@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "date": "2026-09-21T07:45:14.766Z",
+  "baseline": ".local/baseline/20260921074002165-6a5b9c/result.json",
+  "backupTag": "mayday-frontend:before-work-notifications-1789976712121",
+  "oldFrontend": "sha256:c364f03300c7fc42b0fbed694bcfd6d0187c0632373145faef0082858c538373",
+  "newFrontend": "sha256:7194aa0fea3a2c1412ee0553e060977996889c0bf5fa9419a260430cd06c8a84",
+  "backendUnchanged": true,
+  "mysqlUnchanged": true,
+  "httpStatus": 200
+}

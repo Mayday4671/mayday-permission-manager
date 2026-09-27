@@ -1,0 +1,448 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+    - generic: 部门管理
+    - generic: 岗位管理
+    - generic: 字典管理
+    - generic: 参数设置
+  - button "内容全屏":
+  - heading "参数设置" [level=1]
+  - paragraph: 统一管理系统运行参数、登录体验、安全策略与审计策略。支持分组维护、内置保护、缓存刷新与按键名读取，便于后续业务模块复用。
+  - generic: 缓存项：23
+  - generic: 分组数：7
+  - generic: 最近刷新：2026-08-12 14:00:00
+  - generic: 参数总量
+  - generic: "24"
+  - generic: 包括内置参数与业务扩展参数
+  - generic: 启用参数
+  - generic: "23"
+  - generic: 当前会参与读取和缓存的有效参数
+  - generic: 内置参数
+  - generic: "16"
+  - generic: 平台基础参数，建议谨慎修改
+  - generic: 参数分组
+  - generic: "7"
+  - generic: 可按业务域划分不同配置命名空间
+  - generic: 关键词
+  - textbox "关键词":
+    - /placeholder: 请输入参数名称、键名或备注
+  - generic: 分组
+  - combobox "分组"
+  - generic: 请选择分组
+  - generic: 参数类型
+  - combobox "参数类型"
+  - generic: 请选择参数类型
+  - button "重置":
+    - generic: 重置
+  - button "查询":
+    - generic: 查询
+  - button "新增参数":
+    - generic: 新增参数
+  - button "批量删除" [disabled]:
+    - generic: 批量删除
+  - button "刷新缓存":
+    - generic: 刷新缓存
+  - generic: 当前页 10 条
+  - generic: 全部分组
+  - generic: 基础配置 (5)
+  - generic: 界面设置 (3)
+  - generic: 安全策略 (5)
+  - generic: 账号设置 (2)
+  - generic: 通知设置 (3)
+  - generic: 文件设置 (3)
+  - generic: 审计策略 (3)
+  - button:
+  - button "专注模式":
+    - generic: 专注模式
+  - table:
+    - rowgroup:
+      - row "序号 参数名称 参数键名 分组 类型 当前值 状态 属性 最后更新 更新人 操作":
+        - columnheader:
+          - checkbox
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "参数名称":
+          - generic: 参数名称
+        - columnheader "参数键名":
+          - generic: 参数键名
+        - columnheader "分组":
+          - generic: 分组
+        - columnheader "类型":
+          - generic: 类型
+        - columnheader "当前值":
+          - generic: 当前值
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "属性":
+          - generic: 属性
+        - columnheader "最后更新":
+          - generic: 最后更新
+        - columnheader "更新人":
+          - generic: 更新人
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 系统名称 app.name 基础配置 单行文本 Art Design Pro X 启用 内置 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox [disabled]
+        - cell "1":
+          - generic: "1"
+        - cell "系统名称":
+          - generic: 系统名称
+        - cell "app.name":
+          - generic: app.name
+        - cell "基础配置":
+          - generic: 基础配置
+        - cell "单行文本":
+          - generic: 单行文本
+        - cell "Art Design Pro X":
+          - generic "Art Design Pro X"
+        - cell "启用":
+          - generic: 启用
+        - cell "内置":
+          - generic: 内置
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+      - row "2 本地数据模式 app.demoMode 基础配置 布尔值 true 启用 内置 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox [disabled]
+        - cell "2":
+          - generic: "2"
+        - cell "本地数据模式":
+          - generic: 本地数据模式
+        - cell "app.demoMode":
+          - generic: app.demoMode
+        - cell "基础配置":
+          - generic: 基础配置
+        - cell "布尔值":
+          - generic: 布尔值
+        - cell "true":
+          - generic "true"
+        - cell "启用":
+          - generic: 启用
+        - cell "内置":
+          - generic: 内置
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+      - row "3 默认语言 app.defaultLanguage 基础配置 单行文本 zh-CN 启用 内置 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox [disabled]
+        - cell "3":
+          - generic: "3"
+        - cell "默认语言":
+          - generic: 默认语言
+        - cell "app.defaultLanguage":
+          - generic: app.defaultLanguage
+        - cell "基础配置":
+          - generic: 基础配置
+        - cell "单行文本":
+          - generic: 单行文本
+        - cell "zh-CN":
+          - generic "zh-CN"
+        - cell "启用":
+          - generic: 启用
+        - cell "内置":
+          - generic: 内置
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+      - row "4 默认时区 app.timeZone 基础配置 单行文本 Asia/Shanghai 启用 内置 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox [disabled]
+        - cell "4":
+          - generic: "4"
+        - cell "默认时区":
+          - generic: 默认时区
+        - cell "app.timeZone":
+          - generic: app.timeZone
+        - cell "基础配置":
+          - generic: 基础配置
+        - cell "单行文本":
+          - generic: 单行文本
+        - cell "Asia/Shanghai":
+          - generic "Asia/Shanghai"
+        - cell "启用":
+          - generic: 启用
+        - cell "内置":
+          - generic: 内置
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+      - row "5 每页默认条数 table.defaultPageSize 界面设置 数字 20 启用 内置 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox [disabled]
+        - cell "5":
+          - generic: "5"
+        - cell "每页默认条数":
+          - generic: 每页默认条数
+        - cell "table.defaultPageSize":
+          - generic: table.defaultPageSize
+        - cell "界面设置":
+          - generic: 界面设置
+        - cell "数字":
+          - generic: 数字
+        - cell "20":
+          - generic "20"
+        - cell "启用":
+          - generic: 启用
+        - cell "内置":
+          - generic: 内置
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+      - row "6 标签页最大数量 tabs.maxCount 界面设置 数字 12 启用 自定义 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox
+        - cell "6":
+          - generic: "6"
+        - cell "标签页最大数量":
+          - generic: 标签页最大数量
+        - cell "tabs.maxCount":
+          - generic: tabs.maxCount
+        - cell "界面设置":
+          - generic: 界面设置
+        - cell "数字":
+          - generic: 数字
+        - cell "12":
+          - generic "12"
+        - cell "启用":
+          - generic: 启用
+        - cell "自定义":
+          - generic: 自定义
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+      - row "7 侧边栏默认折叠 layout.sidebarCollapsed 界面设置 布尔值 false 启用 自定义 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox
+        - cell "7":
+          - generic: "7"
+        - cell "侧边栏默认折叠":
+          - generic: 侧边栏默认折叠
+        - cell "layout.sidebarCollapsed":
+          - generic: layout.sidebarCollapsed
+        - cell "界面设置":
+          - generic: 界面设置
+        - cell "布尔值":
+          - generic: 布尔值
+        - cell "false":
+          - generic "false"
+        - cell "启用":
+          - generic: 启用
+        - cell "自定义":
+          - generic: 自定义
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+      - row "8 启用水印 security.watermarkEnabled 安全策略 布尔值 true 启用 内置 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox [disabled]
+        - cell "8":
+          - generic: "8"
+        - cell "启用水印":
+          - generic: 启用水印
+        - cell "security.watermarkEnabled":
+          - generic: security.watermarkEnabled
+        - cell "安全策略":
+          - generic: 安全策略
+        - cell "布尔值":
+          - generic: 布尔值
+        - cell "true":
+          - generic "true"
+        - cell "启用":
+          - generic: 启用
+        - cell "内置":
+          - generic: 内置
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+      - row "9 登录失败锁定次数 security.loginMaxRetries 安全策略 数字 5 启用 内置 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox [disabled]
+        - cell "9":
+          - generic: "9"
+        - cell "登录失败锁定次数":
+          - generic: 登录失败锁定次数
+        - cell "security.loginMaxRetries":
+          - generic: security.loginMaxRetries
+        - cell "安全策略":
+          - generic: 安全策略
+        - cell "数字":
+          - generic: 数字
+        - cell "5":
+          - generic "5"
+        - cell "启用":
+          - generic: 启用
+        - cell "内置":
+          - generic: 内置
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+      - row "10 登录锁定时长 security.lockMinutes 安全策略 数字 10 启用 内置 2026-08-05 09:00:00 Super":
+        - cell:
+          - checkbox [disabled]
+        - cell "10":
+          - generic: "10"
+        - cell "登录锁定时长":
+          - generic: 登录锁定时长
+        - cell "security.lockMinutes":
+          - generic: security.lockMinutes
+        - cell "安全策略":
+          - generic: 安全策略
+        - cell "数字":
+          - generic: 数字
+        - cell "10":
+          - generic "10"
+        - cell "启用":
+          - generic: 启用
+        - cell "内置":
+          - generic: 内置
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "Super":
+          - generic: Super
+        - cell:
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+    - listitem "第 2 页": "2"
+    - listitem "第 3 页": "3"
+  - button "下一页":
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页
+  - generic: 共 24 条
+  - dialog "新增参数":
+    - heading "新增参数" [level=2]
+    - button "关闭此对话框":
+    - generic: 参数信息
+    - paragraph: 配置键名、分组和值内容，保存后可刷新缓存使新值生效。
+    - generic: 自定义参数
+    - generic: 基础信息
+    - generic: "*参数名称"
+    - textbox "*参数名称":
+      - /placeholder: 例如：密码最小长度
+    - generic: 参数键名
+    - textbox "参数键名":
+      - /placeholder: 例如：security.password.min_length
+    - generic: 分组编码
+    - textbox "分组编码":
+      - /placeholder: 例如：security
+    - generic: "*分组名称"
+    - textbox "*分组名称":
+      - /placeholder: 例如：安全策略
+    - generic: "*参数类型"
+    - combobox "*参数类型"
+    - generic: 单行文本
+    - generic: 排序
+    - button "减少数值":
+    - button "增加数值":
+    - spinbutton "排序": "1"
+    - generic: 状态与内容
+    - generic: 状态
+    - switch "状态" [checked]
+    - generic: 内置参数
+    - switch "内置参数"
+    - generic: 默认值
+    - textbox "默认值":
+      - /placeholder: 可选，用于记录兜底值或回滚基线
+    - generic: 参数值
+    - textbox "参数值":
+      - /placeholder: 请输入参数值
+    - generic: 扩展配置
+    - textbox "扩展配置":
+      - /placeholder: 可选，支持 JSON 对象，如下拉选项、说明元数据等
+    - generic: 0 / 5000
+    - generic: 备注
+    - textbox "备注":
+      - /placeholder: 请输入参数用途、影响范围或维护说明
+    - generic: 0 / 255
+    - complementary:
+      - generic: 配置预览
+      - term: 键名
+      - definition: "-"
+      - term: 分组
+      - definition: "-"
+      - term: 类型
+      - definition: 单行文本
+      - term: 状态
+      - definition: 启用
+      - term: 值预览
+      - definition: "-"
+      - generic: 维护建议
+      - list:
+        - listitem: 键名建议采用“业务域.模块.字段”的层级命名。
+        - listitem: 内置参数用于平台底层策略，建议限制删除和变更范围。
+        - listitem: JSON 类型可承载复杂配置，但需要保持结构稳定。
+        - listitem: 修改完成后建议执行一次缓存刷新，确保新值及时生效。
+    - button "取消":
+      - generic: 取消
+    - button "保存":
+      - generic: 保存

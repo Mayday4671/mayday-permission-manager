@@ -1,0 +1,692 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+  - button "内容全屏":
+  - button "新增角色":
+    - generic: 新增角色
+  - button:
+  - table:
+    - rowgroup:
+      - row "角色ID 角色名称 角色编码 角色描述 角色状态 创建日期 编辑日期 操作":
+        - columnheader "角色ID":
+          - generic: 角色ID
+        - columnheader "角色名称":
+          - generic: 角色名称
+        - columnheader "角色编码":
+          - generic: 角色编码
+        - columnheader "角色描述":
+          - generic: 角色描述
+        - columnheader "角色状态":
+          - generic: 角色状态
+        - columnheader "创建日期":
+          - generic: 创建日期
+        - columnheader "编辑日期":
+          - generic: 编辑日期
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 超级管理员 R_SUPER 拥有系统全部页面权限 启用 2023-01-10 09:00:00 2026-07-10 16:20:00":
+        - cell "1":
+          - generic: "1"
+        - cell "超级管理员":
+          - generic: 超级管理员
+        - cell "R_SUPER":
+          - generic: R_SUPER
+        - cell "拥有系统全部页面权限":
+          - generic: 拥有系统全部页面权限
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-01-10 09:00:00":
+          - generic: 2023-01-10 09:00:00
+        - cell "2026-07-10 16:20:00":
+          - generic: 2026-07-10 16:20:00
+        - cell:
+          - button:
+      - row "2 运营人员 R_OPERATOR 负责内容、活动与日常运营 启用 2023-02-10 09:00:00 2026-07-11 16:20:00":
+        - cell "2":
+          - generic: "2"
+        - cell "运营人员":
+          - generic: 运营人员
+        - cell "R_OPERATOR":
+          - generic: R_OPERATOR
+        - cell "负责内容、活动与日常运营":
+          - generic: 负责内容、活动与日常运营
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-02-10 09:00:00":
+          - generic: 2023-02-10 09:00:00
+        - cell "2026-07-11 16:20:00":
+          - generic: 2026-07-11 16:20:00
+        - cell:
+          - button:
+      - row "3 部门管理员 R_DEPT_ADMIN 管理本部门成员与业务数据 启用 2023-03-10 09:00:00 2026-07-12 16:20:00":
+        - cell "3":
+          - generic: "3"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "R_DEPT_ADMIN":
+          - generic: R_DEPT_ADMIN
+        - cell "管理本部门成员与业务数据":
+          - generic: 管理本部门成员与业务数据
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-03-10 09:00:00":
+          - generic: 2023-03-10 09:00:00
+        - cell "2026-07-12 16:20:00":
+          - generic: 2026-07-12 16:20:00
+        - cell:
+          - button:
+      - row "4 普通员工 R_EMPLOYEE 访问个人工作台和授权模块 启用 2023-04-10 09:00:00 2026-07-13 16:20:00":
+        - cell "4":
+          - generic: "4"
+        - cell "普通员工":
+          - generic: 普通员工
+        - cell "R_EMPLOYEE":
+          - generic: R_EMPLOYEE
+        - cell "访问个人工作台和授权模块":
+          - generic: 访问个人工作台和授权模块
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-04-10 09:00:00":
+          - generic: 2023-04-10 09:00:00
+        - cell "2026-07-13 16:20:00":
+          - generic: 2026-07-13 16:20:00
+        - cell:
+          - button:
+      - row "5 安全审计员 R_AUDITOR 查看安全审计与运行日志 启用 2023-05-10 09:00:00 2026-07-14 16:20:00":
+        - cell "5":
+          - generic: "5"
+        - cell "安全审计员":
+          - generic: 安全审计员
+        - cell "R_AUDITOR":
+          - generic: R_AUDITOR
+        - cell "查看安全审计与运行日志":
+          - generic: 查看安全审计与运行日志
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-05-10 09:00:00":
+          - generic: 2023-05-10 09:00:00
+        - cell "2026-07-14 16:20:00":
+          - generic: 2026-07-14 16:20:00
+        - cell:
+          - button:
+      - row "6 财务人员 R_FINANCE 访问财务流程与经营数据 启用 2023-06-10 09:00:00 2026-07-15 16:20:00":
+        - cell "6":
+          - generic: "6"
+        - cell "财务人员":
+          - generic: 财务人员
+        - cell "R_FINANCE":
+          - generic: R_FINANCE
+        - cell "访问财务流程与经营数据":
+          - generic: 访问财务流程与经营数据
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-06-10 09:00:00":
+          - generic: 2023-06-10 09:00:00
+        - cell "2026-07-15 16:20:00":
+          - generic: 2026-07-15 16:20:00
+        - cell:
+          - button:
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+  - button "下一页" [disabled]:
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页
+  - generic: 共 6 条
+  - dialog "权限配置":
+    - heading "权限配置" [level=2]
+    - button "关闭此对话框":
+    - tree:
+      - treeitem "仪表盘" [expanded]:
+        - checkbox
+        - generic: 仪表盘
+        - treeitem "分析看板" [expanded]:
+          - checkbox
+          - generic: 分析看板
+        - treeitem "人力资源" [expanded]:
+          - checkbox
+          - generic: 人力资源
+        - treeitem "工作台" [expanded]:
+          - checkbox
+          - generic: 工作台
+        - treeitem "分析页" [expanded]:
+          - checkbox
+          - generic: 分析页
+        - treeitem "电子商务" [expanded]:
+          - checkbox
+          - generic: 电子商务
+        - treeitem "职位仪表盘" [expanded]:
+          - checkbox
+          - generic: 职位仪表盘
+        - treeitem "销售看板" [expanded]:
+          - checkbox
+          - generic: 销售看板
+        - treeitem "客户关系" [expanded]:
+          - checkbox
+          - generic: 客户关系
+        - treeitem "社交媒体" [expanded]:
+          - checkbox
+          - generic: 社交媒体
+        - treeitem "加密货币" [expanded]:
+          - checkbox
+          - generic: 加密货币
+      - treeitem "数据大屏" [expanded]:
+        - checkbox
+        - generic: 数据大屏
+        - treeitem "销售数据大屏" [expanded]:
+          - checkbox
+          - generic: 销售数据大屏
+        - treeitem "SaaS 数据中心大屏" [expanded]:
+          - checkbox
+          - generic: SaaS 数据中心大屏
+        - treeitem "电商运营大屏" [expanded]:
+          - checkbox
+          - generic: 电商运营大屏
+        - treeitem "运营数据大屏" [expanded]:
+          - checkbox
+          - generic: 运营数据大屏
+        - treeitem "工厂生产监控大屏" [expanded]:
+          - checkbox
+          - generic: 工厂生产监控大屏
+      - treeitem "模板中心" [expanded]:
+        - checkbox
+        - generic: 模板中心
+        - treeitem "卡片" [expanded]:
+          - checkbox
+          - generic: 卡片
+        - treeitem "横幅" [expanded]:
+          - checkbox
+          - generic: 横幅
+        - treeitem "图表" [expanded]:
+          - checkbox
+          - generic: 图表
+        - treeitem "聊天" [expanded]:
+          - checkbox
+          - generic: 聊天
+        - treeitem "日历" [expanded]:
+          - checkbox
+          - generic: 日历
+      - treeitem "组件中心" [expanded]:
+        - checkbox
+        - generic: 组件中心
+        - treeitem "图标" [expanded]:
+          - checkbox
+          - generic: 图标
+        - treeitem "图像裁剪" [expanded]:
+          - checkbox
+          - generic: 图像裁剪
+        - treeitem "Excel 导入导出" [expanded]:
+          - checkbox
+          - generic: Excel 导入导出
+        - treeitem "视频播放器" [expanded]:
+          - checkbox
+          - generic: 视频播放器
+        - treeitem "数字滚动" [expanded]:
+          - checkbox
+          - generic: 数字滚动
+        - treeitem "富文本编辑器" [expanded]:
+          - checkbox
+          - generic: 富文本编辑器
+        - treeitem "水印" [expanded]:
+          - checkbox
+          - generic: 水印
+        - treeitem "右键菜单" [expanded]:
+          - checkbox
+          - generic: 右键菜单
+        - treeitem "数据选择器" [expanded]:
+          - checkbox
+          - generic: 数据选择器
+        - treeitem "资源选择器" [expanded]:
+          - checkbox
+          - generic: 资源选择器
+        - treeitem "二维码" [expanded]:
+          - checkbox
+          - generic: 二维码
+        - treeitem "拖拽" [expanded]:
+          - checkbox
+          - generic: 拖拽
+        - treeitem "文字滚动" [expanded]:
+          - checkbox
+          - generic: 文字滚动
+        - treeitem "礼花" [expanded]:
+          - checkbox
+          - generic: 礼花
+        - treeitem "组件总览" [expanded]:
+          - checkbox
+          - generic: 组件总览
+      - treeitem "系统管理" [expanded]:
+        - checkbox
+        - generic: 系统管理
+        - treeitem "用户管理" [expanded]:
+          - checkbox
+          - generic: 用户管理
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+        - treeitem "角色管理" [expanded]:
+          - checkbox
+          - generic: 角色管理
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+          - treeitem "授权" [expanded]:
+            - checkbox
+            - generic: 授权
+        - treeitem "部门管理" [expanded]:
+          - checkbox
+          - generic: 部门管理
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+        - treeitem "岗位管理" [expanded]:
+          - checkbox
+          - generic: 岗位管理
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+        - treeitem "字典管理" [expanded]:
+          - checkbox
+          - generic: 字典管理
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+        - treeitem "参数设置" [expanded]:
+          - checkbox
+          - generic: 参数设置
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+          - treeitem "刷新缓存" [expanded]:
+            - checkbox
+            - generic: 刷新缓存
+        - treeitem "个人中心" [expanded]:
+          - checkbox
+          - generic: 个人中心
+        - treeitem "菜单管理" [expanded]:
+          - checkbox
+          - generic: 菜单管理
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+        - treeitem "操作日志" [expanded]:
+          - checkbox
+          - generic: 操作日志
+        - treeitem "登录日志" [expanded]:
+          - checkbox
+          - generic: 登录日志
+        - treeitem "用户统计" [expanded]:
+          - checkbox
+          - generic: 用户统计
+        - treeitem "网站配置" [expanded]:
+          - checkbox
+          - generic: 网站配置
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+      - treeitem "系统监控" [expanded]:
+        - checkbox
+        - generic: 系统监控
+        - treeitem "监控总览" [expanded]:
+          - checkbox
+          - generic: 监控总览
+        - treeitem "在线用户" [expanded]:
+          - checkbox
+          - generic: 在线用户
+          - treeitem "查看" [expanded]:
+            - checkbox
+            - generic: 查看
+          - treeitem "强制下线" [expanded]:
+            - checkbox
+            - generic: 强制下线
+        - treeitem "服务器监控" [expanded]:
+          - checkbox
+          - generic: 服务器监控
+        - treeitem "缓存监控" [expanded]:
+          - checkbox
+          - generic: 缓存监控
+          - treeitem "查看" [expanded]:
+            - checkbox
+            - generic: 查看
+          - treeitem "刷新" [expanded]:
+            - checkbox
+            - generic: 刷新
+        - treeitem "安全审计" [expanded]:
+          - checkbox
+          - generic: 安全审计
+          - treeitem "查看" [expanded]:
+            - checkbox
+            - generic: 查看
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+      - treeitem "通知中心" [expanded]:
+        - checkbox
+        - generic: 通知中心
+        - treeitem "通知管理" [expanded]:
+          - checkbox
+          - generic: 通知管理
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "复制" [expanded]:
+            - checkbox
+            - generic: 复制
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+          - treeitem "发布" [expanded]:
+            - checkbox
+            - generic: 发布
+          - treeitem "撤回" [expanded]:
+            - checkbox
+            - generic: 撤回
+          - treeitem "查看" [expanded]:
+            - checkbox
+            - generic: 查看
+        - treeitem "通知收件箱" [expanded]:
+          - checkbox
+          - generic: 通知收件箱
+        - treeitem "通知详情" [expanded]:
+          - checkbox
+          - generic: 通知详情
+      - treeitem "任务调度" [expanded]:
+        - checkbox
+        - generic: 任务调度
+        - treeitem "定时任务" [expanded]:
+          - checkbox
+          - generic: 定时任务
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+          - treeitem "执行" [expanded]:
+            - checkbox
+            - generic: 执行
+          - treeitem "启停" [expanded]:
+            - checkbox
+            - generic: 启停
+          - treeitem "查看" [expanded]:
+            - checkbox
+            - generic: 查看
+        - treeitem "任务日志" [expanded]:
+          - checkbox
+          - generic: 任务日志
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+          - treeitem "清空" [expanded]:
+            - checkbox
+            - generic: 清空
+          - treeitem "查看" [expanded]:
+            - checkbox
+            - generic: 查看
+      - treeitem "审批中心" [expanded]:
+        - checkbox
+        - generic: 审批中心
+        - treeitem "流程分类" [expanded]:
+          - checkbox
+          - generic: 流程分类
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+        - treeitem "流程设计" [expanded]:
+          - checkbox
+          - generic: 流程设计
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "校验" [expanded]:
+            - checkbox
+            - generic: 校验
+          - treeitem "状态切换" [expanded]:
+            - checkbox
+            - generic: 状态切换
+          - treeitem "复制" [expanded]:
+            - checkbox
+            - generic: 复制
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+        - treeitem "流程设计器" [expanded]:
+          - checkbox
+          - generic: 流程设计器
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "校验" [expanded]:
+            - checkbox
+            - generic: 校验
+        - treeitem "申请管理" [expanded]:
+          - checkbox
+          - generic: 申请管理
+          - treeitem "发起" [expanded]:
+            - checkbox
+            - generic: 发起
+          - treeitem "撤销" [expanded]:
+            - checkbox
+            - generic: 撤销
+          - treeitem "查看" [expanded]:
+            - checkbox
+            - generic: 查看
+        - treeitem "审批待办" [expanded]:
+          - checkbox
+          - generic: 审批待办
+          - treeitem "审批通过" [expanded]:
+            - checkbox
+            - generic: 审批通过
+          - treeitem "审批驳回" [expanded]:
+            - checkbox
+            - generic: 审批驳回
+          - treeitem "审批评论" [expanded]:
+            - checkbox
+            - generic: 审批评论
+          - treeitem "审批转交" [expanded]:
+            - checkbox
+            - generic: 审批转交
+          - treeitem "审批加签" [expanded]:
+            - checkbox
+            - generic: 审批加签
+          - treeitem "查看" [expanded]:
+            - checkbox
+            - generic: 查看
+      - treeitem "内容管理" [expanded]:
+        - checkbox
+        - generic: 内容管理
+        - treeitem "内容中心" [expanded]:
+          - checkbox
+          - generic: 内容中心
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+          - treeitem "发布" [expanded]:
+            - checkbox
+            - generic: 发布
+          - treeitem "下线" [expanded]:
+            - checkbox
+            - generic: 下线
+          - treeitem "预览" [expanded]:
+            - checkbox
+            - generic: 预览
+        - treeitem "内容详情" [expanded]:
+          - checkbox
+          - generic: 内容详情
+        - treeitem "内容分类" [expanded]:
+          - checkbox
+          - generic: 内容分类
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+        - treeitem "标签管理" [expanded]:
+          - checkbox
+          - generic: 标签管理
+          - treeitem "新增" [expanded]:
+            - checkbox
+            - generic: 新增
+          - treeitem "编辑" [expanded]:
+            - checkbox
+            - generic: 编辑
+          - treeitem "删除" [expanded]:
+            - checkbox
+            - generic: 删除
+        - treeitem "内容回收站" [expanded]:
+          - checkbox
+          - generic: 内容回收站
+          - treeitem "恢复" [expanded]:
+            - checkbox
+            - generic: 恢复
+          - treeitem "彻底删除" [expanded]:
+            - checkbox
+            - generic: 彻底删除
+      - treeitem "结果页面" [expanded]:
+        - checkbox
+        - generic: 结果页面
+        - treeitem "成功页" [expanded]:
+          - checkbox
+          - generic: 成功页
+        - treeitem "失败页" [expanded]:
+          - checkbox
+          - generic: 失败页
+      - treeitem "异常页面" [expanded]:
+        - checkbox
+        - generic: 异常页面
+        - treeitem "403" [expanded]:
+          - checkbox
+          - generic: "403"
+        - treeitem "404" [expanded]:
+          - checkbox
+          - generic: "404"
+        - treeitem "500" [expanded]:
+          - checkbox
+          - generic: "500"
+      - treeitem "更新日志" [expanded]:
+        - checkbox
+        - generic: 更新日志
+    - button "全部收起" [active]:
+      - generic: 全部收起
+    - button "全部选择":
+      - generic: 全部选择
+    - button "保存":
+      - generic: 保存

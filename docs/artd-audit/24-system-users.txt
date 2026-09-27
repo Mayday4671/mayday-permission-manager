@@ -1,0 +1,594 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价" [active]
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 系统管理
+      - generic: /
+      - generic: 用户管理
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+  - button "内容全屏":
+  - generic: 用户名
+  - textbox "用户名":
+    - /placeholder: 请输入用户名
+  - generic: 姓名
+  - textbox "姓名":
+    - /placeholder: 请输入姓名
+  - generic: 手机号
+  - textbox "手机号":
+    - /placeholder: 请输入手机号
+  - button "重置":
+    - generic: 重置
+  - button "查询":
+    - generic: 查询
+  - generic: 展开
+  - button "新增用户":
+    - generic: 新增用户
+  - button:
+  - table:
+    - rowgroup:
+      - row "序号 用户名筛选 姓名 性别 手机号筛选 关联角色筛选 所属部门 所属岗位 创建日期 更新日期 操作":
+        - columnheader:
+          - checkbox
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "用户名筛选":
+          - button "用户名筛选":
+            - generic: 用户名
+        - columnheader "姓名":
+          - generic: 姓名
+        - columnheader "性别":
+          - generic: 性别
+        - columnheader "手机号筛选":
+          - button "手机号筛选":
+            - generic: 手机号
+        - columnheader "关联角色筛选":
+          - button "关联角色筛选":
+            - generic: 关联角色
+        - columnheader "所属部门":
+          - generic: 所属部门
+        - columnheader "所属岗位":
+          - generic: 所属岗位
+        - columnheader "创建日期":
+          - generic: 创建日期
+        - columnheader "更新日期":
+          - generic: 更新日期
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 Super 周明远 男 16600001201 超级管理员 星河数字科技 部门负责人 2023-01-05 09:10:00 2026-07-01 10:20:00":
+        - cell:
+          - checkbox
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "周明远":
+          - generic: 周明远
+        - cell "男":
+          - generic: 男
+        - cell "16600001201":
+          - generic: "16600001201"
+        - cell "超级管理员":
+          - generic: 超级管理员
+        - cell "星河数字科技":
+          - generic: 星河数字科技
+        - cell "部门负责人":
+          - generic: 部门负责人
+        - cell "2023-01-05 09:10:00":
+          - generic: 2023-01-05 09:10:00
+        - cell "2026-07-01 10:20:00":
+          - generic: 2026-07-01 10:20:00
+        - cell:
+      - row "2 lin.zhixia 林知夏 女 16600001202 部门管理员 产品中心 部门负责人 2024-02-06 09:11:00 2026-07-02 11:20:00":
+        - cell:
+          - checkbox
+        - cell "2":
+          - generic: "2"
+        - cell "lin.zhixia":
+          - generic: lin.zhixia
+        - cell "林知夏":
+          - generic: 林知夏
+        - cell "女":
+          - generic: 女
+        - cell "16600001202":
+          - generic: "16600001202"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "产品中心":
+          - generic: 产品中心
+        - cell "部门负责人":
+          - generic: 部门负责人
+        - cell "2024-02-06 09:11:00":
+          - generic: 2024-02-06 09:11:00
+        - cell "2026-07-02 11:20:00":
+          - generic: 2026-07-02 11:20:00
+        - cell:
+      - row "3 luo.yi 罗一 男 16600001203 运营人员 产品中心 产品经理 2025-03-07 09:12:00 2026-07-03 12:20:00":
+        - cell:
+          - checkbox
+        - cell "3":
+          - generic: "3"
+        - cell "luo.yi":
+          - generic: luo.yi
+        - cell "罗一":
+          - generic: 罗一
+        - cell "男":
+          - generic: 男
+        - cell "16600001203":
+          - generic: "16600001203"
+        - cell "运营人员":
+          - generic: 运营人员
+        - cell "产品中心":
+          - generic: 产品中心
+        - cell "产品经理":
+          - generic: 产品经理
+        - cell "2025-03-07 09:12:00":
+          - generic: 2025-03-07 09:12:00
+        - cell "2026-07-03 12:20:00":
+          - generic: 2026-07-03 12:20:00
+        - cell:
+      - row "4 jiang.wan 江晚 女 16600001204 普通员工 产品中心 UI/UX 设计师 2023-04-08 09:13:00 2026-07-04 13:20:00":
+        - cell:
+          - checkbox
+        - cell "4":
+          - generic: "4"
+        - cell "jiang.wan":
+          - generic: jiang.wan
+        - cell "江晚":
+          - generic: 江晚
+        - cell "女":
+          - generic: 女
+        - cell "16600001204":
+          - generic: "16600001204"
+        - cell "普通员工":
+          - generic: 普通员工
+        - cell "产品中心":
+          - generic: 产品中心
+        - cell "UI/UX 设计师":
+          - generic: UI/UX 设计师
+        - cell "2023-04-08 09:13:00":
+          - generic: 2023-04-08 09:13:00
+        - cell "2026-07-04 13:20:00":
+          - generic: 2026-07-04 13:20:00
+        - cell:
+      - row "5 chen.yu 陈屿 男 16600001205 部门管理员 前端研发部 部门负责人 2024-05-09 09:14:00 2026-07-05 14:20:00":
+        - cell:
+          - checkbox
+        - cell "5":
+          - generic: "5"
+        - cell "chen.yu":
+          - generic: chen.yu
+        - cell "陈屿":
+          - generic: 陈屿
+        - cell "男":
+          - generic: 男
+        - cell "16600001205":
+          - generic: "16600001205"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "前端研发部":
+          - generic: 前端研发部
+        - cell "部门负责人":
+          - generic: 部门负责人
+        - cell "2024-05-09 09:14:00":
+          - generic: 2024-05-09 09:14:00
+        - cell "2026-07-05 14:20:00":
+          - generic: 2026-07-05 14:20:00
+        - cell:
+      - row "6 su.mu 苏沐 女 16600001206 普通员工 前端研发部 前端工程师 2025-06-10 09:15:00 2026-07-06 15:20:00":
+        - cell:
+          - checkbox
+        - cell "6":
+          - generic: "6"
+        - cell "su.mu":
+          - generic: su.mu
+        - cell "苏沐":
+          - generic: 苏沐
+        - cell "女":
+          - generic: 女
+        - cell "16600001206":
+          - generic: "16600001206"
+        - cell "普通员工":
+          - generic: 普通员工
+        - cell "前端研发部":
+          - generic: 前端研发部
+        - cell "前端工程师":
+          - generic: 前端工程师
+        - cell "2025-06-10 09:15:00":
+          - generic: 2025-06-10 09:15:00
+        - cell "2026-07-06 15:20:00":
+          - generic: 2026-07-06 15:20:00
+        - cell:
+      - row "7 fang.zhou 方舟 男 16600001207 普通员工 前端研发部 前端工程师 2023-07-11 09:16:00 2026-07-07 16:20:00":
+        - cell:
+          - checkbox
+        - cell "7":
+          - generic: "7"
+        - cell "fang.zhou":
+          - generic: fang.zhou
+        - cell "方舟":
+          - generic: 方舟
+        - cell "男":
+          - generic: 男
+        - cell "16600001207":
+          - generic: "16600001207"
+        - cell "普通员工":
+          - generic: 普通员工
+        - cell "前端研发部":
+          - generic: 前端研发部
+        - cell "前端工程师":
+          - generic: 前端工程师
+        - cell "2023-07-11 09:16:00":
+          - generic: 2023-07-11 09:16:00
+        - cell "2026-07-07 16:20:00":
+          - generic: 2026-07-07 16:20:00
+        - cell:
+      - row "8 gu.yan 顾言 男 16600001208 部门管理员 后端研发部 部门负责人 2024-08-12 09:17:00 2026-07-08 17:20:00":
+        - cell:
+          - checkbox
+        - cell "8":
+          - generic: "8"
+        - cell "gu.yan":
+          - generic: gu.yan
+        - cell "顾言":
+          - generic: 顾言
+        - cell "男":
+          - generic: 男
+        - cell "16600001208":
+          - generic: "16600001208"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "后端研发部":
+          - generic: 后端研发部
+        - cell "部门负责人":
+          - generic: 部门负责人
+        - cell "2024-08-12 09:17:00":
+          - generic: 2024-08-12 09:17:00
+        - cell "2026-07-08 17:20:00":
+          - generic: 2026-07-08 17:20:00
+        - cell:
+      - row "9 qin.mo 秦墨 男 16600001209 普通员工 后端研发部 后端工程师 2025-09-13 09:18:00 2026-07-09 10:20:00":
+        - cell:
+          - checkbox
+        - cell "9":
+          - generic: "9"
+        - cell "qin.mo":
+          - generic: qin.mo
+        - cell "秦墨":
+          - generic: 秦墨
+        - cell "男":
+          - generic: 男
+        - cell "16600001209":
+          - generic: "16600001209"
+        - cell "普通员工":
+          - generic: 普通员工
+        - cell "后端研发部":
+          - generic: 后端研发部
+        - cell "后端工程师":
+          - generic: 后端工程师
+        - cell "2025-09-13 09:18:00":
+          - generic: 2025-09-13 09:18:00
+        - cell "2026-07-09 10:20:00":
+          - generic: 2026-07-09 10:20:00
+        - cell:
+      - row "10 xia.zhi 夏至 女 16600001210 普通员工 后端研发部 后端工程师 2023-10-14 09:19:00 2026-07-10 11:20:00":
+        - cell:
+          - checkbox
+        - cell "10":
+          - generic: "10"
+        - cell "xia.zhi":
+          - generic: xia.zhi
+        - cell "夏至":
+          - generic: 夏至
+        - cell "女":
+          - generic: 女
+        - cell "16600001210":
+          - generic: "16600001210"
+        - cell "普通员工":
+          - generic: 普通员工
+        - cell "后端研发部":
+          - generic: 后端研发部
+        - cell "后端工程师":
+          - generic: 后端工程师
+        - cell "2023-10-14 09:19:00":
+          - generic: 2023-10-14 09:19:00
+        - cell "2026-07-10 11:20:00":
+          - generic: 2026-07-10 11:20:00
+        - cell:
+      - row "11 xu.anran 许安然 女 16600001211 部门管理员 质量保障部 部门负责人 2024-01-15 09:20:00 2026-07-11 12:20:00":
+        - cell:
+          - checkbox
+        - cell "11":
+          - generic: "11"
+        - cell "xu.anran":
+          - generic: xu.anran
+        - cell "许安然":
+          - generic: 许安然
+        - cell "女":
+          - generic: 女
+        - cell "16600001211":
+          - generic: "16600001211"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "质量保障部":
+          - generic: 质量保障部
+        - cell "部门负责人":
+          - generic: 部门负责人
+        - cell "2024-01-15 09:20:00":
+          - generic: 2024-01-15 09:20:00
+        - cell "2026-07-11 12:20:00":
+          - generic: 2026-07-11 12:20:00
+        - cell:
+      - row "12 han.xu 韩旭 男 16600001212 普通员工 质量保障部 测试工程师 2025-02-16 09:21:00 2026-07-12 13:20:00":
+        - cell:
+          - checkbox
+        - cell "12":
+          - generic: "12"
+        - cell "han.xu":
+          - generic: han.xu
+        - cell "韩旭":
+          - generic: 韩旭
+        - cell "男":
+          - generic: 男
+        - cell "16600001212":
+          - generic: "16600001212"
+        - cell "普通员工":
+          - generic: 普通员工
+        - cell "质量保障部":
+          - generic: 质量保障部
+        - cell "测试工程师":
+          - generic: 测试工程师
+        - cell "2025-02-16 09:21:00":
+          - generic: 2025-02-16 09:21:00
+        - cell "2026-07-12 13:20:00":
+          - generic: 2026-07-12 13:20:00
+        - cell:
+      - row "13 he.chuan 贺川 男 16600001213 部门管理员 平台运维部 部门负责人 2023-03-17 09:22:00 2026-07-13 14:20:00":
+        - cell:
+          - checkbox
+        - cell "13":
+          - generic: "13"
+        - cell "he.chuan":
+          - generic: he.chuan
+        - cell "贺川":
+          - generic: 贺川
+        - cell "男":
+          - generic: 男
+        - cell "16600001213":
+          - generic: "16600001213"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "平台运维部":
+          - generic: 平台运维部
+        - cell "部门负责人":
+          - generic: 部门负责人
+        - cell "2023-03-17 09:22:00":
+          - generic: 2023-03-17 09:22:00
+        - cell "2026-07-13 14:20:00":
+          - generic: 2026-07-13 14:20:00
+        - cell:
+      - row "14 yan.qing 严青 女 16600001214 安全审计员 平台运维部 运维工程师 2024-04-18 09:23:00 2026-07-14 15:20:00":
+        - cell:
+          - checkbox
+        - cell "14":
+          - generic: "14"
+        - cell "yan.qing":
+          - generic: yan.qing
+        - cell "严青":
+          - generic: 严青
+        - cell "女":
+          - generic: 女
+        - cell "16600001214":
+          - generic: "16600001214"
+        - cell "安全审计员":
+          - generic: 安全审计员
+        - cell "平台运维部":
+          - generic: 平台运维部
+        - cell "运维工程师":
+          - generic: 运维工程师
+        - cell "2024-04-18 09:23:00":
+          - generic: 2024-04-18 09:23:00
+        - cell "2026-07-14 15:20:00":
+          - generic: 2026-07-14 15:20:00
+        - cell:
+      - row "15 shen.qinghe 沈清禾 女 16600001215 部门管理员 品牌市场部 部门负责人 2025-05-19 09:24:00 2026-07-15 16:20:00":
+        - cell:
+          - checkbox
+        - cell "15":
+          - generic: "15"
+        - cell "shen.qinghe":
+          - generic: shen.qinghe
+        - cell "沈清禾":
+          - generic: 沈清禾
+        - cell "女":
+          - generic: 女
+        - cell "16600001215":
+          - generic: "16600001215"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "品牌市场部":
+          - generic: 品牌市场部
+        - cell "部门负责人":
+          - generic: 部门负责人
+        - cell "2025-05-19 09:24:00":
+          - generic: 2025-05-19 09:24:00
+        - cell "2026-07-15 16:20:00":
+          - generic: 2026-07-15 16:20:00
+        - cell:
+      - row "16 meng.yao 孟遥 男 16600001216 运营人员 品牌市场部 品牌市场经理 2023-06-20 09:25:00 2026-07-16 17:20:00":
+        - cell:
+          - checkbox
+        - cell "16":
+          - generic: "16"
+        - cell "meng.yao":
+          - generic: meng.yao
+        - cell "孟遥":
+          - generic: 孟遥
+        - cell "男":
+          - generic: 男
+        - cell "16600001216":
+          - generic: "16600001216"
+        - cell "运营人员":
+          - generic: 运营人员
+        - cell "品牌市场部":
+          - generic: 品牌市场部
+        - cell "品牌市场经理":
+          - generic: 品牌市场经理
+        - cell "2023-06-20 09:25:00":
+          - generic: 2023-06-20 09:25:00
+        - cell "2026-07-16 17:20:00":
+          - generic: 2026-07-16 17:20:00
+        - cell:
+      - row "17 song.jiahe 宋嘉禾 男 16600001217 部门管理员 用户运营部 部门负责人 2024-07-21 09:26:00 2026-07-17 10:20:00":
+        - cell:
+          - checkbox
+        - cell "17":
+          - generic: "17"
+        - cell "song.jiahe":
+          - generic: song.jiahe
+        - cell "宋嘉禾":
+          - generic: 宋嘉禾
+        - cell "男":
+          - generic: 男
+        - cell "16600001217":
+          - generic: "16600001217"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "用户运营部":
+          - generic: 用户运营部
+        - cell "部门负责人":
+          - generic: 部门负责人
+        - cell "2024-07-21 09:26:00":
+          - generic: 2024-07-21 09:26:00
+        - cell "2026-07-17 10:20:00":
+          - generic: 2026-07-17 10:20:00
+        - cell:
+      - row "18 an.ke 安可 女 16600001218 运营人员 用户运营部 用户运营专员 2025-08-22 09:27:00 2026-07-18 11:20:00":
+        - cell:
+          - checkbox
+        - cell "18":
+          - generic: "18"
+        - cell "an.ke":
+          - generic: an.ke
+        - cell "安可":
+          - generic: 安可
+        - cell "女":
+          - generic: 女
+        - cell "16600001218":
+          - generic: "16600001218"
+        - cell "运营人员":
+          - generic: 运营人员
+        - cell "用户运营部":
+          - generic: 用户运营部
+        - cell "用户运营专员":
+          - generic: 用户运营专员
+        - cell "2025-08-22 09:27:00":
+          - generic: 2025-08-22 09:27:00
+        - cell "2026-07-18 11:20:00":
+          - generic: 2026-07-18 11:20:00
+        - cell:
+      - row "19 tang.yuan 唐予安 男 16600001219 部门管理员 客户成功部 部门负责人 2023-09-05 09:28:00 2026-07-19 12:20:00":
+        - cell:
+          - checkbox
+        - cell "19":
+          - generic: "19"
+        - cell "tang.yuan":
+          - generic: tang.yuan
+        - cell "唐予安":
+          - generic: 唐予安
+        - cell "男":
+          - generic: 男
+        - cell "16600001219":
+          - generic: "16600001219"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "客户成功部":
+          - generic: 客户成功部
+        - cell "部门负责人":
+          - generic: 部门负责人
+        - cell "2023-09-05 09:28:00":
+          - generic: 2023-09-05 09:28:00
+        - cell "2026-07-19 12:20:00":
+          - generic: 2026-07-19 12:20:00
+        - cell:
+      - row "20 qiao.xin 乔欣 女 16600001220 运营人员 客户成功部 客户成功顾问 2024-10-06 09:29:00 2026-07-20 13:20:00":
+        - cell:
+          - checkbox
+        - cell "20":
+          - generic: "20"
+        - cell "qiao.xin":
+          - generic: qiao.xin
+        - cell "乔欣":
+          - generic: 乔欣
+        - cell "女":
+          - generic: 女
+        - cell "16600001220":
+          - generic: "16600001220"
+        - cell "运营人员":
+          - generic: 运营人员
+        - cell "客户成功部":
+          - generic: 客户成功部
+        - cell "客户成功顾问":
+          - generic: 客户成功顾问
+        - cell "2024-10-06 09:29:00":
+          - generic: 2024-10-06 09:29:00
+        - cell "2026-07-20 13:20:00":
+          - generic: 2026-07-20 13:20:00
+        - cell:
+  - generic: 共 24 条
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+    - listitem "第 2 页": "2"
+  - button "下一页":
+  - combobox
+  - generic: 20条/页
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页

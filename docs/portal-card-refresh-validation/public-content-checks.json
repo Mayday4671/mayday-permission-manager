@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "date": "2026-09-21T15:19:47.637Z",
+  "publishedTotal": 4,
+  "categories": [
+    {
+      "id": 27,
+      "name": "产品动态",
+      "count": 1,
+      "isolated": true
+    },
+    {
+      "id": 28,
+      "name": "使用指南",
+      "count": 1,
+      "isolated": true
+    },
+    {
+      "id": 29,
+      "name": "团队故事",
+      "count": 1,
+      "isolated": true
+    },
+    {
+      "id": 30,
+      "name": "公告",
+      "count": 1,
+      "isolated": true
+    }
+  ],
+  "missingCategoryTotal": 0
+}

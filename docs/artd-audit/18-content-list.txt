@@ -1,0 +1,479 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "内容中心":
+      - generic: 内容中心
+    - menuitem "内容分类":
+      - generic: 内容分类
+    - menuitem "标签管理":
+      - generic: 标签管理
+    - menuitem "内容回收站":
+      - generic: 内容回收站
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 内容管理
+      - generic: /
+      - generic: 内容中心
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 内容中心
+  - button "内容全屏":
+  - heading "内容中心" [level=1]
+  - paragraph: 面向商业化项目的通用内容管理模块，覆盖内容策划、编辑、发布、下线与经营监控，支持多频道、多状态、多可见性与 SEO 扩展。
+  - button "新建内容":
+    - generic: 新建内容
+  - button "重置筛选":
+    - generic: 重置筛选
+  - generic: 在线内容
+  - generic: "16"
+  - generic: 当前已对外可见且处于经营中的内容资产
+  - generic: 推荐内容
+  - generic: "7"
+  - generic: 被标记为推荐的高价值内容，可用于首页和专题位
+  - generic: 总浏览
+  - generic: 109,830
+  - generic: 累计沉淀的内容触达规模，适合作为内容经营核心指标
+  - generic: 互动总量
+  - generic: 4,551
+  - generic: 由点赞、评论、收藏构成，反映内容与用户的有效互动
+  - generic: 内容总量
+  - generic: Inventory
+  - generic: "21"
+  - generic: 覆盖全部频道与全部状态
+  - generic: 草稿与审核
+  - generic: Pipeline
+  - generic: "5"
+  - generic: 待编辑与待发布内容池
+  - generic: 置顶内容
+  - generic: Priority
+  - generic: "2"
+  - generic: 用于首页焦点位与重要运营位
+  - generic: 内容互动
+  - generic: Engagement
+  - generic: 1,653
+  - generic: 评论与收藏总和，衡量内容粘性
+  - heading "内容筛选" [level=3]
+  - paragraph: 支持按内容类型、频道、状态、作者和时间范围进行组合检索。
+  - button "全部内容"
+  - button "草稿池"
+  - button "待发布"
+  - button "线上内容"
+  - button "下线内容"
+  - generic: 关键词
+  - textbox "关键词":
+    - /placeholder: 搜索标题 / 摘要 / 别名 / 标签
+  - generic: 内容类型
+  - combobox "内容类型"
+  - generic: 内容类型
+  - generic: 内容分类
+  - combobox "内容分类"
+  - generic: 内容分类
+  - button "重置":
+    - generic: 重置
+  - button "查询":
+    - generic: 查询
+  - generic: 展开
+  - button "新建内容":
+    - generic: 新建内容
+  - generic: 草稿 2
+  - generic: 已发布 16
+  - generic: 已下线 0
+  - button:
+  - button "专注模式":
+    - generic: 专注模式
+  - table:
+    - rowgroup:
+      - row "序号 内容信息 状态 经营数据 时间 操作":
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "内容信息":
+          - generic: 内容信息
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "经营数据":
+          - generic: 经营数据
+        - columnheader "时间":
+          - generic: 时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 未上传封面 Art Design Pro X v1.0.0 开发基线更新 置顶 推荐 新闻 产品动态 产品中心 作者 林知夏 别名 content-001 Art Design Pro X v1.0.0 开发基线更新，结合实际业务场景整理关键步骤、注意事项与可复用经验。 版本更新 产品教程 已发布 公开 浏览 860 点赞 28 评论 6 收藏 12 更新 2026-08-01 09:20:00 发布 2026-07-30 10:20:00 预览 编辑 下线 删除":
+        - cell "1":
+          - generic: "1"
+        - cell "未上传封面 Art Design Pro X v1.0.0 开发基线更新 置顶 推荐 新闻 产品动态 产品中心 作者 林知夏 别名 content-001 Art Design Pro X v1.0.0 开发基线更新，结合实际业务场景整理关键步骤、注意事项与可复用经验。 版本更新 产品教程":
+          - generic: 未上传封面
+          - generic: Art Design Pro X v1.0.0 开发基线更新
+          - generic: 置顶
+          - generic: 推荐
+          - generic: 新闻
+          - generic: 产品动态
+          - generic: 产品中心
+          - generic: 作者 林知夏
+          - generic: 别名 content-001
+          - paragraph: Art Design Pro X v1.0.0 开发基线更新，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: 版本更新
+          - generic: 产品教程
+        - cell "已发布 公开":
+          - generic: 已发布
+          - generic: 公开
+        - cell "浏览 860 点赞 28 评论 6 收藏 12":
+          - generic: 浏览 860
+          - generic: 点赞 28
+          - generic: 评论 6
+          - generic: 收藏 12
+        - cell "更新 2026-08-01 09:20:00 发布 2026-07-30 10:20:00":
+          - generic: 更新 2026-08-01 09:20:00
+          - generic: 发布 2026-07-30 10:20:00
+        - cell "预览 编辑 下线 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "下线":
+            - generic: 下线
+          - button "删除":
+            - generic: 删除
+      - row "2 未上传封面 本地数据模式快速上手指南 帮助中心 使用指南 帮助中心 作者 罗一 别名 content-002 本地数据模式快速上手指南，结合实际业务场景整理关键步骤、注意事项与可复用经验。 新手入门 产品教程 已发布 公开 浏览 1,297 点赞 39 评论 9 收藏 17 更新 2026-08-02 10:20:00 发布 2026-07-29 10:20:00 预览 编辑 下线 删除":
+        - cell "2":
+          - generic: "2"
+        - cell "未上传封面 本地数据模式快速上手指南 帮助中心 使用指南 帮助中心 作者 罗一 别名 content-002 本地数据模式快速上手指南，结合实际业务场景整理关键步骤、注意事项与可复用经验。 新手入门 产品教程":
+          - generic: 未上传封面
+          - generic: 本地数据模式快速上手指南
+          - generic: 帮助中心
+          - generic: 使用指南
+          - generic: 帮助中心
+          - generic: 作者 罗一
+          - generic: 别名 content-002
+          - paragraph: 本地数据模式快速上手指南，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: 新手入门
+          - generic: 产品教程
+        - cell "已发布 公开":
+          - generic: 已发布
+          - generic: 公开
+        - cell "浏览 1,297 点赞 39 评论 9 收藏 17":
+          - generic: 浏览 1,297
+          - generic: 点赞 39
+          - generic: 评论 9
+          - generic: 收藏 17
+        - cell "更新 2026-08-02 10:20:00 发布 2026-07-29 10:20:00":
+          - generic: 更新 2026-08-02 10:20:00
+          - generic: 发布 2026-07-29 10:20:00
+        - cell "预览 编辑 下线 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "下线":
+            - generic: 下线
+          - button "删除":
+            - generic: 删除
+      - row "3 未上传封面 如何将项目接入企业现有 API 帮助中心 使用指南 帮助中心 作者 陈屿 别名 content-003 如何将项目接入企业现有 API，结合实际业务场景整理关键步骤、注意事项与可复用经验。 API 接入 交付指南 已发布 公开 浏览 1,734 点赞 50 评论 12 收藏 22 更新 2026-08-03 11:20:00 发布 2026-07-28 10:20:00 预览 编辑 下线 删除":
+        - cell "3":
+          - generic: "3"
+        - cell "未上传封面 如何将项目接入企业现有 API 帮助中心 使用指南 帮助中心 作者 陈屿 别名 content-003 如何将项目接入企业现有 API，结合实际业务场景整理关键步骤、注意事项与可复用经验。 API 接入 交付指南":
+          - generic: 未上传封面
+          - generic: 如何将项目接入企业现有 API
+          - generic: 帮助中心
+          - generic: 使用指南
+          - generic: 帮助中心
+          - generic: 作者 陈屿
+          - generic: 别名 content-003
+          - paragraph: 如何将项目接入企业现有 API，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: API 接入
+          - generic: 交付指南
+        - cell "已发布 公开":
+          - generic: 已发布
+          - generic: 公开
+        - cell "浏览 1,734 点赞 50 评论 12 收藏 22":
+          - generic: 浏览 1,734
+          - generic: 点赞 50
+          - generic: 评论 12
+          - generic: 收藏 22
+        - cell "更新 2026-08-03 11:20:00 发布 2026-07-28 10:20:00":
+          - generic: 更新 2026-08-03 11:20:00
+          - generic: 发布 2026-07-28 10:20:00
+        - cell "预览 编辑 下线 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "下线":
+            - generic: 下线
+          - button "删除":
+            - generic: 删除
+      - row "4 未上传封面 某制造企业统一管理平台交付复盘 推荐 案例 客户案例 客户案例 作者 唐予安 别名 content-004 某制造企业统一管理平台交付复盘，结合实际业务场景整理关键步骤、注意事项与可复用经验。 客户成功 案例复盘 已发布 公开 浏览 2,171 点赞 61 评论 15 收藏 27 更新 2026-08-04 12:20:00 发布 2026-07-27 10:20:00 预览 编辑 下线 删除":
+        - cell "4":
+          - generic: "4"
+        - cell "未上传封面 某制造企业统一管理平台交付复盘 推荐 案例 客户案例 客户案例 作者 唐予安 别名 content-004 某制造企业统一管理平台交付复盘，结合实际业务场景整理关键步骤、注意事项与可复用经验。 客户成功 案例复盘":
+          - generic: 未上传封面
+          - generic: 某制造企业统一管理平台交付复盘
+          - generic: 推荐
+          - generic: 案例
+          - generic: 客户案例
+          - generic: 客户案例
+          - generic: 作者 唐予安
+          - generic: 别名 content-004
+          - paragraph: 某制造企业统一管理平台交付复盘，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: 客户成功
+          - generic: 案例复盘
+        - cell "已发布 公开":
+          - generic: 已发布
+          - generic: 公开
+        - cell "浏览 2,171 点赞 61 评论 15 收藏 27":
+          - generic: 浏览 2,171
+          - generic: 点赞 61
+          - generic: 评论 15
+          - generic: 收藏 27
+        - cell "更新 2026-08-04 12:20:00 发布 2026-07-27 10:20:00":
+          - generic: 更新 2026-08-04 12:20:00
+          - generic: 发布 2026-07-27 10:20:00
+        - cell "预览 编辑 下线 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "下线":
+            - generic: 下线
+          - button "删除":
+            - generic: 删除
+      - row "5 未上传封面 中后台权限模型设计的五个关键点 推荐 文章 行业洞察 行业观察 作者 周明远 别名 content-005 中后台权限模型设计的五个关键点，结合实际业务场景整理关键步骤、注意事项与可复用经验。 权限管理 最佳实践 已发布 内部可见 浏览 2,608 点赞 72 评论 18 收藏 32 更新 2026-08-05 13:20:00 发布 2026-07-26 10:20:00 预览 编辑 下线 删除":
+        - cell "5":
+          - generic: "5"
+        - cell "未上传封面 中后台权限模型设计的五个关键点 推荐 文章 行业洞察 行业观察 作者 周明远 别名 content-005 中后台权限模型设计的五个关键点，结合实际业务场景整理关键步骤、注意事项与可复用经验。 权限管理 最佳实践":
+          - generic: 未上传封面
+          - generic: 中后台权限模型设计的五个关键点
+          - generic: 推荐
+          - generic: 文章
+          - generic: 行业洞察
+          - generic: 行业观察
+          - generic: 作者 周明远
+          - generic: 别名 content-005
+          - paragraph: 中后台权限模型设计的五个关键点，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: 权限管理
+          - generic: 最佳实践
+        - cell "已发布 内部可见":
+          - generic: 已发布
+          - generic: 内部可见
+        - cell "浏览 2,608 点赞 72 评论 18 收藏 32":
+          - generic: 浏览 2,608
+          - generic: 点赞 72
+          - generic: 评论 18
+          - generic: 收藏 32
+        - cell "更新 2026-08-05 13:20:00 发布 2026-07-26 10:20:00":
+          - generic: 更新 2026-08-05 13:20:00
+          - generic: 发布 2026-07-26 10:20:00
+        - cell "预览 编辑 下线 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "下线":
+            - generic: 下线
+          - button "删除":
+            - generic: 删除
+      - row "6 未上传封面 前端性能治理：从首屏到长列表 文章 技术实践 技术专栏 作者 苏沐 别名 content-006 前端性能治理：从首屏到长列表，结合实际业务场景整理关键步骤、注意事项与可复用经验。 性能优化 技术实践 审核中 公开 浏览 3,045 点赞 83 评论 21 收藏 37 更新 2026-08-01 14:20:00 发布 未发布 预览 编辑 发布 删除":
+        - cell "6":
+          - generic: "6"
+        - cell "未上传封面 前端性能治理：从首屏到长列表 文章 技术实践 技术专栏 作者 苏沐 别名 content-006 前端性能治理：从首屏到长列表，结合实际业务场景整理关键步骤、注意事项与可复用经验。 性能优化 技术实践":
+          - generic: 未上传封面
+          - generic: 前端性能治理：从首屏到长列表
+          - generic: 文章
+          - generic: 技术实践
+          - generic: 技术专栏
+          - generic: 作者 苏沐
+          - generic: 别名 content-006
+          - paragraph: 前端性能治理：从首屏到长列表，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: 性能优化
+          - generic: 技术实践
+        - cell "审核中 公开":
+          - generic: 审核中
+          - generic: 公开
+        - cell "浏览 3,045 点赞 83 评论 21 收藏 37":
+          - generic: 浏览 3,045
+          - generic: 点赞 83
+          - generic: 评论 21
+          - generic: 收藏 37
+        - cell "更新 2026-08-01 14:20:00 发布 未发布":
+          - generic: 更新 2026-08-01 14:20:00
+          - generic: 发布 未发布
+        - cell "预览 编辑 发布 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "发布":
+            - generic: 发布
+          - button "删除":
+            - generic: 删除
+      - row "7 未上传封面 2026 企业管理软件体验趋势报告 推荐 文章 行业洞察 行业观察 作者 沈清禾 别名 content-007 2026 企业管理软件体验趋势报告，结合实际业务场景整理关键步骤、注意事项与可复用经验。 行业报告 用户体验 已发布 公开 浏览 3,482 点赞 94 评论 24 收藏 42 更新 2026-08-02 15:20:00 发布 2026-07-24 10:20:00 预览 编辑 下线 删除":
+        - cell "7":
+          - generic: "7"
+        - cell "未上传封面 2026 企业管理软件体验趋势报告 推荐 文章 行业洞察 行业观察 作者 沈清禾 别名 content-007 2026 企业管理软件体验趋势报告，结合实际业务场景整理关键步骤、注意事项与可复用经验。 行业报告 用户体验":
+          - generic: 未上传封面
+          - generic: 2026 企业管理软件体验趋势报告
+          - generic: 推荐
+          - generic: 文章
+          - generic: 行业洞察
+          - generic: 行业观察
+          - generic: 作者 沈清禾
+          - generic: 别名 content-007
+          - paragraph: 2026 企业管理软件体验趋势报告，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: 行业报告
+          - generic: 用户体验
+        - cell "已发布 公开":
+          - generic: 已发布
+          - generic: 公开
+        - cell "浏览 3,482 点赞 94 评论 24 收藏 42":
+          - generic: 浏览 3,482
+          - generic: 点赞 94
+          - generic: 评论 24
+          - generic: 收藏 42
+        - cell "更新 2026-08-02 15:20:00 发布 2026-07-24 10:20:00":
+          - generic: 更新 2026-08-02 15:20:00
+          - generic: 发布 2026-07-24 10:20:00
+        - cell "预览 编辑 下线 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "下线":
+            - generic: 下线
+          - button "删除":
+            - generic: 删除
+      - row "8 未上传封面 浏览器本地数据的安全边界说明 置顶 公告 服务公告 服务公告 作者 贺川 别名 content-008 浏览器本地数据的安全边界说明，结合实际业务场景整理关键步骤、注意事项与可复用经验。 数据安全 服务通知 已发布 公开 浏览 3,919 点赞 105 评论 27 收藏 47 更新 2026-08-03 16:20:00 发布 2026-07-23 10:20:00 预览 编辑 下线 删除":
+        - cell "8":
+          - generic: "8"
+        - cell "未上传封面 浏览器本地数据的安全边界说明 置顶 公告 服务公告 服务公告 作者 贺川 别名 content-008 浏览器本地数据的安全边界说明，结合实际业务场景整理关键步骤、注意事项与可复用经验。 数据安全 服务通知":
+          - generic: 未上传封面
+          - generic: 浏览器本地数据的安全边界说明
+          - generic: 置顶
+          - generic: 公告
+          - generic: 服务公告
+          - generic: 服务公告
+          - generic: 作者 贺川
+          - generic: 别名 content-008
+          - paragraph: 浏览器本地数据的安全边界说明，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: 数据安全
+          - generic: 服务通知
+        - cell "已发布 公开":
+          - generic: 已发布
+          - generic: 公开
+        - cell "浏览 3,919 点赞 105 评论 27 收藏 47":
+          - generic: 浏览 3,919
+          - generic: 点赞 105
+          - generic: 评论 27
+          - generic: 收藏 47
+        - cell "更新 2026-08-03 16:20:00 发布 2026-07-23 10:20:00":
+          - generic: 更新 2026-08-03 16:20:00
+          - generic: 发布 2026-07-23 10:20:00
+        - cell "预览 编辑 下线 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "下线":
+            - generic: 下线
+          - button "删除":
+            - generic: 删除
+      - row "9 未上传封面 审批中心配置与实践建议 帮助中心 使用指南 帮助中心 作者 罗一 别名 content-009 审批中心配置与实践建议，结合实际业务场景整理关键步骤、注意事项与可复用经验。 产品教程 最佳实践 草稿 公开 浏览 4,356 点赞 116 评论 30 收藏 52 更新 2026-08-04 09:20:00 发布 未发布 预览 编辑 发布 删除":
+        - cell "9":
+          - generic: "9"
+        - cell "未上传封面 审批中心配置与实践建议 帮助中心 使用指南 帮助中心 作者 罗一 别名 content-009 审批中心配置与实践建议，结合实际业务场景整理关键步骤、注意事项与可复用经验。 产品教程 最佳实践":
+          - generic: 未上传封面
+          - generic: 审批中心配置与实践建议
+          - generic: 帮助中心
+          - generic: 使用指南
+          - generic: 帮助中心
+          - generic: 作者 罗一
+          - generic: 别名 content-009
+          - paragraph: 审批中心配置与实践建议，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: 产品教程
+          - generic: 最佳实践
+        - cell "草稿 公开":
+          - generic: 草稿
+          - generic: 公开
+        - cell "浏览 4,356 点赞 116 评论 30 收藏 52":
+          - generic: 浏览 4,356
+          - generic: 点赞 116
+          - generic: 评论 30
+          - generic: 收藏 52
+        - cell "更新 2026-08-04 09:20:00 发布 未发布":
+          - generic: 更新 2026-08-04 09:20:00
+          - generic: 发布 未发布
+        - cell "预览 编辑 发布 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "发布":
+            - generic: 发布
+          - button "删除":
+            - generic: 删除
+      - row "10 未上传封面 客户成功团队如何建立交付标准 文章 客户案例 客户案例 作者 唐予安 别名 content-010 客户成功团队如何建立交付标准，结合实际业务场景整理关键步骤、注意事项与可复用经验。 客户成功 交付指南 已发布 公开 浏览 4,793 点赞 127 评论 6 收藏 57 更新 2026-08-05 10:20:00 发布 2026-07-21 10:20:00 预览 编辑 下线 删除":
+        - cell "10":
+          - generic: "10"
+        - cell "未上传封面 客户成功团队如何建立交付标准 文章 客户案例 客户案例 作者 唐予安 别名 content-010 客户成功团队如何建立交付标准，结合实际业务场景整理关键步骤、注意事项与可复用经验。 客户成功 交付指南":
+          - generic: 未上传封面
+          - generic: 客户成功团队如何建立交付标准
+          - generic: 文章
+          - generic: 客户案例
+          - generic: 客户案例
+          - generic: 作者 唐予安
+          - generic: 别名 content-010
+          - paragraph: 客户成功团队如何建立交付标准，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+          - generic: 客户成功
+          - generic: 交付指南
+        - cell "已发布 公开":
+          - generic: 已发布
+          - generic: 公开
+        - cell "浏览 4,793 点赞 127 评论 6 收藏 57":
+          - generic: 浏览 4,793
+          - generic: 点赞 127
+          - generic: 评论 6
+          - generic: 收藏 57
+        - cell "更新 2026-08-05 10:20:00 发布 2026-07-21 10:20:00":
+          - generic: 更新 2026-08-05 10:20:00
+          - generic: 发布 2026-07-21 10:20:00
+        - cell "预览 编辑 下线 删除":
+          - button "预览":
+            - generic: 预览
+          - button "编辑":
+            - generic: 编辑
+          - button "下线":
+            - generic: 下线
+          - button "删除":
+            - generic: 删除
+  - generic: 共 21 条
+  - combobox
+  - generic: 10条/页
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+    - listitem "第 2 页": "2"
+    - listitem "第 3 页": "3"
+  - button "下一页":
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页

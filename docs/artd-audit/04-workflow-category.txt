@@ -1,0 +1,252 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "流程分类":
+      - generic: 流程分类
+    - menuitem "流程设计":
+      - generic: 流程设计
+    - menuitem "申请管理":
+      - generic: 申请管理
+    - menuitem "审批待办":
+      - generic: 审批待办
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 审批中心
+      - generic: /
+      - generic: 流程分类
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 内容中心
+    - generic: 流程分类
+  - button "内容全屏":
+  - generic: 关键字
+  - textbox "关键字":
+    - /placeholder: 搜索分类名称 / 编码
+  - generic: 状态
+  - combobox "状态"
+  - generic: 分类状态
+  - button "重置":
+    - generic: 重置
+  - button "查询":
+    - generic: 查询
+  - button "新增分类":
+    - generic: 新增分类
+  - button:
+  - table:
+    - rowgroup:
+      - row "序号 分类信息 关联情况 状态 / 排序 备注 更新时间 操作":
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "分类信息":
+          - generic: 分类信息
+        - columnheader "关联情况":
+          - generic: 关联情况
+        - columnheader "状态 / 排序":
+          - generic: 状态 / 排序
+        - columnheader "备注":
+          - generic: 备注
+        - columnheader "更新时间":
+          - generic: 更新时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 通用审批 GENERAL 流程定义 1 流程实例 1 启用 排序 1 适用于日常申请与跨部门协作 2026-07-15 14:20:00 编辑 删除":
+        - cell "1":
+          - generic: "1"
+        - cell "通用审批 GENERAL":
+          - generic: 通用审批
+          - generic: GENERAL
+        - cell "流程定义 1 流程实例 1":
+          - generic: 流程定义 1
+          - generic: 流程实例 1
+        - cell "启用 排序 1":
+          - generic: 启用
+          - generic: 排序 1
+        - cell "适用于日常申请与跨部门协作":
+          - generic: 适用于日常申请与跨部门协作
+        - cell "2026-07-15 14:20:00":
+          - generic: 2026-07-15 14:20:00
+        - cell "编辑 删除":
+          - button "编辑":
+            - generic: 编辑
+          - button "删除":
+            - generic: 删除
+      - row "2 人事行政 HR 流程定义 2 流程实例 3 启用 排序 2 人员、考勤与行政事项审批 2026-07-16 14:20:00 编辑 删除":
+        - cell "2":
+          - generic: "2"
+        - cell "人事行政 HR":
+          - generic: 人事行政
+          - generic: HR
+        - cell "流程定义 2 流程实例 3":
+          - generic: 流程定义 2
+          - generic: 流程实例 3
+        - cell "启用 排序 2":
+          - generic: 启用
+          - generic: 排序 2
+        - cell "人员、考勤与行政事项审批":
+          - generic: 人员、考勤与行政事项审批
+        - cell "2026-07-16 14:20:00":
+          - generic: 2026-07-16 14:20:00
+        - cell "编辑 删除":
+          - button "编辑":
+            - generic: 编辑
+          - button "删除":
+            - generic: 删除
+      - row "3 财务审批 FINANCE 流程定义 2 流程实例 3 启用 排序 3 费用、预算与付款事项审批 2026-07-17 14:20:00 编辑 删除":
+        - cell "3":
+          - generic: "3"
+        - cell "财务审批 FINANCE":
+          - generic: 财务审批
+          - generic: FINANCE
+        - cell "流程定义 2 流程实例 3":
+          - generic: 流程定义 2
+          - generic: 流程实例 3
+        - cell "启用 排序 3":
+          - generic: 启用
+          - generic: 排序 3
+        - cell "费用、预算与付款事项审批":
+          - generic: 费用、预算与付款事项审批
+        - cell "2026-07-17 14:20:00":
+          - generic: 2026-07-17 14:20:00
+        - cell "编辑 删除":
+          - button "编辑":
+            - generic: 编辑
+          - button "删除":
+            - generic: 删除
+      - row "4 采购流程 PROCUREMENT 流程定义 1 流程实例 2 启用 排序 4 采购申请、比价与合同流转 2026-07-18 14:20:00 编辑 删除":
+        - cell "4":
+          - generic: "4"
+        - cell "采购流程 PROCUREMENT":
+          - generic: 采购流程
+          - generic: PROCUREMENT
+        - cell "流程定义 1 流程实例 2":
+          - generic: 流程定义 1
+          - generic: 流程实例 2
+        - cell "启用 排序 4":
+          - generic: 启用
+          - generic: 排序 4
+        - cell "采购申请、比价与合同流转":
+          - generic: 采购申请、比价与合同流转
+        - cell "2026-07-18 14:20:00":
+          - generic: 2026-07-18 14:20:00
+        - cell "编辑 删除":
+          - button "编辑":
+            - generic: 编辑
+          - button "删除":
+            - generic: 删除
+      - row "5 法务管理 LEGAL 流程定义 1 流程实例 2 启用 排序 5 合同、印章与合规事项审批 2026-07-19 14:20:00 编辑 删除":
+        - cell "5":
+          - generic: "5"
+        - cell "法务管理 LEGAL":
+          - generic: 法务管理
+          - generic: LEGAL
+        - cell "流程定义 1 流程实例 2":
+          - generic: 流程定义 1
+          - generic: 流程实例 2
+        - cell "启用 排序 5":
+          - generic: 启用
+          - generic: 排序 5
+        - cell "合同、印章与合规事项审批":
+          - generic: 合同、印章与合规事项审批
+        - cell "2026-07-19 14:20:00":
+          - generic: 2026-07-19 14:20:00
+        - cell "编辑 删除":
+          - button "编辑":
+            - generic: 编辑
+          - button "删除":
+            - generic: 删除
+      - row "6 内容发布 CONTENT 流程定义 1 流程实例 2 启用 排序 6 内容审核与对外发布流程 2026-07-20 14:20:00 编辑 删除":
+        - cell "6":
+          - generic: "6"
+        - cell "内容发布 CONTENT":
+          - generic: 内容发布
+          - generic: CONTENT
+        - cell "流程定义 1 流程实例 2":
+          - generic: 流程定义 1
+          - generic: 流程实例 2
+        - cell "启用 排序 6":
+          - generic: 启用
+          - generic: 排序 6
+        - cell "内容审核与对外发布流程":
+          - generic: 内容审核与对外发布流程
+        - cell "2026-07-20 14:20:00":
+          - generic: 2026-07-20 14:20:00
+        - cell "编辑 删除":
+          - button "编辑":
+            - generic: 编辑
+          - button "删除":
+            - generic: 删除
+      - row "7 IT 服务 IT 流程定义 2 流程实例 3 启用 排序 7 账号、权限和设备服务申请 2026-07-21 14:20:00 编辑 删除":
+        - cell "7":
+          - generic: "7"
+        - cell "IT 服务 IT":
+          - generic: IT 服务
+          - generic: IT
+        - cell "流程定义 2 流程实例 3":
+          - generic: 流程定义 2
+          - generic: 流程实例 3
+        - cell "启用 排序 7":
+          - generic: 启用
+          - generic: 排序 7
+        - cell "账号、权限和设备服务申请":
+          - generic: 账号、权限和设备服务申请
+        - cell "2026-07-21 14:20:00":
+          - generic: 2026-07-21 14:20:00
+        - cell "编辑 删除":
+          - button "编辑":
+            - generic: 编辑
+          - button "删除":
+            - generic: 删除
+      - row "8 运营协同 OPERATIONS 流程定义 2 流程实例 2 启用 排序 8 活动、客户与运营事项协作 2026-07-22 14:20:00 编辑 删除":
+        - cell "8":
+          - generic: "8"
+        - cell "运营协同 OPERATIONS":
+          - generic: 运营协同
+          - generic: OPERATIONS
+        - cell "流程定义 2 流程实例 2":
+          - generic: 流程定义 2
+          - generic: 流程实例 2
+        - cell "启用 排序 8":
+          - generic: 启用
+          - generic: 排序 8
+        - cell "活动、客户与运营事项协作":
+          - generic: 活动、客户与运营事项协作
+        - cell "2026-07-22 14:20:00":
+          - generic: 2026-07-22 14:20:00
+        - cell "编辑 删除":
+          - button "编辑":
+            - generic: 编辑
+          - button "删除":
+            - generic: 删除
+  - generic: 共 8 条
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+  - button "下一页" [disabled]:
+  - combobox
+  - generic: 10条/页
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页

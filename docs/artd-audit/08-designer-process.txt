@@ -1,0 +1,116 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "流程分类":
+      - generic: 流程分类
+    - menuitem "流程设计":
+      - generic: 流程设计
+    - menuitem "申请管理":
+      - generic: 申请管理
+    - menuitem "审批待办":
+      - generic: 审批待办
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 审批中心
+      - generic: /
+      - generic: 流程设计器
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 内容中心
+    - generic: 流程分类
+    - generic: 流程设计
+  - button "内容全屏":
+  - complementary:
+    - navigation:
+      - button "基础信息":
+      - button "表单设计":
+      - button "流程设计":
+      - button "更多设置":
+  - main:
+    - text: 员工请假审批
+    - generic: 编辑模式
+    - generic: LEAVE_REQUEST/
+    - generic: 3 个字段/
+    - generic: 4 个节点/
+    - generic: 自动保存未启用
+    - navigation "流程设计步骤":
+      - button "1 基础信息":
+        - generic: "1"
+        - generic: 基础信息
+      - button "2 表单设计":
+        - generic: "2"
+        - generic: 表单设计
+      - button "3 流程设计" [active]:
+        - generic: "3"
+        - generic: 流程设计
+      - button "4 更多设置":
+        - generic: "4"
+        - generic: 更多设置
+    - button "返回":
+      - generic: 返回
+    - button "版本":
+      - generic: 版本
+    - button "试运行":
+      - generic: 试运行
+    - button "保存草稿":
+      - generic: 保存草稿
+    - button "发布新版":
+      - generic: 发布新版
+    - button "撤销 (Ctrl/⌘ + Z)":
+    - button "重做 (Ctrl/⌘ + Shift + Z)" [disabled]:
+    - button "横向整理":
+    - button "纵向整理":
+    - button "显示全部节点":
+    - button "锁定画布":
+    - button "指针模式：框选元素":
+    - button "手形模式：拖动画布":
+    - button "导出图片":
+    - button "显示属性面板":
+    - generic: 指针模式：拖动画布空白处框选节点和线条，按住空格可临时平移
+    - strong: 发起申请
+    - generic: 开始
+    - emphasis: 开始
+    - generic: 申请人提交后进入流程
+    - generic "打开节点菜单"
+    - generic "打开节点菜单"
+    - strong: 直属负责人审批
+    - generic: 直属负责人审批
+    - emphasis: 或签
+    - generic: 发起人上级
+    - generic "打开节点菜单"
+    - generic "打开节点菜单"
+    - strong: 业务部门复核
+    - generic: 业务部门复核
+    - emphasis: 或签
+    - generic: 1 个对象
+    - generic "打开节点菜单"
+    - generic "打开节点菜单"
+    - strong: 流程结束
+    - generic: 结束
+    - emphasis: 结束
+    - generic: 流程归档并结束
+    - button:
+    - button:
+    - img "Vue Flow mini map"
+    - text: 释放到画布添加节点

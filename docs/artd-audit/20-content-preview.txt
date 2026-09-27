@@ -1,0 +1,50 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "内容中心":
+      - generic: 内容中心
+    - menuitem "内容分类":
+      - generic: 内容分类
+    - menuitem "标签管理":
+      - generic: 标签管理
+    - menuitem "内容回收站":
+      - generic: 内容回收站
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 内容管理
+      - generic: /
+      - generic: 内容详情
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 内容中心
+    - generic: 内容详情
+  - button "内容全屏":
+  - generic: 新闻
+  - generic: 产品中心
+  - generic: 作者 林知夏
+  - generic: 发布于 2026-07-30 10:20:00
+  - heading "Art Design Pro X v1.0.0 开发基线更新" [level=1]
+  - paragraph: Art Design Pro X v1.0.0 开发基线更新，结合实际业务场景整理关键步骤、注意事项与可复用经验。
+  - paragraph: Art Design Pro X v1.0.0 开发基线更新
+  - paragraph: 本文内容用于展示完整的内容管理、检索与发布流程。

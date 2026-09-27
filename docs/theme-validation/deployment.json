@@ -1,0 +1,27 @@
+{
+  "startedAt": "2026-09-21T02:25:05.859Z",
+  "checks": [
+    "已保留前后端旧镜像和数据库备份",
+    "已更新经过独立验收的后端，业务数据、权限和迁移版本一致",
+    "已更新前端，公开主题读取及匿名后台拦截正常"
+  ],
+  "status": "passed",
+  "oldBackend": "sha256:a7650645d690c117d55f5f7881cb6382818c01a1a9025198063305e7a2df6c7e",
+  "oldFrontend": "sha256:8802bf8ba428f47268e8bbfe2fdabccf54626d50311d9b17bf196e6565ff9936",
+  "newBackend": "sha256:ed4d3af35e7e5b6c9108eb521f8b32689428e78d63e6da1e65f353abd0a52b41",
+  "newFrontend": "sha256:c701bbcc93cdc433b474914aeaae573d018b925934aa436e0a502b9444d33fd0",
+  "backendRollbackTag": "mayday-backend:before-theme-20260921022505858",
+  "frontendRollbackTag": "mayday-frontend:before-theme-20260921022505858",
+  "backup": {
+    "path": ".local/theme-validation/before-theme-20260921022505858.sql",
+    "bytes": 80029,
+    "sha256": "9691982c3de34863d31b75cb038a3f84e19bc5d7529faa4c33fbd1868184c653"
+  },
+  "initialPortalTheme": {
+    "mode": "light",
+    "primaryColor": "#245da8",
+    "borderRadius": 4,
+    "compact": false
+  },
+  "finishedAt": "2026-09-21T02:25:30.964Z"
+}

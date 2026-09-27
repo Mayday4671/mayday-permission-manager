@@ -1,0 +1,107 @@
+{
+  "verifiedAt": "2026-09-19T15:03:54.563Z",
+  "pages": [
+    {
+      "name": "用户管理",
+      "result": "passed"
+    },
+    {
+      "name": "角色权限",
+      "result": "passed"
+    },
+    {
+      "name": "组织部门",
+      "result": "passed"
+    },
+    {
+      "name": "岗位管理",
+      "result": "passed"
+    },
+    {
+      "name": "内容中心",
+      "result": "passed"
+    },
+    {
+      "name": "内容分类",
+      "result": "passed"
+    },
+    {
+      "name": "内容标签",
+      "result": "passed"
+    },
+    {
+      "name": "内容回收站",
+      "result": "passed"
+    },
+    {
+      "name": "通知管理",
+      "result": "passed"
+    },
+    {
+      "name": "个人收件箱",
+      "result": "passed"
+    },
+    {
+      "name": "审批分类",
+      "result": "passed"
+    },
+    {
+      "name": "流程定义",
+      "result": "passed"
+    },
+    {
+      "name": "审批申请",
+      "result": "passed"
+    },
+    {
+      "name": "审批待办",
+      "result": "passed"
+    },
+    {
+      "name": "菜单管理",
+      "result": "passed"
+    },
+    {
+      "name": "数据字典",
+      "result": "passed"
+    },
+    {
+      "name": "系统参数",
+      "result": "passed"
+    },
+    {
+      "name": "操作日志",
+      "result": "passed"
+    },
+    {
+      "name": "登录日志",
+      "result": "passed"
+    },
+    {
+      "name": "文件中心",
+      "result": "passed"
+    },
+    {
+      "name": "用户统计",
+      "result": "passed"
+    },
+    {
+      "name": "网站配置",
+      "result": "passed"
+    },
+    {
+      "name": "个人中心",
+      "result": "passed"
+    },
+    {
+      "name": "工作台",
+      "result": "passed"
+    }
+  ],
+  "permissionRevocation": {
+    "apiStatus": 403,
+    "menuRemoved": true,
+    "tabRemoved": true,
+    "pageAccessDenied": true
+  }
+}

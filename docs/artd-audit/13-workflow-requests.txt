@@ -1,0 +1,117 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "流程分类":
+      - generic: 流程分类
+    - menuitem "流程设计":
+      - generic: 流程设计
+    - menuitem "申请管理" [active]:
+      - generic: 申请管理
+    - menuitem "审批待办":
+      - generic: 审批待办
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 审批中心
+      - generic: /
+      - generic: 申请管理
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 内容中心
+    - generic: 流程分类
+    - generic: 流程设计
+    - generic: 申请管理
+  - button "内容全屏":
+  - heading "申请中心" [level=1]
+  - paragraph: 面向商业化审批场景管理申请运行态，支持发起申请、追踪当前节点、查看审批链路与撤回进行中的申请。
+  - button "发起申请":
+    - generic: 发起申请
+  - button "刷新数据":
+    - generic: 刷新数据
+  - article:
+    - generic: 申请总数
+    - generic: "18"
+    - generic: 已创建的全部申请
+  - article:
+    - generic: 审批中
+    - generic: "6"
+    - generic: 当前仍在流转中的申请
+  - article:
+    - generic: 已通过
+    - generic: "6"
+    - generic: 已完成审批并通过的申请
+  - article:
+    - generic: 已驳回
+    - generic: "3"
+    - generic: 已被终止的申请
+  - article:
+    - generic: 我的待办
+    - generic: "8"
+    - generic: 我需要处理的审批数量
+  - heading "申请筛选" [level=2]
+  - paragraph: 按关键字、状态、分类与查看范围定位正在运行或已结束的申请。
+  - radiogroup "radio-group":
+    - radio "我发起的" [checked]
+    - generic: 我发起的
+    - radio "全部申请"
+    - generic: 全部申请
+  - generic: 关键字
+  - textbox "关键字":
+    - /placeholder: 搜索标题 / 流程名称 / 申请编号
+  - generic: 申请状态
+  - combobox "申请状态"
+  - generic: 实例状态
+  - generic: 流程分类
+  - combobox "流程分类"
+  - generic: 流程分类
+  - button "重置":
+    - generic: 重置
+  - button "查询":
+    - generic: 查询
+  - button "发起申请":
+    - generic: 发起申请
+  - button:
+  - button "专注模式":
+    - generic: 专注模式
+  - table:
+    - rowgroup:
+      - row "序号 申请信息 状态 / 优先级 当前节点 待处理人 发起人 发起时间 操作":
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "申请信息":
+          - generic: 申请信息
+        - columnheader "状态 / 优先级":
+          - generic: 状态 / 优先级
+        - columnheader "当前节点":
+          - generic: 当前节点
+        - columnheader "待处理人":
+          - generic: 待处理人
+        - columnheader "发起人":
+          - generic: 发起人
+        - columnheader "发起时间":
+          - generic: 发起时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup
+  - paragraph: 暂无数据

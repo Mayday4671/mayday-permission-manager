@@ -1,0 +1,32 @@
+{
+  "startedAt": "2026-09-21T01:07:37.459Z",
+  "checks": [
+    "已保留旧后端镜像及完整数据库备份",
+    "已运行通过隔离验收的后端镜像，权限配置与业务快照一致，数据库版本未变化",
+    "本机门户、匿名拦截、管理员登录、工作台与退出检查通过；前端镜像保持原版本"
+  ],
+  "status": "passed",
+  "oldImage": "sha256:e97f66eaadfd3fd1e479b09b27bc44ee9594e93a61f1fb8544f3a2e62c08b9a7",
+  "frontendImage": "sha256:54cad6c51f3954f91f30ee96c3c625576186f554624cee8298f2a6e28f4b47f2",
+  "newImage": "sha256:a7650645d690c117d55f5f7881cb6382818c01a1a9025198063305e7a2df6c7e",
+  "rollbackTag": "mayday-backend:before-security-20260921010737458",
+  "backup": {
+    "path": ".local/security-review/before-security-20260921010737458.sql",
+    "bytes": 80713,
+    "sha256": "380586a3736fca07557211c14bf3a4f932516efc5128f9916b2724e08bf4e752"
+  },
+  "businessHashes": {
+    "sys_user": "dfe0bffc61b61ef3eb2a245902e7970e7a95152fa232b1de1fa4b949d0532e1d",
+    "sys_role": "482719330e9dc9c7f2f77f53e0155e3637d5e3cef6e79a1102a1389e651636cf",
+    "sys_user_role": "42fa0e8ce9715a5d6fc0dd8b4919a4bf7b409bb29a4ec5db958f0e725814d185",
+    "sys_role_permission": "55916d632caafc9f9a940b195424d037c036e9a85d4cc22ad75b3e86cfb34ba0",
+    "sys_role_scope": "db5098c0c8d0b59b9fd4cf54fb8097af389806622bce09fd3de8fcea9a7b6a90",
+    "sys_role_scope_department": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sys_entry": "4aeea8076e9cc9cef5289bdb085bb10dac3db340550813c76f725475433fd595",
+    "cms_notice": "6bb20cfeadf2716207654209b3dad89b859119c9efae14b4e51fb871b20e9a35",
+    "cms_revision": "5174f9ce7f8762c8eeb7120cfcd07cd273d661c32a02ff5b7445a5d6aa755a05",
+    "ops_flow_definition": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ops_flow_version": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "finishedAt": "2026-09-21T01:08:02.315Z"
+}

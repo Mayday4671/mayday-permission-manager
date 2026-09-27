@@ -1,0 +1,295 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理" [active]:
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+    - generic: 部门管理
+  - button "内容全屏":
+  - button "新增部门":
+    - generic: 新增部门
+  - button "收起":
+    - generic: 收起
+  - button:
+  - table:
+    - rowgroup:
+      - row "部门名称 部门编码 负责人 联系电话 邮箱 排序 状态 更新时间 操作":
+        - columnheader "部门名称":
+          - generic: 部门名称
+        - columnheader "部门编码":
+          - generic: 部门编码
+        - columnheader "负责人":
+          - generic: 负责人
+        - columnheader "联系电话":
+          - generic: 联系电话
+        - columnheader "邮箱":
+          - generic: 邮箱
+        - columnheader "排序":
+          - generic: 排序
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "更新时间":
+          - generic: 更新时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "星河数字科技 XHDT 周明远 021-55580000 office@example.com 1 启用 2026-07-28 14:20:00":
+        - cell "星河数字科技":
+          - text: 星河数字科技
+        - cell "XHDT":
+          - generic: XHDT
+        - cell "周明远":
+          - generic: 周明远
+        - cell "021-55580000":
+          - generic: 021-55580000
+        - cell "office@example.com":
+          - generic: office@example.com
+        - cell "1":
+          - generic: "1"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-28 14:20:00":
+          - generic: 2026-07-28 14:20:00
+        - cell:
+      - row "产品中心 PRODUCT 林知夏 021-55580001 product@example.com 1 启用 2026-07-10 16:30:00":
+        - cell "产品中心":
+          - generic: 产品中心
+        - cell "PRODUCT":
+          - generic: PRODUCT
+        - cell "林知夏":
+          - generic: 林知夏
+        - cell "021-55580001":
+          - generic: 021-55580001
+        - cell "product@example.com":
+          - generic: product@example.com
+        - cell "1":
+          - generic: "1"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-10 16:30:00":
+          - generic: 2026-07-10 16:30:00
+        - cell:
+      - row "前端研发部 RND-FE 陈屿 021-55580002 frontend@example.com 2 启用 2026-07-11 16:30:00":
+        - cell "前端研发部":
+          - generic: 前端研发部
+        - cell "RND-FE":
+          - generic: RND-FE
+        - cell "陈屿":
+          - generic: 陈屿
+        - cell "021-55580002":
+          - generic: 021-55580002
+        - cell "frontend@example.com":
+          - generic: frontend@example.com
+        - cell "2":
+          - generic: "2"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-11 16:30:00":
+          - generic: 2026-07-11 16:30:00
+        - cell:
+      - row "后端研发部 RND-BE 顾言 021-55580003 backend@example.com 3 启用 2026-07-12 16:30:00":
+        - cell "后端研发部":
+          - generic: 后端研发部
+        - cell "RND-BE":
+          - generic: RND-BE
+        - cell "顾言":
+          - generic: 顾言
+        - cell "021-55580003":
+          - generic: 021-55580003
+        - cell "backend@example.com":
+          - generic: backend@example.com
+        - cell "3":
+          - generic: "3"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-12 16:30:00":
+          - generic: 2026-07-12 16:30:00
+        - cell:
+      - row "质量保障部 RND-QA 许安然 021-55580004 qa@example.com 4 启用 2026-07-13 16:30:00":
+        - cell "质量保障部":
+          - generic: 质量保障部
+        - cell "RND-QA":
+          - generic: RND-QA
+        - cell "许安然":
+          - generic: 许安然
+        - cell "021-55580004":
+          - generic: 021-55580004
+        - cell "qa@example.com":
+          - generic: qa@example.com
+        - cell "4":
+          - generic: "4"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-13 16:30:00":
+          - generic: 2026-07-13 16:30:00
+        - cell:
+      - row "平台运维部 RND-SRE 贺川 021-55580005 sre@example.com 5 启用 2026-07-14 16:30:00":
+        - cell "平台运维部":
+          - generic: 平台运维部
+        - cell "RND-SRE":
+          - generic: RND-SRE
+        - cell "贺川":
+          - generic: 贺川
+        - cell "021-55580005":
+          - generic: 021-55580005
+        - cell "sre@example.com":
+          - generic: sre@example.com
+        - cell "5":
+          - generic: "5"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-14 16:30:00":
+          - generic: 2026-07-14 16:30:00
+        - cell:
+      - row "品牌市场部 MARKETING 沈清禾 021-55580006 marketing@example.com 6 启用 2026-07-15 16:30:00":
+        - cell "品牌市场部":
+          - generic: 品牌市场部
+        - cell "MARKETING":
+          - generic: MARKETING
+        - cell "沈清禾":
+          - generic: 沈清禾
+        - cell "021-55580006":
+          - generic: 021-55580006
+        - cell "marketing@example.com":
+          - generic: marketing@example.com
+        - cell "6":
+          - generic: "6"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-15 16:30:00":
+          - generic: 2026-07-15 16:30:00
+        - cell:
+      - row "用户运营部 OPERATIONS 宋嘉禾 021-55580007 operations@example.com 7 启用 2026-07-16 16:30:00":
+        - cell "用户运营部":
+          - generic: 用户运营部
+        - cell "OPERATIONS":
+          - generic: OPERATIONS
+        - cell "宋嘉禾":
+          - generic: 宋嘉禾
+        - cell "021-55580007":
+          - generic: 021-55580007
+        - cell "operations@example.com":
+          - generic: operations@example.com
+        - cell "7":
+          - generic: "7"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-16 16:30:00":
+          - generic: 2026-07-16 16:30:00
+        - cell:
+      - row "客户成功部 CUSTOMER-SUCCESS 唐予安 021-55580008 success@example.com 8 启用 2026-07-17 16:30:00":
+        - cell "客户成功部":
+          - generic: 客户成功部
+        - cell "CUSTOMER-SUCCESS":
+          - generic: CUSTOMER-SUCCESS
+        - cell "唐予安":
+          - generic: 唐予安
+        - cell "021-55580008":
+          - generic: 021-55580008
+        - cell "success@example.com":
+          - generic: success@example.com
+        - cell "8":
+          - generic: "8"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-17 16:30:00":
+          - generic: 2026-07-17 16:30:00
+        - cell:
+      - row "财务部 FINANCE 叶书宁 021-55580009 finance@example.com 9 启用 2026-07-18 16:30:00":
+        - cell "财务部":
+          - generic: 财务部
+        - cell "FINANCE":
+          - generic: FINANCE
+        - cell "叶书宁":
+          - generic: 叶书宁
+        - cell "021-55580009":
+          - generic: 021-55580009
+        - cell "finance@example.com":
+          - generic: finance@example.com
+        - cell "9":
+          - generic: "9"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-18 16:30:00":
+          - generic: 2026-07-18 16:30:00
+        - cell:
+      - row "人力资源部 HR 温以宁 021-55580010 hr@example.com 10 启用 2026-07-19 16:30:00":
+        - cell "人力资源部":
+          - generic: 人力资源部
+        - cell "HR":
+          - generic: HR
+        - cell "温以宁":
+          - generic: 温以宁
+        - cell "021-55580010":
+          - generic: 021-55580010
+        - cell "hr@example.com":
+          - generic: hr@example.com
+        - cell "10":
+          - generic: "10"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-19 16:30:00":
+          - generic: 2026-07-19 16:30:00
+        - cell:
+      - row "综合行政部 ADMIN 季文川 021-55580011 admin-office@example.com 11 启用 2026-07-20 16:30:00":
+        - cell "综合行政部":
+          - generic: 综合行政部
+        - cell "ADMIN":
+          - generic: ADMIN
+        - cell "季文川":
+          - generic: 季文川
+        - cell "021-55580011":
+          - generic: 021-55580011
+        - cell "admin-office@example.com":
+          - generic: admin-office@example.com
+        - cell "11":
+          - generic: "11"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-20 16:30:00":
+          - generic: 2026-07-20 16:30:00
+        - cell:

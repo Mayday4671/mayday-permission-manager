@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "date": "2026-09-21T17:01:03.105Z",
+  "baseline": ".local/baseline/20260921074002165-6a5b9c/result.json",
+  "backupTag": "mayday-frontend:before-adaptive-table-1790010060350",
+  "oldFrontend": "sha256:fb494170ce97936fa97ce7cdc738c8ace9501de43d337d304a2ec4434e16a4c5",
+  "newFrontend": "sha256:43b460bc00340a5b2f94025ff4a2ea4ed6d2978ccc584e6cd25a9785bdd60477",
+  "backendUnchanged": true,
+  "mysqlUnchanged": true,
+  "httpStatus": 200
+}

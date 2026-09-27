@@ -1,0 +1,10 @@
+{
+  "deployedAt": "2026-09-19T15:53:34.5655457Z",
+  "status": "passed",
+  "frontendImage": "sha256:55b86deaf082c4f44c3985f78fc12ccad37c3a94b40dc3c5b4a6dd821a5b3bd5",
+  "previousImageTag": "mayday-frontend:before-ui-polish-20260919",
+  "backendHealth": "UP",
+  "frontendStatus": 200,
+  "backendCodeOrDatabaseSchemaChanged": false,
+  "finalBrowserSmokePassed": true
+}

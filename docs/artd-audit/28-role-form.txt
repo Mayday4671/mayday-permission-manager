@@ -1,0 +1,202 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+  - button "内容全屏":
+  - button "新增角色":
+    - generic: 新增角色
+  - button:
+  - table:
+    - rowgroup:
+      - row "角色ID 角色名称 角色编码 角色描述 角色状态 创建日期 编辑日期 操作":
+        - columnheader "角色ID":
+          - generic: 角色ID
+        - columnheader "角色名称":
+          - generic: 角色名称
+        - columnheader "角色编码":
+          - generic: 角色编码
+        - columnheader "角色描述":
+          - generic: 角色描述
+        - columnheader "角色状态":
+          - generic: 角色状态
+        - columnheader "创建日期":
+          - generic: 创建日期
+        - columnheader "编辑日期":
+          - generic: 编辑日期
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 超级管理员 R_SUPER 拥有系统全部页面权限 启用 2023-01-10 09:00:00 2026-07-10 16:20:00":
+        - cell "1":
+          - generic: "1"
+        - cell "超级管理员":
+          - generic: 超级管理员
+        - cell "R_SUPER":
+          - generic: R_SUPER
+        - cell "拥有系统全部页面权限":
+          - generic: 拥有系统全部页面权限
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-01-10 09:00:00":
+          - generic: 2023-01-10 09:00:00
+        - cell "2026-07-10 16:20:00":
+          - generic: 2026-07-10 16:20:00
+        - cell:
+          - button:
+      - row "2 运营人员 R_OPERATOR 负责内容、活动与日常运营 启用 2023-02-10 09:00:00 2026-07-11 16:20:00":
+        - cell "2":
+          - generic: "2"
+        - cell "运营人员":
+          - generic: 运营人员
+        - cell "R_OPERATOR":
+          - generic: R_OPERATOR
+        - cell "负责内容、活动与日常运营":
+          - generic: 负责内容、活动与日常运营
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-02-10 09:00:00":
+          - generic: 2023-02-10 09:00:00
+        - cell "2026-07-11 16:20:00":
+          - generic: 2026-07-11 16:20:00
+        - cell:
+          - button:
+      - row "3 部门管理员 R_DEPT_ADMIN 管理本部门成员与业务数据 启用 2023-03-10 09:00:00 2026-07-12 16:20:00":
+        - cell "3":
+          - generic: "3"
+        - cell "部门管理员":
+          - generic: 部门管理员
+        - cell "R_DEPT_ADMIN":
+          - generic: R_DEPT_ADMIN
+        - cell "管理本部门成员与业务数据":
+          - generic: 管理本部门成员与业务数据
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-03-10 09:00:00":
+          - generic: 2023-03-10 09:00:00
+        - cell "2026-07-12 16:20:00":
+          - generic: 2026-07-12 16:20:00
+        - cell:
+          - button:
+      - row "4 普通员工 R_EMPLOYEE 访问个人工作台和授权模块 启用 2023-04-10 09:00:00 2026-07-13 16:20:00":
+        - cell "4":
+          - generic: "4"
+        - cell "普通员工":
+          - generic: 普通员工
+        - cell "R_EMPLOYEE":
+          - generic: R_EMPLOYEE
+        - cell "访问个人工作台和授权模块":
+          - generic: 访问个人工作台和授权模块
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-04-10 09:00:00":
+          - generic: 2023-04-10 09:00:00
+        - cell "2026-07-13 16:20:00":
+          - generic: 2026-07-13 16:20:00
+        - cell:
+          - button:
+      - row "5 安全审计员 R_AUDITOR 查看安全审计与运行日志 启用 2023-05-10 09:00:00 2026-07-14 16:20:00":
+        - cell "5":
+          - generic: "5"
+        - cell "安全审计员":
+          - generic: 安全审计员
+        - cell "R_AUDITOR":
+          - generic: R_AUDITOR
+        - cell "查看安全审计与运行日志":
+          - generic: 查看安全审计与运行日志
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-05-10 09:00:00":
+          - generic: 2023-05-10 09:00:00
+        - cell "2026-07-14 16:20:00":
+          - generic: 2026-07-14 16:20:00
+        - cell:
+          - button:
+      - row "6 财务人员 R_FINANCE 访问财务流程与经营数据 启用 2023-06-10 09:00:00 2026-07-15 16:20:00":
+        - cell "6":
+          - generic: "6"
+        - cell "财务人员":
+          - generic: 财务人员
+        - cell "R_FINANCE":
+          - generic: R_FINANCE
+        - cell "访问财务流程与经营数据":
+          - generic: 访问财务流程与经营数据
+        - cell "启用":
+          - generic: 启用
+        - cell "2023-06-10 09:00:00":
+          - generic: 2023-06-10 09:00:00
+        - cell "2026-07-15 16:20:00":
+          - generic: 2026-07-15 16:20:00
+        - cell:
+          - button:
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+  - button "下一页" [disabled]:
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页
+  - generic: 共 6 条
+  - dialog "新增角色":
+    - heading "新增角色" [level=2]
+    - button "关闭此对话框":
+    - generic: "* 角色名称"
+    - textbox "* 角色名称":
+      - /placeholder: 请输入角色名称
+    - generic: "* 角色编码"
+    - textbox "* 角色编码":
+      - /placeholder: 请输入角色编码
+    - generic: 描述
+    - textbox "描述":
+      - /placeholder: 请输入角色描述
+    - generic: 启用
+    - switch "启用" [checked]
+    - button "取消":
+      - generic: 取消
+    - button "提交":
+      - generic: 提交

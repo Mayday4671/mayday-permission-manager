@@ -1,0 +1,541 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+    - generic: 部门管理
+    - generic: 岗位管理
+    - generic: 字典管理
+    - generic: 参数设置
+    - generic: 菜单管理
+    - generic: 操作日志
+  - button "内容全屏":
+  - button "删除" [disabled]:
+    - generic: 删除
+  - button "清空":
+    - generic: 清空
+  - button "导出":
+    - generic: 导出
+  - button:
+  - table:
+    - rowgroup:
+      - row "日志编号 系统模块 操作类型 操作人员 操作地址 状态 操作日期 消耗时间 操作":
+        - columnheader:
+          - checkbox
+        - columnheader "日志编号":
+          - generic: 日志编号
+        - columnheader "系统模块":
+          - generic: 系统模块
+        - columnheader "操作类型":
+          - generic: 操作类型
+        - columnheader "操作人员":
+          - generic: 操作人员
+        - columnheader "操作地址":
+          - generic: 操作地址
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "操作日期":
+          - generic: 操作日期
+        - columnheader "消耗时间":
+          - generic: 消耗时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "OP-000001 用户管理 QUERY Super 127.0.0.1 失败 2026-08-05 09:00:00 24毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000001":
+          - generic: OP-000001
+        - cell "用户管理":
+          - generic: 用户管理
+        - cell "QUERY":
+          - generic: QUERY
+        - cell "Super":
+          - generic: Super
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "失败":
+          - generic: 失败
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "24毫秒":
+          - generic: 24毫秒
+        - cell:
+      - row "OP-000002 内容管理 CREATE operator 192.168.1.18 成功 2026-08-05 09:00:00 31毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000002":
+          - generic: OP-000002
+        - cell "内容管理":
+          - generic: 内容管理
+        - cell "CREATE":
+          - generic: CREATE
+        - cell "operator":
+          - generic: operator
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "31毫秒":
+          - generic: 31毫秒
+        - cell:
+      - row "OP-000003 参数设置 UPDATE Super 192.168.1.18 成功 2026-08-05 09:00:00 38毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000003":
+          - generic: OP-000003
+        - cell "参数设置":
+          - generic: 参数设置
+        - cell "UPDATE":
+          - generic: UPDATE
+        - cell "Super":
+          - generic: Super
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "38毫秒":
+          - generic: 38毫秒
+        - cell:
+      - row "OP-000004 资源管理 DELETE operator 127.0.0.1 成功 2026-08-05 09:00:00 45毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000004":
+          - generic: OP-000004
+        - cell "资源管理":
+          - generic: 资源管理
+        - cell "DELETE":
+          - generic: DELETE
+        - cell "operator":
+          - generic: operator
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "45毫秒":
+          - generic: 45毫秒
+        - cell:
+      - row "OP-000005 审批中心 EXPORT Super 192.168.1.18 成功 2026-08-05 09:00:00 52毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000005":
+          - generic: OP-000005
+        - cell "审批中心":
+          - generic: 审批中心
+        - cell "EXPORT":
+          - generic: EXPORT
+        - cell "Super":
+          - generic: Super
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "52毫秒":
+          - generic: 52毫秒
+        - cell:
+      - row "OP-000006 用户管理 QUERY operator 192.168.1.18 成功 2026-08-05 09:00:00 59毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000006":
+          - generic: OP-000006
+        - cell "用户管理":
+          - generic: 用户管理
+        - cell "QUERY":
+          - generic: QUERY
+        - cell "operator":
+          - generic: operator
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "59毫秒":
+          - generic: 59毫秒
+        - cell:
+      - row "OP-000007 内容管理 CREATE Super 127.0.0.1 成功 2026-08-05 09:00:00 66毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000007":
+          - generic: OP-000007
+        - cell "内容管理":
+          - generic: 内容管理
+        - cell "CREATE":
+          - generic: CREATE
+        - cell "Super":
+          - generic: Super
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "66毫秒":
+          - generic: 66毫秒
+        - cell:
+      - row "OP-000008 参数设置 UPDATE operator 192.168.1.18 成功 2026-08-05 09:00:00 73毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000008":
+          - generic: OP-000008
+        - cell "参数设置":
+          - generic: 参数设置
+        - cell "UPDATE":
+          - generic: UPDATE
+        - cell "operator":
+          - generic: operator
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "73毫秒":
+          - generic: 73毫秒
+        - cell:
+      - row "OP-000009 资源管理 DELETE Super 192.168.1.18 成功 2026-08-05 09:00:00 80毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000009":
+          - generic: OP-000009
+        - cell "资源管理":
+          - generic: 资源管理
+        - cell "DELETE":
+          - generic: DELETE
+        - cell "Super":
+          - generic: Super
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "80毫秒":
+          - generic: 80毫秒
+        - cell:
+      - row "OP-000010 审批中心 EXPORT operator 127.0.0.1 失败 2026-08-05 09:00:00 87毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000010":
+          - generic: OP-000010
+        - cell "审批中心":
+          - generic: 审批中心
+        - cell "EXPORT":
+          - generic: EXPORT
+        - cell "operator":
+          - generic: operator
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "失败":
+          - generic: 失败
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "87毫秒":
+          - generic: 87毫秒
+        - cell:
+      - row "OP-000011 用户管理 QUERY Super 192.168.1.18 成功 2026-08-05 09:00:00 94毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000011":
+          - generic: OP-000011
+        - cell "用户管理":
+          - generic: 用户管理
+        - cell "QUERY":
+          - generic: QUERY
+        - cell "Super":
+          - generic: Super
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "94毫秒":
+          - generic: 94毫秒
+        - cell:
+      - row "OP-000012 内容管理 CREATE operator 192.168.1.18 成功 2026-08-05 09:00:00 101毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000012":
+          - generic: OP-000012
+        - cell "内容管理":
+          - generic: 内容管理
+        - cell "CREATE":
+          - generic: CREATE
+        - cell "operator":
+          - generic: operator
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "101毫秒":
+          - generic: 101毫秒
+        - cell:
+      - row "OP-000013 参数设置 UPDATE Super 127.0.0.1 成功 2026-08-05 09:00:00 108毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000013":
+          - generic: OP-000013
+        - cell "参数设置":
+          - generic: 参数设置
+        - cell "UPDATE":
+          - generic: UPDATE
+        - cell "Super":
+          - generic: Super
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "108毫秒":
+          - generic: 108毫秒
+        - cell:
+      - row "OP-000014 资源管理 DELETE operator 192.168.1.18 成功 2026-08-05 09:00:00 115毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000014":
+          - generic: OP-000014
+        - cell "资源管理":
+          - generic: 资源管理
+        - cell "DELETE":
+          - generic: DELETE
+        - cell "operator":
+          - generic: operator
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "115毫秒":
+          - generic: 115毫秒
+        - cell:
+      - row "OP-000015 审批中心 EXPORT Super 192.168.1.18 成功 2026-08-05 09:00:00 122毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000015":
+          - generic: OP-000015
+        - cell "审批中心":
+          - generic: 审批中心
+        - cell "EXPORT":
+          - generic: EXPORT
+        - cell "Super":
+          - generic: Super
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "122毫秒":
+          - generic: 122毫秒
+        - cell:
+      - row "OP-000016 用户管理 QUERY operator 127.0.0.1 成功 2026-08-05 09:00:00 129毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000016":
+          - generic: OP-000016
+        - cell "用户管理":
+          - generic: 用户管理
+        - cell "QUERY":
+          - generic: QUERY
+        - cell "operator":
+          - generic: operator
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "129毫秒":
+          - generic: 129毫秒
+        - cell:
+      - row "OP-000017 内容管理 CREATE Super 192.168.1.18 成功 2026-08-05 09:00:00 136毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000017":
+          - generic: OP-000017
+        - cell "内容管理":
+          - generic: 内容管理
+        - cell "CREATE":
+          - generic: CREATE
+        - cell "Super":
+          - generic: Super
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "136毫秒":
+          - generic: 136毫秒
+        - cell:
+      - row "OP-000018 参数设置 UPDATE operator 192.168.1.18 成功 2026-08-05 09:00:00 143毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000018":
+          - generic: OP-000018
+        - cell "参数设置":
+          - generic: 参数设置
+        - cell "UPDATE":
+          - generic: UPDATE
+        - cell "operator":
+          - generic: operator
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "143毫秒":
+          - generic: 143毫秒
+        - cell:
+      - row "OP-000019 资源管理 DELETE Super 127.0.0.1 失败 2026-08-05 09:00:00 150毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000019":
+          - generic: OP-000019
+        - cell "资源管理":
+          - generic: 资源管理
+        - cell "DELETE":
+          - generic: DELETE
+        - cell "Super":
+          - generic: Super
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "失败":
+          - generic: 失败
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "150毫秒":
+          - generic: 150毫秒
+        - cell:
+      - row "OP-000020 审批中心 EXPORT operator 192.168.1.18 成功 2026-08-05 09:00:00 157毫秒":
+        - cell:
+          - checkbox
+        - cell "OP-000020":
+          - generic: OP-000020
+        - cell "审批中心":
+          - generic: 审批中心
+        - cell "EXPORT":
+          - generic: EXPORT
+        - cell "operator":
+          - generic: operator
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "成功":
+          - generic: 成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "157毫秒":
+          - generic: 157毫秒
+        - cell:
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+    - listitem "第 2 页": "2"
+  - button "下一页":
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页
+  - generic: 共 40 条
+  - dialog "操作日志详情":
+    - heading "操作日志详情" [level=2]
+    - button "关闭此对话框":
+    - table:
+      - rowgroup:
+        - row "日志编号 OP-000001 系统模块 用户管理":
+          - cell "日志编号"
+          - cell "OP-000001"
+          - cell "系统模块"
+          - cell "用户管理"
+        - row "操作类型 QUERY 操作人员 Super":
+          - cell "操作类型"
+          - cell "QUERY":
+            - generic: QUERY
+          - cell "操作人员"
+          - cell "Super"
+        - row "请求方式 GET 请求地址 /api/v1/user":
+          - cell "请求方式"
+          - cell "GET"
+          - cell "请求地址"
+          - cell "/api/v1/user"
+        - row "操作IP 127.0.0.1 响应码 500":
+          - cell "操作IP"
+          - cell "127.0.0.1"
+          - cell "响应码"
+          - cell "500"
+        - row "状态 失败 消耗时间 24 毫秒":
+          - cell "状态"
+          - cell "失败":
+            - generic: 失败
+          - cell "消耗时间"
+          - cell "24 毫秒"
+        - row "操作时间 2026-08-05 09:00:00 操作描述 查询分页数据":
+          - cell "操作时间"
+          - cell "2026-08-05 09:00:00"
+          - cell "操作描述"
+          - cell "查询分页数据"
+        - row "错误信息 请求处理超时":
+          - cell "错误信息"
+          - cell "请求处理超时"
+    - generic: 请求参数
+    - generic: "{ \"source\": \"local-demo\", \"page\": 1 }"
+    - generic: 返回参数
+    - generic: "{ \"success\": false }"

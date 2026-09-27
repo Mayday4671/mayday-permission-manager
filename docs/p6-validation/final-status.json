@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-09-19T15:09:35.6075429Z",
+  "status": "passed",
+  "backendHealth": "UP",
+  "isolatedProject": "mayday-check-20260917185508463-0d85ae",
+  "isolatedContainersRemoved": true,
+  "isolatedVolumesRemoved": true,
+  "temporaryFrontendStopped": true,
+  "mainDataVolumePreserved": true
+}

@@ -1,0 +1,192 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置" [active]:
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+    - generic: 部门管理
+    - generic: 岗位管理
+    - generic: 字典管理
+    - generic: 参数设置
+    - generic: 菜单管理
+    - generic: 操作日志
+    - generic: 登录日志
+    - generic: 用户统计
+    - generic: 网站配置
+  - button "内容全屏":
+  - heading "网站配置" [level=1]
+  - paragraph: 统一维护品牌信息、登录体验、SEO 元信息、站点状态与对外联系资料。保存后同步影响登录页、浏览器标题、水印与系统品牌展示。
+  - generic: 最近更新
+  - strong: 2026-08-12 09:00:00
+  - generic: 系统初始化
+  - generic: 默认语言
+  - strong: 简体中文
+  - generic: 登录与公共展示默认语言
+  - complementary:
+    - generic: 配置分组
+    - button "状态概览":
+      - generic: 状态概览
+    - button "系统标识":
+      - generic: 系统标识
+    - button "登录体验":
+      - generic: 登录体验
+    - button "SEO 展现":
+      - generic: SEO 展现
+    - button "联系合规":
+      - generic: 联系合规
+    - button "发布预览":
+      - generic: 发布预览
+    - text: 发布影响
+    - paragraph: 配置保存后会立即同步到登录页、公共配置缓存和系统品牌展示。
+  - main:
+    - generic: 站点状态
+    - strong: 站点正常开放
+    - paragraph: 登录页和公共展示保持正常访问。
+    - generic: 开放注册
+    - strong: 已关闭
+    - paragraph: 公开注册入口已隐藏。
+    - generic: 验证码
+    - strong: 前端滑块
+    - paragraph: 该配置由前端控制，不要求后端提供验证码或账号锁定接口。
+    - generic: 品牌名称
+    - strong: Art Design Pro X
+    - paragraph: 影响登录页、标题、水印和系统品牌展示。
+    - heading "系统标识" [level=2]
+    - paragraph: 配置系统名称、简介与公共水印内容。
+    - generic: "*系统名称"
+    - textbox "*系统名称":
+      - /placeholder: 例如：企业运营管理平台
+      - text: Art Design Pro X
+    - generic: 用于登录页、顶部栏、侧边栏、页签和浏览器标题。
+    - generic: "*水印内容"
+    - combobox "*水印内容"
+    - generic: 用户名
+    - generic: 默认使用当前登录用户名，也可叠加时间、使用站点名称或自定义文本。
+    - generic: 站点简介
+    - textbox "站点简介":
+      - /placeholder: 用于后台说明、站点简介与扩展展示
+      - text: 面向企业项目交付与二次开发的中后台前端底座
+    - generic: 21 / 255
+    - strong: 启用水印
+    - paragraph: 保存后作为站点级配置生效；用户仍可在系统设置抽屉里临时隐藏全局水印。
+    - switch [checked]
+    - heading "登录体验" [level=2]
+    - paragraph: 控制登录页欢迎文案、前端滑块、安全锁定、默认语言、维护模式与注册策略。
+    - generic: 登录欢迎标题
+    - textbox "登录欢迎标题":
+      - /placeholder: 例如：欢迎使用企业运营后台
+      - text: 欢迎使用 Art Design Pro X
+    - generic: 默认语言
+    - combobox "默认语言"
+    - generic: 简体中文
+    - generic: 登录欢迎描述
+    - textbox "登录欢迎描述":
+      - /placeholder: 展示在登录页左侧的品牌描述
+      - text: 面向商业应用的高质量后台管理平台，让管理更高效，让业务更卓越
+    - generic: 30 / 255
+    - strong: 前端滑块
+    - paragraph: 该选项仅控制登录页交互，不要求客户后端实现验证码接口。
+    - switch [checked]
+    - strong: 开放注册
+    - paragraph: 关闭后，登录页和注册页不再提供公开注册入口。
+    - switch
+    - strong: 维护模式
+    - paragraph: 开启后，登录页将显示维护公告，用于版本升级或发布窗口。
+    - switch
+    - generic: 维护提示文案
+    - textbox "维护提示文案":
+      - /placeholder: 维护模式开启时建议填写，例如：系统今晚 23:00-24:00 升级维护
+    - heading "SEO 与搜索展现" [level=2]
+    - paragraph: 用于浏览器标题、搜索摘要和对外品牌检索。
+    - generic: SEO 标题
+    - textbox "SEO 标题":
+      - /placeholder: 例如：企业运营管理平台
+      - text: Art Design Pro X
+    - generic: SEO 关键词
+    - textbox "SEO 关键词":
+      - /placeholder: 多个关键词用英文逗号分隔
+      - text: Vue,中后台,前端模板
+    - generic: SEO 描述
+    - textbox "SEO 描述":
+      - /placeholder: 简要描述你的产品定位、服务对象与主要价值
+      - text: 面向企业项目交付与二次开发的中后台前端底座
+    - generic: 21 / 500
+    - heading "联系与合规信息" [level=2]
+    - paragraph: 配置对外联系方式、地址与备案文案，便于后续扩展官网或登录页页脚。
+    - generic: 联系邮箱
+    - textbox "联系邮箱":
+      - /placeholder: 如 support@example.com
+      - text: support@example.com
+    - generic: 联系电话
+    - textbox "联系电话":
+      - /placeholder: 如 400-800-9000
+    - generic: 联系地址
+    - textbox "联系地址":
+      - /placeholder: 如 广东省深圳市南山区科技园
+    - generic: 版权文案
+    - textbox "版权文案":
+      - /placeholder: 如 Copyright © 2026 某某科技有限公司
+      - text: Copyright © Art Design Pro X
+    - generic: ICP备案号
+    - textbox "ICP备案号":
+      - /placeholder: 如 粤ICP备2026000000号-1
+    - generic: 公安备案号
+    - textbox "公安备案号":
+      - /placeholder: 如 粤公网安备44030002000001号
+    - heading "发布预览" [level=2]
+    - paragraph: 保存前快速确认即将影响公共展示的核心配置。
+    - generic: 品牌名称
+    - strong: Art Design Pro X
+    - generic: 默认语言
+    - strong: 简体中文
+    - generic: 水印内容
+    - strong: 用户名
+    - strong: Art Design Pro X
+    - generic: 保存后会同步影响登录页、浏览器标题与系统品牌展示。
+    - button "重置当前表单":
+      - generic: 重置当前表单
+    - button "保存并发布配置":
+      - generic: 保存并发布配置

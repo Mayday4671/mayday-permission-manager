@@ -1,0 +1,197 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "内容中心":
+      - generic: 内容中心
+    - menuitem "内容分类" [active]:
+      - generic: 内容分类
+    - menuitem "标签管理":
+      - generic: 标签管理
+    - menuitem "内容回收站":
+      - generic: 内容回收站
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 内容管理
+      - generic: /
+      - generic: 内容分类
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 内容中心
+    - generic: 内容详情
+    - generic: 内容分类
+  - button "内容全屏":
+  - generic: 关键字
+  - textbox "关键字":
+    - /placeholder: 搜索分类名称
+  - generic: 状态
+  - combobox "状态"
+  - generic: 请选择状态
+  - button "重置":
+    - generic: 重置
+  - button "查询":
+    - generic: 查询
+  - button "新增分类":
+    - generic: 新增分类
+  - button:
+  - table:
+    - rowgroup:
+      - row "序号 分类名称 内容数 排序 状态 更新时间 操作":
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "分类名称":
+          - generic: 分类名称
+        - columnheader "内容数":
+          - generic: 内容数
+        - columnheader "排序":
+          - generic: 排序
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "更新时间":
+          - generic: 更新时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 产品动态 3 1 启用 2026-07-18 16:20:00":
+        - cell "1":
+          - generic: "1"
+        - cell "产品动态":
+          - generic: 产品动态
+        - cell "3":
+          - generic: "3"
+        - cell "1":
+          - generic: "1"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-18 16:20:00":
+          - generic: 2026-07-18 16:20:00
+        - cell:
+      - row "2 客户案例 4 2 启用 2026-07-19 16:20:00":
+        - cell "2":
+          - generic: "2"
+        - cell "客户案例":
+          - generic: 客户案例
+        - cell "4":
+          - generic: "4"
+        - cell "2":
+          - generic: "2"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-19 16:20:00":
+          - generic: 2026-07-19 16:20:00
+        - cell:
+      - row "3 行业洞察 4 3 启用 2026-07-20 16:20:00":
+        - cell "3":
+          - generic: "3"
+        - cell "行业洞察":
+          - generic: 行业洞察
+        - cell "4":
+          - generic: "4"
+        - cell "3":
+          - generic: "3"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-20 16:20:00":
+          - generic: 2026-07-20 16:20:00
+        - cell:
+      - row "4 使用指南 6 4 启用 2026-07-21 16:20:00":
+        - cell "4":
+          - generic: "4"
+        - cell "使用指南":
+          - generic: 使用指南
+        - cell "6":
+          - generic: "6"
+        - cell "4":
+          - generic: "4"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-21 16:20:00":
+          - generic: 2026-07-21 16:20:00
+        - cell:
+      - row "5 技术实践 3 5 启用 2026-07-22 16:20:00":
+        - cell "5":
+          - generic: "5"
+        - cell "技术实践":
+          - generic: 技术实践
+        - cell "3":
+          - generic: "3"
+        - cell "5":
+          - generic: "5"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-22 16:20:00":
+          - generic: 2026-07-22 16:20:00
+        - cell:
+      - row "6 活动资讯 3 6 启用 2026-07-23 16:20:00":
+        - cell "6":
+          - generic: "6"
+        - cell "活动资讯":
+          - generic: 活动资讯
+        - cell "3":
+          - generic: "3"
+        - cell "6":
+          - generic: "6"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-23 16:20:00":
+          - generic: 2026-07-23 16:20:00
+        - cell:
+      - row "7 服务公告 2 7 启用 2026-07-24 16:20:00":
+        - cell "7":
+          - generic: "7"
+        - cell "服务公告":
+          - generic: 服务公告
+        - cell "2":
+          - generic: "2"
+        - cell "7":
+          - generic: "7"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-07-24 16:20:00":
+          - generic: 2026-07-24 16:20:00
+        - cell:
+      - row "8 团队文化 1 8 禁用 2026-07-25 16:20:00":
+        - cell "8":
+          - generic: "8"
+        - cell "团队文化":
+          - generic: 团队文化
+        - cell "1":
+          - generic: "1"
+        - cell "8":
+          - generic: "8"
+        - cell "禁用":
+          - generic: 禁用
+        - cell "2026-07-25 16:20:00":
+          - generic: 2026-07-25 16:20:00
+        - cell:
+  - generic: 共 8 条
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+  - button "下一页" [disabled]:
+  - combobox
+  - generic: 10条/页
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页

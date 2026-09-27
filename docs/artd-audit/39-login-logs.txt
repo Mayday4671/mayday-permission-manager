@@ -1,0 +1,624 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志" [active]:
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+    - generic: 部门管理
+    - generic: 岗位管理
+    - generic: 字典管理
+    - generic: 参数设置
+    - generic: 菜单管理
+    - generic: 操作日志
+    - generic: 登录日志
+  - button "内容全屏":
+  - button "删除" [disabled]:
+    - generic: 删除
+  - button "清空":
+    - generic: 清空
+  - button "导出":
+    - generic: 导出
+  - button:
+  - table:
+    - rowgroup:
+      - row "访问编号 用户ID 用户名称 设备类型 地址 登录地点 操作系统 浏览器 状态 描述 访问时间 操作":
+        - columnheader:
+          - checkbox
+        - columnheader "访问编号":
+          - generic: 访问编号
+        - columnheader "用户ID":
+          - generic: 用户ID
+        - columnheader "用户名称":
+          - generic: 用户名称
+        - columnheader "设备类型":
+          - generic: 设备类型
+        - columnheader "地址":
+          - generic: 地址
+        - columnheader "登录地点":
+          - generic: 登录地点
+        - columnheader "操作系统":
+          - generic: 操作系统
+        - columnheader "浏览器":
+          - generic: 浏览器
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "描述":
+          - generic: 描述
+        - columnheader "访问时间":
+          - generic: 访问时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "LOGIN-000001 1 Super 桌面端 127.0.0.1 上海市 macOS Chrome 失败 密码验证失败 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000001":
+          - generic: LOGIN-000001
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "上海市":
+          - generic: 上海市
+        - cell "macOS":
+          - generic: macOS
+        - cell "Chrome":
+          - generic: Chrome
+        - cell "失败":
+          - generic: 失败
+        - cell "密码验证失败":
+          - generic: 密码验证失败
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000002 2 operator 移动端 192.168.1.18 杭州市 Windows 11 Edge 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000002":
+          - generic: LOGIN-000002
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "移动端":
+          - generic: 移动端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "杭州市":
+          - generic: 杭州市
+        - cell "Windows 11":
+          - generic: Windows 11
+        - cell "Edge":
+          - generic: Edge
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000003 1 Super 桌面端 192.168.1.18 北京市 iOS Safari 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000003":
+          - generic: LOGIN-000003
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "北京市":
+          - generic: 北京市
+        - cell "iOS":
+          - generic: iOS
+        - cell "Safari":
+          - generic: Safari
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000004 2 operator 桌面端 127.0.0.1 深圳市 Ubuntu Firefox 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000004":
+          - generic: LOGIN-000004
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "深圳市":
+          - generic: 深圳市
+        - cell "Ubuntu":
+          - generic: Ubuntu
+        - cell "Firefox":
+          - generic: Firefox
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000005 1 Super 桌面端 192.168.1.18 上海市 macOS Chrome 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000005":
+          - generic: LOGIN-000005
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "上海市":
+          - generic: 上海市
+        - cell "macOS":
+          - generic: macOS
+        - cell "Chrome":
+          - generic: Chrome
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000006 2 operator 移动端 192.168.1.18 杭州市 Windows 11 Edge 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000006":
+          - generic: LOGIN-000006
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "移动端":
+          - generic: 移动端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "杭州市":
+          - generic: 杭州市
+        - cell "Windows 11":
+          - generic: Windows 11
+        - cell "Edge":
+          - generic: Edge
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000007 1 Super 桌面端 127.0.0.1 北京市 iOS Safari 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000007":
+          - generic: LOGIN-000007
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "北京市":
+          - generic: 北京市
+        - cell "iOS":
+          - generic: iOS
+        - cell "Safari":
+          - generic: Safari
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000008 2 operator 桌面端 192.168.1.18 深圳市 Ubuntu Firefox 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000008":
+          - generic: LOGIN-000008
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "深圳市":
+          - generic: 深圳市
+        - cell "Ubuntu":
+          - generic: Ubuntu
+        - cell "Firefox":
+          - generic: Firefox
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000009 1 Super 桌面端 192.168.1.18 上海市 macOS Chrome 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000009":
+          - generic: LOGIN-000009
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "上海市":
+          - generic: 上海市
+        - cell "macOS":
+          - generic: macOS
+        - cell "Chrome":
+          - generic: Chrome
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000010 2 operator 移动端 127.0.0.1 杭州市 Windows 11 Edge 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000010":
+          - generic: LOGIN-000010
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "移动端":
+          - generic: 移动端
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "杭州市":
+          - generic: 杭州市
+        - cell "Windows 11":
+          - generic: Windows 11
+        - cell "Edge":
+          - generic: Edge
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000011 1 Super 桌面端 192.168.1.18 北京市 iOS Safari 失败 密码验证失败 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000011":
+          - generic: LOGIN-000011
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "北京市":
+          - generic: 北京市
+        - cell "iOS":
+          - generic: iOS
+        - cell "Safari":
+          - generic: Safari
+        - cell "失败":
+          - generic: 失败
+        - cell "密码验证失败":
+          - generic: 密码验证失败
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000012 2 operator 桌面端 192.168.1.18 深圳市 Ubuntu Firefox 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000012":
+          - generic: LOGIN-000012
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "深圳市":
+          - generic: 深圳市
+        - cell "Ubuntu":
+          - generic: Ubuntu
+        - cell "Firefox":
+          - generic: Firefox
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000013 1 Super 桌面端 127.0.0.1 上海市 macOS Chrome 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000013":
+          - generic: LOGIN-000013
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "上海市":
+          - generic: 上海市
+        - cell "macOS":
+          - generic: macOS
+        - cell "Chrome":
+          - generic: Chrome
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000014 2 operator 移动端 192.168.1.18 杭州市 Windows 11 Edge 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000014":
+          - generic: LOGIN-000014
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "移动端":
+          - generic: 移动端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "杭州市":
+          - generic: 杭州市
+        - cell "Windows 11":
+          - generic: Windows 11
+        - cell "Edge":
+          - generic: Edge
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000015 1 Super 桌面端 192.168.1.18 北京市 iOS Safari 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000015":
+          - generic: LOGIN-000015
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "北京市":
+          - generic: 北京市
+        - cell "iOS":
+          - generic: iOS
+        - cell "Safari":
+          - generic: Safari
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000016 2 operator 桌面端 127.0.0.1 深圳市 Ubuntu Firefox 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000016":
+          - generic: LOGIN-000016
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "深圳市":
+          - generic: 深圳市
+        - cell "Ubuntu":
+          - generic: Ubuntu
+        - cell "Firefox":
+          - generic: Firefox
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000017 1 Super 桌面端 192.168.1.18 上海市 macOS Chrome 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000017":
+          - generic: LOGIN-000017
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "上海市":
+          - generic: 上海市
+        - cell "macOS":
+          - generic: macOS
+        - cell "Chrome":
+          - generic: Chrome
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000018 2 operator 移动端 192.168.1.18 杭州市 Windows 11 Edge 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000018":
+          - generic: LOGIN-000018
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "移动端":
+          - generic: 移动端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "杭州市":
+          - generic: 杭州市
+        - cell "Windows 11":
+          - generic: Windows 11
+        - cell "Edge":
+          - generic: Edge
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000019 1 Super 桌面端 127.0.0.1 北京市 iOS Safari 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000019":
+          - generic: LOGIN-000019
+        - cell "1":
+          - generic: "1"
+        - cell "Super":
+          - generic: Super
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "127.0.0.1":
+          - generic: 127.0.0.1
+        - cell "北京市":
+          - generic: 北京市
+        - cell "iOS":
+          - generic: iOS
+        - cell "Safari":
+          - generic: Safari
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "LOGIN-000020 2 operator 桌面端 192.168.1.18 深圳市 Ubuntu Firefox 成功 访问成功 2026-08-05 09:00:00":
+        - cell:
+          - checkbox
+        - cell "LOGIN-000020":
+          - generic: LOGIN-000020
+        - cell "2":
+          - generic: "2"
+        - cell "operator":
+          - generic: operator
+        - cell "桌面端":
+          - generic: 桌面端
+        - cell "192.168.1.18":
+          - generic: 192.168.1.18
+        - cell "深圳市":
+          - generic: 深圳市
+        - cell "Ubuntu":
+          - generic: Ubuntu
+        - cell "Firefox":
+          - generic: Firefox
+        - cell "成功":
+          - generic: 成功
+        - cell "访问成功":
+          - generic: 访问成功
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+    - listitem "第 2 页": "2"
+  - button "下一页":
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页
+  - generic: 共 40 条

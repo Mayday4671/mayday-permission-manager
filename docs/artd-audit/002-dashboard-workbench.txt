@@ -1,0 +1,206 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "分析看板":
+      - generic: 分析看板
+    - menuitem "人力资源":
+      - generic: 人力资源
+    - menuitem "工作台" [active]:
+      - generic: 工作台
+    - menuitem "分析页":
+      - generic: 分析页
+    - menuitem "电子商务":
+      - generic: 电子商务
+    - menuitem "职位仪表盘":
+      - generic: 职位仪表盘
+    - menuitem "销售看板":
+      - generic: 销售看板
+    - menuitem "客户关系":
+      - generic: 客户关系
+    - menuitem "社交媒体":
+      - generic: 社交媒体
+    - menuitem "加密货币":
+      - generic: 加密货币
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 仪表盘
+      - generic: /
+      - generic: 工作台
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+  - button "内容全屏":
+  - text: 总访问次数
+  - generic: "9120"
+  - generic: 较上周
+  - generic: +20%
+  - text: 在线访客数
+  - generic: "182"
+  - generic: 较上周
+  - generic: +10%
+  - text: 点击量
+  - generic: "9520"
+  - generic: 较上周
+  - generic: "-12%"
+  - text: 新用户
+  - generic: "156"
+  - generic: 较上周
+  - generic: +30%
+  - heading "用户概述" [level=3]
+  - paragraph: 比上周 +23%
+  - paragraph: 我们为您创建了多个选项，可将它们组合在一起并定制为像素完美的页面
+  - paragraph: 32k
+  - paragraph: 总用户量
+  - paragraph: 128k
+  - paragraph: 总访问量
+  - paragraph: 1.2k
+  - paragraph: 日访问量
+  - paragraph: +5%
+  - paragraph: 周同比
+  - heading "访问量" [level=4]
+  - paragraph: 今年增长+15%
+  - heading "新用户" [level=4]
+  - paragraph: 这个月增长+20%
+  - radiogroup "radio-group":
+    - radio "本月" [checked]
+    - generic: 本月
+    - radio "上月"
+    - generic: 上月
+    - radio "今年"
+    - generic: 今年
+  - table:
+    - rowgroup:
+      - row "头像 地区 性别 进度":
+        - columnheader "头像":
+          - generic: 头像
+        - columnheader "地区":
+          - generic: 地区
+        - columnheader "性别":
+          - generic: 性别
+        - columnheader "进度":
+          - generic: 进度
+  - table:
+    - rowgroup:
+      - row "avatar 安安 北京 女 60":
+        - cell "avatar 安安":
+          - img "avatar"
+          - generic: 安安
+        - cell "北京":
+          - generic: 北京
+        - cell "女":
+          - generic: 女
+        - cell "60":
+          - 'progressbar "安安的完成进度: 60%"':
+            - generic: 60%
+      - row "avatar 远远 深圳 男 20":
+        - cell "avatar 远远":
+          - img "avatar"
+          - generic: 远远
+        - cell "深圳":
+          - generic: 深圳
+        - cell "男":
+          - generic: 男
+        - cell "20":
+          - 'progressbar "远远的完成进度: 20%"':
+            - generic: 20%
+      - row "avatar 阿轩 上海 男 60":
+        - cell "avatar 阿轩":
+          - img "avatar"
+          - generic: 阿轩
+        - cell "上海":
+          - generic: 上海
+        - cell "男":
+          - generic: 男
+        - cell "60":
+          - 'progressbar "阿轩的完成进度: 60%"':
+            - generic: 60%
+      - row "avatar 嘉宁 长沙 女 50":
+        - cell "avatar 嘉宁":
+          - img "avatar"
+          - generic: 嘉宁
+        - cell "长沙":
+          - generic: 长沙
+        - cell "女":
+          - generic: 女
+        - cell "50":
+          - 'progressbar "嘉宁的完成进度: 50%"':
+            - generic: 50%
+      - row "avatar 一辰 浙江 男 70":
+        - cell "avatar 一辰":
+          - img "avatar"
+          - generic: 一辰
+        - cell "浙江":
+          - generic: 浙江
+        - cell "男":
+          - generic: 男
+        - cell "70":
+          - 'progressbar "一辰的完成进度: 70%"':
+            - generic: 70%
+      - row "avatar 清妍 湖北 男 90":
+        - cell "avatar 清妍":
+          - img "avatar"
+          - generic: 清妍
+        - cell "湖北":
+          - generic: 湖北
+        - cell "男":
+          - generic: 男
+        - cell "90":
+          - 'progressbar "清妍的完成进度: 90%"':
+            - generic: 90%
+  - heading "动态" [level=4]
+  - paragraph: 新增+6
+  - generic: 安安关注了阿轩
+  - generic: 远远发表文章Vue3 + Typescript + Vite 项目实战笔记
+  - generic: 安安关注了阿轩
+  - generic: 远远发表文章Vue3 + Typescript + Vite 项目实战笔记
+  - generic: 阿轩提出问题主题可以配置吗
+  - generic: 嘉宁兑换了物品《奇特的一生》
+  - generic: 一辰关闭了问题嘉宁
+  - generic: 清妍兑换了物品《高效人士的七个习惯》
+  - heading "待办事项" [level=4]
+  - paragraph: 待处理3
+  - paragraph: 查看今天工作内容
+  - paragraph: 上午 09:30
+  - checkbox [checked]
+  - paragraph: 回复邮件
+  - paragraph: 上午 10:30
+  - checkbox [checked]
+  - paragraph: 工作汇报整理
+  - paragraph: 上午 11:00
+  - checkbox [checked]
+  - paragraph: 产品需求会议
+  - paragraph: 下午 02:00
+  - checkbox
+  - paragraph: 整理会议内容
+  - paragraph: 下午 03:30
+  - checkbox
+  - paragraph: 明天工作计划
+  - paragraph: 下午 06:30
+  - checkbox
+  - heading "关于项目" [level=2]
+  - paragraph: Art Design Pro X 是面向企业项目交付与二次开发的中后台前端底座
+  - paragraph: 基于 Vue 3、TypeScript、Vite 与 Element Plus 构建
+  - generic: 项目官网
+  - generic: 文档
+  - generic: GitHub
+  - generic: 哔哩哔哩
+  - img "项目技术栈插图"

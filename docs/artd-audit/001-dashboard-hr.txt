@@ -1,0 +1,350 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "分析看板":
+      - generic: 分析看板
+    - menuitem "人力资源" [active]:
+      - generic: 人力资源
+    - menuitem "工作台":
+      - generic: 工作台
+    - menuitem "分析页":
+      - generic: 分析页
+    - menuitem "电子商务":
+      - generic: 电子商务
+    - menuitem "职位仪表盘":
+      - generic: 职位仪表盘
+    - menuitem "销售看板":
+      - generic: 销售看板
+    - menuitem "客户关系":
+      - generic: 客户关系
+    - menuitem "社交媒体":
+      - generic: 社交媒体
+    - menuitem "加密货币":
+      - generic: 加密货币
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 仪表盘
+      - generic: /
+      - generic: 人力资源
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+  - button "内容全屏":
+  - article:
+    - paragraph: 员工总数
+    - generic: 12,860
+    - generic: 2.84%
+    - generic: 本年
+  - article:
+    - paragraph: 新增员工
+    - generic: 1,126
+    - generic: 4.13%
+    - generic: 本年
+  - article:
+    - paragraph: 求职申请数
+    - generic: 2,418
+    - generic: 3.56%
+    - generic: 本年
+  - article:
+    - paragraph: 离职员工
+    - generic: "206"
+    - generic: 1.05%
+    - generic: 本年
+  - article:
+    - heading "员工结构" [level=3]
+    - generic: 28%
+    - generic: 22%
+    - generic: 34%
+    - generic: 16%
+    - generic: 远程办公
+    - generic: 3,624
+    - generic: 试用员工
+    - generic: 2,885
+    - generic: 正式员工
+    - generic: 4,372
+    - generic: 外包/合同
+    - generic: 1,979
+  - article:
+    - heading "招聘概览" [level=3]
+    - paragraph: 累计录用人数
+    - paragraph: "624"
+    - paragraph: 累计反馈数
+    - paragraph: 2,036
+  - article:
+    - heading "考勤概览" [level=3]
+    - generic: 正常出勤
+    - generic: 1,754
+    - generic: 迟到
+    - generic: "878"
+    - generic: 请假
+    - generic: "634"
+    - generic: 缺勤
+    - generic: "470"
+    - button "查看完整统计":
+      - generic: 查看完整统计
+  - article:
+    - heading "部门分布" [level=3]
+  - article:
+    - heading "在职人员" [level=3]
+    - generic: 按入职日期排序
+    - img "林雨"
+    - paragraph: 林雨
+    - generic: 市场部
+    - paragraph: 市场经理
+    - paragraph: 2024-05-20
+    - paragraph: 入职日期
+    - img "周远"
+    - paragraph: 周远
+    - generic: 技术研发
+    - paragraph: 后端开发工程师
+    - paragraph: 2022-11-30
+    - paragraph: 入职日期
+    - img "陈静"
+    - paragraph: 陈静
+    - generic: 运营部
+    - paragraph: 项目经理
+    - paragraph: 2021-07-08
+    - paragraph: 入职日期
+    - img "王哲"
+    - paragraph: 王哲
+    - generic: 技术研发
+    - paragraph: 数据分析师
+    - paragraph: 2020-10-10
+    - paragraph: 入职日期
+    - img "赵欣"
+    - paragraph: 赵欣
+    - generic: 财务部
+    - paragraph: 财务分析师
+    - paragraph: 2022-02-28
+    - paragraph: 入职日期
+    - img "刘洋"
+    - paragraph: 刘洋
+    - generic: 销售部
+    - paragraph: 销售主管
+    - paragraph: 2022-08-05
+    - paragraph: 入职日期
+  - article:
+    - heading "今日出勤" [level=3]
+    - button "排序方式": 排序方式
+    - table:
+      - rowgroup:
+        - row "姓名 签到时间 状态":
+          - columnheader "姓名":
+            - generic: 姓名
+          - columnheader "签到时间":
+            - generic: 签到时间
+          - columnheader "状态":
+            - generic: 状态
+    - table:
+      - rowgroup:
+        - row "张伟 张伟 经理 8:48 全天出勤":
+          - cell "张伟 张伟 经理":
+            - img "张伟"
+            - paragraph: 张伟
+            - paragraph: 经理
+          - cell "8:48":
+            - generic: 8:48
+          - cell "全天出勤":
+            - generic: 全天出勤
+        - row "李娜 李娜 开发工程师 9:20 迟到":
+          - cell "李娜 李娜 开发工程师":
+            - img "李娜"
+            - paragraph: 李娜
+            - paragraph: 开发工程师
+          - cell "9:20":
+            - generic: 9:20
+          - cell "迟到":
+            - generic: 迟到
+        - row "王强 王强 人事专员 8:10 全天出勤":
+          - cell "王强 王强 人事专员":
+            - img "王强"
+            - paragraph: 王强
+            - paragraph: 人事专员
+          - cell "8:10":
+            - generic: 8:10
+          - cell "全天出勤":
+            - generic: 全天出勤
+        - row "陈晨 陈晨 分析师 7:20 早退":
+          - cell "陈晨 陈晨 分析师":
+            - img "陈晨"
+            - paragraph: 陈晨
+            - paragraph: 分析师
+          - cell "7:20":
+            - generic: 7:20
+          - cell "早退":
+            - generic: 早退
+        - row "周敏 周敏 设计师 10:30 全天出勤":
+          - cell "周敏 周敏 设计师":
+            - img "周敏"
+            - paragraph: 周敏
+            - paragraph: 设计师
+          - cell "10:30":
+            - generic: 10:30
+          - cell "全天出勤":
+            - generic: 全天出勤
+        - row "赵磊 赵磊 产品经理 8:35 全天出勤":
+          - cell "赵磊 赵磊 产品经理":
+            - img "赵磊"
+            - paragraph: 赵磊
+            - paragraph: 产品经理
+          - cell "8:35":
+            - generic: 8:35
+          - cell "全天出勤":
+            - generic: 全天出勤
+        - row "林晓 林晓 测试工程师 9:05 迟到":
+          - cell "林晓 林晓 测试工程师":
+            - img "林晓"
+            - paragraph: 林晓
+            - paragraph: 测试工程师
+          - cell "9:05":
+            - generic: 9:05
+          - cell "迟到":
+            - generic: 迟到
+  - article:
+    - heading "应聘者列表" [level=3]
+    - textbox "搜索编号 / 姓名 / 岗位"
+    - button "排序方式":
+      - generic: 排序方式
+    - table:
+      - rowgroup:
+        - row "申请编号 应聘者 应聘岗位 申请日期 邮箱 工作经验 状态 操作":
+          - columnheader:
+            - checkbox
+          - columnheader "申请编号":
+            - generic: 申请编号
+          - columnheader "应聘者":
+            - generic: 应聘者
+          - columnheader "应聘岗位":
+            - generic: 应聘岗位
+          - columnheader "申请日期":
+            - generic: 申请日期
+          - columnheader "邮箱":
+            - generic: 邮箱
+          - columnheader "工作经验":
+            - generic: 工作经验
+          - columnheader "状态":
+            - generic: 状态
+          - columnheader "操作":
+            - generic: 操作
+      - rowgroup:
+        - row "#SPT-011 许悦 许悦 系统管理员 2023-11-24 xuyue@company.com 2年以上 新申请":
+          - cell:
+            - checkbox
+          - cell "#SPT-011":
+            - generic: "#SPT-011"
+          - cell "许悦 许悦":
+            - img "许悦"
+            - generic: 许悦
+          - cell "系统管理员":
+            - generic: 系统管理员
+          - cell "2023-11-24":
+            - generic: 2023-11-24
+          - cell "xuyue@company.com":
+            - generic: xuyue@company.com
+          - cell "2年以上":
+            - generic: 2年以上
+          - cell "新申请":
+            - generic: 新申请
+          - cell:
+        - row "#SPT-012 吴昊 吴昊 数据分析 2023-12-13 wuhao@company.com 3年以上 已面试":
+          - cell:
+            - checkbox
+          - cell "#SPT-012":
+            - generic: "#SPT-012"
+          - cell "吴昊 吴昊":
+            - img "吴昊"
+            - generic: 吴昊
+          - cell "数据分析":
+            - generic: 数据分析
+          - cell "2023-12-13":
+            - generic: 2023-12-13
+          - cell "wuhao@company.com":
+            - generic: wuhao@company.com
+          - cell "3年以上":
+            - generic: 3年以上
+          - cell "已面试":
+            - generic: 已面试
+          - cell:
+        - row "#SPT-013 宋婧 宋婧 UX/UI 设计师 2023-11-10 songjing@company.com 应届 已录用":
+          - cell:
+            - checkbox
+          - cell "#SPT-013":
+            - generic: "#SPT-013"
+          - cell "宋婧 宋婧":
+            - img "宋婧"
+            - generic: 宋婧
+          - cell "UX/UI 设计师":
+            - generic: UX/UI 设计师
+          - cell "2023-11-10":
+            - generic: 2023-11-10
+          - cell "songjing@company.com":
+            - generic: songjing@company.com
+          - cell "应届":
+            - generic: 应届
+          - cell "已录用":
+            - generic: 已录用
+          - cell:
+        - row "#SPT-014 叶琳 叶琳 数据库管理 2023-12-16 yelin@company.com 1年 待复审":
+          - cell:
+            - checkbox
+          - cell "#SPT-014":
+            - generic: "#SPT-014"
+          - cell "叶琳 叶琳":
+            - img "叶琳"
+            - generic: 叶琳
+          - cell "数据库管理":
+            - generic: 数据库管理
+          - cell "2023-12-16":
+            - generic: 2023-12-16
+          - cell "yelin@company.com":
+            - generic: yelin@company.com
+          - cell "1年":
+            - generic: 1年
+          - cell "待复审":
+            - generic: 待复审
+          - cell:
+        - row "#SPT-015 唐凯 唐凯 AI 与机器学习 2023-12-22 tangkai@company.com 5年以上 已淘汰":
+          - cell:
+            - checkbox
+          - cell "#SPT-015":
+            - generic: "#SPT-015"
+          - cell "唐凯 唐凯":
+            - img "唐凯"
+            - generic: 唐凯
+          - cell "AI 与机器学习":
+            - generic: AI 与机器学习
+          - cell "2023-12-22":
+            - generic: 2023-12-22
+          - cell "tangkai@company.com":
+            - generic: tangkai@company.com
+          - cell "5年以上":
+            - generic: 5年以上
+          - cell "已淘汰":
+            - generic: 已淘汰
+          - cell:
+    - paragraph: 显示 5 条记录
+    - button "上一页":
+    - list:
+      - listitem "第 1 页": "1"
+      - listitem "第 2 页": "2"
+      - listitem "第 3 页": "3"
+      - listitem "第 4 页": "4"
+    - button "下一页":

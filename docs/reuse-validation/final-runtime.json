@@ -1,0 +1,24 @@
+{
+  "checkedAt": "2026-09-21T03:12:11.923Z",
+  "status": "passed",
+  "frontend": "sha256:5aaa89312ba43b429d98a72a6e3eafe4f310c68bf1565562d6570d1e097e10fa",
+  "backend": "sha256:a1bdb70061a7ef367a2bdb915acad84f5b4af49c3e275f69e7832a6c037d0bf9",
+  "headers": {
+    "x-frame-options": "DENY",
+    "content-security-policy": "frame-ancestors 'none'",
+    "x-content-type-options": "nosniff"
+  },
+  "anonymousManagement": 401,
+  "database": {
+    "tables": 35,
+    "columns": 301,
+    "missingComments": 0,
+    "invalidRelations": 0
+  },
+  "publicTheme": {
+    "mode": "light",
+    "primaryColor": "#245da8",
+    "borderRadius": 4,
+    "compact": false
+  }
+}

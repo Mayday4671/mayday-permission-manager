@@ -1,0 +1,63 @@
+{
+  "runId": "20260921030530727-a13fbb",
+  "project": "mayday-check-20260921030530727-a13fbb",
+  "startedAt": "2026-09-21T03:05:30.728Z",
+  "status": "passed",
+  "checks": [
+    {
+      "name": "原数据库一致性快照与 SQL 备份",
+      "status": "passed"
+    },
+    {
+      "name": "备份已在独立数据库成功恢复",
+      "status": "passed"
+    },
+    {
+      "name": "升级与空库安装迁移一致，原业务记录与角色授权不变",
+      "status": "passed"
+    },
+    {
+      "name": "所有业务表和字段的中文 COMMENT 完整且一致，原有字段定义保持不变",
+      "status": "passed",
+      "detail": {
+        "tables": 35,
+        "columns": 301
+      }
+    },
+    {
+      "name": "纯净初始化仅创建管理员及必要基础资料，不创建演示组织、人员或文章",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade：真实 MySQL 接口回归",
+      "status": "passed"
+    },
+    {
+      "name": "fresh：真实 MySQL 接口回归",
+      "status": "passed"
+    },
+    {
+      "name": "接口回归结束后，原业务快照完全一致",
+      "status": "passed"
+    },
+    {
+      "name": "重启未重复初始化或改变迁移、原业务数据",
+      "status": "passed"
+    },
+    {
+      "name": "日常运行数据库未被本次验证更改",
+      "status": "passed"
+    }
+  ],
+  "backup": {
+    "path": "D:\\Code\\2026\\mayday-permission-manager\\.local\\baseline\\20260921030530727-a13fbb\\source.sql",
+    "sha256": "39f738f91a665d9adb4827f59b9e48f4fdd8d7a07e17cfec64be051cea2b4247",
+    "bytes": 80510
+  },
+  "databaseDocumentation": {
+    "tables": 35,
+    "columns": 301
+  },
+  "cleanup": "passed",
+  "finishedAt": "2026-09-21T03:09:36.388Z"
+}

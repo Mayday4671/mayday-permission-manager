@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 独立 POM：不依赖 Mayday 父工程、Spring、数据库或权限模块，可直接复制并单独构建。 -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.mayday</groupId><artifactId>mayday-netty</artifactId><version>1.0.0</version>
+  <properties><maven.compiler.release>17</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding><netty.version>4.1.105.Final</netty.version></properties>
+  <dependencyManagement><dependencies><dependency><groupId>io.netty</groupId><artifactId>netty-bom</artifactId><version>${netty.version}</version><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement>
+  <dependencies>
+    <!-- 仅加载 UDP transport，不引入 netty-all、HTTP、TLS、DNS 等无关协议实现。 -->
+    <dependency><groupId>io.netty</groupId><artifactId>netty-transport</artifactId></dependency>
+    <dependency><groupId>io.netty</groupId><artifactId>netty-transport-classes-epoll</artifactId></dependency>
+    <dependency><groupId>io.netty</groupId><artifactId>netty-transport-native-epoll</artifactId><classifier>linux-x86_64</classifier><scope>runtime</scope></dependency>
+    <dependency><groupId>io.netty</groupId><artifactId>netty-transport-native-epoll</artifactId><classifier>linux-aarch_64</classifier><scope>runtime</scope></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.11.4</version><scope>test</scope></dependency>
+  </dependencies>
+  <build><plugins>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.0</version></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.3</version></plugin>
+  </plugins></build>
+</project>

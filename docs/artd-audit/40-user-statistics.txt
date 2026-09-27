@@ -1,0 +1,387 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计" [active]:
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+    - generic: 部门管理
+    - generic: 岗位管理
+    - generic: 字典管理
+    - generic: 参数设置
+    - generic: 菜单管理
+    - generic: 操作日志
+    - generic: 登录日志
+    - generic: 用户统计
+  - button "内容全屏":
+  - heading "用户统计" [level=1]
+  - paragraph: 面向共享账号场景，以 IP、设备、浏览器、访问时间、活跃路径等信号近似识别独立访问者，输出趋势、画像与异常提示，帮助运营在上线前建立可持续的用户洞察能力。
+  - generic: 最近聚合 2026-09-17 22:44:07
+  - generic: 识别规则 IP + UA + 时间窗 + 行为序列
+  - article:
+    - generic: 发布以来访问用户
+    - generic: "36"
+    - generic: 历史去重估算，非自然人
+    - generic: 全站指纹
+    - generic: 128 人
+    - generic: 公共账号
+    - generic: 2 人
+    - generic: 长期累计用于判断公开访问入口的真实触达规模
+  - article:
+    - generic: 公共账号访客
+    - generic: "2"
+    - generic: 当前窗口内的公共账号访客画像
+    - generic: 业务访客
+    - generic: 6 人
+    - generic: 复用率
+    - generic: 18x
+    - generic: 已隔离不参与业务账号复用与风险均值
+  - article:
+    - generic: 高风险画像
+    - generic: "1"
+    - generic: 跨区域切换、夜间高频或多端突变访客
+    - generic: 业务访客
+    - generic: 6 人
+    - generic: 高风险
+    - generic: 1 人
+    - generic: 重点复核建议优先运营与安全协同排查
+  - article:
+    - generic: 平均识别置信度
+    - generic: 82%
+    - generic: 当前样本中识别准确度的整体参考值
+    - generic: 高置信度
+    - generic: 7 人
+    - generic: 当前识别
+    - generic: 8 人
+    - generic: 实时校准后续可继续叠加更细粒度埋点提升精度
+  - article:
+    - heading "近 7 日访问趋势" [level=2]
+    - paragraph: 同时观察访问次数、识别访客数与高置信度访客占比，判断共享账号的实际覆盖规模。
+    - button "近 7 天"
+    - button "近 14 天"
+    - generic: 访问次数
+    - generic: 识别访客
+    - generic: 高置信度
+    - generic: 峰值访问
+    - generic: 35 次
+    - generic: 08-07 为当前峰值日
+    - generic: 峰值识别访客
+    - generic: 16 人
+    - generic: 帮助评估共享账号真实覆盖规模
+    - generic: 高置信度占比
+    - generic: 87%
+    - generic: 高于 80% 表示规则稳定度较好
+  - article:
+    - heading "识别引擎说明" [level=2]
+    - paragraph: 解释当前“疑似独立访客”识别口径，便于运营理解和校准。
+    - generic: 设备与网络组合
+    - generic: 40%
+    - generic: 结合设备、浏览器和网络来源识别
+    - generic: 置信度分层
+    - generic: 建议用于运营打标
+    - generic: 高置信度
+    - generic: 8 人
+    - progressbar
+  - article:
+    - heading "设备画像" [level=3]
+    - generic: 按会话归因
+    - generic: "6"
+    - generic: desktop
+    - generic: "2"
+    - generic: mobile
+  - article:
+    - heading "浏览器分布" [level=3]
+    - generic: 兼容性判断
+    - generic: Chrome
+    - generic: 主要访问浏览器
+    - generic: "8"
+    - generic: 100%
+    - progressbar
+  - article:
+    - heading "高活跃时段" [level=3]
+    - generic: 北京时间
+  - article:
+    - heading "共享账号复用排行" [level=3]
+    - paragraph: 识别被多个疑似访客共同使用的账号，优先观察账号授权与运营归因。
+  - article:
+    - heading "异常提示" [level=3]
+    - paragraph: 识别潜在异常共享、夜间高频和跨区域切换行为。
+  - generic: 关键词
+  - textbox "关键词":
+    - /placeholder: 访客别名 / 账号 / IP / 地区
+  - generic: 风险等级
+  - combobox "风险等级"
+  - generic: 请选择风险等级
+  - generic: 设备类型
+  - combobox "设备类型"
+  - generic: 请选择设备类型
+  - button "重置":
+    - generic: 重置
+  - button "查询":
+    - generic: 查询
+  - heading "疑似访客明细" [level=3]
+  - paragraph: 查看识别结果、归属账号、风险等级与访问特征，支持运营进一步打标。
+  - generic: 共 8 人
+  - generic: 业务 6 人
+  - generic: 公共账号 2 人
+  - generic: 高风险 1 人
+  - button:
+  - button "专注模式":
+    - generic: 专注模式
+  - table:
+    - rowgroup:
+      - row "访客画像 归属账号 来源信息 设备 / 浏览器 置信度 风险等级 最近访问 操作":
+        - columnheader "访客画像":
+          - generic: 访客画像
+        - columnheader "归属账号":
+          - generic: 归属账号
+        - columnheader "来源信息":
+          - generic: 来源信息
+        - columnheader "设备 / 浏览器":
+          - generic: 设备 / 浏览器
+        - columnheader "置信度":
+          - generic: 置信度
+        - columnheader "风险等级":
+          - generic: 风险等级
+        - columnheader "最近访问":
+          - generic: 最近访问
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "周明 周明远 session-super-mac Super 公共账号 2 次会话 10.24.18.10 上海市 macOS 14.6 · Chrome 127 / Chrome 127 macOS 14.6 86% 高可信 中风险 2026-08-06 16:53:10":
+        - cell "周明 周明远 session-super-mac":
+          - button "周明 周明远 session-super-mac":
+            - generic: 周明
+            - generic: 周明远
+            - generic: session-super-mac
+        - cell "Super 公共账号 2 次会话":
+          - generic: Super
+          - generic: 公共账号
+          - generic: 2 次会话
+        - cell "10.24.18.10 上海市":
+          - generic: 10.24.18.10
+          - generic: 上海市
+        - cell "macOS 14.6 · Chrome 127 / Chrome 127 macOS 14.6":
+          - generic: macOS 14.6 · Chrome 127 / Chrome 127
+          - generic: macOS 14.6
+        - cell "86% 高可信":
+          - generic: 86%
+          - generic: 高可信
+        - cell "中风险":
+          - generic: 中风险
+        - cell "2026-08-06 16:53:10":
+          - generic: 2026-08-06 16:53:10
+        - cell:
+      - row "周明 周明远 session-super-mobile Super 公共账号 3 次会话 172.18.4.21 上海市 iOS 18 · Safari 17 / Safari 17 iOS 18 85% 高可信 低风险 2026-08-06 16:51:11":
+        - cell "周明 周明远 session-super-mobile":
+          - button "周明 周明远 session-super-mobile":
+            - generic: 周明
+            - generic: 周明远
+            - generic: session-super-mobile
+        - cell "Super 公共账号 3 次会话":
+          - generic: Super
+          - generic: 公共账号
+          - generic: 3 次会话
+        - cell "172.18.4.21 上海市":
+          - generic: 172.18.4.21
+          - generic: 上海市
+        - cell "iOS 18 · Safari 17 / Safari 17 iOS 18":
+          - generic: iOS 18 · Safari 17 / Safari 17
+          - generic: iOS 18
+        - cell "85% 高可信":
+          - generic: 85%
+          - generic: 高可信
+        - cell "低风险":
+          - generic: 低风险
+        - cell "2026-08-06 16:51:11":
+          - generic: 2026-08-06 16:51:11
+        - cell:
+      - row "林知 林知夏 session-product-lin lin.zhixia 4 次会话 10.24.18.36 上海市 macOS 14.6 · Chrome 127 / Chrome 127 macOS 14.6 84% 高可信 低风险 2026-08-06 16:52:12":
+        - cell "林知 林知夏 session-product-lin":
+          - button "林知 林知夏 session-product-lin":
+            - generic: 林知
+            - generic: 林知夏
+            - generic: session-product-lin
+        - cell "lin.zhixia 4 次会话":
+          - generic: lin.zhixia
+          - generic: 4 次会话
+        - cell "10.24.18.36 上海市":
+          - generic: 10.24.18.36
+          - generic: 上海市
+        - cell "macOS 14.6 · Chrome 127 / Chrome 127 macOS 14.6":
+          - generic: macOS 14.6 · Chrome 127 / Chrome 127
+          - generic: macOS 14.6
+        - cell "84% 高可信":
+          - generic: 84%
+          - generic: 高可信
+        - cell "低风险":
+          - generic: 低风险
+        - cell "2026-08-06 16:52:12":
+          - generic: 2026-08-06 16:52:12
+        - cell:
+      - row "陈屿 陈屿 session-frontend-chen chen.yu 5 次会话 10.24.32.17 上海市 Windows 11 · Edge 127 / Edge 127 Windows 11 83% 高可信 中风险 2026-08-06 16:48:13":
+        - cell "陈屿 陈屿 session-frontend-chen":
+          - button "陈屿 陈屿 session-frontend-chen":
+            - generic: 陈屿
+            - generic: 陈屿
+            - generic: session-frontend-chen
+        - cell "chen.yu 5 次会话":
+          - generic: chen.yu
+          - generic: 5 次会话
+        - cell "10.24.32.17 上海市":
+          - generic: 10.24.32.17
+          - generic: 上海市
+        - cell "Windows 11 · Edge 127 / Edge 127 Windows 11":
+          - generic: Windows 11 · Edge 127 / Edge 127
+          - generic: Windows 11
+        - cell "83% 高可信":
+          - generic: 83%
+          - generic: 高可信
+        - cell "中风险":
+          - generic: 中风险
+        - cell "2026-08-06 16:48:13":
+          - generic: 2026-08-06 16:48:13
+        - cell:
+      - row "顾言 顾言 session-backend-gu gu.yan 6 次会话 10.24.41.28 上海市 Ubuntu 24.04 · Chrome 127 / Chrome 127 Ubuntu 24.04 82% 高可信 高风险 2026-08-06 16:16:14":
+        - cell "顾言 顾言 session-backend-gu":
+          - button "顾言 顾言 session-backend-gu":
+            - generic: 顾言
+            - generic: 顾言
+            - generic: session-backend-gu
+        - cell "gu.yan 6 次会话":
+          - generic: gu.yan
+          - generic: 6 次会话
+        - cell "10.24.41.28 上海市":
+          - generic: 10.24.41.28
+          - generic: 上海市
+        - cell "Ubuntu 24.04 · Chrome 127 / Chrome 127 Ubuntu 24.04":
+          - generic: Ubuntu 24.04 · Chrome 127 / Chrome 127
+          - generic: Ubuntu 24.04
+        - cell "82% 高可信":
+          - generic: 82%
+          - generic: 高可信
+        - cell "高风险":
+          - generic: 高风险
+        - cell "2026-08-06 16:16:14":
+          - generic: 2026-08-06 16:16:14
+        - cell:
+      - row "严青 严青 session-sre-yan yan.qing 7 次会话 10.24.72.43 上海市 Ubuntu 24.04 · Chrome 127 / Chrome 127 Ubuntu 24.04 81% 高可信 低风险 2026-08-06 16:50:15":
+        - cell "严青 严青 session-sre-yan":
+          - button "严青 严青 session-sre-yan":
+            - generic: 严青
+            - generic: 严青
+            - generic: session-sre-yan
+        - cell "yan.qing 7 次会话":
+          - generic: yan.qing
+          - generic: 7 次会话
+        - cell "10.24.72.43 上海市":
+          - generic: 10.24.72.43
+          - generic: 上海市
+        - cell "Ubuntu 24.04 · Chrome 127 / Chrome 127 Ubuntu 24.04":
+          - generic: Ubuntu 24.04 · Chrome 127 / Chrome 127
+          - generic: Ubuntu 24.04
+        - cell "81% 高可信":
+          - generic: 81%
+          - generic: 高可信
+        - cell "低风险":
+          - generic: 低风险
+        - cell "2026-08-06 16:50:15":
+          - generic: 2026-08-06 16:50:15
+        - cell:
+      - row "安可 安可 session-ops-an an.ke 8 次会话 10.24.46.29 上海市 Windows 11 · Edge 127 / Edge 127 Windows 11 80% 高可信 中风险 2026-08-06 16:46:16":
+        - cell "安可 安可 session-ops-an":
+          - button "安可 安可 session-ops-an":
+            - generic: 安可
+            - generic: 安可
+            - generic: session-ops-an
+        - cell "an.ke 8 次会话":
+          - generic: an.ke
+          - generic: 8 次会话
+        - cell "10.24.46.29 上海市":
+          - generic: 10.24.46.29
+          - generic: 上海市
+        - cell "Windows 11 · Edge 127 / Edge 127 Windows 11":
+          - generic: Windows 11 · Edge 127 / Edge 127
+          - generic: Windows 11
+        - cell "80% 高可信":
+          - generic: 80%
+          - generic: 高可信
+        - cell "中风险":
+          - generic: 中风险
+        - cell "2026-08-06 16:46:16":
+          - generic: 2026-08-06 16:46:16
+        - cell:
+      - row "乔欣 乔欣 session-success-qiao qiao.xin 9 次会话 172.18.5.62 上海市 iOS 18 · Safari 17 / Safari 17 iOS 18 79% 中可信 低风险 2026-08-06 16:28:17":
+        - cell "乔欣 乔欣 session-success-qiao":
+          - button "乔欣 乔欣 session-success-qiao":
+            - generic: 乔欣
+            - generic: 乔欣
+            - generic: session-success-qiao
+        - cell "qiao.xin 9 次会话":
+          - generic: qiao.xin
+          - generic: 9 次会话
+        - cell "172.18.5.62 上海市":
+          - generic: 172.18.5.62
+          - generic: 上海市
+        - cell "iOS 18 · Safari 17 / Safari 17 iOS 18":
+          - generic: iOS 18 · Safari 17 / Safari 17
+          - generic: iOS 18
+        - cell "79% 中可信":
+          - generic: 79%
+          - generic: 中可信
+        - cell "低风险":
+          - generic: 低风险
+        - cell "2026-08-06 16:28:17":
+          - generic: 2026-08-06 16:28:17
+        - cell:
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+  - button "下一页" [disabled]:
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页
+  - generic: 共 8 条

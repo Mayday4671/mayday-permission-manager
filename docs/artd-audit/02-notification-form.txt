@@ -1,0 +1,609 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "通知管理":
+      - generic: 通知管理
+    - menuitem "通知收件箱":
+      - generic: 通知收件箱
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 通知中心
+      - generic: /
+      - generic: 通知管理
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 内容中心
+    - generic: 流程分类
+    - generic: 通知管理
+  - button "内容全屏":
+  - button "新增通知":
+    - generic: 新增通知
+  - button "我的收件箱":
+    - generic: 我的收件箱
+  - button:
+  - table:
+    - rowgroup:
+      - row "序号 通知标题 通知类型 发送范围 状态 接收人数 已读人数 创建人 发布时间 更新时间 操作":
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "通知标题":
+          - generic: 通知标题
+        - columnheader "通知类型":
+          - generic: 通知类型
+        - columnheader "发送范围":
+          - generic: 发送范围
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "接收人数":
+          - generic: 接收人数
+        - columnheader "已读人数":
+          - generic: 已读人数
+        - columnheader "创建人":
+          - generic: 创建人
+        - columnheader "发布时间":
+          - generic: 发布时间
+        - columnheader "更新时间":
+          - generic: 更新时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 系统维护公告 维护期间部分功能可能短暂不可用 公告通知 全员 已发布 36 18 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "1":
+          - generic: "1"
+        - cell "系统维护公告 维护期间部分功能可能短暂不可用":
+          - generic: 系统维护公告
+          - generic: 维护期间部分功能可能短暂不可用
+        - cell "公告通知":
+          - generic: 公告通知
+        - cell "全员":
+          - generic: 全员
+        - cell "已发布":
+          - generic: 已发布
+        - cell "36":
+          - generic: "36"
+        - cell "18":
+          - generic: "18"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "2 版本更新通知 本次更新优化了操作体验 更新通知 按角色 (1) 草稿 0 0 Super - 2026-08-05 09:00:00":
+        - cell "2":
+          - generic: "2"
+        - cell "版本更新通知 本次更新优化了操作体验":
+          - generic: 版本更新通知
+          - generic: 本次更新优化了操作体验
+        - cell "更新通知":
+          - generic: 更新通知
+        - cell "按角色 (1)":
+          - generic: 按角色 (1)
+        - cell "草稿":
+          - generic: 草稿
+        - cell "0":
+          - generic: "0"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "3 安全风险提醒 请及时检查账号安全设置 预警通知 按部门 (1) 已发布 42 20 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "3":
+          - generic: "3"
+        - cell "安全风险提醒 请及时检查账号安全设置":
+          - generic: 安全风险提醒
+          - generic: 请及时检查账号安全设置
+        - cell "预警通知":
+          - generic: 预警通知
+        - cell "按部门 (1)":
+          - generic: 按部门 (1)
+        - cell "已发布":
+          - generic: 已发布
+        - cell "42":
+          - generic: "42"
+        - cell "20":
+          - generic: "20"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "4 业务培训安排 培训资料已上传至资源库 系统通知 指定用户 (1) 已撤回 45 0 Super - 2026-08-05 09:00:00":
+        - cell "4":
+          - generic: "4"
+        - cell "业务培训安排 培训资料已上传至资源库":
+          - generic: 业务培训安排
+          - generic: 培训资料已上传至资源库
+        - cell "系统通知":
+          - generic: 系统通知
+        - cell "指定用户 (1)":
+          - generic: 指定用户 (1)
+        - cell "已撤回":
+          - generic: 已撤回
+        - cell "45":
+          - generic: "45"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "5 系统维护公告 维护期间部分功能可能短暂不可用 公告通知 全员 已发布 48 22 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "5":
+          - generic: "5"
+        - cell "系统维护公告 维护期间部分功能可能短暂不可用":
+          - generic: 系统维护公告
+          - generic: 维护期间部分功能可能短暂不可用
+        - cell "公告通知":
+          - generic: 公告通知
+        - cell "全员":
+          - generic: 全员
+        - cell "已发布":
+          - generic: 已发布
+        - cell "48":
+          - generic: "48"
+        - cell "22":
+          - generic: "22"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "6 版本更新通知 本次更新优化了操作体验 更新通知 按角色 (1) 草稿 0 0 Super - 2026-08-05 09:00:00":
+        - cell "6":
+          - generic: "6"
+        - cell "版本更新通知 本次更新优化了操作体验":
+          - generic: 版本更新通知
+          - generic: 本次更新优化了操作体验
+        - cell "更新通知":
+          - generic: 更新通知
+        - cell "按角色 (1)":
+          - generic: 按角色 (1)
+        - cell "草稿":
+          - generic: 草稿
+        - cell "0":
+          - generic: "0"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "7 安全风险提醒 请及时检查账号安全设置 预警通知 按部门 (1) 已发布 54 24 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "7":
+          - generic: "7"
+        - cell "安全风险提醒 请及时检查账号安全设置":
+          - generic: 安全风险提醒
+          - generic: 请及时检查账号安全设置
+        - cell "预警通知":
+          - generic: 预警通知
+        - cell "按部门 (1)":
+          - generic: 按部门 (1)
+        - cell "已发布":
+          - generic: 已发布
+        - cell "54":
+          - generic: "54"
+        - cell "24":
+          - generic: "24"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "8 业务培训安排 培训资料已上传至资源库 系统通知 指定用户 (1) 已撤回 57 0 Super - 2026-08-05 09:00:00":
+        - cell "8":
+          - generic: "8"
+        - cell "业务培训安排 培训资料已上传至资源库":
+          - generic: 业务培训安排
+          - generic: 培训资料已上传至资源库
+        - cell "系统通知":
+          - generic: 系统通知
+        - cell "指定用户 (1)":
+          - generic: 指定用户 (1)
+        - cell "已撤回":
+          - generic: 已撤回
+        - cell "57":
+          - generic: "57"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "9 系统维护公告 维护期间部分功能可能短暂不可用 公告通知 全员 已发布 60 26 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "9":
+          - generic: "9"
+        - cell "系统维护公告 维护期间部分功能可能短暂不可用":
+          - generic: 系统维护公告
+          - generic: 维护期间部分功能可能短暂不可用
+        - cell "公告通知":
+          - generic: 公告通知
+        - cell "全员":
+          - generic: 全员
+        - cell "已发布":
+          - generic: 已发布
+        - cell "60":
+          - generic: "60"
+        - cell "26":
+          - generic: "26"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "10 版本更新通知 本次更新优化了操作体验 更新通知 按角色 (1) 草稿 0 0 Super - 2026-08-05 09:00:00":
+        - cell "10":
+          - generic: "10"
+        - cell "版本更新通知 本次更新优化了操作体验":
+          - generic: 版本更新通知
+          - generic: 本次更新优化了操作体验
+        - cell "更新通知":
+          - generic: 更新通知
+        - cell "按角色 (1)":
+          - generic: 按角色 (1)
+        - cell "草稿":
+          - generic: 草稿
+        - cell "0":
+          - generic: "0"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "11 安全风险提醒 请及时检查账号安全设置 预警通知 按部门 (1) 已发布 66 28 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "11":
+          - generic: "11"
+        - cell "安全风险提醒 请及时检查账号安全设置":
+          - generic: 安全风险提醒
+          - generic: 请及时检查账号安全设置
+        - cell "预警通知":
+          - generic: 预警通知
+        - cell "按部门 (1)":
+          - generic: 按部门 (1)
+        - cell "已发布":
+          - generic: 已发布
+        - cell "66":
+          - generic: "66"
+        - cell "28":
+          - generic: "28"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "12 业务培训安排 培训资料已上传至资源库 系统通知 指定用户 (1) 已撤回 69 0 Super - 2026-08-05 09:00:00":
+        - cell "12":
+          - generic: "12"
+        - cell "业务培训安排 培训资料已上传至资源库":
+          - generic: 业务培训安排
+          - generic: 培训资料已上传至资源库
+        - cell "系统通知":
+          - generic: 系统通知
+        - cell "指定用户 (1)":
+          - generic: 指定用户 (1)
+        - cell "已撤回":
+          - generic: 已撤回
+        - cell "69":
+          - generic: "69"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "13 系统维护公告 维护期间部分功能可能短暂不可用 公告通知 全员 已发布 72 30 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "13":
+          - generic: "13"
+        - cell "系统维护公告 维护期间部分功能可能短暂不可用":
+          - generic: 系统维护公告
+          - generic: 维护期间部分功能可能短暂不可用
+        - cell "公告通知":
+          - generic: 公告通知
+        - cell "全员":
+          - generic: 全员
+        - cell "已发布":
+          - generic: 已发布
+        - cell "72":
+          - generic: "72"
+        - cell "30":
+          - generic: "30"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "14 版本更新通知 本次更新优化了操作体验 更新通知 按角色 (1) 草稿 0 0 Super - 2026-08-05 09:00:00":
+        - cell "14":
+          - generic: "14"
+        - cell "版本更新通知 本次更新优化了操作体验":
+          - generic: 版本更新通知
+          - generic: 本次更新优化了操作体验
+        - cell "更新通知":
+          - generic: 更新通知
+        - cell "按角色 (1)":
+          - generic: 按角色 (1)
+        - cell "草稿":
+          - generic: 草稿
+        - cell "0":
+          - generic: "0"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "15 安全风险提醒 请及时检查账号安全设置 预警通知 按部门 (1) 已发布 78 32 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "15":
+          - generic: "15"
+        - cell "安全风险提醒 请及时检查账号安全设置":
+          - generic: 安全风险提醒
+          - generic: 请及时检查账号安全设置
+        - cell "预警通知":
+          - generic: 预警通知
+        - cell "按部门 (1)":
+          - generic: 按部门 (1)
+        - cell "已发布":
+          - generic: 已发布
+        - cell "78":
+          - generic: "78"
+        - cell "32":
+          - generic: "32"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "16 业务培训安排 培训资料已上传至资源库 系统通知 指定用户 (1) 已撤回 81 0 Super - 2026-08-05 09:00:00":
+        - cell "16":
+          - generic: "16"
+        - cell "业务培训安排 培训资料已上传至资源库":
+          - generic: 业务培训安排
+          - generic: 培训资料已上传至资源库
+        - cell "系统通知":
+          - generic: 系统通知
+        - cell "指定用户 (1)":
+          - generic: 指定用户 (1)
+        - cell "已撤回":
+          - generic: 已撤回
+        - cell "81":
+          - generic: "81"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "17 系统维护公告 维护期间部分功能可能短暂不可用 公告通知 全员 已发布 84 34 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "17":
+          - generic: "17"
+        - cell "系统维护公告 维护期间部分功能可能短暂不可用":
+          - generic: 系统维护公告
+          - generic: 维护期间部分功能可能短暂不可用
+        - cell "公告通知":
+          - generic: 公告通知
+        - cell "全员":
+          - generic: 全员
+        - cell "已发布":
+          - generic: 已发布
+        - cell "84":
+          - generic: "84"
+        - cell "34":
+          - generic: "34"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "18 版本更新通知 本次更新优化了操作体验 更新通知 按角色 (1) 草稿 0 0 Super - 2026-08-05 09:00:00":
+        - cell "18":
+          - generic: "18"
+        - cell "版本更新通知 本次更新优化了操作体验":
+          - generic: 版本更新通知
+          - generic: 本次更新优化了操作体验
+        - cell "更新通知":
+          - generic: 更新通知
+        - cell "按角色 (1)":
+          - generic: 按角色 (1)
+        - cell "草稿":
+          - generic: 草稿
+        - cell "0":
+          - generic: "0"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "19 安全风险提醒 请及时检查账号安全设置 预警通知 按部门 (1) 已发布 90 36 Super 2026-08-05 09:00:00 2026-08-05 09:00:00":
+        - cell "19":
+          - generic: "19"
+        - cell "安全风险提醒 请及时检查账号安全设置":
+          - generic: 安全风险提醒
+          - generic: 请及时检查账号安全设置
+        - cell "预警通知":
+          - generic: 预警通知
+        - cell "按部门 (1)":
+          - generic: 按部门 (1)
+        - cell "已发布":
+          - generic: 已发布
+        - cell "90":
+          - generic: "90"
+        - cell "36":
+          - generic: "36"
+        - cell "Super":
+          - generic: Super
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "20 业务培训安排 培训资料已上传至资源库 系统通知 指定用户 (1) 已撤回 93 0 Super - 2026-08-05 09:00:00":
+        - cell "20":
+          - generic: "20"
+        - cell "业务培训安排 培训资料已上传至资源库":
+          - generic: 业务培训安排
+          - generic: 培训资料已上传至资源库
+        - cell "系统通知":
+          - generic: 系统通知
+        - cell "指定用户 (1)":
+          - generic: 指定用户 (1)
+        - cell "已撤回":
+          - generic: 已撤回
+        - cell "93":
+          - generic: "93"
+        - cell "0":
+          - generic: "0"
+        - cell "Super":
+          - generic: Super
+        - cell "-":
+          - generic: "-"
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+  - generic: 共 30 条
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+    - listitem "第 2 页": "2"
+  - button "下一页":
+  - combobox
+  - generic: 20条/页
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页
+  - dialog "新增通知":
+    - heading "新增通知" [level=2]
+    - button "关闭此对话框":
+    - generic: "* 通知标题"
+    - textbox "* 通知标题":
+      - /placeholder: 请输入通知标题
+    - generic: "* 通知类型"
+    - combobox "* 通知类型"
+    - generic: 系统通知
+    - generic: 通知摘要
+    - textbox "通知摘要":
+      - /placeholder: 可选，用于通知弹窗的简短描述
+    - generic: 0 / 255
+    - generic: "* 推送范围"
+    - radiogroup "* 推送范围":
+      - radio "全员" [checked]
+      - generic: 全员
+      - radio "按部门"
+      - generic: 按部门
+      - radio "按角色"
+      - generic: 按角色
+      - radio "指定用户"
+      - generic: 指定用户
+    - generic: 过期时间
+    - combobox "过期时间"
+    - group "内容":
+      - generic: 内容
+      - button "正文":
+        - text: 正文
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button "默认字号":
+        - text: 默认字号
+      - button "默认行高":
+        - text: 默认行高
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - button:
+      - paragraph
+      - generic: 请输入内容...
+    - generic: 发布状态
+    - radiogroup "发布状态":
+      - radio "立即发布" [checked]
+      - generic: 立即发布
+      - radio "保存草稿"
+      - generic: 保存草稿
+    - button "取消":
+      - generic: 取消
+    - button "提交":
+      - generic: 提交

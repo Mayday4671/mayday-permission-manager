@@ -1,0 +1,341 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理":
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+    - generic: 部门管理
+    - generic: 岗位管理
+    - generic: 字典管理
+    - generic: 参数设置
+    - generic: 菜单管理
+  - button "内容全屏":
+  - button "新增菜单":
+    - generic: 新增菜单
+  - button "展开":
+    - generic: 展开
+  - button:
+  - table:
+    - rowgroup:
+      - row "菜单名称 菜单类型 路由 权限标识 排序 编辑时间 状态 操作":
+        - columnheader "菜单名称":
+          - generic: 菜单名称
+        - columnheader "菜单类型":
+          - generic: 菜单类型
+        - columnheader "路由":
+          - generic: 路由
+        - columnheader "权限标识":
+          - generic: 权限标识
+        - columnheader "排序":
+          - generic: 排序
+        - columnheader "编辑时间":
+          - generic: 编辑时间
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "拖拽排序 仪表盘 目录 /dashboard - - 启用":
+        - cell "拖拽排序 仪表盘":
+          - button "拖拽排序":
+          - generic: 仪表盘
+        - cell "目录":
+          - generic: 目录
+        - cell "/dashboard":
+          - generic: /dashboard
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 数据大屏 目录 /data-screen - - 启用":
+        - cell "拖拽排序 数据大屏":
+          - button "拖拽排序":
+          - generic: 数据大屏
+        - cell "目录":
+          - generic: 目录
+        - cell "/data-screen":
+          - generic: /data-screen
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 模板中心 目录 /template - - 启用":
+        - cell "拖拽排序 模板中心":
+          - button "拖拽排序":
+          - generic: 模板中心
+        - cell "目录":
+          - generic: 目录
+        - cell "/template":
+          - generic: /template
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 组件中心 目录 /widgets - - 启用":
+        - cell "拖拽排序 组件中心":
+          - button "拖拽排序":
+          - generic: 组件中心
+        - cell "目录":
+          - generic: 目录
+        - cell "/widgets":
+          - generic: /widgets
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 系统管理 目录 /system - - 启用":
+        - cell "拖拽排序 系统管理":
+          - button "拖拽排序":
+          - generic: 系统管理
+        - cell "目录":
+          - generic: 目录
+        - cell "/system":
+          - generic: /system
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 系统监控 目录 /monitor - - 启用":
+        - cell "拖拽排序 系统监控":
+          - button "拖拽排序":
+          - generic: 系统监控
+        - cell "目录":
+          - generic: 目录
+        - cell "/monitor":
+          - generic: /monitor
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 通知中心 目录 /notification - - 启用":
+        - cell "拖拽排序 通知中心":
+          - button "拖拽排序":
+          - generic: 通知中心
+        - cell "目录":
+          - generic: 目录
+        - cell "/notification":
+          - generic: /notification
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 任务调度 目录 /scheduler - - 启用":
+        - cell "拖拽排序 任务调度":
+          - button "拖拽排序":
+          - generic: 任务调度
+        - cell "目录":
+          - generic: 目录
+        - cell "/scheduler":
+          - generic: /scheduler
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 审批中心 目录 /workflow - - 启用":
+        - cell "拖拽排序 审批中心":
+          - button "拖拽排序":
+          - generic: 审批中心
+        - cell "目录":
+          - generic: 目录
+        - cell "/workflow":
+          - generic: /workflow
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 内容管理 目录 /content - - 启用":
+        - cell "拖拽排序 内容管理":
+          - button "拖拽排序":
+          - generic: 内容管理
+        - cell "目录":
+          - generic: 目录
+        - cell "/content":
+          - generic: /content
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 结果页面 目录 /result - - 启用":
+        - cell "拖拽排序 结果页面":
+          - button "拖拽排序":
+          - generic: 结果页面
+        - cell "目录":
+          - generic: 目录
+        - cell "/result":
+          - generic: /result
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 异常页面 目录 /exception - - 启用":
+        - cell "拖拽排序 异常页面":
+          - button "拖拽排序":
+          - generic: 异常页面
+        - cell "目录":
+          - generic: 目录
+        - cell "/exception":
+          - generic: /exception
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "拖拽排序 更新日志 菜单 /change/log - - 启用":
+        - cell "拖拽排序 更新日志":
+          - button "拖拽排序":
+          - generic: 更新日志
+        - cell "菜单":
+          - generic: 菜单
+        - cell "/change/log":
+          - generic: /change/log
+        - cell
+        - cell "-":
+          - generic: "-"
+        - cell "-":
+          - generic: "-"
+        - cell "启用":
+          - generic: 启用
+        - cell:
+  - dialog "新建目录":
+    - heading "新建目录" [level=2]
+    - button "关闭此对话框":
+    - generic: 类型
+    - radiogroup "类型":
+      - radio "目录" [checked]
+      - generic: 目录
+      - radio "菜单"
+      - generic: 菜单
+      - radio "按钮"
+      - generic: 按钮
+      - radio "内嵌"
+      - generic: 内嵌
+      - radio "外链"
+      - generic: 外链
+    - paragraph: 新建时可直接选择类型。按钮权限仍需挂在具体菜单下。
+    - generic: 上级菜单
+    - combobox "上级菜单"
+    - generic: 不选择则创建为顶级菜单
+    - text: "*"
+    - generic: 目录名称
+    - textbox "* 目录名称":
+      - /placeholder: 目录名称
+    - text: "*"
+    - generic: 路由地址
+    - textbox "* 路由地址":
+      - /placeholder: 如：/system
+    - generic: 权限标识
+    - textbox "权限标识":
+      - /placeholder: 如：System
+    - generic: 图标
+    - textbox "图标":
+      - /placeholder: 如：ri:user-line
+    - button "选择图标"
+    - generic: 菜单排序
+    - button "减少数值":
+    - button "增加数值":
+    - spinbutton "菜单排序": "1"
+    - separator:
+      - generic: 其他设置
+    - generic: 是否启用
+    - switch [checked]
+    - generic: 隐藏菜单
+    - switch
+    - generic: 显示徽章
+    - switch
+    - generic: 新标签打开
+    - switch
+    - button "取 消":
+      - generic: 取 消
+    - button "确 定":
+      - generic: 确 定

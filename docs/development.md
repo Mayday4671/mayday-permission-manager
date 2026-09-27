@@ -1,0 +1,92 @@
+# 架构与扩展指南
+
+## 模块依赖
+
+`mayday-common` 提供基础响应与契约；system 保存组织、账号和配置；security 依赖 system 实施授权；content 保存内容修订；operations 保存通知、文件、流程并实现运行引擎；crawler 依赖 operations 的文件契约，实现双层分页图片采集、持久队列和安全网络访问；application 组合所有模块并实现跨模块业务绑定。
+
+`ContentService` 负责草稿、修订、排期和发布，`NotificationService` 负责接收范围与投递，`WorkflowDefinitions` 负责模型发布和人员解析，`WorkflowEngine` 负责申请及节点流转。控制器只做协议转换、分页和调用。`WorkflowBusiness` 是审批与其他业务之间的契约，`ContentApprovalBinding` 在 application 层实现它，避免内容模块与审批模块循环依赖。
+
+Spring Data JPA 负责数据访问，Hibernate 使用 `ddl-auto=validate`，不会自动改动已有结构。空库可由 Flyway 初始化，或一次导入 `database/mayday.sql`（内含 V17 基线）；已有库升级统一由 Flyway 执行。新增字段须创建下一份迁移文件，不能改写任何已执行迁移（当前 V1–V17）。V12 补齐原有业务表/字段中文注释，V13 增加图片采集任务与队列，V14 增加文章归档、逐页正文及文章配图关联，V15 拆分采集数据与配置并增加配置归档标记，V16 增加 UDP 转发持久配置，V17 增加发送源 IP/端口与 NIO/EPOLL 传输模式。`mayday-netty` 使用独立 POM，仅依赖 Netty，不进入 JPA 链路；管理端适配位于应用模块 `com.mayday.relay`。后续新增表或字段须同步更新单文件初始化 SQL 的结构、基础资料及基线版本，通过 `node scripts/database-docs.mjs --check` 检查注释完整性。
+
+## 通用组件
+
+`ResourcePage<T>` 集中处理：
+
+- 请求、服务端分页、关键词搜索、状态筛选。
+- 列表加载、错误重试、空态、删除末条后自动回退页码。
+- 新建/编辑弹窗、表单验证、版本提交、防止重复保存。
+- 权限按钮、删除确认、成功/失败提示、业务缓存刷新。
+- 扩展插槽：表单、额外按钮、导出、额外保存转换。
+
+模块页面只提供 `columns`、`fields`、`endpoint` 和资源规则。`shared.tsx` 的状态标签、人物标识、QueryState 在全站复用。列表主操作统一放入工具栏，不重复展示页面大标题和宣传文案。后台布局样式集中在 `admin.css`，主题由 `lib/theme.tsx` 统一提供。
+
+页面名称已有导航、面包屑和标签页，正文禁止再放“数据概览”之类泛化标题、介绍横幅或重复预览。`ResourcePage.title` 仅用于表格可访问名称和业务提示，不渲染页面标题。数据面板保留能区分业务内容的分区名，统计口径等必要帮助放到对应字段旁；首页刷新复用标签栏“刷新当前页”，不为日期/刷新另占一行。
+
+`PersonalWorkPanel` 是工作台的个人待办/未读消息区，复用 `ApprovalDetailModal` 和 `MessageDetailModal`。个人查询与轮询周期集中在 `lib/personal-work.ts`：请求键包含账号 ID；审批同时检查查看、处理权限；收件箱详情重新鉴权后标记已读，关闭后释放正文缓存。阅读操作统一刷新 `messages`、`unread` 查询，审批完成刷新业务查询；不在页面本地手工减少总数，避免并发处理、消息撤回或权限变化后产生错误计数。通知投递与审批执行语义独立，读消息不意味着完成审批。
+
+`FormModal<T>` 是业务表单的统一弹窗组件，用户、角色、部门、内容、菜单、字典、参数的新增/编辑以及密码重置均复用它。默认宽度 640px，密码重置 480px、内容编辑 1040px、权限配置 880px；窄屏限制为视口宽度减 32px，双列表单自动改成单列。标题和底部按钮固定，只有超出可用高度的正文滚动。
+
+业务页面使用 Form 实例设置初始值，提交回调只处理已校验的数据及成功反馈。弹窗集中处理校验定位、同步提交锁、请求失败提示和保存中的关闭保护；点击遮罩不丢失输入，普通状态可通过 Esc、关闭按钮或取消退出。失败保留输入，关闭动画结束后清空表单，表单内容不进入页签缓存。
+
+设计参考 [Art Design Pro 的用户表单](https://github.com/Daymychen/art-design-pro/blob/main/src/views/system/user/modules/user-dialog.vue)、[表格体系](https://www.artd.pro/docs/zh/pro/ui/table-list.html)和[后端权限分层](https://www.artd.pro/docs/zh/pro/server/permission-system.html)：统一表格与表单行为，分开处理页面可见性、接口操作授权和记录范围。本项目对应到 React 公共组件、Spring Security / AccessPolicy 和模块化 Java 服务，不迁移参考项目的 Vue / NestJS 技术栈。前台门户继续通过公开站点配置与发布内容接口取得数据。
+
+## 前后台主题
+
+使用 [Ant Design 定制主题](https://ant.design/docs/react/customize-theme-cn/)的 `ConfigProvider`、明暗/紧凑算法和设计 Token。`theme-model.ts` 定义四字段契约与安全默认值，`ThemeScope` 把 Token 同步为普通 HTML、图表和富文本可以读取的 CSS 变量。新增页面应消费 `--app-*` 语义变量，不写死底色、文字、边框或主色。预览使用 `inherit: false` 的独立作用域，不影响外层页面；业务弹窗继续使用当前主题上下文。
+
+`AppearanceControls`、`AppearancePreview`、`ThemeFormContent` 在前后台配置弹窗中复用。后台偏好只保存在当前浏览器 `mayday.admin.appearance.v1`，刷新保留、同源标签页通过 storage 事件同步；不可写存储时仅应用当前页面并提示。`appearance-context.ts` 独立维护 Context，避免主题模块热更新重建上下文。
+
+网站配置的“前台主题”单独提交 `site.theme` 值和打开弹窗时的版本；普通站点文本保存不包含此键。服务器 `PortalThemePolicy` 严格校验 mode、六位 HEX primaryColor、整数 borderRadius（0–16）、布尔 compact，拒绝未知字段、任意 CSS 和尾随 JSON。网站配置与通用参数写入均经过同一校验，沿用 `settings:view/update` 权限、乐观锁与事务回滚。公开接口只返回解析后的四个字段；旧库没有该键或存在非法遗留值时使用浅色蓝色默认主题，无需修改数据库结构。前台访客不提供后台入口或全站主题编辑入口。
+
+跟随系统监听 `prefers-color-scheme`。门户初次加载配置前使用默认主题；已打开页面按现有公开配置查询的刷新机制获取更新。验收与截图见 [主题验证记录](theme-validation/README.md)。
+
+## 后台多页签
+
+`WorkspaceProvider` 管理已打开的路径，`WorkspaceTabs` 提供切换、关闭、刷新以及右键菜单（关闭其他、右侧、全部）。工作台固定保留；没有工作台权限时固定个人中心。侧栏、快捷入口、地址直达和浏览器前进/后退均以路由同步页签，相同路径不会重复打开。
+
+窄屏使用原生横向滚动，也可通过「所有页签」菜单直接切换。页签支持方向键、Home/End、Delete 和鼠标中键关闭；标签与实际路由内容通过 ARIA 关联。所有弹层挂载到稳定节点，窗口缩放不依赖反复测量并重建溢出菜单。
+
+`ResourcePage` 通过 `usePageState` 统一保留搜索输入、已提交条件、状态、页码和每页条数。切换页签和“刷新此页”保留这些条件；关闭页签后清除。浏览器整页刷新仅恢复页签清单，筛选条件恢复默认。编辑表单、密码不缓存，切换页面会关闭未提交的编辑表单。
+
+页签清单按账号隔离存于 sessionStorage，恢复时按照当前权限和 `workspace-model.ts` 的路由白名单过滤。权限撤回时移除相关页签及筛选缓存，路由 Guard 和后端接口仍独立校验权限。
+
+`api.ts` 统一同源 `/api`、超时、错误、Bearer 令牌与登录失效。React Query 管理服务端状态，账号切换时清空缓存。AuthProvider 只保留会话状态，不缓存业务记录。窗口聚焦及可见状态每 30 秒刷新权限，让后台授权变化及时显示；接口立即重新鉴权。
+
+字体通过 npm 本地打包；门户图形为本地 CSS，不需要外部图片、CDN 或在线字体服务。
+
+## 增加一个业务模块
+
+1. 在 `PermissionCatalog` 增加资源与操作；如有数据范围，设置 `scoped=true` 并在 `AccessPolicy` 的调用处明确所有者和部门字段。角色表单、后端范围白名单和会话摘要自动读取该目录，无需再维护固定的 users/notices 列表。
+2. 添加专用实体、Repository、DTO 和 Service。创建下一个未占用版本号的 `V<number>__xxx.sql`，通过迁移增加表与索引。
+3. 每个 Controller 方法声明所需动作，列表使用 `access.filter(...)`，写入使用 `access.checkData(...)`。
+4. 前端定义 TypeScript 请求/响应类型，提供 ResourcePage 的 columns 和 fields；保存时提交版本，不直接提交整个实体。
+5. 在 `App.tsx` 注册页面和 Guard，在 `workspace-model.ts` 的 `adminPages` 注册页签名称及查看权限，在菜单管理中新增对应路径、权限和顺序。菜单配置不会自动生成不存在的 React 页面。
+6. 增加正常访问、无操作权、超出数据范围、过期版本四类验证。
+
+## 内容、门户与可靠事件
+
+网站配置使用类型配置服务：品牌、简介、SEO、联系/版权/备案等公开字段有白名单，内部安全参数不公开。分类和标签使用独立稳定 ID；重命名不会破坏历史关联。字典用于通用业务选项，不再用逗号分类字符串代替正式分类。
+
+正文经后端 jsoup 白名单处理，前端展示组件再次使用 DOMPurify；附件必须先上传并经过所有权/业务关联检查。公开接口只读取 liveRevision；编辑新草稿不会替换线上内容。排期执行重新检查安排者当前发布权限和文章范围。
+
+审批发布保存不可变模型；实例另存模型、人员、原始提交和业务修订快照。每次动作锁定申请行并检查 version，任务、历史、业务回调和事件在同一事务。字段调整保留 before/after，并在查询历史时按查看者字段权限过滤。
+
+事务内只插入 ops_event，后台工作器另起事务创建通知。eventKey 唯一、事件行锁、单用户投递唯一约束共同防重。失败回滚通知半成品，再记录退避时间；重启继续处理待投递事件。此机制只负责本地站内消息，不含外部邮件/短信。
+
+`WorkflowFields` 共享申请/处理/模拟表单，`ApprovalDetailModal` 共享详情和操作。流程设计器使用数据路由守卫与 Workspace 离开守卫：侧栏、页签、浏览器后退以及页签刷新/关闭先确认，再改变页面；草稿内容不进入 sessionStorage。嵌套审批操作弹窗显式高于详情，丢弃提醒再高一层。
+
+新业务接入审批需实现 WorkflowBusiness：提交时绑定准确业务版本，完成时仅更新该版本的审核状态，业务自己的发布/执行动作继续独立鉴权。
+
+## 部署约定
+
+开发期 Vite 将 `/api` 代理到 `VITE_API_TARGET`（默认 `http://127.0.0.1:18080`）；部署时 Nginx 将 `/api` 转给 backend 服务。前端请求地址不随环境改动。
+
+Compose 使用命名数据卷，镜像中后端使用非 root 用户。前台、后台共用一个 React 项目与设计系统，路由空间分别是 `/` 和 `/admin`，API 公开空间与认证空间分开。
+
+当前采用同源 Bearer API，无 Cookie 自动认证，因此不依赖跨站 Cookie；Spring Security 关闭 Session 与 CSRF。反向代理上线时保留同源模型，并使用 HTTPS。
+
+## 已验证与未覆盖
+
+当前已验证前端生产构建、后端 Maven 测试/打包、真实 MySQL 建表初始化与 API 回归、浏览器登录/列表/表单/权限页和手机布局。
+
+这里没有宣称生产负载测试、浏览器全组合兼容测试或第三方安全认证。大规模用户量时应对角色关联加载、批量导出、审计保留和限流存储单独优化。

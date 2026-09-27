@@ -1,0 +1,153 @@
+{
+  "checkedAt": "2026-09-19T15:49:19.009Z",
+  "pages": [
+    {
+      "error": false,
+      "mainVisible": true,
+      "page": "菜单管理",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "mainVisible": true,
+      "page": "数据字典",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "mainVisible": true,
+      "page": "系统参数",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "mainVisible": true,
+      "page": "操作日志",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "mainVisible": true,
+      "page": "登录日志",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "mainVisible": true,
+      "page": "用户统计",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "mainVisible": true,
+      "page": "网站配置",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "mainVisible": true,
+      "page": "文件中心",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "通知管理",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "个人收件箱",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "审批分类",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "流程定义",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "审批申请",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "审批待办",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "内容中心",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "内容分类",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "内容标签",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "内容回收站",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "用户管理",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "角色权限",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "组织部门",
+      "pageOverflow": false
+    },
+    {
+      "error": false,
+      "page": "岗位管理",
+      "pageOverflow": false
+    },
+    {
+      "page": "工作台",
+      "pageOverflow": false,
+      "pageHeight": 900,
+      "viewportHeight": 900,
+      "error": false
+    },
+    {
+      "error": false,
+      "page": "个人中心",
+      "pageOverflow": false
+    }
+  ],
+  "mobile": {
+    "activeTabVisible": true,
+    "fixedActionCells": 0,
+    "pageOverflow": false,
+    "viewport": 390
+  },
+  "desktop": {
+    "width": 1440,
+    "height": 900,
+    "dashboardHeight": 900
+  },
+  "wide": {
+    "width": 2560,
+    "sideGutters": 16,
+    "tableInset": 16.8,
+    "menuOverflow": false
+  },
+  "consoleErrors": []
+}

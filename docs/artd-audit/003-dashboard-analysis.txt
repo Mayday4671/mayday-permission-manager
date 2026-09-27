@@ -1,0 +1,133 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "分析看板":
+      - generic: 分析看板
+    - menuitem "人力资源":
+      - generic: 人力资源
+    - menuitem "工作台":
+      - generic: 工作台
+    - menuitem "分析页" [active]:
+      - generic: 分析页
+    - menuitem "电子商务":
+      - generic: 电子商务
+    - menuitem "职位仪表盘":
+      - generic: 职位仪表盘
+    - menuitem "销售看板":
+      - generic: 销售看板
+    - menuitem "客户关系":
+      - generic: 客户关系
+    - menuitem "社交媒体":
+      - generic: 社交媒体
+    - menuitem "加密货币":
+      - generic: 加密货币
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 仪表盘
+      - generic: /
+      - generic: 分析页
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+  - button "内容全屏":
+  - heading "今日销售" [level=4]
+  - paragraph: 销售总结
+  - generic: 导出
+  - text: "999"
+  - paragraph: 总销售额
+  - generic: 较昨天 +10%
+  - text: "300"
+  - paragraph: 总订单量
+  - generic: 较昨天 +15%
+  - text: "56"
+  - paragraph: 产品销售量
+  - generic: 较昨天 -5%
+  - text: "68"
+  - paragraph: 新客户数
+  - generic: 较昨天 +8%
+  - heading "访客洞察" [level=4]
+  - heading "总收入" [level=4]
+  - heading "客户满意度" [level=4]
+  - heading "目标与实际" [level=4]
+  - generic: 实际销售额
+  - generic: 全球
+  - generic: 8,823
+  - generic: 目标销售额
+  - generic: 商业
+  - generic: 12,122
+  - heading "热门产品" [level=4]
+  - table:
+    - rowgroup:
+      - row "产品名称 销量 销量":
+        - columnheader "产品名称":
+          - generic: 产品名称
+        - columnheader "销量":
+          - generic: 销量
+        - columnheader "销量":
+          - generic: 销量
+  - table:
+    - rowgroup:
+      - row "智能手机 10 100":
+        - cell "智能手机":
+          - generic: 智能手机
+        - cell "10":
+          - progressbar
+        - cell "100":
+          - generic: "100"
+      - row "笔记本电脑 29 100":
+        - cell "笔记本电脑":
+          - generic: 笔记本电脑
+        - cell "29":
+          - progressbar
+        - cell "100":
+          - generic: "100"
+      - row "平板电脑 65 100":
+        - cell "平板电脑":
+          - generic: 平板电脑
+        - cell "65":
+          - progressbar
+        - cell "100":
+          - generic: "100"
+      - row "智能手表 32 100":
+        - cell "智能手表":
+          - generic: 智能手表
+        - cell "32":
+          - progressbar
+        - cell "100":
+          - generic: "100"
+      - row "无线耳机 78 100":
+        - cell "无线耳机":
+          - generic: 无线耳机
+        - cell "78":
+          - progressbar
+        - cell "100":
+          - generic: "100"
+      - row "智能音箱 41 100":
+        - cell "智能音箱":
+          - generic: 智能音箱
+        - cell "41":
+          - progressbar
+        - cell "100":
+          - generic: "100"
+  - heading "全国销售分布" [level=4]
+  - heading "业务量与服务水平" [level=4]

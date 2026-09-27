@@ -1,0 +1,9 @@
+{
+  "deployedAt": "2026-09-21T00:26:53.3712386Z",
+  "frontendImage": "sha256:54cad6c51f3954f91f30ee96c3c625576186f554624cee8298f2a6e28f4b47f2",
+  "previousImageTag": "mayday-frontend:before-portal-customer-20260921",
+  "frontendStatus": 200,
+  "backendHealth": "UP",
+  "backendCodeOrDatabaseSchemaChanged": false,
+  "finalBrowserSmokePassed": true
+}

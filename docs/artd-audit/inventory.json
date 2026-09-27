@@ -1,0 +1,23 @@
+[
+  {
+    "n": 1,
+    "label": "dashboard-hr",
+    "url": "https://www.frontend.artd.pro/#/dashboard/hrm",
+    "screenshot": "screenshots/001-dashboard-hr.png",
+    "dom": "001-dashboard-hr.txt"
+  },
+  {
+    "n": 2,
+    "label": "dashboard-workbench",
+    "url": "https://www.frontend.artd.pro/#/dashboard/console",
+    "screenshot": "screenshots/002-dashboard-workbench.png",
+    "dom": "002-dashboard-workbench.txt"
+  },
+  {
+    "n": 3,
+    "label": "dashboard-analysis",
+    "url": "https://www.frontend.artd.pro/#/dashboard/analysis",
+    "screenshot": "screenshots/003-dashboard-analysis.png",
+    "dom": "003-dashboard-analysis.txt"
+  }
+]

@@ -1,0 +1,285 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "用户管理":
+      - generic: 用户管理
+    - menuitem "角色管理":
+      - generic: 角色管理
+    - menuitem "部门管理":
+      - generic: 部门管理
+    - menuitem "岗位管理":
+      - generic: 岗位管理
+    - menuitem "字典管理" [active]:
+      - generic: 字典管理
+    - menuitem "参数设置":
+      - generic: 参数设置
+    - menuitem "菜单管理":
+      - generic: 菜单管理
+    - menuitem "操作日志":
+      - generic: 操作日志
+    - menuitem "登录日志":
+      - generic: 登录日志
+    - menuitem "用户统计":
+      - generic: 用户统计
+    - menuitem "网站配置":
+      - generic: 网站配置
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 角色管理
+    - generic: 部门管理
+    - generic: 岗位管理
+    - generic: 字典管理
+  - button "内容全屏":
+  - textbox "请输入字典名称或字典编码"
+  - button "查询":
+    - generic: 查询
+  - button "新增字典":
+    - generic: 新增字典
+  - table:
+    - rowgroup:
+      - row "序号 字典名称 字典编码 状态 操作":
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "字典名称":
+          - generic: 字典名称
+        - columnheader "字典编码":
+          - generic: 字典编码
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 通用状态 common_status 启用":
+        - cell "1":
+          - generic: "1"
+        - cell "通用状态":
+          - generic: 通用状态
+        - cell "common_status":
+          - generic: common_status
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "2 用户性别 user_gender 启用":
+        - cell "2":
+          - generic: "2"
+        - cell "用户性别":
+          - generic: 用户性别
+        - cell "user_gender":
+          - generic: user_gender
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "3 消息类型 notification_type 启用":
+        - cell "3":
+          - generic: "3"
+        - cell "消息类型":
+          - generic: 消息类型
+        - cell "notification_type":
+          - generic: notification_type
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "4 审批状态 approval_status 启用":
+        - cell "4":
+          - generic: "4"
+        - cell "审批状态":
+          - generic: 审批状态
+        - cell "approval_status":
+          - generic: approval_status
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "5 优先级 priority_level 启用":
+        - cell "5":
+          - generic: "5"
+        - cell "优先级":
+          - generic: 优先级
+        - cell "priority_level":
+          - generic: priority_level
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "6 设备类型 device_type 启用":
+        - cell "6":
+          - generic: "6"
+        - cell "设备类型":
+          - generic: 设备类型
+        - cell "device_type":
+          - generic: device_type
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "7 文件类型 file_type 启用":
+        - cell "7":
+          - generic: "7"
+        - cell "文件类型":
+          - generic: 文件类型
+        - cell "file_type":
+          - generic: file_type
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "8 内容状态 content_status 启用":
+        - cell "8":
+          - generic: "8"
+        - cell "内容状态":
+          - generic: 内容状态
+        - cell "content_status":
+          - generic: content_status
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "9 任务状态 task_status 启用":
+        - cell "9":
+          - generic: "9"
+        - cell "任务状态":
+          - generic: 任务状态
+        - cell "task_status":
+          - generic: task_status
+        - cell "启用":
+          - generic: 启用
+        - cell:
+      - row "10 登录事件 login_event 启用":
+        - cell "10":
+          - generic: "10"
+        - cell "登录事件":
+          - generic: 登录事件
+        - cell "login_event":
+          - generic: login_event
+        - cell "启用":
+          - generic: 启用
+        - cell:
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+  - button "下一页" [disabled]:
+  - generic: 数据标签
+  - textbox "数据标签":
+    - /placeholder: 请输入数据标签
+  - generic: 数据键值
+  - textbox "数据键值":
+    - /placeholder: 请输入数据键值
+  - button "重置":
+    - generic: 重置
+  - button "查询":
+    - generic: 查询
+  - generic: 字典数据 · 通用状态
+  - generic: common_status
+  - button "新增数据":
+    - generic: 新增数据
+  - button:
+  - table:
+    - rowgroup:
+      - row "序号 数据标签 数据键值 标签类型 排序 状态 更新时间 操作":
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "数据标签":
+          - generic: 数据标签
+        - columnheader "数据键值":
+          - generic: 数据键值
+        - columnheader "标签类型":
+          - generic: 标签类型
+        - columnheader "排序":
+          - generic: 排序
+        - columnheader "状态":
+          - generic: 状态
+        - columnheader "更新时间":
+          - generic: 更新时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 启用 COMMON_STATUS_1 success 1 启用 2026-08-05 09:00:00":
+        - cell "1":
+          - generic: "1"
+        - cell "启用":
+          - generic: 启用
+        - cell "COMMON_STATUS_1":
+          - generic: COMMON_STATUS_1
+        - cell "success":
+          - generic: success
+        - cell "1":
+          - generic: "1"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "2 禁用 COMMON_STATUS_2 info 2 启用 2026-08-05 09:00:00":
+        - cell "2":
+          - generic: "2"
+        - cell "禁用":
+          - generic: 禁用
+        - cell "COMMON_STATUS_2":
+          - generic: COMMON_STATUS_2
+        - cell "info":
+          - generic: info
+        - cell "2":
+          - generic: "2"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "3 草稿 COMMON_STATUS_3 warning 3 启用 2026-08-05 09:00:00":
+        - cell "3":
+          - generic: "3"
+        - cell "草稿":
+          - generic: 草稿
+        - cell "COMMON_STATUS_3":
+          - generic: COMMON_STATUS_3
+        - cell "warning":
+          - generic: warning
+        - cell "3":
+          - generic: "3"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+      - row "4 已归档 COMMON_STATUS_4 danger 4 启用 2026-08-05 09:00:00":
+        - cell "4":
+          - generic: "4"
+        - cell "已归档":
+          - generic: 已归档
+        - cell "COMMON_STATUS_4":
+          - generic: COMMON_STATUS_4
+        - cell "danger":
+          - generic: danger
+        - cell "4":
+          - generic: "4"
+        - cell "启用":
+          - generic: 启用
+        - cell "2026-08-05 09:00:00":
+          - generic: 2026-08-05 09:00:00
+        - cell:
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+  - button "下一页" [disabled]:
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页
+  - generic: 共 4 条

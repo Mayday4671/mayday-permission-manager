@@ -1,0 +1,7 @@
+{
+  "checkedAt": "2026-09-21T06:30:24.605Z",
+  "images": {
+    "backend": "sha256:95185a27af6b13664e0d59948f57c5647a07c20486fe8795c1e05b3b1eaeb4e6",
+    "frontend": "sha256:c364f03300c7fc42b0fbed694bcfd6d0187c0632373145faef0082858c538373"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "startedAt": "2026-09-21T03:09:49.917Z",
+  "verification": "D:\\Code\\2026\\mayday-permission-manager\\.local\\baseline\\20260921030530727-a13fbb",
+  "status": "passed",
+  "checks": [
+    "前后端镜像构建及旧镜像保留",
+    "停写后的完整数据库备份",
+    "实际迁移与已通过验收一致",
+    "原有账号、权限、组织和内容字段保持一致",
+    "前后端与数据库服务已启动"
+  ],
+  "oldImages": {
+    "backend": {
+      "image": "sha256:ed4d3af35e7e5b6c9108eb521f8b32689428e78d63e6da1e65f353abd0a52b41",
+      "tag": "mayday-backend:before-20260921030949916"
+    },
+    "frontend": {
+      "image": "sha256:c701bbcc93cdc433b474914aeaae573d018b925934aa436e0a502b9444d33fd0",
+      "tag": "mayday-frontend:before-20260921030949916"
+    }
+  },
+  "backup": {
+    "path": "D:\\Code\\2026\\mayday-permission-manager\\.local\\upgrades\\20260921030949916\\before.sql",
+    "sha256": "39f738f91a665d9adb4827f59b9e48f4fdd8d7a07e17cfec64be051cea2b4247",
+    "bytes": 80510
+  },
+  "finishedAt": "2026-09-21T03:10:13.507Z"
+}

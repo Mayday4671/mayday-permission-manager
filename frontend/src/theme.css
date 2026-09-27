@@ -1,0 +1,418 @@
+/* 主题变量来自 Ant Design 解析后的 Token。业务组件和 Ant 控件使用同一套颜色，避免只切换按钮而壳层仍是浅色。 */
+/* 根页面、弹窗、下拉框和内部列表均消费当前主题；预览范围沿用自身 ThemeScope 的变量。 */
+:where(html, body, *) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: var(--app-scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb);
+  border-radius: 8px;
+  border: 2px solid var(--app-scrollbar-track);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--app-scrollbar-hover);
+}
+/* Ant 的虚拟选择列表使用 DOM 模拟滚动条，需同步它自身的变量，不能只改原生伪元素。 */
+[class*="-scrollbar-thumb"] {
+  --rc-virtual-list-scrollbar-bg: var(--app-scrollbar-thumb);
+}
+[class*="-scrollbar-thumb"]:hover {
+  --rc-virtual-list-scrollbar-bg: var(--app-scrollbar-hover);
+}
+
+/* Recharts 的无障碍层保留键盘访问；鼠标点击没有黑色浏览器默认框，键盘焦点用主题色。 */
+.recharts-wrapper:focus:not(:focus-visible),
+.recharts-wrapper :focus:not(:focus-visible) {
+  outline: none;
+}
+.recharts-wrapper:focus-visible,
+.recharts-wrapper :focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: -2px;
+  border-radius: var(--app-radius);
+}
+
+.data-table .ant-table {
+  border: 1px solid var(--app-table-border);
+  border-radius: var(--app-radius);
+}
+.data-table-container {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.data-table .row-icon-actions .ant-btn {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+}
+.data-table .ant-table-cell {
+  overflow-wrap: anywhere;
+}
+.data-table .table-sequence {
+  color: var(--app-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.data-table .person-cell,
+.data-table .person-cell > div {
+  min-width: 0;
+}
+.data-table .ant-table-cell-ellipsis .person-cell strong,
+.data-table .ant-table-cell-ellipsis .person-cell small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-table .person-cell > span {
+  flex-shrink: 0;
+}
+.tree-table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.data-table .table-group-row > td {
+  background: var(--app-table-header);
+  cursor: pointer;
+}
+.data-table .table-group-row:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: -2px;
+}
+.data-table .table-group-row:hover > td {
+  background: var(--app-table-hover);
+}
+.data-table .table-group-row strong {
+  font-weight: 500;
+}
+.data-table .ant-table-cell-with-append .person-cell {
+  display: inline-flex;
+  vertical-align: middle;
+  max-width: calc(100% - 50px);
+}
+
+.role-editor-tabs .ant-tabs-content-holder {
+  min-height: 370px;
+}
+.role-editor-tabs .ant-tabs-tabpane > .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+.permission-picker {
+  border: 1px solid var(--app-table-border);
+  border-radius: var(--app-radius);
+  overflow: hidden;
+}
+.permission-picker-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border-bottom: 1px solid var(--app-table-border);
+}
+.permission-picker-toolbar .ant-input-affix-wrapper {
+  max-width: 280px;
+}
+.permission-picker-toolbar > span:last-child {
+  white-space: nowrap;
+  font-size: 12px;
+}
+.permission-picker-body {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  height: min(380px, 46vh);
+  min-height: 240px;
+}
+.permission-module-list {
+  overflow-y: auto;
+  padding: 8px;
+  border-right: 1px solid var(--app-table-border);
+  background: var(--app-fill);
+}
+.permission-module-list button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--app-radius);
+  background: transparent;
+  gap: 8px;
+}
+.permission-module-list button:hover {
+  background: var(--app-table-hover);
+}
+.permission-module-list button[aria-current="true"] {
+  color: var(--app-primary-text);
+  background: var(--app-primary-bg);
+  font-weight: 500;
+}
+.permission-module-list small {
+  color: var(--app-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.permission-module-detail {
+  padding: 16px;
+  overflow-y: auto;
+  min-width: 0;
+}
+.permission-module-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.permission-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 12px;
+}
+.permission-picker-help {
+  margin: 24px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--app-text-tertiary);
+}
+@media (max-width: 600px) {
+  .role-editor-tabs .ant-tabs-content-holder {
+    min-height: 300px;
+  }
+  .permission-picker-body {
+    grid-template-columns: 125px minmax(0, 1fr);
+    height: 350px;
+  }
+  .permission-module-list {
+    padding: 4px;
+  }
+  .permission-module-list button {
+    padding: 10px 6px;
+    gap: 2px;
+  }
+  .permission-module-detail {
+    padding: 12px;
+  }
+  .permission-choice-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.theme-scope {
+  min-width: 0;
+}
+.theme-scope .ant-app {
+  color: inherit;
+}
+.theme-scope .admin-layout {
+  --radius: var(--app-radius);
+}
+.appearance-description {
+  color: var(--app-text-secondary);
+  margin-bottom: 22px;
+}
+.appearance-editor {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.3fr);
+  gap: 28px;
+  align-items: start;
+}
+.appearance-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+.appearance-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.appearance-field > label,
+.appearance-switch > label {
+  font-weight: 500;
+}
+.appearance-field .ant-segmented-item-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.appearance-field .ant-segmented-item-icon {
+  display: flex;
+}
+.appearance-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.appearance-colors button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 5px;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.appearance-colors button[aria-pressed="true"] {
+  outline: 2px solid var(--app-text-secondary);
+  outline-offset: 3px;
+}
+.custom-color-button {
+  width: 100%;
+  justify-content: flex-start;
+}
+.custom-color-button > span:first-child {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+}
+.custom-color-button code {
+  margin-left: auto;
+}
+.appearance-switch {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.appearance-reset {
+  margin-top: 22px;
+}
+.appearance-preview {
+  overflow: hidden;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+  background: var(--app-layout);
+  color: var(--app-text);
+}
+.appearance-preview-head {
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
+}
+.appearance-preview-head .ant-tag {
+  margin: 0;
+}
+.appearance-preview-body {
+  padding: 16px;
+}
+.appearance-preview-nav {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.appearance-preview-nav > span {
+  padding: 7px 10px;
+  color: var(--app-text-secondary);
+  border-radius: var(--app-radius);
+}
+.appearance-preview-nav .selected {
+  color: var(--app-primary-text);
+  background: var(--app-primary-bg);
+}
+.appearance-preview-content {
+  padding: 18px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+}
+.appearance-preview-content h3 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.appearance-preview-content p {
+  color: var(--app-text-secondary);
+  line-height: 1.7;
+}
+.appearance-preview-actions {
+  display: flex;
+  gap: 8px;
+  margin-block: 18px;
+}
+.appearance-preview-actions .ant-input {
+  min-width: 0;
+}
+.appearance-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 52px;
+  border-top: 1px solid var(--app-border);
+}
+.appearance-preview-row .ant-tag {
+  margin: 0;
+}
+.site-appearance-summary {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(300px, 1.5fr);
+  gap: 24px;
+  padding: 24px;
+}
+.site-appearance-summary .ant-descriptions {
+  align-self: start;
+}
+.theme-color-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.theme-color-value i {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid var(--app-border);
+}
+/* 紧凑算法调整 Ant 控件；这里同步调整原生页面区域的间距，表格自己的密度工具仍可继续使用。 */
+.theme-scope[data-density="compact"]
+  > .appearance-preview
+  .appearance-preview-row {
+  min-height: 40px;
+}
+.theme-scope[data-density="default"]
+  > .appearance-preview
+  .appearance-preview-row {
+  min-height: 52px;
+}
+[data-density="compact"] .site-toolbar-inner {
+  min-height: 84px;
+  padding-block: 16px;
+}
+[data-density="compact"] .site-article-row {
+  padding-block: 18px;
+}
+[data-density="compact"] .site-link-section,
+[data-density="compact"] .site-support {
+  padding: 16px;
+}
+[data-density="compact"] .site-results-heading {
+  padding-block: 16px;
+}
+@media (max-width: 760px) {
+  .appearance-editor,
+  .site-appearance-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .site-appearance-summary {
+    padding: 16px;
+  }
+}

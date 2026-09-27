@@ -1,0 +1,60 @@
+# 独立验证环境：项目名由验证脚本每次生成，数据卷与日常 mayday 项目完全分开。
+# 数据库不映射宿主机端口；两个后端仅绑定本机，分别验证升级安装和空库安装。
+services:
+  upgrade-db:
+    image: mysql:8.4
+    environment: &database-environment
+      MYSQL_ROOT_PASSWORD: ${VERIFY_DB_PASSWORD:?由验证脚本注入}
+      MYSQL_DATABASE: mayday_verify
+      MYSQL_USER: mayday_verify
+      MYSQL_PASSWORD: ${VERIFY_DB_PASSWORD}
+      TZ: Asia/Shanghai
+    volumes:
+      - upgrade_data:/var/lib/mysql
+    healthcheck: &database-health
+      # 使用 TCP 与业务账号查询，避免初始化期间的临时 socket 服务被误判为可用。
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP --host=127.0.0.1 --user="$$MYSQL_USER" --database="$$MYSQL_DATABASE" --execute="SELECT 1" --silent']
+      interval: 2s
+      timeout: 3s
+      retries: 60
+  fresh-db:
+    image: mysql:8.4
+    environment: *database-environment
+    volumes:
+      - fresh_data:/var/lib/mysql
+    healthcheck: *database-health
+  backend-upgrade:
+    image: mayday-verification-backend:local
+    build: ./backend
+    environment: &backend-environment
+      DB_URL: jdbc:mysql://upgrade-db:3306/mayday_verify?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      DB_USERNAME: mayday_verify
+      DB_PASSWORD: ${VERIFY_DB_PASSWORD}
+      ADMIN_PASSWORD: ${VERIFY_ADMIN_PASSWORD:?由验证脚本注入}
+      SEED_DEMO_DATA: "false"
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${VERIFY_UPGRADE_PORT:-18081}:8080"
+    depends_on:
+      upgrade-db:
+        condition: service_healthy
+    healthcheck: &backend-health
+      test: [CMD, wget, --spider, -q, 'http://127.0.0.1:8080/actuator/health']
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 15s
+  backend-fresh:
+    image: mayday-verification-backend:local
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:mysql://fresh-db:3306/mayday_verify?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    ports:
+      - "127.0.0.1:${VERIFY_FRESH_PORT:-18082}:8080"
+    depends_on:
+      fresh-db:
+        condition: service_healthy
+    healthcheck: *backend-health
+volumes:
+  upgrade_data:
+  fresh_data:

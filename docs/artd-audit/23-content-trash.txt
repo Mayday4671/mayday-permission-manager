@@ -1,0 +1,177 @@
+- complementary:
+  - img "logo"
+  - list:
+  - img "用户头像"
+  - paragraph: Art Design Pro X
+  - menubar:
+    - menuitem "内容中心":
+      - generic: 内容中心
+    - menuitem "内容分类":
+      - generic: 内容分类
+    - menuitem "标签管理":
+      - generic: 标签管理
+    - menuitem "内容回收站" [active]:
+      - generic: 内容回收站
+  - button "收起购买授权":
+  - generic: 购买商业授权
+  - paragraph: 纯前端商业源码，授权范围、交付内容与更新服务以购买方案说明为准。
+  - button "产品介绍":
+    - generic: 产品介绍
+  - button "查看定价"
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - generic: 内容管理
+      - generic: /
+      - generic: 内容回收站
+  - generic: 搜索
+  - generic: k
+  - button:
+  - button "全局专注模式":
+    - generic: 专注模式
+  - button "专注模式设置，可配置是否隐藏标签页":
+  - img "avatar"
+  - list:
+    - generic: 工作台
+    - generic: 分析看板
+    - generic: 用户管理
+    - generic: 人力资源
+    - generic: 分析页
+    - generic: 内容中心
+    - generic: 内容详情
+    - generic: 内容分类
+    - generic: 标签管理
+    - generic: 内容回收站
+  - button "内容全屏":
+  - generic: 关键字
+  - textbox "关键字":
+    - /placeholder: 搜索标题 / 作者 / 标签
+  - generic: 内容类型
+  - combobox "内容类型"
+  - generic: 请选择内容类型
+  - button "重置":
+    - generic: 重置
+  - button "查询":
+    - generic: 查询
+  - generic: 内容回收站
+  - generic: 支持恢复误删内容，或执行彻底删除。
+  - button:
+  - table:
+    - rowgroup:
+      - row "序号 内容标题 类型 分类 作者 删除时间 操作":
+        - columnheader "序号":
+          - generic: 序号
+        - columnheader "内容标题":
+          - generic: 内容标题
+        - columnheader "类型":
+          - generic: 类型
+        - columnheader "分类":
+          - generic: 分类
+        - columnheader "作者":
+          - generic: 作者
+        - columnheader "删除时间":
+          - generic: 删除时间
+        - columnheader "操作":
+          - generic: 操作
+  - table:
+    - rowgroup:
+      - row "1 年度客户交流会活动回顾 新闻 活动资讯 沈清禾 2026-08-01 16:30:00 恢复 彻底删除":
+        - cell "1":
+          - generic: "1"
+        - cell "年度客户交流会活动回顾":
+          - generic: 年度客户交流会活动回顾
+        - cell "新闻":
+          - generic: 新闻
+        - cell "活动资讯":
+          - generic: 活动资讯
+        - cell "沈清禾":
+          - generic: 沈清禾
+        - cell "2026-08-01 16:30:00":
+          - generic: 2026-08-01 16:30:00
+        - cell "恢复 彻底删除":
+          - button "恢复":
+            - generic: 恢复
+          - button "彻底删除":
+            - generic: 彻底删除
+      - row "2 设计系统升级方案讨论稿 文章 产品动态 江晚 2026-08-02 16:30:00 恢复 彻底删除":
+        - cell "2":
+          - generic: "2"
+        - cell "设计系统升级方案讨论稿":
+          - generic: 设计系统升级方案讨论稿
+        - cell "文章":
+          - generic: 文章
+        - cell "产品动态":
+          - generic: 产品动态
+        - cell "江晚":
+          - generic: 江晚
+        - cell "2026-08-02 16:30:00":
+          - generic: 2026-08-02 16:30:00
+        - cell "恢复 彻底删除":
+          - button "恢复":
+            - generic: 恢复
+          - button "彻底删除":
+            - generic: 彻底删除
+      - row "3 旧版部署手册（已废弃） 帮助中心 使用指南 韩旭 2026-08-03 16:30:00 恢复 彻底删除":
+        - cell "3":
+          - generic: "3"
+        - cell "旧版部署手册（已废弃）":
+          - generic: 旧版部署手册（已废弃）
+        - cell "帮助中心":
+          - generic: 帮助中心
+        - cell "使用指南":
+          - generic: 使用指南
+        - cell "韩旭":
+          - generic: 韩旭
+        - cell "2026-08-03 16:30:00":
+          - generic: 2026-08-03 16:30:00
+        - cell "恢复 彻底删除":
+          - button "恢复":
+            - generic: 恢复
+          - button "彻底删除":
+            - generic: 彻底删除
+      - row "4 春季线上分享会预告 新闻 活动资讯 孟遥 2026-08-04 16:30:00 恢复 彻底删除":
+        - cell "4":
+          - generic: "4"
+        - cell "春季线上分享会预告":
+          - generic: 春季线上分享会预告
+        - cell "新闻":
+          - generic: 新闻
+        - cell "活动资讯":
+          - generic: 活动资讯
+        - cell "孟遥":
+          - generic: 孟遥
+        - cell "2026-08-04 16:30:00":
+          - generic: 2026-08-04 16:30:00
+        - cell "恢复 彻底删除":
+          - button "恢复":
+            - generic: 恢复
+          - button "彻底删除":
+            - generic: 彻底删除
+      - row "5 客户交付案例旧稿（已撤回） 案例 客户案例 乔欣 2026-08-05 16:30:00 恢复 彻底删除":
+        - cell "5":
+          - generic: "5"
+        - cell "客户交付案例旧稿（已撤回）":
+          - generic: 客户交付案例旧稿（已撤回）
+        - cell "案例":
+          - generic: 案例
+        - cell "客户案例":
+          - generic: 客户案例
+        - cell "乔欣":
+          - generic: 乔欣
+        - cell "2026-08-05 16:30:00":
+          - generic: 2026-08-05 16:30:00
+        - cell "恢复 彻底删除":
+          - button "恢复":
+            - generic: 恢复
+          - button "彻底删除":
+            - generic: 彻底删除
+  - generic: 共 5 条
+  - combobox
+  - generic: 10条/页
+  - button "上一页" [disabled]:
+  - list:
+    - listitem "第 1 页": "1"
+  - button "下一页" [disabled]:
+  - generic: 前往
+  - spinbutton "页": "1"
+  - generic: 页

@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-09-21T02:14:48.295Z",
+  "before": {
+    "mode": "dark",
+    "primaryColor": "#1677ff",
+    "borderRadius": 8,
+    "compact": false
+  },
+  "after": {
+    "mode": "dark",
+    "primaryColor": "#1677ff",
+    "borderRadius": 8,
+    "compact": false
+  },
+  "result": "passed"
+}

@@ -1,0 +1,275 @@
+{
+  "scope": "实际公共组件与样式，独立示例数据，不连接业务接口；不是后台登录后逐页验收",
+  "scenarios": [
+    {
+      "document": [
+        1010,
+        1010,
+        800,
+        800
+      ],
+      "groups": [],
+      "page": "posts",
+      "tables": [
+        {
+          "overflowX": "visible",
+          "scrollWidth": 731,
+          "width": 731
+        }
+      ],
+      "viewport": [
+        1010,
+        800
+      ]
+    },
+    {
+      "document": [
+        1010,
+        1010,
+        800,
+        800
+      ],
+      "groups": [],
+      "page": "files",
+      "tables": [
+        {
+          "overflowX": "visible",
+          "scrollWidth": 731,
+          "width": 731
+        }
+      ],
+      "viewport": [
+        1010,
+        800
+      ]
+    },
+    {
+      "document": [
+        1010,
+        1010,
+        800,
+        800
+      ],
+      "groups": [
+        {
+          "expanded": "false",
+          "name": "概览目录"
+        },
+        {
+          "expanded": "false",
+          "name": "工作空间目录"
+        },
+        {
+          "expanded": "false",
+          "name": "内容管理目录"
+        },
+        {
+          "expanded": "false",
+          "name": "通知中心目录"
+        },
+        {
+          "expanded": "false",
+          "name": "审批中心目录"
+        },
+        {
+          "expanded": "false",
+          "name": "系统管理目录"
+        }
+      ],
+      "page": "menus",
+      "tables": [
+        {
+          "overflowX": "visible",
+          "scrollWidth": 731,
+          "width": 731
+        }
+      ],
+      "viewport": [
+        1010,
+        800
+      ]
+    },
+    {
+      "document": [
+        1366,
+        1366,
+        768,
+        768
+      ],
+      "groups": [],
+      "page": "posts",
+      "tables": [
+        {
+          "overflowX": "visible",
+          "scrollWidth": 1087,
+          "width": 1087
+        }
+      ],
+      "viewport": [
+        1366,
+        768
+      ]
+    },
+    {
+      "document": [
+        1366,
+        1366,
+        768,
+        768
+      ],
+      "groups": [],
+      "page": "files",
+      "tables": [
+        {
+          "overflowX": "visible",
+          "scrollWidth": 1087,
+          "width": 1087
+        }
+      ],
+      "viewport": [
+        1366,
+        768
+      ]
+    },
+    {
+      "document": [
+        1366,
+        1366,
+        768,
+        768
+      ],
+      "groups": [
+        {
+          "expanded": "false",
+          "name": "概览目录"
+        },
+        {
+          "expanded": "false",
+          "name": "工作空间目录"
+        },
+        {
+          "expanded": "false",
+          "name": "内容管理目录"
+        },
+        {
+          "expanded": "false",
+          "name": "通知中心目录"
+        },
+        {
+          "expanded": "false",
+          "name": "审批中心目录"
+        },
+        {
+          "expanded": "false",
+          "name": "系统管理目录"
+        }
+      ],
+      "page": "menus",
+      "tables": [
+        {
+          "overflowX": "visible",
+          "scrollWidth": 1087,
+          "width": 1087
+        }
+      ],
+      "viewport": [
+        1366,
+        768
+      ]
+    },
+    {
+      "document": [
+        1920,
+        1920,
+        1080,
+        1080
+      ],
+      "groups": [],
+      "page": "posts",
+      "tables": [
+        {
+          "overflowX": "visible",
+          "scrollWidth": 1641,
+          "width": 1641
+        }
+      ],
+      "viewport": [
+        1920,
+        1080
+      ]
+    },
+    {
+      "document": [
+        1920,
+        1920,
+        1080,
+        1080
+      ],
+      "groups": [],
+      "page": "files",
+      "tables": [
+        {
+          "overflowX": "visible",
+          "scrollWidth": 1641,
+          "width": 1641
+        }
+      ],
+      "viewport": [
+        1920,
+        1080
+      ]
+    },
+    {
+      "document": [
+        1920,
+        1920,
+        1080,
+        1080
+      ],
+      "groups": [
+        {
+          "expanded": "false",
+          "name": "概览目录"
+        },
+        {
+          "expanded": "false",
+          "name": "工作空间目录"
+        },
+        {
+          "expanded": "false",
+          "name": "内容管理目录"
+        },
+        {
+          "expanded": "false",
+          "name": "通知中心目录"
+        },
+        {
+          "expanded": "false",
+          "name": "审批中心目录"
+        },
+        {
+          "expanded": "false",
+          "name": "系统管理目录"
+        }
+      ],
+      "page": "menus",
+      "tables": [
+        {
+          "overflowX": "visible",
+          "scrollWidth": 1641,
+          "width": 1641
+        }
+      ],
+      "viewport": [
+        1920,
+        1080
+      ]
+    }
+  ],
+  "interaction": {
+    "rowClick": true,
+    "iconClick": true,
+    "enterKey": true,
+    "spaceKey": true
+  }
+}

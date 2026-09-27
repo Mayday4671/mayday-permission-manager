@@ -1,0 +1,154 @@
+[
+  {
+    "key": "01-notifications",
+    "url": "https://www.frontend.artd.pro/#/notification/manage"
+  },
+  {
+    "key": "04-flow-category",
+    "url": "https://www.frontend.artd.pro/#/workflow/category",
+    "screenshot": "screenshots/04-flow-category.png"
+  },
+  {
+    "key": "05-flow-design",
+    "url": "https://www.frontend.artd.pro/#/workflow/definition"
+  },
+  {
+    "key": "06-designer-base",
+    "url": "https://www.frontend.artd.pro/#/workflow/definition/designer/1",
+    "screenshot": "screenshots/06-designer-base.png"
+  },
+  {
+    "key": "07-designer-form",
+    "url": "https://www.frontend.artd.pro/#/workflow/definition/designer/1"
+  },
+  {
+    "key": "08-designer-process",
+    "url": "https://www.frontend.artd.pro/#/workflow/definition/designer/1",
+    "screenshot": "screenshots/08-designer-process.png"
+  },
+  {
+    "key": "10-node-field-permissions",
+    "url": "https://www.frontend.artd.pro/#/workflow/definition/designer/1",
+    "screenshot": "screenshots/10-node-field-permissions.png"
+  },
+  {
+    "key": "12-designer-settings",
+    "url": "https://www.frontend.artd.pro/#/workflow/definition/designer/1",
+    "screenshot": "screenshots/12-designer-settings.png"
+  },
+  {
+    "key": "13-workflow-requests",
+    "url": "https://www.frontend.artd.pro/#/workflow/instance",
+    "screenshot": "screenshots/13-workflow-requests.png"
+  },
+  {
+    "key": "15-content-approval-form",
+    "url": "https://www.frontend.artd.pro/#/workflow/instance",
+    "screenshot": "screenshots/15-content-approval-form.png"
+  },
+  {
+    "key": "16-approval-tasks",
+    "url": "https://www.frontend.artd.pro/#/workflow/task",
+    "screenshot": "screenshots/16-approval-tasks.png"
+  },
+  {
+    "key": "17-approval-detail",
+    "url": "https://www.frontend.artd.pro/#/workflow/task"
+  },
+  {
+    "key": "18-content-list",
+    "url": "https://www.frontend.artd.pro/#/content/content-list"
+  },
+  {
+    "key": "19-content-editor",
+    "url": "https://www.frontend.artd.pro/#/content/content-list",
+    "screenshot": "screenshots/19-content-editor.png"
+  },
+  {
+    "key": "20-content-preview",
+    "url": "https://www.frontend.artd.pro/#/content/detail/1",
+    "screenshot": "screenshots/20-content-preview.png"
+  },
+  {
+    "key": "21-content-categories",
+    "url": "https://www.frontend.artd.pro/#/content/category"
+  },
+  {
+    "key": "22-content-tags",
+    "url": "https://www.frontend.artd.pro/#/content/tag",
+    "screenshot": "screenshots/22-content-tags.png"
+  },
+  {
+    "key": "23-content-trash",
+    "url": "https://www.frontend.artd.pro/#/content/recycle",
+    "screenshot": "screenshots/23-content-trash.png"
+  },
+  {
+    "key": "24-system-users",
+    "url": "https://www.frontend.artd.pro/#/system/user",
+    "screenshot": "screenshots/24-system-users.png"
+  },
+  {
+    "key": "25-system-roles",
+    "url": "https://www.frontend.artd.pro/#/system/role"
+  },
+  {
+    "key": "27-role-permissions-expanded",
+    "url": "https://www.frontend.artd.pro/#/system/role",
+    "screenshot": "screenshots/27-role-permissions-expanded.png"
+  },
+  {
+    "key": "29-system-departments",
+    "url": "https://www.frontend.artd.pro/#/system/department"
+  },
+  {
+    "key": "30-system-posts",
+    "url": "https://www.frontend.artd.pro/#/system/post",
+    "screenshot": "screenshots/30-system-posts.png"
+  },
+  {
+    "key": "31-system-dictionaries",
+    "url": "https://www.frontend.artd.pro/#/system/dict",
+    "screenshot": "screenshots/31-system-dictionaries.png"
+  },
+  {
+    "key": "33-system-parameters",
+    "url": "https://www.frontend.artd.pro/#/system/system-param",
+    "screenshot": "screenshots/33-system-parameters.png"
+  },
+  {
+    "key": "34-parameter-form",
+    "url": "https://www.frontend.artd.pro/#/system/system-param",
+    "screenshot": "screenshots/34-parameter-form.png"
+  },
+  {
+    "key": "35-system-menus",
+    "url": "https://www.frontend.artd.pro/#/system/menu",
+    "screenshot": "screenshots/35-system-menus.png"
+  },
+  {
+    "key": "37-operation-logs",
+    "url": "https://www.frontend.artd.pro/#/system/operation-log",
+    "screenshot": "screenshots/37-operation-logs.png"
+  },
+  {
+    "key": "39-login-logs",
+    "url": "https://www.frontend.artd.pro/#/system/login-log",
+    "screenshot": "screenshots/39-login-logs.png"
+  },
+  {
+    "key": "40-user-statistics",
+    "url": "https://www.frontend.artd.pro/#/system/visitor-analytics",
+    "screenshot": "screenshots/40-user-statistics.png"
+  },
+  {
+    "key": "41-site-settings",
+    "url": "https://www.frontend.artd.pro/#/system/site-setting",
+    "screenshot": "screenshots/41-site-settings.png"
+  },
+  {
+    "key": "42-site-publish-preview",
+    "url": "https://www.frontend.artd.pro/#/system/site-setting",
+    "screenshot": "screenshots/42-site-publish-preview.png"
+  }
+]

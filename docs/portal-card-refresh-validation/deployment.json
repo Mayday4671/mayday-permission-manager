@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "date": "2026-09-21T15:11:49.956Z",
+  "baseline": ".local/baseline/20260921074002165-6a5b9c/result.json",
+  "backupTag": "mayday-frontend:before-portal-cards-1790003506880",
+  "oldFrontend": "sha256:93e1ecb44915ff6dadbb88b109afd00f25d9946bc85d3926eb9f5f336f70053e",
+  "newFrontend": "sha256:88445caef2eca3e2b446f7da2ee17ac95af7496043cc92d5b62c2aeeb20cc5a6",
+  "backendUnchanged": true,
+  "mysqlUnchanged": true,
+  "httpStatus": 200
+}

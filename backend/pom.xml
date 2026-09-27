@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.0.8</version>
+    <relativePath />
+  </parent>
+  <groupId>com.mayday</groupId>
+  <artifactId>mayday-parent</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+  <name>Mayday 模块化管理平台</name>
+  <modules>
+    <module>mayday-common</module>
+    <module>mayday-system</module>
+    <module>mayday-content</module>
+    <module>mayday-security</module>
+    <module>mayday-operations</module>
+    <module>mayday-crawler</module>
+    <module>mayday-netty</module>
+    <module>mayday-application</module>
+  </modules>
+  <properties>
+    <java.version>21</java.version>
+    <!-- UDP 转发按约定锁定版本；统一解析，避免 Boot 将模块的传递依赖替换成另一版 Netty。 -->
+    <netty.version>4.1.105.Final</netty.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+</project>

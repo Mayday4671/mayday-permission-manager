@@ -1,0 +1,62 @@
+{
+  "date": "2026-09-21T15:14:42.559Z",
+  "portal": {
+    "adminLinks": 0,
+    "articleTitleSize": "18px",
+    "columns": "498.6px 498.6px 498.6px 498.6px",
+    "footerHeight": 63.20000076293945,
+    "gutter": 40,
+    "headerHeight": 68.80000305175781,
+    "images": true,
+    "overflow": false,
+    "viewport": [
+      2560,
+      1390
+    ]
+  },
+  "dashboard": {
+    "chartHeight": 180,
+    "documentHeight": 900,
+    "documentWidth": 1440,
+    "viewport": [
+      1440,
+      900
+    ]
+  },
+  "categories": [
+    {
+      "active": "公告",
+      "categoryLinks": [
+        "/categories/30"
+      ],
+      "theme": "light",
+      "url": "/categories/30"
+    },
+    {
+      "active": "产品动态",
+      "categoryLinks": [
+        "/categories/27"
+      ],
+      "theme": "light",
+      "url": "/categories/27"
+    },
+    {
+      "active": "团队故事",
+      "categoryLinks": [
+        "/categories/29"
+      ],
+      "theme": "light",
+      "url": "/categories/29"
+    },
+    {
+      "active": "使用指南",
+      "categoryLinks": [
+        "/categories/28"
+      ],
+      "theme": "light",
+      "url": "/categories/28"
+    }
+  ],
+  "portalErrors": [],
+  "adminErrors": []
+}

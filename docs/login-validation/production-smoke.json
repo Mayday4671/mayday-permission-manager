@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "checkedAt": "2026-09-21T06:28:24.608Z",
+  "missingProof": 400,
+  "loginWithRealPuzzle": 200,
+  "sessionRead": 200,
+  "logout": 200
+}

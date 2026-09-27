@@ -1,0 +1,14 @@
+import { createContext, useContext } from "react";
+import type { Appearance } from "./theme-model";
+
+/** 独立上下文模块保持开发热更新时的身份稳定，避免编辑主题组件后 Provider 与消费者失配。 */
+export const AppearanceContext = createContext<{
+  appearance: Appearance;
+  save: (value: Appearance) => boolean;
+} | null>(null);
+
+export function useAdminAppearance() {
+  const context = useContext(AppearanceContext);
+  if (!context) throw new Error("缺少主题上下文");
+  return context;
+}
