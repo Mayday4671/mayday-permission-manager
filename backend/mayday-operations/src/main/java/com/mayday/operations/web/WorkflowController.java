@@ -213,12 +213,25 @@ public class WorkflowController {
   public ApiResponse<?> requests(
       @RequestParam(defaultValue = "") String keyword,
       @RequestParam(defaultValue = "mine") String box,
+      @RequestParam(required = false) String status,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
+    if (status != null
+        && !java.util.Set.of(
+                "DRAFT", "PENDING", "RETURNED", "APPROVED", "REJECTED", "WITHDRAWN", "CANCELLED")
+            .contains(status)) throw new BusinessException("未知申请状态");
     return ApiResponse.ok(
         PageResult.from(
             requests
-                .findAll(engine.filter(keyword, box), PageResult.request(page, size))
+                .findAll(
+                    engine
+                        .filter(keyword, box)
+                        .and(
+                            (r, q, c) ->
+                                status == null
+                                    ? c.conjunction()
+                                    : c.equal(r.get("status"), status)),
+                    PageResult.request(page, size))
                 .map(engine::summary)));
   }
 
@@ -239,6 +252,44 @@ public class WorkflowController {
   @Transactional
   public ApiResponse<?> submit(@Valid @RequestBody WorkflowEngine.Submit body) {
     return ApiResponse.ok(engine.submit(body));
+  }
+
+  /** 申请草稿只对本人可见；必填字段可暂缺，类型、附件所有权和发布版本仍检查。 */
+  @PostMapping("/requests/drafts")
+  @Transactional
+  public ApiResponse<?> draft(@Valid @RequestBody WorkflowEngine.Submit body) {
+    return ApiResponse.ok(engine.draft(body));
+  }
+
+  /** 仅原申请人可保存草稿、退回或撤回后的修改，不能变更实例所属流程与业务修订。 */
+  @PutMapping("/requests/{id}")
+  @Transactional
+  public ApiResponse<?> edit(@PathVariable Long id, @Valid @RequestBody WorkflowEngine.Edit body) {
+    return ApiResponse.ok(engine.edit(id, body, false));
+  }
+
+  /** 重提沿用原发布模型并重新解析有效人员；旧待办不能作为新轮次的通过凭证。 */
+  @PostMapping("/requests/{id}/submit")
+  @Transactional
+  public ApiResponse<?> resubmit(
+      @PathVariable Long id, @Valid @RequestBody WorkflowEngine.Edit body) {
+    return ApiResponse.ok(engine.edit(id, body, true));
+  }
+
+  /** 只删除本人未提交草稿，正式申请保留审计轨迹且不能物理删除。 */
+  @DeleteMapping("/requests/{id}")
+  @Transactional
+  public ApiResponse<Void> discardDraft(@PathVariable Long id, @RequestParam Long version) {
+    engine.discardDraft(id, version);
+    return ApiResponse.ok(null);
+  }
+
+  /** 只修改当前接收者自己的抄送阅读状态，查看权限不能代替审批权限。 */
+  @PostMapping("/requests/{id}/copies/read")
+  @Transactional
+  public ApiResponse<Void> readCopies(@PathVariable Long id) {
+    engine.readCopies(id);
+    return ApiResponse.ok(null);
   }
 
   /** 决定在申请行锁内核验版本、当前处理人、节点动作和可写字段，不能代替其他人处理。 */

@@ -2,7 +2,7 @@
 
 这套系统适合单组织、共享数据库的企业内部后台，以及带公开内容门户的中小型业务系统。账号、角色、部门、岗位、操作权限、数据范围、用户敏感字段、菜单、日志、通知、内容和审批可直接复用。新业务需要接入资源权限与服务端数据范围，不能仅新增菜单就认为授权已经完成。
 
-2026-10-02 的启动与工程阶段检查分别见 [启动与复用记录](startup-reuse-validation-20261002/README.md) 和 [工程底座验收](engineering-validation-20261002/README.md)。V19 新增能力见 [通用平台说明](general-platform.md)，最新完成范围以 [本轮通用平台验收](general-platform-validation-20261002/README.md) 为准；历史记录不自动代表本轮新增能力已通过。
+2026-10-02 的启动与工程阶段检查分别见 [启动与复用记录](startup-reuse-validation-20261002/README.md) 和 [工程底座验收](engineering-validation-20261002/README.md)。V19 新增能力见 [通用平台说明](general-platform.md)，OA 新增办理能力见 [OA 流程说明](oa-workflow.md)，最新完成范围以对应验收记录为准；历史记录不自动代表本轮新增能力已通过。
 
 目前不是多租户 SaaS 或独立身份平台：没有租户隔离、SSO/OIDC/SAML、MFA、任意 ABAC 策略、通用可配置字段权限平台。用户邮箱/电话和审批字段已做细粒度控制，其他新业务字段需单独定义。数据范围按多个角色取并集，没有显式拒绝规则。共享基础资料（如部门树、岗位、分类）与角色目录采用模块权限，不声称全部都是部门级隔离。
 
@@ -11,7 +11,7 @@
 1. 复制源码目录中的 `backend`、`frontend`、`scripts`、`tests`、`tools`、`contracts`、`database`、`docs`、`.github`、Compose 文件、README 和工程配置文件（含 `.env.example`、`.editorconfig`、`.gitattributes`、`.gitignore`）。保留 Maven Wrapper（包括 `backend/.mvn`）及前端 lockfile。
 2. **不要复制**日常 `.env`、`.local`、真实数据库备份/卷、构建输出、`node_modules`、缓存和日志。当前源码已提交到 [GitHub 仓库](https://github.com/Mayday4671/mayday-permission-manager)，可克隆后为新业务另建仓库或分支；数据库备份与代码版本管理分别保留。
 3. 将 `.env.example` 复制为新项目 `.env`；替换管理员和数据库口令，保持 `SEED_DEMO_DATA=false`。Compose 顶部项目名、数据库名、端口按新项目调整，使用独立目录和独立数据卷，不能指向旧业务库。
-4. 执行 `docker compose up -d --build`，Flyway 会从空库迁移到 V19。需要手动建库时，先把 `database/mayday.sql` 一次导入独立空库，再启动应用；文件已包含 V19 基线，无需关闭迁移或放宽校验。两种安装方式均由应用创建管理员和必要基础资料，没有演示成员、部门或文章。UDP 转发默认停止；仅需独立转发时可直接复制 `backend/mayday-netty`，不需要整个后台。
+4. 执行 `docker compose up -d --build`，Flyway 会从空库迁移到 V20。需要手动建库时，先把 `database/mayday.sql` 一次导入独立空库，再启动应用；文件已包含 V20 基线，无需关闭迁移或放宽校验。两种安装方式均由应用创建管理员和必要基础资料，没有演示成员、部门或文章。UDP 转发默认停止；仅需独立转发时可直接复制 `backend/mayday-netty`，不需要整个后台。
 5. 登录后配置站点名称、联系信息、前台主题和实际组织；创建普通角色，按最小权限授权。账号、角色、组织、业务配置在数据库内，重启不重置。
 6. 在增加业务前运行前端构建与隔离基线验证，保留结果。默认端口均绑定本机；正式部署另行配置域名、HTTPS 和反向代理。
 
@@ -23,7 +23,7 @@ UDP 是可选业务能力，普通后台安装不要求预先提高内核 socket
 
 可先使用 [模块生成器与工程规范](engineering.md) 生成基础代码，已提供默认关闭的工单示例。以“工单”为例，先明确数据所有者和所属部门，决定工单转派时权限如何变化；跨组织或客户隔离不能直接拿部门字段冒充租户字段。
 
-1. 新增实体、Repository、请求/响应 DTO、服务；使用独立业务表，不把复杂业务塞进 `sys_entry.value`。当前已到 V19，新增迁移从下一个未占用版本（现为 V20）开始，写完整表/列 COMMENT，再同步 `database/mayday.sql` 中的当前结构、基础资料和基线版本。
+1. 新增实体、Repository、请求/响应 DTO、服务；使用独立业务表，不把复杂业务塞进 `sys_entry.value`。当前已到 V20，新增迁移从下一个未占用版本（现为 V21）开始，写完整表/列 COMMENT，再同步 `database/mayday.sql` 中的当前结构、基础资料和基线版本。
 2. 在 `PermissionCatalog.GROUPS` 注册 `tickets` 及 view/create/update/delete/export 等实际支持动作；需要行级范围则设置 `scoped=true`。角色编辑页面、后端范围白名单及会话摘要现在统一从该目录派生。
 3. **操作授权**：Controller 使用 `@PreAuthorize("@access.has('tickets:view')")` 或 Service 入口 `access.require(...)`；认证通过不等于拥有模块权限。
 4. **列表范围**：`access.filter("tickets", "ownerId")` 与业务条件组合；当前通用策略约定实体的部门属性名为 `departmentId`。分页、总数、导出、搜索选项和图表都复用同一过滤，不先全量查再在前端过滤。

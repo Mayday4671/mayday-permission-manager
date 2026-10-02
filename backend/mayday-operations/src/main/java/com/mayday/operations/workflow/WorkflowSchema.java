@@ -3,6 +3,7 @@ package com.mayday.operations.workflow;
 import com.mayday.common.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -28,7 +29,25 @@ public final class WorkflowSchema {
       BigDecimal min,
       BigDecimal max,
       Integer maxLength,
-      List<String> options) {}
+      List<String> options,
+      String placeholder,
+      String helpText,
+      List<Field> columns,
+      Integer maxRows) {
+    /** 已有发布版本及业务扩展保持原构造签名；新增属性缺失时使用运行端默认值。 */
+    public Field(
+        String id,
+        String label,
+        String type,
+        Boolean required,
+        Integer width,
+        BigDecimal min,
+        BigDecimal max,
+        Integer maxLength,
+        List<String> options) {
+      this(id, label, type, required, width, min, max, maxLength, options, null, null, null, null);
+    }
+  }
 
   /** 条件按列表顺序匹配，next 是稳定节点 ID；全部不命中时使用节点默认出口。 */
   public record Condition(String field, String operator, String value, String next) {}
@@ -116,6 +135,9 @@ public final class WorkflowSchema {
           "NUMBER",
           "MONEY",
           "DATE",
+          "DATETIME",
+          "DATE_RANGE",
+          "DETAILS",
           "SINGLE",
           "MULTI",
           "USER",
@@ -152,6 +174,30 @@ public final class WorkflowSchema {
               && fields.add(f.id()),
           "字段 ID 必须唯一，只包含字母、数字和下划线");
       require(text(f.label(), 60) && TYPES.contains(Objects.toString(f.type(), "")), "字段名称或类型无效");
+      require(f.placeholder() == null || f.placeholder().length() <= 200, "输入提示最多 200 字");
+      require(f.helpText() == null || f.helpText().length() <= 500, "字段说明最多 500 字");
+      if ("DETAILS".equals(f.type())) {
+        require(
+            f.columns() != null && !f.columns().isEmpty() && f.columns().size() <= 6,
+            "明细表需要 1 至 6 列");
+        require(f.maxRows() == null || (f.maxRows() >= 1 && f.maxRows() <= 50), "明细最多 1 至 50 行");
+        require(
+            f.columns().stream()
+                .allMatch(
+                    column ->
+                        column != null
+                            && Set.of(
+                                    "TEXT",
+                                    "TEXTAREA",
+                                    "NUMBER",
+                                    "MONEY",
+                                    "DATE",
+                                    "DATETIME",
+                                    "SINGLE")
+                                .contains(Objects.toString(column.type(), ""))),
+            "明细列只支持文字、数值、日期时间与单选，不能嵌套明细或附件");
+        validateFields(f.columns());
+      } else require(f.columns() == null || f.columns().isEmpty(), "只有明细表可以配置子列");
       require(f.width() == null || Set.of(12, 24).contains(f.width()), "字段布局只支持半行或整行");
       require(
           f.maxLength() == null || (f.maxLength() >= 1 && f.maxLength() <= 10000),
@@ -176,12 +222,13 @@ public final class WorkflowSchema {
           "节点 ID 必须唯一且格式正确");
       require(
           text(n.name(), 80)
-              && Set.of("APPROVAL", "CONDITION", "END").contains(Objects.toString(n.type(), "")),
+              && Set.of("APPROVAL", "COPY", "CONDITION", "END")
+                  .contains(Objects.toString(n.type(), "")),
           "节点名称或类型无效");
       require(
           fields.containsAll(n.readable()) && n.readable().containsAll(n.writable()),
           "可写字段必须同时可读，且字段必须存在");
-      if ("APPROVAL".equals(n.type())) {
+      if (Set.of("APPROVAL", "COPY").contains(n.type())) {
         require(
             n.timeoutMinutes() == null || (n.timeoutMinutes() >= 1 && n.timeoutMinutes() <= 43200),
             "超时提醒应为 1 至 43200 分钟，留空表示不提醒");
@@ -189,17 +236,25 @@ public final class WorkflowSchema {
             Set.of("USERS", "ROLES", "DEPARTMENT_LEADER")
                 .contains(Objects.toString(n.source(), "")),
             "请选择审批人来源");
-        require(Set.of("ANY", "ALL").contains(Objects.toString(n.mode(), "")), "请选择或签或会签");
+        require(
+            "COPY".equals(n.type())
+                || Set.of("ANY", "ALL", "SERIAL").contains(Objects.toString(n.mode(), "")),
+            "请选择或签、会签或顺签");
         require(
             n.assigneeIds().size() <= 100
                 && ("DEPARTMENT_LEADER".equals(n.source()) || !n.assigneeIds().isEmpty()),
             "审批人来源不能为空或超过 100 项");
         require(new HashSet<>(n.assigneeIds()).size() == n.assigneeIds().size(), "审批人来源不能重复");
         require(
-            Set.of("APPROVE", "REJECT", "COMMENT", "TRANSFER", "ADD_SIGN").containsAll(n.actions())
-                && n.actions().contains("APPROVE")
-                && n.actions().contains("REJECT"),
+            "COPY".equals(n.type())
+                || (Set.of("APPROVE", "REJECT", "RETURN", "COMMENT", "TRANSFER", "ADD_SIGN")
+                        .containsAll(n.actions())
+                    && n.actions().contains("APPROVE")
+                    && n.actions().contains("REJECT")),
             "节点至少允许同意和驳回");
+        require(
+            !"COPY".equals(n.type()) || (n.writable().isEmpty() && n.actions().isEmpty()),
+            "抄送节点不能修改字段或审批");
       }
       require("APPROVAL".equals(n.type()) || n.timeoutMinutes() == null, "只有审批节点可以配置超时提醒");
       if ("CONDITION".equals(n.type())) {
@@ -216,9 +271,12 @@ public final class WorkflowSchema {
           Field f =
               s.fields().stream().filter(v -> v.id().equals(c.field())).findFirst().orElseThrow();
           require(
-              !Set.of("FILES", "MULTI", "USER", "DEPARTMENT").contains(f.type()), "条件暂不支持附件或对象字段");
-          if (Set.of("GT", "GE", "LT", "LE").contains(c.operator())) {
+              !Set.of("FILES", "MULTI", "USER", "DEPARTMENT", "DATE_RANGE", "DETAILS")
+                  .contains(f.type()),
+              "条件暂不支持附件或对象字段");
+          if (Set.of("GT", "GE", "LT", "LE").contains(c.operator()))
             require(Set.of("NUMBER", "MONEY").contains(f.type()), "大小比较只适用于数值字段");
+          if (Set.of("NUMBER", "MONEY").contains(f.type()) && !"CONTAINS".equals(c.operator())) {
             try {
               new BigDecimal(c.value());
             } catch (Exception e) {
@@ -268,6 +326,11 @@ public final class WorkflowSchema {
 
   /** 未知字段一律拒绝，避免利用 JSON 额外属性覆盖审批状态、申请人或业务关联。 */
   public static Map<String, Object> form(Spec s, Map<String, Object> raw) {
+    return form(s, raw, true);
+  }
+
+  /** 草稿允许暂缺必填项，仍严格校验类型、数值边界、未知字段及明细结构。 */
+  public static Map<String, Object> form(Spec s, Map<String, Object> raw, boolean required) {
     Map<String, Object> values = raw == null ? Map.of() : raw;
     Map<String, Object> result = new LinkedHashMap<>();
     require(s.fields().stream().map(Field::id).toList().containsAll(values.keySet()), "表单含未登记字段");
@@ -277,12 +340,50 @@ public final class WorkflowSchema {
           value == null
               || (value instanceof String v && v.isBlank())
               || (value instanceof Collection<?> v && v.isEmpty());
-      require(!Boolean.TRUE.equals(f.required()) || !empty, f.label() + "不能为空");
+      require(!required || !Boolean.TRUE.equals(f.required()) || !empty, f.label() + "不能为空");
       if (empty) {
         result.put(f.id(), null);
         continue;
       }
       switch (f.type()) {
+        case "DETAILS" -> {
+          require(value instanceof List<?>, f.label() + "必须为明细列表");
+          List<?> rows = (List<?>) value;
+          require(rows.size() <= (f.maxRows() == null ? 20 : f.maxRows()), f.label() + "明细行数超限");
+          value =
+              rows.stream()
+                  .map(
+                      row -> {
+                        require(row instanceof Map<?, ?>, f.label() + "明细行无效");
+                        Map<String, Object> cells = new LinkedHashMap<>();
+                        ((Map<?, ?>) row)
+                            .forEach(
+                                (key, cell) -> {
+                                  require(key instanceof String, "明细字段名无效");
+                                  cells.put((String) key, cell);
+                                });
+                        return form(
+                            new Spec(
+                                f.columns(), List.of(), "", "ALL", Set.of(), false, false, true),
+                            cells,
+                            required);
+                      })
+                  .toList();
+        }
+        case "DATE_RANGE" -> {
+          require(value instanceof List<?> && ((List<?>) value).size() == 2, f.label() + "需要起止日期");
+          List<?> range = (List<?>) value;
+          try {
+            LocalDate from = LocalDate.parse(range.get(0).toString());
+            LocalDate to = LocalDate.parse(range.get(1).toString());
+            require(!from.isAfter(to), f.label() + "结束日期不能早于开始日期");
+            value = List.of(from.toString(), to.toString());
+          } catch (BusinessException e) {
+            throw e;
+          } catch (Exception e) {
+            throw new BusinessException(f.label() + "日期区间格式无效");
+          }
+        }
         case "NUMBER", "MONEY" -> {
           BigDecimal number;
           try {
@@ -326,11 +427,40 @@ public final class WorkflowSchema {
             } catch (Exception e) {
               throw new BusinessException(f.label() + "日期格式应为 YYYY-MM-DD");
             }
+          if ("DATETIME".equals(f.type()))
+            try {
+              value = LocalDateTime.parse(text).toString();
+            } catch (Exception e) {
+              throw new BusinessException(f.label() + "日期时间格式无效");
+            }
         }
       }
       result.put(f.id(), value);
     }
     return result;
+  }
+
+  /** 明细列复用主表字段校验，不绕过稳定 ID、选项和数值规则；没有可执行的子流程。 */
+  private static void validateFields(List<Field> columns) {
+    Node approval =
+        new Node(
+            "review",
+            "校验",
+            "APPROVAL",
+            "end",
+            "USERS",
+            List.of(1L),
+            "ALL",
+            Set.of(),
+            Set.of(),
+            Set.of("APPROVE", "REJECT"),
+            List.of());
+    Node end =
+        new Node(
+            "end", "结束", "END", null, null, List.of(), null, Set.of(), Set.of(), Set.of(),
+            List.of());
+    validate(
+        new Spec(columns, List.of(approval, end), "review", "ALL", Set.of(), false, false, true));
   }
 
   /** 人员/部门/文件关联 ID 必须为正整数，不接受小数、科学计数或任意对象。 */
@@ -351,8 +481,14 @@ public final class WorkflowSchema {
         if (value == null) continue;
         boolean match =
             switch (c.operator()) {
-              case "EQ" -> value.toString().equals(c.value());
-              case "NE" -> !value.toString().equals(c.value());
+              case "EQ" ->
+                  value instanceof Number
+                      ? new BigDecimal(value.toString()).compareTo(new BigDecimal(c.value())) == 0
+                      : value.toString().equals(c.value());
+              case "NE" ->
+                  value instanceof Number
+                      ? new BigDecimal(value.toString()).compareTo(new BigDecimal(c.value())) != 0
+                      : !value.toString().equals(c.value());
               case "CONTAINS" -> value.toString().contains(c.value());
               default -> {
                 int compare = new BigDecimal(value.toString()).compareTo(new BigDecimal(c.value()));

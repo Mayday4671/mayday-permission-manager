@@ -9,6 +9,9 @@ export type FieldType =
   | "NUMBER"
   | "MONEY"
   | "DATE"
+  | "DATETIME"
+  | "DATE_RANGE"
+  | "DETAILS"
   | "SINGLE"
   | "MULTI"
   | "USER"
@@ -24,6 +27,10 @@ export interface WorkflowField {
   max?: number;
   maxLength?: number;
   options?: string[];
+  placeholder?: string;
+  helpText?: string;
+  columns?: WorkflowField[];
+  maxRows?: number;
 }
 export interface WorkflowCondition {
   field: string;
@@ -32,15 +39,22 @@ export interface WorkflowCondition {
   next: string;
 }
 export type WorkflowAction =
-  "APPROVE" | "REJECT" | "COMMENT" | "WITHDRAW" | "TRANSFER" | "ADD_SIGN";
+  | "APPROVE"
+  | "REJECT"
+  | "RETURN"
+  | "TERMINATE"
+  | "COMMENT"
+  | "WITHDRAW"
+  | "TRANSFER"
+  | "ADD_SIGN";
 export interface WorkflowNode {
   id: string;
   name: string;
-  type: "APPROVAL" | "CONDITION" | "END";
+  type: "APPROVAL" | "COPY" | "CONDITION" | "END";
   next?: string;
   source?: "USERS" | "ROLES" | "DEPARTMENT_LEADER";
   assigneeIds?: number[];
-  mode?: "ANY" | "ALL";
+  mode?: "ANY" | "ALL" | "SERIAL";
   readable?: string[];
   writable?: string[];
   actions?: WorkflowAction[];
@@ -90,6 +104,10 @@ export interface WorkflowTask extends BaseRecord {
   decidedAt: string | null;
   dueAt: string | null;
   timeoutNotifiedAt: string | null;
+  runNumber: number;
+  nodeVisit: number;
+  kind: "APPROVAL" | "COPY";
+  readAt: string | null;
 }
 export interface WorkflowHistory extends BaseRecord {
   actorName: string;
@@ -98,6 +116,10 @@ export interface WorkflowHistory extends BaseRecord {
   nodeName: string | null;
   targetUserName: string | null;
   changes?: Record<string, { before: unknown; after: unknown }>;
+  runNumber: number;
+  nodeVisit: number;
+  targetNodeId?: string;
+  submittedValues?: Record<string, unknown>;
 }
 export interface ApprovalRecord extends BaseRecord {
   title: string;
@@ -114,6 +136,8 @@ export interface ApprovalRecord extends BaseRecord {
   currentNodeName: string | null;
   completedAt: string | null;
   lastRemindedAt: string | null;
+  runNumber: number;
+  submittedAt: string | null;
 }
 export interface ApprovalDetail extends ApprovalRecord {
   fields: WorkflowField[];
@@ -128,26 +152,51 @@ export interface ApprovalDetail extends ApprovalRecord {
   canWithdraw: boolean;
   canComment: boolean;
   canRemind: boolean;
+  canEdit: boolean;
+  canTerminate: boolean;
+  returnTargets: { id: string; name: string }[];
+  unreadCopies: number;
+  diagram: {
+    startNodeId: string;
+    nodes: {
+      id: string;
+      name: string;
+      type: WorkflowNode["type"];
+      next?: string;
+      branches: string[];
+      current: boolean;
+      visited: boolean;
+    }[];
+  };
   business:
     | (ContentRevision & {
         noticeId: number;
         currentRevision: boolean;
         deleted: boolean;
+        noticeVersion: number;
       })
     | null;
 }
 export const approvalStates: Record<string, string> = {
   PENDING: "审批中",
+  DRAFT: "草稿",
+  RETURNED: "已退回",
+  WAITING: "未轮到",
+  COPIED: "已抄送",
   APPROVED: "已通过",
   REJECTED: "已驳回",
   WITHDRAWN: "已撤回",
-  CANCELLED: "已取消",
+  CANCELLED: "已失效",
   TRANSFERRED: "已转交",
 };
 export const actionNames: Record<string, string> = {
   SUBMIT: "提交",
   APPROVE: "同意",
   REJECT: "驳回",
+  RETURN: "退回",
+  TERMINATE: "终止",
+  RESUBMIT: "重新提交",
+  EDIT: "保存修改",
   WITHDRAW: "撤回",
   COMMENT: "评论",
   TRANSFER: "转交",
@@ -160,6 +209,9 @@ export const fieldNames: Record<FieldType, string> = {
   NUMBER: "数字",
   MONEY: "金额",
   DATE: "日期",
+  DATETIME: "日期时间",
+  DATE_RANGE: "日期区间",
+  DETAILS: "明细表",
   SINGLE: "单选",
   MULTI: "多选",
   USER: "人员",
@@ -190,7 +242,7 @@ export function initialSpec(): WorkflowSpec {
         next: "end",
         readable: ["description"],
         writable: [],
-        actions: ["APPROVE", "REJECT", "COMMENT"],
+        actions: ["APPROVE", "REJECT", "RETURN", "COMMENT"],
         conditions: [],
       },
       { id: "end", name: "结束", type: "END" },

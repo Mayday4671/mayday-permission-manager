@@ -188,9 +188,13 @@ V15 起，DELETE `/crawler/tasks/{id}` 对已经产生文章的配置采用归�
 
 ## 审批实例
 
-- `GET /operations/requests?box=mine|todo|done|participated|all`；all 单独鉴权。`GET .../{id}` 与 `/{id}/history` 返回按参与权和字段读权过滤的详情/历史。
+- `GET /operations/requests?box=mine|drafts|todo|done|participated|copies|all`；all 单独鉴权。`GET .../{id}` 与 `/{id}/history` 返回按参与权和字段读权过滤的详情/历史。
 - `POST /operations/requests`：`definitionId/versionId/title/values`；内容审批再传 `businessId/businessRevisionId/businessVersion`。必须绑定当前已发布流程版本及文章当前修订。
-- `POST /operations/requests/{id}/decision`：`version/taskId/action/comment/targetUserId/values`。action 为 APPROVE/REJECT/WITHDRAW/COMMENT/TRANSFER/ADD_SIGN；驳回和评论需要内容，转交/加签需要目标用户。values 只能包含当前节点可写字段。
+- `POST /operations/requests/{id}/decision`：`version/taskId/action/comment/targetUserId/targetNodeId/values`。action 为 APPROVE/REJECT/RETURN/TERMINATE/WITHDRAW/COMMENT/TRANSFER/ADD_SIGN；驳回、退回、终止和评论需要原因或内容，转交/加签需要目标用户。values 只能包含当前节点可写字段。
+- `POST /operations/requests/drafts` 保存未提交草稿；`PUT /operations/requests/{id}` 保存本人草稿/退回/撤回后的修改；`POST .../{id}/submit` 完整校验后提交或重提。编辑体为 `version/title/values/businessVersion`；不能换发起人、流程或业务修订。
+- `DELETE /operations/requests/{id}?version=...` 只删除本人未提交草稿，正式申请不能删除。`POST .../{id}/copies/read` 只标记本人的抄送已读，不改变申请版本。
+- RETURN 的 targetNodeId 为空表示退回申请人修改；指定 ID 只能来自详情 returnTargets 中当前有效路径的已办节点。TERMINATE 单独要求 requests:manage，不替代审批人决定；终止、终止性驳回和通过不能重提。
+- 实例 runNumber 区分提交轮次，任务 nodeVisit 区分节点重办批次；history 的 submittedValues 为各轮提交的权限裁剪快照。`status` 可单独过滤实例状态，全部申请不含他人的未提交草稿。
 - `GET .../{id}/files/{fileId}` 检查字段附件读权；`GET .../{id}/content-files/{fileId}` 检查送审内容快照附件。
 - `GET .../{id}/events`、`POST .../{id}/retry-notifications` 为审批管理员的可靠通知运维入口。
 - `POST /operations/requests/{id}/remind`：`{version}`，需 `requests:remind`，申请人可催办自己的运行中申请，审批管理员另需 `requests:manage`；30 分钟冷却，通知当前有效待办人。

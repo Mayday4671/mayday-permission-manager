@@ -31,6 +31,19 @@ public class FlowTask extends BaseEntity {
   private String status = "PENDING";
 
   private boolean mandatory;
+
+  /** 任务属于哪个提交轮次和节点办理批次；旧任务只用于历史展示。 */
+  private int runNumber = 1;
+
+  private int nodeVisit;
+
+  /** 抄送没有审批能力；顺签尚未轮到的任务为 WAITING，不计入个人待办。 */
+  @Column(nullable = false, length = 16)
+  private String kind = "APPROVAL";
+
+  /** 仅抄送接收者能标记已读，不能修改其他接收者的阅读状态。 */
+  private LocalDateTime readAt;
+
   private LocalDateTime decidedAt;
 
   /** 从申请冻结的节点超时配置推算；转交和加签继承当前节点期限，不因换人重置。 */

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Form, Modal, type FormInstance } from "antd";
+import { Button, Form, Modal, Space, type FormInstance } from "antd";
 import { useFormDialog } from "../lib/useFormDialog";
 
 interface FormModalProps<T extends object> {
@@ -16,6 +16,8 @@ interface FormModalProps<T extends object> {
   onSubmit: (values: T) => Promise<void>;
   /** 分页签表单在校验失败时先切到错误所在页签，再交给 Form 定位字段。 */
   onInvalid?: (field: (string | number)[]) => void;
+  /** 草稿等次要提交复用同一提交锁；跳过必填项校验后仍由业务服务校验类型和归属。 */
+  secondaryAction?: { label: string; onSubmit: (values: T) => Promise<void> };
 }
 
 /**
@@ -36,6 +38,7 @@ export function FormModal<T extends object>({
   onCancel,
   onSubmit,
   onInvalid,
+  secondaryAction,
 }: FormModalProps<T>) {
   const { formName, saving, submit, close, reset, valuesChanged } =
     useFormDialog({
@@ -73,6 +76,27 @@ export function FormModal<T extends object>({
       onCancel={() => void close()}
       onOk={() => form.submit()}
       afterClose={reset}
+      footer={
+        secondaryAction
+          ? (_, { OkBtn, CancelBtn }) => (
+              <Space wrap>
+                <Button
+                  disabled={saving}
+                  onClick={() =>
+                    void submit(
+                      form.getFieldsValue(true),
+                      secondaryAction.onSubmit,
+                    )
+                  }
+                >
+                  {secondaryAction.label}
+                </Button>
+                <CancelBtn />
+                <OkBtn />
+              </Space>
+            )
+          : undefined
+      }
     >
       <Form
         name={formName}

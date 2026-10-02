@@ -1,20 +1,25 @@
-import {
-  Descriptions,
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  type UploadFile,
-} from "antd";
+import { Descriptions, Form, type UploadFile } from "antd";
 import { UserSelect } from "./LookupSelect";
 import { DepartmentField } from "./DepartmentSelect";
 import { AttachmentUpload, attachmentIds } from "./AttachmentUpload";
 import { AttachmentList } from "./AttachmentList";
 import type { WorkflowField } from "../types/workflow";
 import type { FileRecord } from "../types/operations";
+import {
+  WorkflowInput,
+  WorkflowDateRange,
+  WorkflowDetailRows,
+} from "./workflow/WorkflowInputs";
+import { DataTable } from "./DataTable";
 
 /** 申请、审批补充、设计器预览共用渲染器。可写字段由服务端给出，不用前端模型推断权限。 */
-export function WorkflowFields({ fields }: { fields: WorkflowField[] }) {
+export function WorkflowFields({
+  fields,
+  preview = false,
+}: {
+  fields: WorkflowField[];
+  preview?: boolean;
+}) {
   return (
     <div className="workflow-fields">
       {fields.map((field) => (
@@ -22,6 +27,7 @@ export function WorkflowFields({ fields }: { fields: WorkflowField[] }) {
           key={field.id}
           name={["values", field.id]}
           label={field.label}
+          extra={field.helpText}
           className={field.width === 12 ? "half-field" : undefined}
           rules={[
             { required: field.required, message: "请填写" + field.label },
@@ -30,35 +36,18 @@ export function WorkflowFields({ fields }: { fields: WorkflowField[] }) {
               : []),
           ]}
         >
-          {field.type === "TEXT" ? (
-            <Input maxLength={field.maxLength ?? 2000} />
-          ) : field.type === "TEXTAREA" ? (
-            <Input.TextArea
-              rows={3}
-              maxLength={field.maxLength ?? 2000}
-              showCount
-            />
-          ) : field.type === "NUMBER" || field.type === "MONEY" ? (
-            <InputNumber
-              min={field.min}
-              max={field.max}
-              precision={field.type === "MONEY" ? 2 : undefined}
-              style={{ width: "100%" }}
-            />
-          ) : field.type === "DATE" ? (
-            <Input type="date" />
-          ) : field.type === "SINGLE" || field.type === "MULTI" ? (
-            <Select
-              allowClear
-              mode={field.type === "MULTI" ? "multiple" : undefined}
-              options={field.options?.map((value) => ({ value, label: value }))}
-            />
+          {field.type === "DETAILS" ? (
+            <WorkflowDetailRows field={field} />
+          ) : field.type === "DATE_RANGE" ? (
+            <WorkflowDateRange />
           ) : field.type === "USER" ? (
             <UserSelect />
           ) : field.type === "DEPARTMENT" ? (
             <DepartmentField />
+          ) : field.type === "FILES" ? (
+            <AttachmentUpload disabled={preview} />
           ) : (
-            <AttachmentUpload />
+            <WorkflowInput field={field} />
           )}
         </Form.Item>
       ))}
@@ -123,7 +112,23 @@ export function WorkflowValues({
         key: field.id,
         label: field.label,
         children:
-          field.type === "FILES" ? (
+          field.type === "DETAILS" ? (
+            <DataTable
+              rowKey="rowNumber"
+              size="small"
+              pagination={{ pageSize: 5 }}
+              dataSource={(
+                (values[field.id] ?? []) as Record<string, unknown>[]
+              ).map((row, index) => ({ ...row, rowNumber: index + 1 }))}
+              columns={(field.columns ?? []).map((column) => ({
+                title: column.label,
+                dataIndex: column.id,
+                render: (value: unknown) => (
+                  <span className="preserve-lines">{String(value ?? "—")}</span>
+                ),
+              }))}
+            />
+          ) : field.type === "FILES" ? (
             <AttachmentList
               files={files.filter((f) =>
                 ((values[field.id] ?? []) as number[]).includes(f.id),
@@ -136,7 +141,9 @@ export function WorkflowValues({
             <span className="preserve-lines">
               {labels[field.id] ??
                 (Array.isArray(values[field.id])
-                  ? (values[field.id] as string[]).join("、")
+                  ? (values[field.id] as string[]).join(
+                      field.type === "DATE_RANGE" ? " 至 " : "、",
+                    )
                   : String(values[field.id] ?? "—"))}
             </span>
           ),

@@ -13,15 +13,11 @@ import {
   Tag,
 } from "antd";
 import {
-  ArrowDown,
-  ArrowUp,
   ArrowRight,
   GitBranch,
-  GripVertical,
   Plus,
   Save,
   Send,
-  Trash2,
   UserRound,
   Square,
 } from "lucide-react";
@@ -51,6 +47,8 @@ import {
   type WorkflowNode,
   type WorkflowSpec,
 } from "../../types/workflow";
+import { WorkflowDiagram } from "../../components/workflow/WorkflowDiagram";
+import { WorkflowFormDesigner } from "../../components/workflow/WorkflowFormDesigner";
 import "../../workflow.css";
 interface Simulation {
   valid: boolean;
@@ -61,7 +59,12 @@ interface Simulation {
     approvers: { id: number; name: string }[];
   }[];
 }
-const nodeLabels = { APPROVAL: "审批节点", CONDITION: "条件分支", END: "结束" };
+const nodeLabels = {
+  APPROVAL: "审批节点",
+  COPY: "抄送",
+  CONDITION: "条件分支",
+  END: "结束",
+};
 /**
  * 设计器独立页签，字段与节点均通过弹窗编辑；同时提供可键盘操作的节点列表。
  * 本地草稿不写浏览器存储，保存/发布均携带版本，发布前由同一运行引擎验证模型和人员引用。
@@ -90,6 +93,7 @@ export function WorkflowDesignerPage() {
   const loadedId = useRef<number | null>(null),
     [tab, setTab] = useState("nodes"),
     [listMode, setListMode] = useState(false);
+  const [insertAfter, setInsertAfter] = useState<string | null>(null);
   const [field, setField] = useState<WorkflowField | null>(null),
     [node, setNode] = useState<WorkflowNode | null>(null),
     [existing, setExisting] = useState(false);
@@ -337,106 +341,78 @@ export function WorkflowDesignerPage() {
                         </Button>
                       )}
                     </div>
-                    <div className="field-card-grid">
-                      {spec.fields.map((f, index) => (
-                        <div className="field-card" key={f.id}>
-                          <div className="field-card-title">
-                            <GripVertical size={16} />
-                            <b>{f.label}</b>
-                            {f.required && (
-                              <span className="required-mark">*</span>
-                            )}
-                            <Tag>{fieldNames[f.type]}</Tag>
-                          </div>
-                          <div className="field-preview">
-                            {f.type === "TEXTAREA"
-                              ? "多行输入"
-                              : f.type === "FILES"
-                                ? "上传附件"
-                                : f.type === "SINGLE" || f.type === "MULTI"
-                                  ? "请选择"
-                                  : f.type === "DATE"
-                                    ? "年 / 月 / 日"
-                                    : "请输入" + f.label}
-                          </div>
-                          <div className="field-card-footer">
-                            <code>{f.id}</code>
-                            <span>{f.width === 12 ? "半行" : "整行"}</span>
-                            {editable && (
-                              <Space size={0}>
-                                <Button
-                                  type="text"
-                                  aria-label={"上移" + f.label}
-                                  disabled={!index}
-                                  icon={<ArrowUp size={14} />}
-                                  onClick={() => {
-                                    const next = [...spec.fields];
-                                    [next[index - 1], next[index]] = [
-                                      next[index],
-                                      next[index - 1],
-                                    ];
-                                    change("fields", next);
-                                  }}
-                                />
-                                <Button
-                                  type="text"
-                                  aria-label={"下移" + f.label}
-                                  disabled={index === spec.fields.length - 1}
-                                  icon={<ArrowDown size={14} />}
-                                  onClick={() => {
-                                    const next = [...spec.fields];
-                                    [next[index + 1], next[index]] = [
-                                      next[index],
-                                      next[index + 1],
-                                    ];
-                                    change("fields", next);
-                                  }}
-                                />
-                                <Button
-                                  type="link"
-                                  onClick={() => {
-                                    setExisting(true);
-                                    setField(f);
-                                  }}
-                                >
-                                  编辑
-                                </Button>
-                                <Button
-                                  type="text"
-                                  danger
-                                  aria-label={"移除" + f.label}
-                                  icon={<Trash2 size={14} />}
-                                  onClick={() =>
-                                    modal.confirm({
-                                      title: "移除字段？",
-                                      content:
-                                        "同时清理节点的读写引用；使用此字段的分支条件需要重新配置。",
-                                      centered: true,
-                                      onOk: () =>
-                                        update({
-                                          ...spec,
-                                          fields: spec.fields.filter(
-                                            (x) => x.id !== f.id,
-                                          ),
-                                          nodes: spec.nodes.map((n) => ({
-                                            ...n,
-                                            readable: n.readable?.filter(
-                                              (x) => x !== f.id,
-                                            ),
-                                            writable: n.writable?.filter(
-                                              (x) => x !== f.id,
-                                            ),
-                                          })),
-                                        }),
-                                    })
-                                  }
-                                />
-                              </Space>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <WorkflowFormDesigner
+                      fields={spec.fields}
+                      editable={editable}
+                      onAdd={(type) => {
+                        setExisting(false);
+                        setField({
+                          id: newId(
+                            "field",
+                            spec.fields.map((f) => f.id),
+                          ),
+                          label: fieldNames[type],
+                          type,
+                          width: type === "DETAILS" ? 24 : 12,
+                          required: false,
+                          columns:
+                            type === "DETAILS"
+                              ? [
+                                  {
+                                    id: "item",
+                                    label: "项目",
+                                    type: "TEXT",
+                                    required: true,
+                                  },
+                                  {
+                                    id: "amount",
+                                    label: "金额",
+                                    type: "MONEY",
+                                    required: true,
+                                    min: 0,
+                                  },
+                                ]
+                              : undefined,
+                          maxRows: type === "DETAILS" ? 20 : undefined,
+                        });
+                      }}
+                      onEdit={(field) => {
+                        setExisting(true);
+                        setField(field);
+                      }}
+                      onMove={(index, target) => {
+                        const next = [...spec.fields];
+                        [next[index], next[target]] = [
+                          next[target],
+                          next[index],
+                        ];
+                        change("fields", next);
+                      }}
+                      onRemove={(field) =>
+                        modal.confirm({
+                          title: "移除字段？",
+                          content:
+                            "同时清理节点读写引用；分支条件需要重新配置。",
+                          centered: true,
+                          onOk: () =>
+                            update({
+                              ...spec,
+                              fields: spec.fields.filter(
+                                (item) => item.id !== field.id,
+                              ),
+                              nodes: spec.nodes.map((node) => ({
+                                ...node,
+                                readable: node.readable?.filter(
+                                  (id) => id !== field.id,
+                                ),
+                                writable: node.writable?.filter(
+                                  (id) => id !== field.id,
+                                ),
+                              })),
+                            }),
+                        })
+                      }
+                    />
                     {!spec.fields.length && (
                       <Empty
                         image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -475,6 +451,7 @@ export function WorkflowDesignerPage() {
                             icon={<Plus size={15} />}
                             disabled={spec.nodes.length >= 40}
                             onClick={() => {
+                              setInsertAfter(null);
                               setExisting(false);
                               setNode({
                                 id: newId(
@@ -489,7 +466,12 @@ export function WorkflowDesignerPage() {
                                 next: "end",
                                 readable: spec.fields.map((f) => f.id),
                                 writable: [],
-                                actions: ["APPROVE", "REJECT", "COMMENT"],
+                                actions: [
+                                  "APPROVE",
+                                  "REJECT",
+                                  "RETURN",
+                                  "COMMENT",
+                                ],
                                 conditions: [],
                               });
                             }}
@@ -499,122 +481,214 @@ export function WorkflowDesignerPage() {
                         )}
                       </Space>
                     </div>
-                    <div
-                      className={
-                        listMode ? "workflow-node-list" : "workflow-graph"
-                      }
-                    >
-                      {spec.nodes.map((n) => (
-                        <div
-                          key={n.id}
-                          className={"workflow-node " + n.type.toLowerCase()}
-                        >
-                          <div className="workflow-node-head">
-                            <span>
-                              {n.type === "APPROVAL" ? (
-                                <UserRound size={17} />
-                              ) : n.type === "CONDITION" ? (
-                                <GitBranch size={17} />
-                              ) : (
-                                <Square size={15} />
+                    {!listMode && (
+                      <WorkflowDiagram
+                        startNodeId={spec.startNodeId}
+                        items={spec.nodes.map((node) => ({
+                          ...node,
+                          branches: node.conditions?.map((rule) => rule.next),
+                          description:
+                            node.type === "END"
+                              ? undefined
+                              : node.type === "CONDITION"
+                                ? `${node.conditions?.length ?? 0} 条分支规则`
+                                : node.source === "DEPARTMENT_LEADER"
+                                  ? "部门负责人"
+                                  : `${node.assigneeIds?.length ?? 0} ${node.source === "ROLES" ? "个角色" : "人"} · ${node.type === "COPY" ? "抄送" : node.mode === "SERIAL" ? "顺签" : node.mode === "ALL" ? "会签" : "或签"}`,
+                        }))}
+                        onInsert={
+                          editable
+                            ? (id) => {
+                                if (spec.nodes.length >= 40) {
+                                  message.warning("最多40个节点");
+                                  return;
+                                }
+                                setInsertAfter(id);
+                                setExisting(false);
+                                setNode({
+                                  id: newId(
+                                    "node",
+                                    spec.nodes.map((n) => n.id),
+                                  ),
+                                  name: "新审批节点",
+                                  type: "APPROVAL",
+                                  source: "USERS",
+                                  assigneeIds: [],
+                                  mode: "ALL",
+                                  next: spec.nodes.find((n) => n.id === id)
+                                    ?.next,
+                                  readable: spec.fields.map((f) => f.id),
+                                  writable: [],
+                                  actions: [
+                                    "APPROVE",
+                                    "REJECT",
+                                    "RETURN",
+                                    "COMMENT",
+                                  ],
+                                  conditions: [],
+                                });
+                              }
+                            : undefined
+                        }
+                        onEdit={
+                          editable
+                            ? (id) => {
+                                setExisting(true);
+                                setNode(
+                                  spec.nodes.find((node) => node.id === id) ??
+                                    null,
+                                );
+                              }
+                            : undefined
+                        }
+                        onConnect={
+                          editable
+                            ? (source, target, branch) =>
+                                change(
+                                  "nodes",
+                                  spec.nodes.map((node) =>
+                                    node.id !== source
+                                      ? node
+                                      : branch === null
+                                        ? { ...node, next: target }
+                                        : {
+                                            ...node,
+                                            conditions: node.conditions?.map(
+                                              (rule, index) =>
+                                                index === branch
+                                                  ? { ...rule, next: target }
+                                                  : rule,
+                                            ),
+                                          },
+                                  ),
+                                )
+                            : undefined
+                        }
+                      />
+                    )}
+                    {listMode && (
+                      <div className="workflow-node-list">
+                        {spec.nodes.map((n) => (
+                          <div
+                            key={n.id}
+                            className={"workflow-node " + n.type.toLowerCase()}
+                          >
+                            <div className="workflow-node-head">
+                              <span>
+                                {n.type === "APPROVAL" ? (
+                                  <UserRound size={17} />
+                                ) : n.type === "CONDITION" ? (
+                                  <GitBranch size={17} />
+                                ) : (
+                                  <Square size={15} />
+                                )}
+                              </span>
+                              <strong>{n.name}</strong>
+                              <Tag>{nodeLabels[n.type]}</Tag>
+                              {spec.startNodeId === n.id && (
+                                <Tag color="blue">起点</Tag>
                               )}
-                            </span>
-                            <strong>{n.name}</strong>
-                            <Tag>{nodeLabels[n.type]}</Tag>
-                            {spec.startNodeId === n.id && (
-                              <Tag color="blue">起点</Tag>
-                            )}
-                          </div>
-                          {n.type === "APPROVAL" && (
-                            <div className="workflow-node-info">
-                              {n.source === "DEPARTMENT_LEADER"
-                                ? "部门负责人"
-                                : n.source === "ROLES"
-                                  ? "指定角色 · " +
-                                    (n.assigneeIds?.length ?? 0) +
-                                    " 项"
-                                  : "指定人员 · " +
-                                    (n.assigneeIds?.length ?? 0) +
-                                    " 人"}
-                              <span>{n.mode === "ALL" ? "会签" : "或签"}</span>
                             </div>
-                          )}
-                          <div className="workflow-exits">
-                            {n.conditions?.map((rule, index) => (
-                              <div key={index}>
-                                <GitBranch size={13} />
+                            {n.type === "APPROVAL" && (
+                              <div className="workflow-node-info">
+                                {n.source === "DEPARTMENT_LEADER"
+                                  ? "部门负责人"
+                                  : n.source === "ROLES"
+                                    ? "指定角色 · " +
+                                      (n.assigneeIds?.length ?? 0) +
+                                      " 项"
+                                    : "指定人员 · " +
+                                      (n.assigneeIds?.length ?? 0) +
+                                      " 人"}
                                 <span>
-                                  {spec.fields.find((f) => f.id === rule.field)
-                                    ?.label ?? rule.field}{" "}
-                                  {
+                                  {n.mode === "ALL"
+                                    ? "会签"
+                                    : n.mode === "SERIAL"
+                                      ? "顺签"
+                                      : "或签"}
+                                </span>
+                              </div>
+                            )}
+                            <div className="workflow-exits">
+                              {n.conditions?.map((rule, index) => (
+                                <div key={index}>
+                                  <GitBranch size={13} />
+                                  <span>
+                                    {spec.fields.find(
+                                      (f) => f.id === rule.field,
+                                    )?.label ?? rule.field}{" "}
                                     {
-                                      EQ: "=",
-                                      NE: "≠",
-                                      GT: ">",
-                                      GE: "≥",
-                                      LT: "<",
-                                      LE: "≤",
-                                      CONTAINS: "包含",
-                                    }[rule.operator]
-                                  }{" "}
-                                  {rule.value}
-                                </span>
-                                <ArrowRight size={13} />
-                                {spec.nodes.find((x) => x.id === rule.next)
-                                  ?.name ?? "出口失效"}
-                              </div>
-                            ))}
-                            {n.type !== "END" && (
-                              <div>
-                                <span>
-                                  {n.type === "CONDITION" ? "默认" : "下一节点"}
-                                </span>
-                                <ArrowRight size={13} />
-                                {spec.nodes.find((x) => x.id === n.next)
-                                  ?.name ?? "未连接"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="workflow-node-footer">
-                            <code>{n.id}</code>
-                            {editable && (
-                              <Space>
-                                <Button
-                                  size="small"
-                                  onClick={() => {
-                                    setExisting(true);
-                                    setNode(n);
-                                  }}
-                                >
-                                  配置节点
-                                </Button>
-                                <Button
-                                  size="small"
-                                  danger
-                                  onClick={() =>
-                                    modal.confirm({
-                                      title: "移除这个节点？",
-                                      content:
-                                        "引用它的出口需要重新连接，发布时会检查所有引用。",
-                                      centered: true,
-                                      onOk: () =>
-                                        change(
-                                          "nodes",
-                                          spec.nodes.filter(
-                                            (x) => x.id !== n.id,
+                                      {
+                                        EQ: "=",
+                                        NE: "≠",
+                                        GT: ">",
+                                        GE: "≥",
+                                        LT: "<",
+                                        LE: "≤",
+                                        CONTAINS: "包含",
+                                      }[rule.operator]
+                                    }{" "}
+                                    {rule.value}
+                                  </span>
+                                  <ArrowRight size={13} />
+                                  {spec.nodes.find((x) => x.id === rule.next)
+                                    ?.name ?? "出口失效"}
+                                </div>
+                              ))}
+                              {n.type !== "END" && (
+                                <div>
+                                  <span>
+                                    {n.type === "CONDITION"
+                                      ? "默认"
+                                      : "下一节点"}
+                                  </span>
+                                  <ArrowRight size={13} />
+                                  {spec.nodes.find((x) => x.id === n.next)
+                                    ?.name ?? "未连接"}
+                                </div>
+                              )}
+                            </div>
+                            <div className="workflow-node-footer">
+                              <code>{n.id}</code>
+                              {editable && (
+                                <Space>
+                                  <Button
+                                    size="small"
+                                    onClick={() => {
+                                      setExisting(true);
+                                      setNode(n);
+                                    }}
+                                  >
+                                    配置节点
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    danger
+                                    onClick={() =>
+                                      modal.confirm({
+                                        title: "移除这个节点？",
+                                        content:
+                                          "引用它的出口需要重新连接，发布时会检查所有引用。",
+                                        centered: true,
+                                        onOk: () =>
+                                          change(
+                                            "nodes",
+                                            spec.nodes.filter(
+                                              (x) => x.id !== n.id,
+                                            ),
                                           ),
-                                        ),
-                                    })
-                                  }
-                                >
-                                  移除
-                                </Button>
-                              </Space>
-                            )}
+                                      })
+                                    }
+                                  >
+                                    移除
+                                  </Button>
+                                </Space>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ),
               },
@@ -689,7 +763,12 @@ export function WorkflowDesignerPage() {
                 "nodes",
                 existing
                   ? spec.nodes.map((n) => (n.id === next.id ? next : n))
-                  : [...spec.nodes, next],
+                  : [
+                      ...spec.nodes.map((n) =>
+                        n.id === insertAfter ? { ...n, next: next.id } : n,
+                      ),
+                      next,
+                    ],
               );
               setNode(null);
             }}

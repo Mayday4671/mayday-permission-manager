@@ -72,6 +72,19 @@ public class FlowRequest extends BaseEntity {
   /** 手动催办时间由持有申请行锁的事务更新；整个申请每 30 分钟最多发送一次。 */
   private java.time.LocalDateTime lastRemindedAt;
 
+  /** 草稿为 0；每次正式提交递增，历史任务和决定不会作为下一轮的通过凭证。 */
+  private int runNumber = 1;
+
+  /** 每次进入审批节点递增，同一节点退回重办时使用新办理批次。 */
+  private int nodeVisit;
+
+  /** 当前轮实际经过的审批节点路径；退回只允许此前经过的节点，不接受任意目标 ID。 */
+  @Column(columnDefinition = "text")
+  private String activePath;
+
+  /** 首次提交或最近重提时间；草稿创建时间不冒充提交时间。 */
+  private java.time.LocalDateTime submittedAt;
+
   @ElementCollection(fetch = FetchType.EAGER)
   @CollectionTable(name = "ops_request_file", joinColumns = @JoinColumn(name = "request_id"))
   @Column(name = "file_id", nullable = false)

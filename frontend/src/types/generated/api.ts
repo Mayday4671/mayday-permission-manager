@@ -1176,8 +1176,24 @@ export interface paths {
       cookie?: never;
     };
     get: operations["WorkflowController_request"];
-    put?: never;
+    put: operations["WorkflowController_edit"];
     post?: never;
+    delete: operations["WorkflowController_discardDraft"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/requests/{id}/copies/read": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["WorkflowController_readCopies"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1280,6 +1296,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/operations/requests/{id}/submit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["WorkflowController_resubmit"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/operations/requests/{requestId}/content-files/{fileId}": {
     parameters: {
       query?: never;
@@ -1290,6 +1322,22 @@ export interface paths {
     get: operations["ContentFileController_approval"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/requests/drafts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["WorkflowController_draft"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2167,6 +2215,7 @@ export interface components {
     Action: {
       action: string;
       comment?: string;
+      targetNodeId?: string;
       /** Format: int64 */
       targetUserId?: number;
       /** Format: int64 */
@@ -2493,6 +2542,16 @@ export interface components {
       /** Format: int64 */
       version?: number;
     };
+    Edit: {
+      /** Format: int64 */
+      businessVersion?: number;
+      title: string;
+      values?: {
+        [key: string]: unknown;
+      };
+      /** Format: int64 */
+      version: number;
+    };
     EntryRequest: {
       code: string;
       description?: string;
@@ -2602,13 +2661,18 @@ export interface components {
       type: string;
     };
     Field: {
+      columns?: components["schemas"]["Field"][];
+      helpText?: string;
       id?: string;
       label?: string;
       max?: number;
       /** Format: int32 */
       maxLength?: number;
+      /** Format: int32 */
+      maxRows?: number;
       min?: number;
       options?: string[];
+      placeholder?: string;
       required?: boolean;
       type?: string;
       /** Format: int32 */
@@ -5272,6 +5336,7 @@ export interface operations {
         keyword?: string;
         page?: number;
         size?: number;
+        status?: string;
       };
       header?: never;
       path?: never;
@@ -5332,6 +5397,78 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  WorkflowController_edit: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Edit"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  WorkflowController_discardDraft: {
+    parameters: {
+      query: {
+        version: number;
+      };
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseVoid"];
+        };
+      };
+    };
+  };
+  WorkflowController_readCopies: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseVoid"];
         };
       };
     };
@@ -5477,6 +5614,32 @@ export interface operations {
       };
     };
   };
+  WorkflowController_resubmit: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Edit"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
   ContentFileController_approval: {
     parameters: {
       query?: {
@@ -5498,6 +5661,30 @@ export interface operations {
         };
         content: {
           "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  WorkflowController_draft: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["WorkflowSubmission"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
         };
       };
     };

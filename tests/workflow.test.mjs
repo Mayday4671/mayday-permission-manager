@@ -210,6 +210,486 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
         status,
       );
     };
+    // OA 生命周期验收使用独立库、真实行锁和权限，不用模拟状态代替业务执行。
+    const editApplication = async (
+      id,
+      values,
+      submitAgain = false,
+      token = applicant.token,
+      status = 200,
+    ) => {
+      const latest = await detail(id, token);
+      return call(
+        `/operations/requests/${id}${submitAgain ? "/submit" : ""}`,
+        token,
+        submitAgain ? "POST" : "PUT",
+        { version: latest.version, title: latest.title, values },
+        status,
+      );
+    };
+    await t.test(
+      "草稿仅本人可见，部分保存与完整提交分开校验，日期区间和明细类型不能伪造",
+      async () => {
+        const spec = {
+          ...schema([node([a.id])]),
+          fields: [
+            field,
+            {
+              id: "dates",
+              label: "日期区间",
+              type: "DATE_RANGE",
+              required: true,
+              width: 24,
+            },
+            {
+              id: "items",
+              label: "费用明细",
+              type: "DETAILS",
+              required: true,
+              width: 24,
+              maxRows: 2,
+              columns: [
+                { ...field, id: "item", label: "项目" },
+                {
+                  id: "cost",
+                  label: "金额",
+                  type: "MONEY",
+                  required: true,
+                  min: 0,
+                  max: 1000,
+                },
+              ],
+            },
+          ],
+        };
+        const d = await create(spec);
+        const draft = await call(
+          "/operations/requests/drafts",
+          applicant.token,
+          "POST",
+          {
+            definitionId: d.id,
+            versionId: d.publishedVersionId,
+            title: prefix + " 草稿",
+            values: {},
+          },
+        );
+        made.requests.push(draft.id);
+        assert.equal(draft.status, "DRAFT");
+        assert.equal(draft.runNumber, 0);
+        assert.equal(draft.tasks.length, 0);
+        assert.equal(draft.submittedAt, null);
+        await call(
+          `/operations/requests/${draft.id}`,
+          a.token,
+          "GET",
+          undefined,
+          403,
+        );
+        await call(
+          `/operations/requests/${draft.id}`,
+          admin,
+          "GET",
+          undefined,
+          403,
+        );
+        assert.equal(
+          (
+            await call(
+              `/operations/requests?box=all&keyword=${encodeURIComponent(draft.title)}`,
+              admin,
+            )
+          ).total,
+          0,
+        );
+        assert.equal(
+          (
+            await call(
+              `/operations/requests?box=drafts&keyword=${encodeURIComponent(draft.title)}`,
+              applicant.token,
+            )
+          ).total,
+          1,
+        );
+        await editApplication(draft.id, { memo: "补充" });
+        await editApplication(
+          draft.id,
+          { memo: "补充" },
+          true,
+          applicant.token,
+          400,
+        );
+        const valid = {
+          memo: "补充",
+          dates: ["2026-10-01", "2026-10-03"],
+          items: [{ item: "交通", cost: 30.25 }],
+        };
+        await editApplication(
+          draft.id,
+          { ...valid, dates: ["2026-10-03", "2026-10-01"] },
+          true,
+          applicant.token,
+          400,
+        );
+        await editApplication(
+          draft.id,
+          { ...valid, items: [{ item: "非法", cost: 3, other: "伪造" }] },
+          true,
+          applicant.token,
+          400,
+        );
+        await editApplication(
+          draft.id,
+          { ...valid, items: [{ item: "缺金额" }] },
+          true,
+          applicant.token,
+          400,
+        );
+        await editApplication(
+          draft.id,
+          { ...valid, items: [{ item: "越界", cost: 1001 }] },
+          true,
+          applicant.token,
+          400,
+        );
+        const submitted = await editApplication(draft.id, valid, true);
+        assert.equal(submitted.status, "PENDING");
+        assert.equal(submitted.runNumber, 1);
+        assert.deepEqual(
+          submitted.history.find((h) => h.action === "SUBMIT").submittedValues,
+          valid,
+        );
+        await call(
+          `/operations/requests/${draft.id}?version=${submitted.version}`,
+          applicant.token,
+          "DELETE",
+          undefined,
+          403,
+        );
+        const disposable = await call(
+          "/operations/requests/drafts",
+          applicant.token,
+          "POST",
+          {
+            definitionId: d.id,
+            versionId: d.publishedVersionId,
+            title: "可删除草稿",
+            values: {},
+          },
+        );
+        await call(
+          `/operations/requests/${disposable.id}?version=${disposable.version}`,
+          outsider.token,
+          "DELETE",
+          undefined,
+          403,
+        );
+        await call(
+          `/operations/requests/${disposable.id}?version=${disposable.version}`,
+          applicant.token,
+          "DELETE",
+        );
+        await call(
+          `/operations/requests/${disposable.id}`,
+          applicant.token,
+          "GET",
+          undefined,
+          400,
+        );
+      },
+    );
+    await t.test(
+      "顺签逐人激活，退回申请人重提隔离旧轮次，抄送只有阅读权限且快照裁剪隐藏字段",
+      async () => {
+        const d = await create({
+          ...schema([
+            node([a.id, b.id], {
+              mode: "SERIAL",
+              next: "copy",
+              actions: ["APPROVE", "REJECT", "RETURN"],
+            }),
+            {
+              id: "copy",
+              name: "抄送",
+              type: "COPY",
+              source: "USERS",
+              assigneeIds: [c.id],
+              next: "end",
+              readable: ["memo"],
+              writable: [],
+              actions: [],
+            },
+          ]),
+          fields: [field, { ...field, id: "private", label: "保密" }],
+        });
+        const r = await submit(d, {
+          values: { memo: "第一轮", private: "秘密一" },
+        });
+        const oldTask = r.tasks.find((task) => task.assigneeId === a.id).id;
+        assert.equal(
+          r.tasks.find((task) => task.assigneeId === b.id).status,
+          "WAITING",
+        );
+        await call(
+          `/operations/requests/${r.id}`,
+          b.token,
+          "GET",
+          undefined,
+          403,
+        );
+        await call(
+          `/operations/requests/${r.id}`,
+          c.token,
+          "GET",
+          undefined,
+          403,
+        );
+        await decide(r.id, a, "APPROVE");
+        assert((await detail(r.id, b.token)).myTaskId);
+        await decide(r.id, b, "RETURN");
+        const returned = await detail(r.id);
+        assert.equal(returned.status, "RETURNED");
+        assert(returned.canEdit);
+        assert(
+          !returned.tasks.some((task) =>
+            ["PENDING", "WAITING"].includes(task.status),
+          ),
+        );
+        await editApplication(
+          r.id,
+          { memo: "第二轮", private: "秘密二" },
+          false,
+          b.token,
+          403,
+        );
+        await editApplication(r.id, { memo: "第二轮", private: "秘密二" });
+        const next = await editApplication(
+          r.id,
+          { memo: "第二轮", private: "秘密二" },
+          true,
+        );
+        assert.equal(next.runNumber, 2);
+        await call(
+          `/operations/requests/${r.id}/decision`,
+          a.token,
+          "POST",
+          { version: next.version, taskId: oldTask, action: "APPROVE" },
+          403,
+        );
+        await decide(r.id, a, "APPROVE");
+        await decide(r.id, b, "APPROVE");
+        const copy = await detail(r.id, c.token);
+        assert.equal(copy.status, "APPROVED");
+        assert.equal(copy.unreadCopies, 1);
+        assert.deepEqual(
+          copy.fields.map((f) => f.id),
+          ["memo"],
+        );
+        assert.equal(copy.values.private, undefined);
+        assert(
+          copy.history.every((h) => h.submittedValues.private === undefined),
+        );
+        assert.equal(copy.actions.length, 0);
+        const mine = await call(
+          `/operations/requests?box=copies&keyword=${encodeURIComponent(r.title)}`,
+          c.token,
+        );
+        assert.equal(mine.total, 1);
+        await call(`/operations/requests/${r.id}/copies/read`, c.token, "POST");
+        const read = await detail(r.id, c.token);
+        assert.equal(read.unreadCopies, 0);
+        assert.equal(read.version, copy.version);
+        const own = await detail(r.id);
+        assert.equal(
+          own.history.filter((h) => ["SUBMIT", "RESUBMIT"].includes(h.action))
+            .length,
+          2,
+        );
+        assert.equal(
+          own.history.find((h) => h.action === "SUBMIT").submittedValues.memo,
+          "第一轮",
+        );
+      },
+    );
+    await t.test(
+      "退回实际已办节点可重复办理，旧会签与退回后的旧待办不能驱动新批次",
+      async () => {
+        const d = await create(
+          schema([
+            node([a.id, b.id], {
+              mode: "ANY",
+              next: "second",
+              actions: ["APPROVE", "REJECT", "RETURN"],
+            }),
+            node([c.id], {
+              id: "second",
+              name: "复核",
+              actions: ["APPROVE", "REJECT", "RETURN"],
+            }),
+          ]),
+        );
+        const r = await submit(d);
+        await decide(r.id, a, "APPROVE");
+        const before = await detail(r.id, c.token);
+        assert.deepEqual(before.returnTargets, [
+          { id: "review", name: "审核" },
+        ]);
+        await decide(r.id, c, "RETURN", { targetNodeId: "notVisited" }, 400);
+        await decide(r.id, c, "RETURN", { targetNodeId: "review" });
+        const renewed = await detail(r.id);
+        assert.equal(renewed.currentNodeName, "审核");
+        assert.equal(renewed.runNumber, 1);
+        const batch = renewed.tasks.filter((task) => task.status === "PENDING");
+        assert.equal(batch.length, 2);
+        assert(
+          batch.every(
+            (task) =>
+              task.nodeVisit >
+              before.tasks.find((task) => task.id === before.myTaskId)
+                .nodeVisit,
+          ),
+        );
+        await decide(r.id, b, "APPROVE");
+        assert.equal((await detail(r.id)).currentNodeName, "复核");
+        await decide(r.id, c, "RETURN", { targetNodeId: "review" });
+        await decide(r.id, a, "APPROVE");
+        await decide(r.id, c, "APPROVE");
+        assert.equal((await detail(r.id)).status, "APPROVED");
+        assert.equal(
+          (await detail(r.id)).history.filter((h) => h.action === "RETURN")
+            .length,
+          2,
+        );
+      },
+    );
+    await t.test(
+      "撤回可以重提，管理员终止不能代替审批，终态不可复活或删除",
+      async () => {
+        const d = await create(
+          schema([node([a.id], { actions: ["APPROVE", "REJECT", "RETURN"] })]),
+        );
+        const r = await submit(d);
+        await decide(r.id, applicant, "WITHDRAW");
+        assert((await detail(r.id)).canEdit);
+        await editApplication(r.id, { memo: "撤回修改" }, true);
+        const latest = await detail(r.id);
+        assert.equal(latest.runNumber, 2);
+        await call(
+          `/operations/requests/${r.id}/decision`,
+          applicant.token,
+          "POST",
+          { version: latest.version, action: "TERMINATE", comment: "伪造" },
+          403,
+        );
+        await call(
+          `/operations/requests/${r.id}/decision`,
+          admin,
+          "POST",
+          { version: latest.version, action: "TERMINATE" },
+          400,
+        );
+        await call(`/operations/requests/${r.id}/decision`, admin, "POST", {
+          version: latest.version,
+          action: "TERMINATE",
+          comment: "业务取消",
+        });
+        assert.equal((await detail(r.id)).status, "CANCELLED");
+        await editApplication(
+          r.id,
+          { memo: "试图复活" },
+          true,
+          applicant.token,
+          403,
+        );
+        await decide(r.id, a, "APPROVE", {}, 400);
+      },
+    );
+    await t.test(
+      "审批与退回并发只有一个成功，不产生两个节点批次或重复结果",
+      async () => {
+        const d = await create(
+          schema([
+            node([a.id, b.id], {
+              mode: "ANY",
+              actions: ["APPROVE", "REJECT", "RETURN"],
+            }),
+          ]),
+        );
+        const r = await submit(d),
+          da = await detail(r.id, a.token),
+          db = await detail(r.id, b.token);
+        const responses = await Promise.all(
+          [
+            [a, da, "APPROVE"],
+            [b, db, "RETURN"],
+          ].map(async ([who, view, action]) =>
+            fetch(base + `/operations/requests/${r.id}/decision`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + who.token,
+              },
+              body: JSON.stringify({
+                version: view.version,
+                taskId: view.myTaskId,
+                action,
+                comment: "并发验收",
+              }),
+            }),
+          ),
+        );
+        assert.deepEqual(
+          responses.map((response) => response.status).sort(),
+          [200, 409],
+        );
+        const latest = await detail(r.id);
+        assert(["APPROVED", "RETURNED"].includes(latest.status));
+        assert.equal(
+          latest.history.filter((h) => ["APPROVE", "RETURN"].includes(h.action))
+            .length,
+          1,
+        );
+        assert(
+          !latest.tasks.some((task) =>
+            ["PENDING", "WAITING"].includes(task.status),
+          ),
+        );
+      },
+    );
+    await t.test(
+      "互斥条件分支允许同一审批人，金额等值不受小数表示形式影响",
+      async () => {
+        const d = await create({
+          ...schema([
+            {
+              id: "choice",
+              name: "金额分流",
+              type: "CONDITION",
+              next: "review",
+              conditions: [
+                {
+                  field: "amount",
+                  operator: "EQ",
+                  value: "0.00",
+                  next: "alternative",
+                },
+              ],
+            },
+            node([a.id]),
+            node([a.id], { id: "alternative", name: "零金额审核" }),
+          ]),
+          fields: [
+            field,
+            { id: "amount", label: "金额", type: "MONEY", required: true },
+          ],
+          startNodeId: "choice",
+        });
+        const r = await submit(d, { values: { memo: "分支", amount: 0 } });
+        assert.equal(r.currentNodeName, "零金额审核");
+        await decide(r.id, a, "APPROVE");
+        assert.equal((await detail(r.id)).status, "APPROVED");
+      },
+    );
     await t.test(
       "个人待办按当前节点分派，通知仅收件人可读，阅读不等于处理且结果通知申请人",
       async () => {
@@ -901,6 +1381,86 @@ DELIMITER ;`,
             businessRevisionId: content.revisionId,
             businessVersion: content.version,
           });
+        // 内容草稿必须在读取送审快照前鉴权，并且不占用内容审核状态。
+        const draftPayload = {
+          definitionId: d.id,
+          versionId: d.publishedVersionId,
+          title: "内容审核草稿",
+          values: {},
+          businessId: content.id,
+          businessRevisionId: content.revisionId,
+          businessVersion: content.version,
+        };
+        await call(
+          "/operations/requests/drafts",
+          outsider.token,
+          "POST",
+          draftPayload,
+          403,
+        );
+        const draft = await call(
+          "/operations/requests/drafts",
+          applicant.token,
+          "POST",
+          draftPayload,
+        );
+        made.requests.push(draft.id);
+        assert.equal(draft.status, "DRAFT");
+        assert.equal(draft.tasks.length, 0);
+        const afterDraft = await call(
+          "/content/notices/" + content.id,
+          applicant.token,
+        );
+        assert.equal(afterDraft.version, content.version);
+        assert.equal(afterDraft.status, content.status);
+        // 草稿创建时的权限不是永久授权；撤销业务编辑权限后读、保存、提交都拒绝。
+        let applicantRole = applicant.role;
+        const originalPermissions = applicantRole.permissions;
+        applicantRole = await call(
+          "/system/roles/" + applicant.role.id,
+          admin,
+          "PUT",
+          {
+            ...applicantRole,
+            permissions: originalPermissions.filter(
+              (p) => p !== "notices:update",
+            ),
+          },
+        );
+        await call(
+          `/operations/requests/${draft.id}`,
+          applicant.token,
+          "GET",
+          undefined,
+          403,
+        );
+        for (const [suffix, method] of [
+          ["", "PUT"],
+          ["/submit", "POST"],
+        ])
+          await call(
+            `/operations/requests/${draft.id}${suffix}`,
+            applicant.token,
+            method,
+            {
+              version: draft.version,
+              title: draft.title,
+              values: { memo: "权限已撤销" },
+              businessVersion: content.version,
+            },
+            403,
+          );
+        applicant.role = await call(
+          "/system/roles/" + applicant.role.id,
+          admin,
+          "PUT",
+          { ...applicantRole, permissions: originalPermissions },
+        );
+        assert.equal(
+          (await detail(draft.id)).version,
+          draft.version,
+          "拒绝的保存必须完整回滚",
+        );
         const first = await submitContent();
         await call(
           "/content/notices/" + content.id + "/publish",

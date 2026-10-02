@@ -32,6 +32,10 @@ for (const key of [
     value: dom.window[key],
   });
 }
+globalThis.innerWidth = 1366;
+globalThis.innerHeight = 800;
+globalThis.scrollX = 0;
+globalThis.scrollY = 0;
 globalThis.getComputedStyle = (element) => dom.window.getComputedStyle(element);
 globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
 globalThis.cancelAnimationFrame = clearTimeout;
@@ -78,6 +82,10 @@ const { WorkspaceProvider, useWorkspace } =
   await import("../src/lib/workspace");
 const { ResourcePage } = await import("../src/components/ResourcePage");
 const { FormModal } = await import("../src/components/FormModal");
+const { NodeEditor } = await import("../src/components/workflow/NodeEditor");
+const { FieldEditor } = await import("../src/components/workflow/FieldEditor");
+const { WorkflowFields, encodeWorkflowValues } =
+  await import("../src/components/WorkflowFields");
 const { FormDrawer } = await import("../src/components/FormDrawer");
 const { AppearanceProvider } = await import("../src/lib/theme");
 const { AdminThemeButton, ThemeFormContent } =
@@ -1629,4 +1637,229 @@ test("抽屉图片分页不漏图，跨页放大保持绝对序号且正文按�
     cleanup();
     globalThis.fetch = original;
   }
+});
+
+// OA 控件和节点弹窗使用真实 Ant 表单；覆盖未注册矩阵字段与初始化离开保护的回归。
+test("节点弹窗初始化不提示丢弃，权限矩阵保留未注册字段且可编辑自动包含可读", async () => {
+  const user = userEvent.setup();
+  let saved;
+  const original = {
+    id: "review",
+    name: "负责人",
+    type: "APPROVAL",
+    source: "DEPARTMENT_LEADER",
+    mode: "ALL",
+    next: "end",
+    readable: ["memo"],
+    writable: [],
+    actions: ["APPROVE", "REJECT", "RETURN"],
+    conditions: [],
+  };
+  function NodeHarness() {
+    const [node, setNode] = useState(null);
+    return (
+      <>
+        <Button onClick={() => setNode(original)}>配置流程</Button>
+        <NodeEditor
+          node={node}
+          existing
+          nodes={[original, { id: "end", name: "结束", type: "END" }]}
+          fields={[
+            {
+              id: "memo",
+              label: "说明",
+              type: "TEXT",
+              required: true,
+              width: 24,
+            },
+          ]}
+          onClose={() => setNode(null)}
+          onSave={(value) => {
+            saved = value;
+            setNode(null);
+          }}
+        />
+      </>
+    );
+  }
+  mount(<NodeHarness />);
+  await user.click(await screen.findByRole("button", { name: "配置流程" }));
+  const dialog = screen.getByRole("dialog", { name: "编辑流程节点" });
+  await user.click(within(dialog).getByRole("tab", { name: "字段权限" }));
+  assert(within(dialog).getByRole("radio", { name: "只读" }).checked);
+  await user.click(within(dialog).getByRole("button", { name: "取 消" }));
+  assert.equal(screen.queryByText("放弃未保存的修改？"), null);
+  await user.click(screen.getByRole("button", { name: "配置流程" }));
+  await user.click(
+    within(screen.getByRole("dialog", { name: "编辑流程节点" })).getByRole(
+      "tab",
+      { name: "字段权限" },
+    ),
+  );
+  await user.click(
+    within(screen.getByRole("dialog", { name: "编辑流程节点" }))
+      .getByRole("radio", { name: "可编辑" })
+      .closest("label"),
+  );
+  await user.click(
+    within(screen.getByRole("dialog", { name: "编辑流程节点" })).getByRole(
+      "button",
+      { name: "保 存" },
+    ),
+  );
+  await waitFor(() => assert(saved));
+  assert.deepEqual(saved.readable, ["memo"]);
+  assert.deepEqual(saved.writable, ["memo"]);
+});
+test("申请明细和日期区间使用同一受控表单，增删行不丢其他行且提交只传业务值", async () => {
+  const user = userEvent.setup();
+  let submitted;
+  const fields = [
+    {
+      id: "dates",
+      label: "日期",
+      type: "DATE_RANGE",
+      required: true,
+      width: 24,
+    },
+    {
+      id: "items",
+      label: "明细",
+      type: "DETAILS",
+      required: true,
+      width: 24,
+      maxRows: 2,
+      columns: [
+        { id: "item", label: "项目", type: "TEXT", required: true },
+        { id: "amount", label: "金额", type: "MONEY", required: true },
+      ],
+    },
+  ];
+  function DetailHarness() {
+    const [form] = Form.useForm();
+    return (
+      <Form
+        form={form}
+        onFinish={(values) =>
+          (submitted = encodeWorkflowValues(fields, values.values))
+        }
+      >
+        <WorkflowFields fields={fields} />
+        <Button htmlType="submit">发送申请</Button>
+      </Form>
+    );
+  }
+  mount(<DetailHarness />);
+  await screen.findByRole("button", { name: "发送申请" });
+  fireEvent.change(screen.getByLabelText("开始日期"), {
+    target: { value: "2026-10-01" },
+  });
+  fireEvent.change(screen.getByLabelText("结束日期"), {
+    target: { value: "2026-10-02" },
+  });
+  await user.click(screen.getByRole("button", { name: /添加明细/ }));
+  await user.type(screen.getByRole("textbox", { name: "第1行项目" }), "交通");
+  await user.type(screen.getByRole("spinbutton", { name: "第1行金额" }), "30");
+  await user.click(screen.getByRole("button", { name: /添加明细/ }));
+  assert(screen.getByRole("button", { name: /添加明细/ }).disabled);
+  await user.type(screen.getByRole("textbox", { name: "第2行项目" }), "住宿");
+  await user.type(screen.getByRole("spinbutton", { name: "第2行金额" }), "100");
+  await user.click(screen.getByRole("button", { name: "删除第1行" }));
+  assert.equal(
+    screen.getByRole("textbox", { name: "第1行项目" }).value,
+    "住宿",
+  );
+  await user.click(screen.getByRole("button", { name: "发送申请" }));
+  await waitFor(() => assert(submitted));
+  assert.deepEqual(submitted, {
+    dates: ["2026-10-01", "2026-10-02"],
+    items: [{ item: "住宿", amount: 100 }],
+  });
+});
+test("保存草稿跳过必填项但复用提交锁，正式提交仍要求表单完整", async () => {
+  const user = userEvent.setup();
+  let applicationForm;
+  let draftCalls = 0,
+    submitCalls = 0;
+  function DraftHarness() {
+    const [form] = Form.useForm();
+    applicationForm = form;
+    return (
+      <FormModal
+        title="申请草稿"
+        open
+        form={form}
+        onCancel={() => {}}
+        onSubmit={async () => {
+          submitCalls++;
+        }}
+        secondaryAction={{
+          label: "保存草稿",
+          onSubmit: async () => {
+            draftCalls++;
+          },
+        }}
+      >
+        <Form.Item name="memo" label="说明" rules={[{ required: true }]}>
+          <Input />
+        </Form.Item>
+      </FormModal>
+    );
+  }
+  mount(<DraftHarness />);
+  await screen.findByRole("dialog", { name: "申请草稿" });
+  await act(async () => {
+    await assert.rejects(applicationForm.validateFields());
+  });
+  assert.equal(submitCalls, 0);
+  await user.click(screen.getByRole("button", { name: "保存草稿" }));
+  await waitFor(() => assert.equal(draftCalls, 1));
+  await user.type(screen.getByRole("textbox", { name: "说明" }), "正式申请");
+  await user.click(screen.getByRole("button", { name: "保 存" }));
+  await waitFor(() => assert.equal(submitCalls, 1));
+});
+
+test("明细列属性编辑保留模板约束，并允许修改金额上限", async () => {
+  const user = userEvent.setup();
+  let saved;
+  mount(
+    <FieldEditor
+      existing
+      field={{
+        id: "items",
+        label: "费用明细",
+        type: "DETAILS",
+        width: 24,
+        required: true,
+        maxRows: 20,
+        columns: [
+          { id: "item", label: "项目", type: "TEXT", maxLength: 200 },
+          {
+            id: "amount",
+            label: "金额",
+            type: "MONEY",
+            min: 0,
+            max: 1000,
+            required: true,
+          },
+        ],
+      }}
+      onClose={() => {}}
+      onSave={(value) => {
+        saved = value;
+      }}
+    />,
+  );
+  const dialog = await screen.findByRole("dialog", { name: "编辑表单字段" });
+  await user.click(within(dialog).getByRole("tab", { name: "明细列" }));
+  await user.click(within(dialog).getByRole("tab", { name: "第 2 列" }));
+  const maximum = within(dialog).getByRole("spinbutton", { name: "最大值" });
+  await user.clear(maximum);
+  await user.type(maximum, "500");
+  await user.click(within(dialog).getByRole("button", { name: "保 存" }));
+  await waitFor(() => assert(saved));
+  assert.equal(saved.maxRows, 20);
+  assert.equal(saved.columns[0].maxLength, 200);
+  assert.equal(saved.columns[1].min, 0);
+  assert.equal(saved.columns[1].max, 500);
 });

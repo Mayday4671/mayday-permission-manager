@@ -294,3 +294,184 @@
   padding: 6px 0;
   overflow-wrap: anywhere;
 }
+
+/* 连接图拥有明确高度，内部缩放画布不扩大页面；控件和聚焦状态使用统一主题变量。 */
+.workflow-diagram {
+  height: clamp(300px, 52dvh, 520px);
+  min-width: 0;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+  background: var(--app-fill);
+  overflow: hidden;
+  --xy-background-color-default: var(--app-fill);
+  --xy-controls-button-background-color-default: var(--app-surface);
+  --xy-controls-button-color-default: var(--app-text);
+  --xy-controls-button-border-color-default: var(--app-border-strong);
+  --xy-controls-button-background-color-hover-default: var(--app-primary-bg);
+}
+/* 运行图置于业务弹窗中，给表单和办理按钮留出空间；画布自身缩放不撑高弹窗。 */
+.business-form-modal .workflow-diagram {
+  height: clamp(240px, 36dvh, 360px);
+}
+.workflow-canvas-node {
+  width: 220px;
+  padding: 14px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+  color: var(--app-text);
+}
+.workflow-canvas-node.current,
+.react-flow__node:focus-visible .workflow-canvas-node {
+  border-color: var(--app-primary-text);
+  box-shadow: 0 0 0 2px var(--app-primary-bg);
+}
+.workflow-canvas-node.visited {
+  border-color: var(--app-primary-text);
+}
+.workflow-canvas-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+.workflow-canvas-title strong {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.workflow-canvas-title .ant-tag {
+  flex-shrink: 0;
+}
+.workflow-canvas-description {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  margin: 8px 0;
+}
+.workflow-diagram .react-flow__handle {
+  background: var(--app-primary-text);
+  border-color: var(--app-surface);
+  width: 8px;
+  height: 8px;
+}
+/* 第三方画布默认采用浅色控件；显式消费全站 Token，避免深色模式出现白底黑字工具块。 */
+.workflow-diagram .react-flow__controls-button {
+  background: var(--app-surface);
+  color: var(--app-text);
+  border-color: var(--app-border-strong);
+}
+.workflow-diagram .react-flow__controls-button:hover {
+  background: var(--app-primary-bg);
+}
+.workflow-diagram .react-flow__controls-button svg {
+  fill: currentColor;
+}
+.workflow-diagram .react-flow__attribution {
+  background: var(--app-surface);
+}
+.workflow-diagram .react-flow__attribution a {
+  color: var(--app-text-secondary);
+}
+/* 控件库、预览、明细均使用可缩列网格；明细不要求横向滚动来填写。 */
+.form-designer-workspace {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 20px;
+}
+.form-designer-palette {
+  display: grid;
+  /* 13 类控件按两列排列，避免少量表单字段时仅控件库就撑出页面滚动条。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+.form-designer-palette .ant-btn {
+  justify-content: flex-start;
+}
+.form-designer-canvas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+.form-designer-field {
+  grid-column: span 2;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+}
+.form-designer-field.half-field {
+  grid-column: span 1;
+}
+.field-design-control {
+  margin: 16px 0 8px;
+}
+.field-design-control .ant-form-item-label {
+  display: none;
+}
+.field-design-control .ant-form-item {
+  margin-bottom: 12px;
+}
+.form-designer-field .field-card-footer {
+  justify-content: flex-end;
+  display: flex;
+}
+.workflow-date-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.workflow-detail-rows {
+  display: grid;
+  gap: 12px;
+}
+.workflow-detail-row {
+  padding: 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+}
+.workflow-detail-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.workflow-detail-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+}
+.workflow-detail-cells label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.workflow-detail-rows > .ant-btn {
+  justify-self: start;
+}
+.node-field-permissions > .ant-space {
+  margin-bottom: 12px;
+}
+@media (max-width: 700px) {
+  .form-designer-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .form-designer-palette {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .form-designer-canvas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .form-designer-field,
+  .form-designer-field.half-field {
+    grid-column: span 1;
+  }
+  .workflow-diagram {
+    height: 340px;
+  }
+}

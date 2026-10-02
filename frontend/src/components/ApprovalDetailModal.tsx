@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   Popconfirm,
+  Select,
   Space,
   Tabs,
   Tag,
@@ -35,6 +36,8 @@ import {
   type ApprovalDetail,
   type WorkflowAction,
 } from "../types/workflow";
+import { ApprovalEditModal } from "./ApprovalEditModal";
+import { WorkflowDiagram } from "./workflow/WorkflowDiagram";
 interface EventState {
   id: number;
   status: string;
@@ -54,6 +57,7 @@ export function ApprovalDetailModal({
     { message } = App.useApp(),
     client = useQueryClient();
   const [action, setAction] = useState<WorkflowAction | null>(null);
+  const [editing, setEditing] = useState<ApprovalDetail | null>(null);
   const [form] = Form.useForm();
   const query = useQuery({
     queryKey: ["approvals", "detail", id],
@@ -78,7 +82,10 @@ export function ApprovalDetailModal({
       });
     setAction(next);
   };
-  useEffect(() => setAction(null), [id]);
+  useEffect(() => {
+    setAction(null);
+    setEditing(null);
+  }, [id]);
   return (
     <>
       <DetailsModal
@@ -112,7 +119,9 @@ export function ApprovalDetailModal({
                           : "default"
                   }
                 >
-                  {approvalStates[d.status]}
+                  {d.status === "CANCELLED"
+                    ? "已终止"
+                    : approvalStates[d.status]}
                 </Tag>
               </div>
               <Descriptions
@@ -123,12 +132,14 @@ export function ApprovalDetailModal({
                   {
                     key: "at",
                     label: "提交时间",
-                    children: formatTime(d.createdAt),
+                    children: formatTime(d.submittedAt),
                   },
                   {
                     key: "node",
                     label: "当前节点",
-                    children: d.currentNodeName ?? "流程已结束",
+                    children:
+                      d.currentNodeName ??
+                      (d.canEdit ? "申请人填写" : "流程已结束"),
                   },
                   {
                     key: "end",
@@ -149,6 +160,16 @@ export function ApprovalDetailModal({
                         labels={d.valueLabels}
                         files={d.files}
                         requestId={d.id}
+                      />
+                    ),
+                  },
+                  {
+                    key: "diagram",
+                    label: `运行流程 · 第${d.runNumber}轮`,
+                    children: (
+                      <WorkflowDiagram
+                        startNodeId={d.diagram.startNodeId}
+                        items={d.diagram.nodes}
                       />
                     ),
                   },
@@ -207,12 +228,18 @@ export function ApprovalDetailModal({
                         dataSource={d.tasks}
                         pagination={{ pageSize: 6 }}
                         columns={[
+                          { title: "轮次", dataIndex: "runNumber", width: 70 },
                           { title: "节点", dataIndex: "nodeName" },
                           { title: "审批人", dataIndex: "assigneeName" },
                           {
                             title: "状态",
                             dataIndex: "status",
-                            render: (value) => approvalStates[value] ?? value,
+                            render: (value, row) =>
+                              row.kind === "COPY"
+                                ? row.readAt
+                                  ? "抄送已读"
+                                  : "抄送未读"
+                                : (approvalStates[value] ?? value),
                           },
                           {
                             title: "加签",
@@ -252,7 +279,21 @@ export function ApprovalDetailModal({
                         size="small"
                         dataSource={d.history}
                         pagination={{ pageSize: 8 }}
+                        expandable={{
+                          rowExpandable: (row) =>
+                            Object.keys(row.submittedValues ?? {}).length > 0,
+                          expandedRowRender: (row) => (
+                            <WorkflowValues
+                              fields={d.fields}
+                              values={row.submittedValues ?? {}}
+                              labels={d.valueLabels}
+                              files={d.files}
+                              requestId={d.id}
+                            />
+                          ),
+                        }}
                         columns={[
+                          { title: "轮次", dataIndex: "runNumber", width: 65 },
                           {
                             title: "处理人",
                             dataIndex: "actorName",
@@ -277,6 +318,14 @@ export function ApprovalDetailModal({
                                   </span>
                                 )}
                                 {value || "—"}
+                                {row.targetNodeId && (
+                                  <div>
+                                    退回至：
+                                    {d.diagram.nodes.find(
+                                      (node) => node.id === row.targetNodeId,
+                                    )?.name ?? row.targetNodeId}
+                                  </div>
+                                )}
                                 {Object.entries(row.changes ?? {}).map(
                                   ([key, change]) => (
                                     <div
@@ -371,63 +420,124 @@ export function ApprovalDetailModal({
                     : []),
                 ]}
               />
-              {d.status === "PENDING" && (
+              {(d.canEdit ||
+                d.canTerminate ||
+                d.unreadCopies > 0 ||
+                d.status === "PENDING") && (
                 <Space wrap className="approval-actions">
-                  {d.actions
-                    .filter((a) => a !== "COMMENT")
-                    .map((a) => (
-                      <Button
-                        key={a}
-                        type={a === "APPROVE" ? "primary" : "default"}
-                        danger={a === "REJECT"}
-                        onClick={() => start(a)}
-                      >
-                        {actionNames[a]}
-                      </Button>
-                    ))}
-                  {d.canComment && (
-                    <Button onClick={() => start("COMMENT")}>评论</Button>
+                  {d.status === "DRAFT" && d.canEdit && (
+                    <Popconfirm
+                      title="删除此未提交草稿？"
+                      onConfirm={async () => {
+                        try {
+                          await api(
+                            `/operations/requests/${d.id}?version=${d.version}`,
+                            { method: "DELETE" },
+                          );
+                          await client.invalidateQueries();
+                          onClose();
+                          message.success("草稿已删除");
+                        } catch (error) {
+                          message.error((error as Error).message);
+                        }
+                      }}
+                    >
+                      <Button danger>删除草稿</Button>
+                    </Popconfirm>
                   )}
-                  {d.canWithdraw && (
-                    <Button onClick={() => start("WITHDRAW")}>撤回申请</Button>
+                  {d.canEdit && (
+                    <Button type="primary" onClick={() => setEditing(d)}>
+                      {d.status === "DRAFT" ? "继续填写" : "修改并重新提交"}
+                    </Button>
                   )}
-                  {can("requests:remind") &&
-                    (d.applicantId === session?.user.id ||
-                      can("requests:manage")) && (
-                      <Popconfirm
-                        title="提醒当前节点审批人？"
-                        description="每项申请 30 分钟内只能催办一次。"
-                        disabled={!d.canRemind}
-                        onConfirm={async () => {
-                          try {
-                            await api(`/operations/requests/${d.id}/remind`, {
-                              method: "POST",
-                              body: jsonBody({ version: d.version }),
-                            });
-                            void client.invalidateQueries({
-                              queryKey: ["approvals"],
-                            });
-                            void client.invalidateQueries({
-                              queryKey: ["requests"],
-                            });
-                            message.success("已安排催办通知");
-                          } catch (error) {
-                            message.error((error as Error).message);
-                          }
-                        }}
-                      >
-                        <Button
-                          disabled={!d.canRemind}
-                          title={
-                            !d.canRemind
-                              ? "距离上次催办不足 30 分钟"
-                              : undefined
-                          }
-                        >
-                          催办
+                  {d.canTerminate && (
+                    <Button danger onClick={() => start("TERMINATE")}>
+                      终止申请
+                    </Button>
+                  )}
+                  {d.unreadCopies > 0 && (
+                    <Button
+                      onClick={async () => {
+                        try {
+                          await api(
+                            `/operations/requests/${d.id}/copies/read`,
+                            { method: "POST" },
+                          );
+                          void client.invalidateQueries({
+                            queryKey: ["approvals"],
+                          });
+                        } catch (error) {
+                          message.error((error as Error).message);
+                        }
+                      }}
+                    >
+                      标记抄送已读
+                    </Button>
+                  )}
+                  {d.status === "PENDING" && (
+                    <>
+                      {d.actions
+                        .filter((a) => a !== "COMMENT")
+                        .map((a) => (
+                          <Button
+                            key={a}
+                            type={a === "APPROVE" ? "primary" : "default"}
+                            danger={a === "REJECT"}
+                            onClick={() => start(a)}
+                          >
+                            {actionNames[a]}
+                          </Button>
+                        ))}
+                      {d.canComment && (
+                        <Button onClick={() => start("COMMENT")}>评论</Button>
+                      )}
+                      {d.canWithdraw && (
+                        <Button onClick={() => start("WITHDRAW")}>
+                          撤回申请
                         </Button>
-                      </Popconfirm>
-                    )}
+                      )}
+                      {can("requests:remind") &&
+                        (d.applicantId === session?.user.id ||
+                          can("requests:manage")) && (
+                          <Popconfirm
+                            title="提醒当前节点审批人？"
+                            description="每项申请 30 分钟内只能催办一次。"
+                            disabled={!d.canRemind}
+                            onConfirm={async () => {
+                              try {
+                                await api(
+                                  `/operations/requests/${d.id}/remind`,
+                                  {
+                                    method: "POST",
+                                    body: jsonBody({ version: d.version }),
+                                  },
+                                );
+                                void client.invalidateQueries({
+                                  queryKey: ["approvals"],
+                                });
+                                void client.invalidateQueries({
+                                  queryKey: ["requests"],
+                                });
+                                message.success("已安排催办通知");
+                              } catch (error) {
+                                message.error((error as Error).message);
+                              }
+                            }}
+                          >
+                            <Button
+                              disabled={!d.canRemind}
+                              title={
+                                !d.canRemind
+                                  ? "距离上次催办不足 30 分钟"
+                                  : undefined
+                              }
+                            >
+                              催办
+                            </Button>
+                          </Popconfirm>
+                        )}
+                    </>
+                  )}
                 </Space>
               )}
             </>
@@ -452,6 +562,10 @@ export function ApprovalDetailModal({
               action,
               comment: values.comment,
               targetUserId: values.targetUserId,
+              targetNodeId:
+                values.targetNodeId === "applicant"
+                  ? undefined
+                  : values.targetNodeId,
               values: ["APPROVE", "REJECT"].includes(action)
                 ? encodeWorkflowValues(writable, values.values ?? {})
                 : undefined,
@@ -464,6 +578,34 @@ export function ApprovalDetailModal({
       >
         {action && (
           <>
+            {action === "RETURN" && (
+              <Form.Item
+                name="targetNodeId"
+                label="退回位置"
+                initialValue="applicant"
+                rules={[{ required: true }]}
+              >
+                <Select
+                  options={[
+                    {
+                      value: "applicant",
+                      label: "申请人 · 修改后从起点重新提交",
+                    },
+                    ...(d?.returnTargets.map((target) => ({
+                      value: target.id,
+                      label: `${target.name} · 重新办理后继续流程`,
+                    })) ?? []),
+                  ]}
+                />
+              </Form.Item>
+            )}
+            {action === "REJECT" && (
+              <Alert
+                type="warning"
+                title="驳回会结束本次申请，不能继续编辑重提。需要修改补充时请选择退回。"
+                className="form-message"
+              />
+            )}
             {["TRANSFER", "ADD_SIGN"].includes(action) && (
               <Form.Item
                 name="targetUserId"
@@ -481,7 +623,12 @@ export function ApprovalDetailModal({
               label={action === "COMMENT" ? "评论" : "处理意见"}
               rules={[
                 {
-                  required: ["REJECT", "COMMENT"].includes(action),
+                  required: [
+                    "REJECT",
+                    "RETURN",
+                    "TERMINATE",
+                    "COMMENT",
+                  ].includes(action),
                   whitespace: true,
                 },
               ]}
@@ -491,6 +638,7 @@ export function ApprovalDetailModal({
           </>
         )}
       </FormModal>
+      <ApprovalEditModal record={editing} onClose={() => setEditing(null)} />
     </>
   );
 }

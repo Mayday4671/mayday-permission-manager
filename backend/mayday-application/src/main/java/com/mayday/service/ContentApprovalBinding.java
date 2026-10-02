@@ -2,6 +2,7 @@ package com.mayday.service;
 
 import com.mayday.common.BusinessException;
 import com.mayday.content.ContentRevisionRepository;
+import com.mayday.content.Notice;
 import com.mayday.content.NoticeRepository;
 import com.mayday.operations.model.FlowRequest;
 import com.mayday.operations.workflow.WorkflowBusiness;
@@ -28,6 +29,23 @@ public class ContentApprovalBinding implements WorkflowBusiness {
 
   @Override
   public Map<String, Object> submitted(FlowRequest request, Long businessVersion) {
+    var n = eligible(request, businessVersion);
+    var r = content.revision(request.getBusinessRevisionId(), n.getId());
+    n.setRequiresApproval(true);
+    n.setDraftStatus("PENDING");
+    r.setApprovalStatus("PENDING");
+    r.setApprovalRequestId(request.getId());
+    return content.revisionView(r);
+  }
+
+  /** 保存审批草稿不能绕过内容权限，也不能将文章或修订提前标记为送审中。 */
+  @Override
+  public void validateDraft(FlowRequest request, Long businessVersion) {
+    eligible(request, businessVersion);
+  }
+
+  /** 草稿与正式送审共用同一锁内校验，禁止仅凭业务 ID 读取未授权文章。 */
+  private Notice eligible(FlowRequest request, Long businessVersion) {
     access.require("notices:update");
     if (request.getBusinessId() == null || request.getBusinessRevisionId() == null)
       throw new BusinessException("请选择内容及送审修订");
@@ -40,11 +58,7 @@ public class ContentApprovalBinding implements WorkflowBusiness {
     if (Set.of("PENDING", "APPROVED").contains(r.getApprovalStatus()))
       throw new BusinessException("此修订已经在审核中或已通过，请勿重复提交");
     if (n.getScheduledPublishAt() != null) throw new BusinessException("请先取消上线排期再送审");
-    n.setRequiresApproval(true);
-    n.setDraftStatus("PENDING");
-    r.setApprovalStatus("PENDING");
-    r.setApprovalRequestId(request.getId());
-    return content.revisionView(r);
+    return n;
   }
 
   @Override
@@ -67,6 +81,11 @@ public class ContentApprovalBinding implements WorkflowBusiness {
 
   @Override
   public Map<String, Object> detail(FlowRequest request) {
+    // 未提交草稿不能获得正式审批参与者的业务读取资格；授权撤销后即时禁止读取。
+    if ("DRAFT".equals(request.getStatus())) {
+      access.require("notices:update");
+      content.managed(request.getBusinessId(), false);
+    }
     var n =
         notices
             .findById(request.getBusinessId())
@@ -76,6 +95,7 @@ public class ContentApprovalBinding implements WorkflowBusiness {
     result.put("noticeId", n.getId());
     result.put("currentRevision", Objects.equals(n.getDraftRevisionId(), r.getId()));
     result.put("deleted", n.getDeletedAt() != null);
+    result.put("noticeVersion", n.getVersion());
     return result;
   }
 }

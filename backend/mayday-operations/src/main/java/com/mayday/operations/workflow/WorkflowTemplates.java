@@ -32,8 +32,7 @@ public final class WorkflowTemplates {
                     null,
                     null,
                     List.of("事假", "年假", "病假", "其他")),
-                field("startDate", "开始日期", "DATE", 12),
-                field("endDate", "结束日期", "DATE", 12),
+                field("dates", "请假日期", "DATE_RANGE", 24),
                 new Field(
                     "days",
                     "请假天数",
@@ -70,6 +69,31 @@ public final class WorkflowTemplates {
                     new BigDecimal("1000000"),
                     null,
                     null),
+                new Field(
+                    "items",
+                    "报销明细",
+                    "DETAILS",
+                    true,
+                    24,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "每行填写费用项目和金额",
+                    List.of(
+                        field("item", "费用项目", "TEXT", 24),
+                        new Field(
+                            "amount",
+                            "金额",
+                            "MONEY",
+                            true,
+                            12,
+                            BigDecimal.ZERO,
+                            new BigDecimal("1000000"),
+                            null,
+                            null)),
+                    20),
                 field("reason", "费用说明", "TEXTAREA", 24),
                 new Field("receipts", "票据附件", "FILES", false, 24, null, null, null, null))),
         template(
@@ -124,7 +148,7 @@ public final class WorkflowTemplates {
             "ALL",
             readable,
             Set.of(),
-            Set.of("APPROVE", "REJECT", "COMMENT", "TRANSFER"),
+            Set.of("APPROVE", "REJECT", "RETURN", "COMMENT", "TRANSFER"),
             List.of(),
             1440);
     Node end =

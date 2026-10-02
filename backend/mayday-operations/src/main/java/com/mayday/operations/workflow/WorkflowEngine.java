@@ -29,6 +29,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -77,12 +78,32 @@ public class WorkflowEngine implements FileUsage {
   /** 所有决定携带申请版本；转交/加签仅目标账号有效，其他动作不能通过额外属性改写身份。 */
   public record Action(
       @NotNull Long version,
-      @NotBlank @Pattern(regexp = "APPROVE|REJECT|WITHDRAW|COMMENT|TRANSFER|ADD_SIGN")
+      @NotBlank
+          @Pattern(regexp = "APPROVE|REJECT|RETURN|WITHDRAW|TERMINATE|COMMENT|TRANSFER|ADD_SIGN")
           String action,
       @Size(max = 500) String comment,
       Long taskId,
       Long targetUserId,
-      Map<String, Object> values) {}
+      Map<String, Object> values,
+      @Size(max = 40) String targetNodeId) {
+    /** 兼容已有业务扩展调用；未选择退回目标时表示退回申请人。 */
+    public Action(
+        Long version,
+        String action,
+        String comment,
+        Long taskId,
+        Long targetUserId,
+        Map<String, Object> values) {
+      this(version, action, comment, taskId, targetUserId, values, null);
+    }
+  }
+
+  /** 编辑和重提始终由原申请人完成，不能改变流程、身份和业务关联。 */
+  public record Edit(
+      @NotNull Long version,
+      @NotBlank @Size(max = 160) String title,
+      Map<String, Object> values,
+      Long businessVersion) {}
 
   private WorkflowBusiness business(String type) {
     return businesses.stream()
@@ -117,6 +138,9 @@ public class WorkflowEngine implements FileUsage {
     var request =
         (lock ? requests.lockById(id) : requests.findById(id))
             .orElseThrow(() -> new BusinessException("审批申请不存在"));
+    if ("DRAFT".equals(request.getStatus())
+        && !Objects.equals(request.getApplicantId(), access.current().getId()))
+      throw new AccessDeniedException("申请草稿只对本人可见");
     if (!participant(request)) throw new AccessDeniedException("不在此审批的参与范围");
     return request;
   }
@@ -125,14 +149,19 @@ public class WorkflowEngine implements FileUsage {
   public Specification<FlowRequest> filter(String keyword, String box) {
     access.require("requests:view");
     Long userId = access.current().getId();
-    if (!Set.of("mine", "todo", "done", "participated", "all").contains(box))
+    if (!Set.of("mine", "drafts", "copies", "todo", "done", "participated", "all").contains(box))
       throw new BusinessException("未知审批筛选");
     if (box.equals("all")) access.require("requests:manage");
     if (box.equals("todo") || box.equals("done")) access.require("requests:approve");
     return (request, q, c) -> {
       var base = SearchPredicates.contains(c, request.get("title"), keyword);
-      if (box.equals("all")) return base;
+      if (box.equals("all")) return c.and(base, c.notEqual(request.get("status"), "DRAFT"));
       if (box.equals("mine")) return c.and(base, c.equal(request.get("applicantId"), userId));
+      if (box.equals("drafts"))
+        return c.and(
+            base,
+            c.equal(request.get("applicantId"), userId),
+            c.equal(request.get("status"), "DRAFT"));
       if (box.equals("participated"))
         return c.and(base, c.isMember(userId, request.get("approverIds")));
       var sub = q.subquery(Long.class);
@@ -140,7 +169,9 @@ public class WorkflowEngine implements FileUsage {
       var state =
           box.equals("todo")
               ? c.equal(task.get("status"), "PENDING")
-              : task.get("status").in("APPROVED", "REJECTED", "TRANSFERRED");
+              : box.equals("copies")
+                  ? c.equal(task.get("kind"), "COPY")
+                  : task.get("status").in("APPROVED", "REJECTED", "RETURNED", "TRANSFERRED");
       sub.select(task.get("requestId")).where(c.equal(task.get("assigneeId"), userId), state);
       var match = request.get("id").in(sub);
       if (box.equals("todo"))
@@ -170,6 +201,8 @@ public class WorkflowEngine implements FileUsage {
     out.put("applicantId", request.getApplicantId());
     out.put("applicantName", request.getApplicantName());
     out.put("status", request.getStatus());
+    out.put("runNumber", request.getRunNumber());
+    out.put("submittedAt", request.getSubmittedAt());
     out.put("businessType", request.getBusinessType());
     out.put(
         "definitionVersionNumber",
@@ -205,7 +238,7 @@ public class WorkflowEngine implements FileUsage {
     out.put("fields", spec.fields().stream().filter(f -> readable.contains(f.id())).toList());
     out.put("values", visible);
     out.put("tasks", requestTasks);
-    out.put("files", files.findAllById(fileIds(spec, visible)));
+    out.put("files", files.findAllById(readableFileIds(request, spec, readable)));
     Map<String, String> labels = new LinkedHashMap<>();
     for (Field f : spec.fields())
       if (visible.get(f.id()) != null) {
@@ -244,9 +277,38 @@ public class WorkflowEngine implements FileUsage {
             .orElse(null);
     Node node = mine == null ? null : spec.node(mine.getNodeId());
     out.put("myTaskId", mine == null ? null : mine.getId());
-    out.put("actions", node == null || !access.has("requests:approve") ? Set.of() : node.actions());
+    boolean actionable =
+        node != null
+            && "PENDING".equals(request.getStatus())
+            && access.has("requests:approve")
+            && (Boolean.TRUE.equals(spec.allowSelfApproval())
+                || !Objects.equals(request.getApplicantId(), access.current().getId()));
+    out.put("actions", actionable ? node.actions() : Set.of());
+    out.put("writable", actionable ? node.writable() : Set.of());
     out.put(
-        "writable", node == null || !access.has("requests:approve") ? Set.of() : node.writable());
+        "canEdit",
+        Objects.equals(request.getApplicantId(), access.current().getId())
+            && access.has("requests:create")
+            && Set.of("DRAFT", "RETURNED", "WITHDRAWN").contains(request.getStatus()));
+    out.put(
+        "canTerminate",
+        access.has("requests:manage")
+            && Set.of("PENDING", "RETURNED", "WITHDRAWN").contains(request.getStatus()));
+    out.put(
+        "returnTargets",
+        returnTargets(request).stream()
+            .map(target -> Map.of("id", target, "name", spec.node(target).name()))
+            .toList());
+    out.put(
+        "unreadCopies",
+        requestTasks.stream()
+            .filter(
+                task ->
+                    "COPY".equals(task.getKind())
+                        && task.getAssigneeId().equals(access.current().getId())
+                        && task.getReadAt() == null)
+            .count());
+    out.put("diagram", diagram(request, spec, requestTasks));
     out.put(
         "canWithdraw",
         "PENDING".equals(request.getStatus())
@@ -286,6 +348,9 @@ public class WorkflowEngine implements FileUsage {
     out.put("action", decision.getAction());
     out.put("comment", decision.getComment());
     out.put("nodeName", decision.getNodeName());
+    out.put("runNumber", decision.getRunNumber());
+    out.put("nodeVisit", decision.getNodeVisit());
+    out.put("targetNodeId", decision.getTargetNodeId());
     out.put("targetUserName", decision.getTargetUserName());
     var changes =
         decision.getChangesJson() == null
@@ -293,6 +358,12 @@ public class WorkflowEngine implements FileUsage {
             : new LinkedHashMap<>(json.form(decision.getChangesJson()));
     changes.keySet().retainAll(readable);
     out.put("changes", changes);
+    Map<String, Object> submitted =
+        decision.getFormSnapshot() == null
+            ? new LinkedHashMap<>()
+            : new LinkedHashMap<>(json.form(decision.getFormSnapshot()));
+    submitted.keySet().retainAll(readable);
+    out.put("submittedValues", submitted);
     return out;
   }
 
@@ -310,6 +381,16 @@ public class WorkflowEngine implements FileUsage {
   /** 提交冻结发布版本和所有节点的人员解析结果；业务回调失败时任务、历史与消息一并回滚。 */
   @Transactional
   public Map<String, Object> submit(Submit input) {
+    return create(input, false);
+  }
+
+  /** 草稿只属于申请人，不解析审批人、不创建待办、不发送消息，也不占用内容审核状态。 */
+  @Transactional
+  public Map<String, Object> draft(Submit input) {
+    return create(input, true);
+  }
+
+  private Map<String, Object> create(Submit input, boolean draft) {
     access.require("requests:view");
     access.require("requests:create");
     var definition = definitions.find(input.definitionId(), true);
@@ -319,8 +400,9 @@ public class WorkflowEngine implements FileUsage {
       throw new org.springframework.dao.OptimisticLockingFailureException("流程发布版本已变化，请重新打开申请");
     var published = versions.findById(input.versionId()).orElseThrow();
     var spec = json.spec(published.getSchemaJson());
-    var resolved = definitions.resolve(spec, access.current());
-    var form = WorkflowSchema.form(spec, input.values());
+    if (!definitions.canStart(spec, access.current()))
+      throw new AccessDeniedException("当前账号不在流程发起范围");
+    var form = WorkflowSchema.form(spec, input.values(), !draft);
     validateAssociations(spec, form, Map.of());
     var request = new FlowRequest();
     request.setDefinitionId(definition.getId());
@@ -328,27 +410,95 @@ public class WorkflowEngine implements FileUsage {
     request.setDefinitionVersionId(published.getId());
     request.setSchemaSnapshot(published.getSchemaJson());
     request.setFormData(json.write(form));
-    request.setSubmittedFormData(request.getFormData());
-    request.setResolvedAssignees(json.write(resolved));
+    request.setSubmittedFormData(draft ? null : request.getFormData());
     request.setTitle(input.title().trim());
     request.setContent("");
     request.setApplicantId(access.current().getId());
     request.setApplicantName(access.current().getNickname());
-    request.setStatus("PENDING");
+    request.setStatus(draft ? "DRAFT" : "PENDING");
+    request.setRunNumber(draft ? 0 : 1);
+    request.setSubmittedAt(draft ? null : LocalDateTime.now());
     request.setBusinessType(definition.getBusinessType());
     request.setBusinessId(input.businessId());
     request.setBusinessRevisionId(input.businessRevisionId());
     request.setAttachmentIds(fileIds(spec, form));
+    if (draft && !"GENERAL".equals(request.getBusinessType()))
+      business(request.getBusinessType()).validateDraft(request, input.businessVersion());
     requests.saveAndFlush(request);
-    if (!"GENERAL".equals(request.getBusinessType()))
+    if (!draft && !"GENERAL".equals(request.getBusinessType()))
       business(request.getBusinessType()).submitted(request, input.businessVersion());
-    else if (input.businessId() != null || input.businessRevisionId() != null)
+    else if ("GENERAL".equals(request.getBusinessType())
+        && (input.businessId() != null || input.businessRevisionId() != null))
       throw new BusinessException("通用审批不能冒用业务关联");
-    record(request, "SUBMIT", null, "发起申请", null);
-    advance(request, spec.startNodeId());
+    if (!draft) {
+      request.setResolvedAssignees(json.write(definitions.resolve(spec, access.current())));
+      record(request, "SUBMIT", null, "发起申请", null);
+      advance(request, spec.startNodeId());
+    }
     requests.flush();
     refreshParticipants(request);
     return detail(request.getId());
+  }
+
+  /** 保存原申请人的草稿或退回修改，旧附件引用仍保留用于历史保护。 */
+  @Transactional
+  public Map<String, Object> edit(Long id, Edit input, boolean submit) {
+    FlowRequest request = accessible(id, true);
+    access.require("requests:create");
+    OperationSupport.version(request, input.version());
+    if (!Objects.equals(request.getApplicantId(), access.current().getId())
+        || !Set.of("DRAFT", "RETURNED", "WITHDRAWN").contains(request.getStatus()))
+      throw new AccessDeniedException("只有申请人能修改未提交、已退回或已撤回的申请");
+    Spec spec = schema(request);
+    // 业务草稿及退回修改每次保存都重新检查所属数据和版本，不能沿用首次创建时的授权。
+    if (!submit && !"GENERAL".equals(request.getBusinessType()))
+      business(request.getBusinessType()).validateDraft(request, input.businessVersion());
+    Map<String, Object> old = values(request);
+    var form = WorkflowSchema.form(spec, input.values(), submit);
+    validateAssociations(spec, form, old);
+    request.setTitle(input.title().trim());
+    request.setFormData(json.write(form));
+    request.getAttachmentIds().addAll(fileIds(spec, form));
+    request.setUpdatedAt(LocalDateTime.now());
+    if (submit) {
+      var definition = definitions.find(request.getDefinitionId(), true);
+      if (!definition.isEnabled() || definition.getPublishedVersionId() == null)
+        throw new BusinessException("流程已停用，不能重新提交");
+      var current =
+          json.spec(
+              versions.findById(definition.getPublishedVersionId()).orElseThrow().getSchemaJson());
+      if (!definitions.canStart(current, access.current()))
+        throw new AccessDeniedException("当前发起范围已撤销");
+      request.setResolvedAssignees(json.write(definitions.resolve(spec, access.current())));
+      request.setRunNumber(request.getRunNumber() + 1);
+      request.setActivePath(null);
+      request.setCompletedAt(null);
+      request.setLastRemindedAt(null);
+      request.setSubmittedAt(LocalDateTime.now());
+      if (request.getSubmittedFormData() == null)
+        request.setSubmittedFormData(request.getFormData());
+      request.setStatus("PENDING");
+      if (!"GENERAL".equals(request.getBusinessType()))
+        business(request.getBusinessType()).submitted(request, input.businessVersion());
+      record(request, request.getRunNumber() == 1 ? "SUBMIT" : "RESUBMIT", null, "提交申请", null);
+      advance(request, spec.startNodeId());
+    } else {
+      var decision = record(request, "EDIT", null, "保存申请", null);
+      Map<String, Object> changes = new LinkedHashMap<>();
+      form.forEach(
+          (key, value) -> {
+            if (!Objects.equals(old.get(key), value)) {
+              Map<String, Object> change = new LinkedHashMap<>();
+              change.put("before", old.get(key));
+              change.put("after", value);
+              changes.put(key, change);
+            }
+          });
+      decision.setChangesJson(changes.isEmpty() ? null : json.write(changes));
+    }
+    requests.flush();
+    refreshParticipants(request);
+    return detail(id);
   }
 
   /** 动态字段关联使用最小权限。修改保留原附件无需重新获得上传者权限，新增关联必须拥有文件。 */
@@ -419,17 +569,39 @@ public class WorkflowEngine implements FileUsage {
     var request = accessible(requestId, false);
     var schema = schema(request);
     var readable = readable(request, schema, tasks.findByRequestIdOrderByIdAsc(requestId));
-    var form = values(request);
-    boolean allowed =
-        schema.fields().stream()
-            .filter(f -> readable.contains(f.id()) && "FILES".equals(f.type()))
-            .anyMatch(
-                f ->
-                    form.get(f.id()) instanceof List<?> list
-                        && list.stream()
-                            .anyMatch(
-                                id -> WorkflowSchema.positiveId(id, f.label()).equals(fileId)));
-    if (!allowed) throw new AccessDeniedException("当前节点无权读取此附件");
+    if (!readableFileIds(request, schema, readable).contains(fileId))
+      throw new AccessDeniedException("当前节点无权读取此附件");
+  }
+
+  /** 按可读字段收集当前与历次提交的文件，保留历史凭证但不让附件编号绕过字段权限。 */
+  private Set<Long> readableFileIds(FlowRequest request, Spec spec, Set<String> readable) {
+    Set<Long> result = new HashSet<>();
+    List<Map<String, Object>> snapshots = new ArrayList<>();
+    snapshots.add(values(request));
+    history
+        .findAll((root, query, cb) -> cb.equal(root.get("requestId"), request.getId()))
+        .forEach(
+            decision -> {
+              if (decision.getFormSnapshot() != null)
+                snapshots.add(json.form(decision.getFormSnapshot()));
+              if (decision.getChangesJson() != null) {
+                json.form(decision.getChangesJson())
+                    .forEach(
+                        (key, change) -> {
+                          if (change instanceof Map<?, ?> map) {
+                            for (String side : List.of("before", "after")) {
+                              if (map.get(side) != null) snapshots.add(Map.of(key, map.get(side)));
+                            }
+                          }
+                        });
+              }
+            });
+    for (var snapshot : snapshots) {
+      var visible = new LinkedHashMap<>(snapshot);
+      visible.keySet().retainAll(readable);
+      result.addAll(fileIds(spec, visible));
+    }
+    return result;
   }
 
   /** 回收或删除文件前供文件模块检查历史申请引用，不能只检查当前表单值。 */
@@ -455,11 +627,16 @@ public class WorkflowEngine implements FileUsage {
       }
       List<Long> ids = assignments.get(node.id());
       if (ids == null || ids.isEmpty()) throw new BusinessException("节点缺少审批人快照");
+      request.setNodeVisit(request.getNodeVisit() + 1);
+      int index = 0;
       for (Long id : ids) {
         var user =
             users
                 .findById(id)
-                .filter(u -> access.hasFor(u, "requests:approve"))
+                .filter(
+                    u ->
+                        access.hasFor(
+                            u, "COPY".equals(node.type()) ? "requests:view" : "requests:approve"))
                 .orElseThrow(() -> new BusinessException("下一节点审批人权限已失效，请联系管理员恢复或撤回申请"));
         var task = new FlowTask();
         task.setRequestId(request.getId());
@@ -467,15 +644,27 @@ public class WorkflowEngine implements FileUsage {
         task.setNodeName(node.name());
         task.setAssigneeId(id);
         task.setAssigneeName(user.getNickname());
+        task.setRunNumber(request.getRunNumber());
+        task.setNodeVisit(request.getNodeVisit());
+        task.setKind(node.type());
+        task.setStatus(
+            "COPY".equals(node.type())
+                ? "COPIED"
+                : ("SERIAL".equals(node.mode()) && index++ > 0 ? "WAITING" : "PENDING"));
         task.setDueAt(
             node.timeoutMinutes() == null
                 ? null
                 : LocalDateTime.now().plusMinutes(node.timeoutMinutes()));
         tasks.saveAndFlush(task);
-        if (!request.getApproverIds().contains(id)) request.getApproverIds().add(id);
-        events.enqueue(
-            request, id, "request:" + request.getId() + ":task:" + task.getId(), "你有一项待处理审批");
+        if (!"WAITING".equals(task.getStatus())) activate(request, task);
       }
+      if ("COPY".equals(node.type())) {
+        next = node.next();
+        continue;
+      }
+      var trail = path(request);
+      trail.add(node.id());
+      request.setActivePath(json.write(Map.of("nodes", trail)));
       request.setCurrentNodeId(node.id());
       request.setCurrentApproverId(ids.getFirst());
       return;
@@ -484,22 +673,129 @@ public class WorkflowEngine implements FileUsage {
   }
 
   private void finish(FlowRequest request, String status) {
+    boolean active = "PENDING".equals(request.getStatus());
     request.setStatus(status);
-    request.setCompletedAt(LocalDateTime.now());
+    request.setCompletedAt("RETURNED".equals(status) ? null : LocalDateTime.now());
     request.setCurrentNodeId(null);
     request.setCurrentApproverId(null);
     for (var task : tasks.findByRequestIdOrderByIdAsc(request.getId()))
-      if (task.getStatus().equals("PENDING")) task.setStatus("CANCELLED");
-    if (!request.getBusinessType().equals("GENERAL"))
+      if (Set.of("PENDING", "WAITING").contains(task.getStatus())) task.setStatus("CANCELLED");
+    if (!request.getBusinessType().equals("GENERAL") && (active || !"CANCELLED".equals(status)))
       business(request.getBusinessType()).completed(request);
     String label =
         switch (status) {
           case "APPROVED" -> "审批已通过";
           case "REJECTED" -> "审批已驳回";
+          case "RETURNED" -> "审批已退回，请修改后重新提交";
+          case "CANCELLED" -> "审批已由管理员终止";
           default -> "审批已撤回";
         };
     events.enqueue(
-        request, request.getApplicantId(), "request:" + request.getId() + ":result", label);
+        request,
+        request.getApplicantId(),
+        "request:"
+            + request.getId()
+            + ":result:"
+            + request.getRunNumber()
+            + ":"
+            + request.getNodeVisit()
+            + ":"
+            + status,
+        label);
+  }
+
+  /** 激活顺签或抄送时再次检查当前权限；WAITING 不提前获得实例参与权。 */
+  private void activate(FlowRequest request, FlowTask task) {
+    var user =
+        users
+            .findById(task.getAssigneeId())
+            .filter(
+                candidate ->
+                    access.hasFor(
+                        candidate,
+                        "COPY".equals(task.getKind()) ? "requests:view" : "requests:approve"))
+            .orElseThrow(() -> new BusinessException("处理人权限已失效，请撤回或由管理员终止"));
+    if (!request.getApproverIds().contains(user.getId()))
+      request.getApproverIds().add(user.getId());
+    events.enqueue(
+        request,
+        user.getId(),
+        "request:" + request.getId() + ":task:" + task.getId(),
+        "COPY".equals(task.getKind()) ? "你收到一项审批抄送" : "你有一项待处理审批");
+  }
+
+  private List<String> path(FlowRequest request) {
+    if (request.getActivePath() == null) return new ArrayList<>();
+    Object nodes = json.form(request.getActivePath()).get("nodes");
+    if (!(nodes instanceof List<?> list)) throw new BusinessException("流程运行路径无效");
+    return new ArrayList<>(list.stream().map(Object::toString).toList());
+  }
+
+  /** 只可退回当前有效路径的已办理节点；被退回废弃的分支不会继续出现在目标列表。 */
+  private List<String> returnTargets(FlowRequest request) {
+    List<String> trail = path(request);
+    if (trail.isEmpty()) return List.of();
+    return trail.subList(0, trail.size() - 1).stream().distinct().toList();
+  }
+
+  /** 运行图仅返回节点和连接元信息，不把隐藏字段、未来人员或完整定义快照交给参与者。 */
+  private Map<String, Object> diagram(FlowRequest request, Spec spec, List<FlowTask> requestTasks) {
+    List<Map<String, Object>> nodes =
+        spec.nodes().stream()
+            .map(
+                node -> {
+                  Map<String, Object> item = new LinkedHashMap<>();
+                  item.put("id", node.id());
+                  item.put("name", node.name());
+                  item.put("type", node.type());
+                  item.put("next", node.next());
+                  item.put(
+                      "branches",
+                      node.conditions().stream()
+                          .map(condition -> condition.next())
+                          .distinct()
+                          .toList());
+                  item.put("current", Objects.equals(node.id(), request.getCurrentNodeId()));
+                  item.put(
+                      "visited",
+                      requestTasks.stream()
+                          .anyMatch(
+                              task ->
+                                  task.getRunNumber() == request.getRunNumber()
+                                      && node.id().equals(task.getNodeId())
+                                      && !"WAITING".equals(task.getStatus())));
+                  return item;
+                })
+            .toList();
+    return Map.of("nodes", nodes, "startNodeId", spec.startNodeId());
+  }
+
+  /** 未提交草稿可以由本人放弃；正式提交的申请及历史不得借此接口删除。 */
+  @Transactional
+  public void discardDraft(Long id, Long version) {
+    access.require("requests:create");
+    var request = accessible(id, true);
+    OperationSupport.version(request, version);
+    if (!"DRAFT".equals(request.getStatus())
+        || !Objects.equals(request.getApplicantId(), access.current().getId()))
+      throw new AccessDeniedException("只能删除本人未提交的草稿");
+    history.deleteAll(history.findAll((root, query, cb) -> cb.equal(root.get("requestId"), id)));
+    requests.delete(request);
+    requests.flush();
+    realtime.changed(Set.of(access.current().getId()), "requests");
+  }
+
+  /** 抄送已读是接收者个人状态，不修改申请乐观版本，也不允许代他人标记。 */
+  @Transactional
+  public void readCopies(Long id) {
+    accessible(id, true);
+    tasks.findByRequestIdOrderByIdAsc(id).stream()
+        .filter(
+            task ->
+                "COPY".equals(task.getKind())
+                    && task.getAssigneeId().equals(access.current().getId())
+                    && task.getReadAt() == null)
+        .forEach(task -> task.setReadAt(LocalDateTime.now()));
   }
 
   private FlowDecision record(
@@ -509,6 +805,10 @@ public class WorkflowEngine implements FileUsage {
     decision.setActorId(access.current().getId());
     decision.setActorName(access.current().getNickname());
     decision.setAction(action);
+    decision.setRunNumber(request.getRunNumber());
+    decision.setNodeVisit(request.getNodeVisit());
+    if (Set.of("SUBMIT", "RESUBMIT").contains(action))
+      decision.setFormSnapshot(request.getFormData());
     decision.setComment(comment);
     if (node != null) {
       decision.setNodeId(node.id());
@@ -526,7 +826,23 @@ public class WorkflowEngine implements FileUsage {
   public Map<String, Object> act(Long id, Action input) {
     var request = accessible(id, true);
     OperationSupport.version(request, input.version());
-    if (!request.getStatus().equals("PENDING")) throw new BusinessException("申请已经结束");
+    if (input.targetNodeId() != null && !"RETURN".equals(input.action()))
+      throw new BusinessException("只有退回可指定目标节点");
+    if (input.action().equals("TERMINATE")) {
+      access.require("requests:manage");
+      if (!Set.of("PENDING", "RETURNED", "WITHDRAWN").contains(request.getStatus()))
+        throw new BusinessException("申请已结束或尚未提交");
+      if (input.comment() == null || input.comment().isBlank())
+        throw new BusinessException("请输入终止原因");
+      if (input.values() != null && !input.values().isEmpty())
+        throw new BusinessException("终止不能修改表单");
+      finish(request, "CANCELLED");
+      record(request, "TERMINATE", null, input.comment(), null);
+      requests.flush();
+      refreshParticipants(request);
+      return detail(id);
+    }
+    if (!request.getStatus().equals("PENDING")) throw new BusinessException("申请不在审批中");
     var spec = schema(request);
     String action = input.action();
     Long userId = access.current().getId();
@@ -557,6 +873,8 @@ public class WorkflowEngine implements FileUsage {
                       Objects.equals(t.getId(), input.taskId())
                           && t.getAssigneeId().equals(userId)
                           && t.getStatus().equals("PENDING")
+                          && t.getNodeVisit() == request.getNodeVisit()
+                          && t.getRunNumber() == request.getRunNumber()
                           && t.getNodeId().equals(request.getCurrentNodeId()))
               .findFirst()
               .orElseThrow(() -> new AccessDeniedException("不是当前待办处理人"));
@@ -597,21 +915,58 @@ public class WorkflowEngine implements FileUsage {
           task.setDecidedAt(LocalDateTime.now());
           finish(request, "REJECTED");
         }
+        case "RETURN" -> {
+          if (input.comment() == null || input.comment().isBlank())
+            throw new BusinessException("请输入退回原因");
+          if (input.targetNodeId() != null
+              && !returnTargets(request).contains(input.targetNodeId()))
+            throw new BusinessException("只能退回当前实际路径中已办理的审批节点");
+          task.setStatus("RETURNED");
+          task.setDecidedAt(LocalDateTime.now());
+          current.stream()
+              .filter(pending -> Set.of("PENDING", "WAITING").contains(pending.getStatus()))
+              .forEach(pending -> pending.setStatus("CANCELLED"));
+          if (input.targetNodeId() == null) finish(request, "RETURNED");
+          else {
+            var trail = path(request);
+            request.setActivePath(
+                json.write(Map.of("nodes", trail.subList(0, trail.indexOf(input.targetNodeId())))));
+            advance(request, input.targetNodeId());
+          }
+        }
         case "APPROVE" -> {
           task.setStatus("APPROVED");
           task.setDecidedAt(LocalDateTime.now());
           tasks.flush();
           var group =
               tasks.findByRequestIdOrderByIdAsc(id).stream()
-                  .filter(t -> t.getNodeId().equals(node.id()))
+                  .filter(
+                      t ->
+                          t.getNodeId().equals(node.id())
+                              && t.getNodeVisit() == task.getNodeVisit()
+                              && t.getRunNumber() == task.getRunNumber())
                   .toList();
           boolean mandatory =
               group.stream()
                   .filter(FlowTask::isMandatory)
                   .anyMatch(t -> t.getStatus().equals("PENDING"));
+          if (node.mode().equals("SERIAL")
+              && group.stream().noneMatch(t -> t.getStatus().equals("PENDING"))) {
+            var waiting =
+                group.stream()
+                    .filter(t -> t.getStatus().equals("WAITING"))
+                    .findFirst()
+                    .orElse(null);
+            if (waiting != null) {
+              waiting.setStatus("PENDING");
+              activate(request, waiting);
+              request.setCurrentApproverId(waiting.getAssigneeId());
+            }
+          }
           boolean ready =
-              node.mode().equals("ALL")
-                  ? group.stream().noneMatch(t -> t.getStatus().equals("PENDING"))
+              Set.of("ALL", "SERIAL").contains(node.mode())
+                  ? group.stream()
+                      .noneMatch(t -> Set.of("PENDING", "WAITING").contains(t.getStatus()))
                   : !mandatory
                       && group.stream()
                           .anyMatch(t -> !t.isMandatory() && t.getStatus().equals("APPROVED"));
@@ -644,8 +999,11 @@ public class WorkflowEngine implements FileUsage {
               .anyMatch(
                   t ->
                       t.getAssigneeId().equals(targetId)
-                          && (t.getNodeId().equals(node.id())
+                          && ((t.getNodeVisit() == task.getNodeVisit()
+                                  && t.getRunNumber() == task.getRunNumber())
                               || (!Boolean.TRUE.equals(spec.allowRepeatApproval())
+                                  && t.getRunNumber() == request.getRunNumber()
+                                  && path(request).contains(t.getNodeId())
                                   && t.getStatus().equals("APPROVED")))))
             throw new BusinessException("接收人已参与当前节点或不允许重复审批");
           var added = new FlowTask();
@@ -655,6 +1013,8 @@ public class WorkflowEngine implements FileUsage {
           added.setAssigneeId(targetId);
           added.setAssigneeName(target.getNickname());
           added.setMandatory(action.equals("ADD_SIGN") || task.isMandatory());
+          added.setRunNumber(task.getRunNumber());
+          added.setNodeVisit(task.getNodeVisit());
           added.setDueAt(task.getDueAt());
           tasks.saveAndFlush(added);
           if (action.equals("TRANSFER")) {
@@ -671,6 +1031,8 @@ public class WorkflowEngine implements FileUsage {
         default -> throw new BusinessException("不支持的审批动作");
       }
       var decision = record(request, action, node, input.comment(), target);
+      decision.setNodeVisit(task.getNodeVisit());
+      decision.setTargetNodeId(input.targetNodeId());
       decision.setChangesJson(changes.isEmpty() ? null : json.write(changes));
       request.setUpdatedAt(LocalDateTime.now());
     }

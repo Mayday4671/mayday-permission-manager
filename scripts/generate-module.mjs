@@ -496,20 +496,12 @@ export function createGenerationPlan(root, input) {
       `BASELINE 声明当前结构已处于版本 ${version}`,
     )
     .replace(/本初始化基线为 \d+/g, `本初始化基线为 ${version}`)
-    .replace(
-      `VALUES (1, '${baseline[1]}',`,
-      `${menu}\nVALUES (1, '${version}',`,
-    );
-  // 菜单插入不能插在 flyway INSERT 的列清单与 VALUES 中间。
-  updated = updated
-    .replace(
-      `  (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)\n${menu}\nVALUES`,
-      `  (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)\nVALUES`,
-    )
-    .replace(
-      "-- 全部建表及基础资料成功后才登记基线",
-      `${menu}\n-- 全部建表及基础资料成功后才登记基线`,
-    );
+    .replace(`VALUES (1, '${baseline[1]}',`, `VALUES (1, '${version}',`);
+  // 菜单只插入基线说明前一次，不依赖 LF/CRLF 去清除误插入的第二份语句。
+  updated = updated.replace(
+    "-- 全部建表及基础资料成功后才登记基线",
+    `${menu}\n-- 全部建表及基础资料成功后才登记基线`,
+  );
   plan.set("database/mayday.sql", {
     name: "database/mayday.sql",
     before: migrations,

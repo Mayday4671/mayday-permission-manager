@@ -44,9 +44,21 @@ export function useModalTablePagination(rowHeight = 64, limit = 10) {
       const actualRow = node.querySelector<HTMLElement>(
         ".ant-table-tbody > .ant-table-row",
       );
+      const card = node.querySelector<HTMLElement>(".table-mobile-card");
+      const nextCard = card?.nextElementSibling;
       const height = Math.max(
         rowHeight,
-        actualRow?.getBoundingClientRect().height ?? 0,
+        card
+          ? Math.max(
+              // 手机卡片之间可能用外边距分隔；保留 144px 下限使最后一页不因少一条记录反复变容量。
+              144,
+              card.getBoundingClientRect().height,
+              nextCard
+                ? nextCard.getBoundingClientRect().top -
+                    card.getBoundingClientRect().top
+                : 0,
+            )
+          : (actualRow?.getBoundingClientRect().height ?? 0),
       );
       const offset =
         rect.top - body.getBoundingClientRect().top + body.scrollTop;
@@ -56,7 +68,7 @@ export function useModalTablePagination(rowHeight = 64, limit = 10) {
         (footer?.getBoundingClientRect().height ?? 60) -
         offset -
         pixels(getComputedStyle(body).paddingBottom) -
-        (tableHead?.getBoundingClientRect().height || 40) -
+        (card ? 0 : tableHead?.getBoundingClientRect().height || 40) -
         pagerHeight -
         4;
       const pageSize = Math.max(

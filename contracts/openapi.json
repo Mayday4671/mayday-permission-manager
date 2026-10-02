@@ -5,11 +5,16 @@
         "properties": {
           "action": {
             "minLength": 1,
-            "pattern": "APPROVE|REJECT|WITHDRAW|COMMENT|TRANSFER|ADD_SIGN",
+            "pattern": "APPROVE|REJECT|RETURN|WITHDRAW|TERMINATE|COMMENT|TRANSFER|ADD_SIGN",
             "type": "string"
           },
           "comment": {
             "maxLength": 500,
+            "minLength": 0,
+            "type": "string"
+          },
+          "targetNodeId": {
+            "maxLength": 40,
             "minLength": 0,
             "type": "string"
           },
@@ -1199,6 +1204,32 @@
         ],
         "type": "object"
       },
+      "Edit": {
+        "properties": {
+          "businessVersion": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 160,
+            "minLength": 0,
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title",
+          "version"
+        ],
+        "type": "object"
+      },
       "EntryRequest": {
         "properties": {
           "code": {
@@ -1560,6 +1591,15 @@
       },
       "Field": {
         "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            },
+            "type": "array"
+          },
+          "helpText": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -1573,6 +1613,10 @@
             "format": "int32",
             "type": "integer"
           },
+          "maxRows": {
+            "format": "int32",
+            "type": "integer"
+          },
           "min": {
             "type": "number"
           },
@@ -1581,6 +1625,9 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "placeholder": {
+            "type": "string"
           },
           "required": {
             "type": "boolean"
@@ -7080,6 +7127,14 @@
           },
           {
             "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "page",
             "required": false,
             "schema": {
@@ -7154,7 +7209,85 @@
         ]
       }
     },
+    "/api/operations/requests/drafts": {
+      "post": {
+        "operationId": "WorkflowController_draft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowSubmission"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "workflow-controller"
+        ]
+      }
+    },
     "/api/operations/requests/{id}": {
+      "delete": {
+        "operationId": "WorkflowController_discardDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "workflow-controller"
+        ]
+      },
       "get": {
         "operationId": "WorkflowController_request",
         "parameters": [
@@ -7174,6 +7307,86 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "workflow-controller"
+        ]
+      },
+      "put": {
+        "operationId": "WorkflowController_edit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Edit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "workflow-controller"
+        ]
+      }
+    },
+    "/api/operations/requests/{id}/copies/read": {
+      "post": {
+        "operationId": "WorkflowController_readCopies",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
             },
@@ -7414,6 +7627,52 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "workflow-controller"
+        ]
+      }
+    },
+    "/api/operations/requests/{id}/submit": {
+      "post": {
+        "operationId": "WorkflowController_resubmit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Edit"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

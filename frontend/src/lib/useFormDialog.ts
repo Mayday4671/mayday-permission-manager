@@ -29,31 +29,45 @@ export function useFormDialog<T extends object>({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const original = useRef("");
+  const initialized = useRef(false);
   const submitting = useRef(false);
   const watched = Form.useWatch((values) => values, { form, preserve: true });
   useEffect(() => {
+    let active = true;
+    initialized.current = false;
     if (open) {
-      // 调用者在打开前提供初值；本次打开仅取一次快照，后台刷新不能覆盖编辑草稿。
-      original.current = JSON.stringify(form.getFieldsValue(true));
-      setDirty(false);
+      // 等本次 React 提交中调用者的 reset/setFieldsValue 完成后捕获初值。
+      // 微任务在浏览器下一次用户输入前执行，避免打开节点弹窗就被判为已修改。
+      queueMicrotask(() => {
+        if (!active) return;
+        original.current = JSON.stringify(form.getFieldsValue(true));
+        initialized.current = true;
+        setDirty(false);
+      });
     }
+    return () => {
+      active = false;
+    };
   }, [open, form]);
   // 同时观察用户输入与 setFieldValue，恢复默认或导入配置也属于未保存修改。
   useEffect(() => {
-    if (open)
+    if (open && initialized.current)
       setDirty(JSON.stringify(form.getFieldsValue(true)) !== original.current);
   }, [open, watched, form]);
   const confirmLeave = useUnsavedChanges(open && dirty && confirmDiscard, {
     busy: open && saving,
     zIndex: zIndex === undefined ? undefined : zIndex + 20,
   });
-  const submit = async (values: T) => {
+  const submit = async (
+    values: T,
+    handler: (values: T) => Promise<void> = onSubmit,
+  ) => {
     // 同步 ref 覆盖快速连点及 Enter 与保存按钮同时提交的间隙。
     if (submitting.current) return;
     submitting.current = true;
     setSaving(true);
     try {
-      await onSubmit(values);
+      await handler(values);
     } catch (error) {
       message.error(
         error instanceof Error ? error.message : "保存失败，请重试",

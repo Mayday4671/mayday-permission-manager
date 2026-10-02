@@ -45,6 +45,32 @@ export function ApprovalSubmitModal({
       );
     }
   }, [open, content?.id]);
+  const submitApplication = async (
+    values: { title: string; values?: Record<string, unknown> },
+    draft: boolean,
+  ) => {
+    if (!definition) throw new Error("请选择已发布流程");
+    if (!values.title?.trim()) throw new Error("请填写申请标题");
+    const record = await api<ApprovalDetail>(
+      draft ? "/operations/requests/drafts" : "/operations/requests",
+      {
+        method: "POST",
+        body: jsonBody({
+          definitionId: definition.id,
+          versionId: definition.versionId,
+          title: values.title,
+          values: encodeWorkflowValues(definition.fields, values.values ?? {}),
+          businessId: content?.id,
+          businessRevisionId: content?.revisionId,
+          businessVersion: content?.version,
+        }),
+      },
+    );
+    void client.invalidateQueries();
+    message.success(draft ? "草稿已保存" : "申请已提交");
+    onClose();
+    onSuccess?.(record);
+  };
   return (
     <FormModal
       title={content ? "提交内容审核" : "发起审批"}
@@ -53,28 +79,11 @@ export function ApprovalSubmitModal({
       form={form}
       width={760}
       okText="提交申请"
-      onSubmit={async (values) => {
-        if (!definition) throw new Error("请选择已发布流程");
-        const record = await api<ApprovalDetail>("/operations/requests", {
-          method: "POST",
-          body: jsonBody({
-            definitionId: definition.id,
-            versionId: definition.versionId,
-            title: values.title,
-            values: encodeWorkflowValues(
-              definition.fields,
-              values.values ?? {},
-            ),
-            businessId: content?.id,
-            businessRevisionId: content?.revisionId,
-            businessVersion: content?.version,
-          }),
-        });
-        void client.invalidateQueries();
-        message.success("申请已提交");
-        onClose();
-        onSuccess?.(record);
+      secondaryAction={{
+        label: "保存草稿",
+        onSubmit: (values) => submitApplication(values, true),
       }}
+      onSubmit={(values) => submitApplication(values, false)}
     >
       {open && (
         <QueryState

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Segmented, Tag } from "antd";
+import { Button, Segmented, Select, Space, Tag } from "antd";
 import { Plus, Eye } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { ResourcePage } from "../../components/ResourcePage";
@@ -15,6 +15,10 @@ function Approvals({ tasks = false }: { tasks?: boolean }) {
   const [params, setParams] = useSearchParams();
   const [selected, setSelected] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [status, setStatus] = usePageState<string | undefined>(
+    "applicationStatus",
+    undefined,
+  );
   const [box, setBox] = usePageState<string>(
     "approvalBox",
     tasks ? "todo" : "mine",
@@ -38,7 +42,9 @@ function Approvals({ tasks = false }: { tasks?: boolean }) {
       ]
     : [
         { label: "我发起的", value: "mine" },
+        { label: "草稿", value: "drafts" },
         { label: "我参与的", value: "participated" },
+        { label: "抄送我的", value: "copies" },
         ...(can("requests:manage")
           ? [{ label: "全部申请", value: "all" }]
           : []),
@@ -53,10 +59,24 @@ function Approvals({ tasks = false }: { tasks?: boolean }) {
         readOnly
         fields={() => null}
         actionsWidth={80}
-        queryParams={{ box }}
+        queryParams={{ box, status }}
         savedFilters={{
-          keys: ["box"],
-          apply: (values) =>
+          keys: ["box", "status"],
+          apply: (values) => {
+            setStatus(
+              typeof values.status === "string" &&
+                [
+                  "DRAFT",
+                  "PENDING",
+                  "RETURNED",
+                  "APPROVED",
+                  "REJECTED",
+                  "WITHDRAWN",
+                  "CANCELLED",
+                ].includes(values.status)
+                ? values.status
+                : undefined,
+            );
             setBox(
               typeof values.box === "string" &&
                 options.some((item) => item.value === values.box)
@@ -64,10 +84,40 @@ function Approvals({ tasks = false }: { tasks?: boolean }) {
                 : tasks
                   ? "todo"
                   : "mine",
-            ),
+            );
+          },
         }}
         extraFilters={
-          <Segmented options={options} value={box} onChange={setBox} />
+          <Space wrap>
+            <Segmented
+              options={options}
+              value={box}
+              onChange={(value) => {
+                setBox(value);
+                setStatus(undefined);
+              }}
+            />
+            <Select
+              aria-label="申请状态"
+              allowClear
+              placeholder="全部状态"
+              style={{ width: 130 }}
+              value={status}
+              onChange={setStatus}
+              options={[
+                "DRAFT",
+                "PENDING",
+                "RETURNED",
+                "APPROVED",
+                "REJECTED",
+                "WITHDRAWN",
+                "CANCELLED",
+              ].map((value) => ({
+                value,
+                label: value === "CANCELLED" ? "已终止" : approvalStates[value],
+              }))}
+            />
+          </Space>
         }
         extraToolbar={
           !tasks &&
@@ -107,13 +157,13 @@ function Approvals({ tasks = false }: { tasks?: boolean }) {
                         : "default"
                 }
               >
-                {approvalStates[value]}
+                {value === "CANCELLED" ? "已终止" : approvalStates[value]}
               </Tag>
             ),
           },
           {
             title: "提交时间",
-            dataIndex: "createdAt",
+            dataIndex: "submittedAt",
             width: 175,
             render: formatTime,
           },

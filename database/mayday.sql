@@ -1,6 +1,6 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V19）
--- 唯一对外交付 SQL：48 张业务表、471 个业务字段、索引/外键及必要基础资料。
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V20）
+-- 唯一对外交付 SQL：48 张业务表、483 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
 -- 【使用方法】
@@ -12,7 +12,7 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V19 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V20+。
+-- 4. 本文件已包含 V20 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V21+。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
@@ -237,6 +237,10 @@ CREATE TABLE `ops_flow_decision` (
   `target_user_id` bigint DEFAULT NULL COMMENT '转交或加签目标账号 ID，逻辑关联 sys_user.id；其他动作可为空',
   `target_user_name` varchar(64) DEFAULT NULL COMMENT '转交/加签目标昵称快照',
   `changes_json` longtext COMMENT '字段修改前后值 JSON；历史返回时按读取者可见字段过滤，禁止直接整列公开',
+  `run_number` INT NOT NULL DEFAULT 1 COMMENT '决定所属提交轮次；重提不覆盖以前的处理轨迹',
+  `node_visit` INT NOT NULL DEFAULT 0 COMMENT '决定所属节点办理批次；进入下一节点前的决定归属于原任务批次',
+  `target_node_id` VARCHAR(40) DEFAULT NULL COMMENT '退回目标节点稳定ID；为空表示退回申请人，其他动作不用',
+  `form_snapshot` LONGTEXT DEFAULT NULL COMMENT '每轮提交时的完整表单JSON快照；接口按查看人字段权限裁剪，不直接序列化',
   PRIMARY KEY (`id`),
   KEY `idx_decision_request` (`request_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='审批操作及字段变更历史；保留人员节点快照，不反向授予历史操作人当前处理权';
@@ -271,7 +275,7 @@ CREATE TABLE `ops_flow_request` (
   `content` text NOT NULL COMMENT '申请说明正文，经富文本清理；详情按参与关系及字段权限返回',
   `applicant_id` bigint DEFAULT NULL COMMENT '发起账号 ID，逻辑关联 sys_user.id；决定本人申请范围',
   `applicant_name` varchar(64) DEFAULT NULL COMMENT '发起人昵称快照',
-  `status` varchar(20) NOT NULL COMMENT '申请状态：PENDING 审批中、APPROVED 通过、REJECTED 驳回、WITHDRAWN 撤回',
+  `status` varchar(20) NOT NULL COMMENT '申请状态：DRAFT草稿/PENDING审批中/RETURNED待修改/APPROVED通过/REJECTED终止性驳回/WITHDRAWN撤回/CANCELLED管理员终止',
   `current_step` int NOT NULL COMMENT 'V3 顺序审批的步骤索引兼容字段；新版以 current_node_id 和待办任务为准',
   `current_approver_id` bigint DEFAULT NULL COMMENT '旧版单人当前审批人兼容字段；新版多任务处理必须查 ops_flow_task',
   `definition_version_id` bigint DEFAULT NULL COMMENT '绑定发布版本 ID，逻辑关联 ops_flow_version.id；旧实例导入时补齐',
@@ -285,6 +289,10 @@ CREATE TABLE `ops_flow_request` (
   `completed_at` datetime(6) DEFAULT NULL COMMENT '结束时间；通过、驳回或撤回时写入，审批中为 NULL',
   `submitted_form_data` longtext COMMENT '发起时的原始表单 JSON，不随节点修改变化；字段读取仍须应用可见性过滤',
   `last_reminded_at` datetime(6) DEFAULT NULL COMMENT '申请人最近一次手动催办时间；每30分钟最多一次，不改变审批状态和节点授权',
+  `run_number` INT NOT NULL DEFAULT 1 COMMENT '提交轮次：未提交草稿为0；首次提交为1；修改重提递增',
+  `node_visit` INT NOT NULL DEFAULT 0 COMMENT '节点办理批次：每次进入审批或抄送递增，用于隔离退回后的旧决定',
+  `active_path` TEXT DEFAULT NULL COMMENT '当前轮实际审批路径JSON，nodes为稳定节点ID数组；退回时裁剪，重提时清空',
+  `submitted_at` DATETIME(6) DEFAULT NULL COMMENT '最近一次正式提交时间；未提交草稿为空，不使用草稿创建时间冒充',
   PRIMARY KEY (`id`),
   KEY `idx_request_applicant` (`applicant_id`),
   KEY `idx_request_approver` (`current_approver_id`,`status`)
@@ -310,14 +318,19 @@ CREATE TABLE `ops_flow_task` (
   `node_name` varchar(80) NOT NULL COMMENT '生成任务时节点名称快照',
   `assignee_id` bigint NOT NULL COMMENT '待办账号 ID，逻辑关联 sys_user.id；不能由请求参数冒充',
   `assignee_name` varchar(64) NOT NULL COMMENT '待办人昵称快照',
-  `status` varchar(20) NOT NULL COMMENT '任务状态：PENDING/APPROVED/REJECTED/CANCELLED/TRANSFERRED；非待办不可重复处理',
+  `status` varchar(20) NOT NULL COMMENT '任务状态：WAITING顺签未轮到/PENDING待办/APPROVED通过/REJECTED驳回/RETURNED退回/TRANSFERRED转交/CANCELLED失效/COPIED抄送',
   `mandatory` tinyint(1) NOT NULL DEFAULT '0' COMMENT '加签必签标记；1 时必须独立通过，不能被原或签审批人的通过代替',
   `decided_at` datetime(6) DEFAULT NULL COMMENT '任务已处理时间；尚未处理时为 NULL',
   `due_at` datetime(6) DEFAULT NULL COMMENT '审批任务到期时间，由已发布流程版本的节点超时分钟数计算；NULL表示未设置超时',
   `timeout_notified_at` datetime(6) DEFAULT NULL COMMENT '已发送本任务一次超时提醒的时间；NULL表示尚未提醒，任务行锁保证并发幂等',
+  `run_number` INT NOT NULL DEFAULT 1 COMMENT '所属提交轮次，与申请重提轮次对应；旧任务只作为历史',
+  `node_visit` INT NOT NULL DEFAULT 0 COMMENT '所属节点办理批次；同一节点退回重办不得混用以前的会签结果',
+  `kind` VARCHAR(16) NOT NULL DEFAULT 'APPROVAL' COMMENT '任务种类：APPROVAL审批/COPY抄送，抄送不具备决定权限',
+  `read_at` DATETIME(6) DEFAULT NULL COMMENT '抄送接收者首次已读时间，空表示未读；审批任务不用此字段',
   PRIMARY KEY (`id`),
   KEY `idx_task_pending` (`assignee_id`,`status`,`request_id`),
-  KEY `request_id` (`request_id`),
+  KEY `idx_flow_task_round_visit` (`request_id`,`run_number`,`node_visit`),
+  KEY `idx_flow_task_copy_reader` (`assignee_id`,`kind`,`read_at`),
   CONSTRAINT `ops_flow_task_ibfk_1` FOREIGN KEY (`request_id`) REFERENCES `ops_flow_request` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='实例节点对单个审批人的任务；处理时锁定实例并检查任务归属、动作权限和乐观版本';
 
@@ -611,11 +624,11 @@ CREATE TABLE `sys_user_role` (
 
 
 -- Flyway 版本管理表：记录本文件对应的 V15 基线，后续仍按正常增量迁移升级。
--- BASELINE 声明当前结构已处于版本 19；不伪造历史迁移的执行校验和。
+-- BASELINE 声明当前结构已处于版本 20；不伪造历史迁移的执行校验和。
 -- 参考：https://documentation.red-gate.com/flyway/flyway-concepts/baselines
 CREATE TABLE flyway_schema_history (
   installed_rank INT NOT NULL COMMENT '安装记录顺序；由 Flyway 后续维护',
-  version VARCHAR(50) DEFAULT NULL COMMENT '数据库迁移版本；本初始化基线为 19',
+  version VARCHAR(50) DEFAULT NULL COMMENT '数据库迁移版本；本初始化基线为 20',
   description VARCHAR(200) NOT NULL COMMENT '迁移描述或基线标记',
   type VARCHAR(20) NOT NULL COMMENT '记录类型；BASELINE 表示导入后的结构起点，后续 SQL 表示增量迁移',
   script VARCHAR(1000) NOT NULL COMMENT '迁移脚本名或标准基线标记',
@@ -966,9 +979,9 @@ WHERE NOT EXISTS(SELECT 1 FROM sys_entry WHERE kind='menus' AND code='changes');
 -- 全部建表及基础资料成功后才登记基线；如前面报错，必须停止，不能跳过失败语句。
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '19', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '20', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
--- 安装完成自检：应得到 48 张业务表、471 个业务字段，缺少注释数均为 0。
+-- 安装完成自检：应得到 48 张业务表、483 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。
 SELECT COUNT(*) AS business_tables, SUM(table_comment = '') AS missing_table_comments
 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history';

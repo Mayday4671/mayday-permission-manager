@@ -191,8 +191,9 @@ public class WorkflowDefinitions {
     if ("DEPARTMENTS".equals(schema.applicantType()))
       for (Long id : schema.applicantIds()) validDepartment(id);
     for (Node node : schema.nodes())
-      if ("APPROVAL".equals(node.type())) {
-        if ("USERS".equals(node.source())) for (Long id : node.assigneeIds()) validUser(id, true);
+      if (Set.of("APPROVAL", "COPY").contains(node.type())) {
+        if ("USERS".equals(node.source()))
+          for (Long id : node.assigneeIds()) validUser(id, "APPROVAL".equals(node.type()));
         if ("ROLES".equals(node.source())) for (Long id : node.assigneeIds()) validRole(id);
       }
   }
@@ -242,12 +243,12 @@ public class WorkflowDefinitions {
     WorkflowSchema.validate(schema);
     if (!canStart(schema, applicant)) throw new AccessDeniedException("当前账号不在流程发起范围");
     Map<String, List<Long>> result = new LinkedHashMap<>();
-    Set<Long> used = new HashSet<>();
     for (Node node : schema.nodes())
-      if ("APPROVAL".equals(node.type())) {
+      if (Set.of("APPROVAL", "COPY").contains(node.type())) {
+        boolean approval = "APPROVAL".equals(node.type());
         List<SysUser> candidates;
         if ("USERS".equals(node.source()))
-          candidates = node.assigneeIds().stream().map(id -> validUser(id, true)).toList();
+          candidates = node.assigneeIds().stream().map(id -> validUser(id, approval)).toList();
         else if ("DEPARTMENT_LEADER".equals(node.source())) {
           var department =
               Optional.ofNullable(applicant.getDepartmentId())
@@ -255,7 +256,7 @@ public class WorkflowDefinitions {
                   .filter(SystemEntry::isEnabled)
                   .orElseThrow(() -> new BusinessException("发起人没有有效所属部门"));
           if (department.getLeaderId() == null) throw new BusinessException("所属部门尚未设置负责人");
-          candidates = List.of(validUser(department.getLeaderId(), true));
+          candidates = List.of(validUser(department.getLeaderId(), approval));
         } else {
           node.assigneeIds().forEach(this::validRole);
           candidates =
@@ -266,21 +267,47 @@ public class WorkflowDefinitions {
                         return r.join("roles").get("id").in(node.assigneeIds());
                       })
                   .stream()
-                  .filter(user -> user.isEnabled() && access.hasFor(user, "requests:approve"))
+                  .filter(
+                      user ->
+                          user.isEnabled()
+                              && access.hasFor(
+                                  user, approval ? "requests:approve" : "requests:view"))
                   .toList();
         }
         if (candidates.isEmpty() || candidates.size() > 100)
           throw new BusinessException(node.name() + "没有有效审批人或超过 100 人");
-        List<Long> ids = candidates.stream().map(SysUser::getId).distinct().sorted().toList();
-        if (!Boolean.TRUE.equals(schema.allowSelfApproval()) && ids.contains(applicant.getId()))
+        // 指定人员顺序决定顺签顺序；角色成员没有人工顺序，按稳定账号编号排序。
+        List<Long> ids =
+            "USERS".equals(node.source())
+                ? candidates.stream().map(SysUser::getId).distinct().toList()
+                : candidates.stream().map(SysUser::getId).distinct().sorted().toList();
+        if (approval
+            && !Boolean.TRUE.equals(schema.allowSelfApproval())
+            && ids.contains(applicant.getId()))
           throw new BusinessException(node.name() + "包含申请人，流程不允许自我审批");
-        if (!Boolean.TRUE.equals(schema.allowRepeatApproval())
-            && ids.stream().anyMatch(used::contains))
-          throw new BusinessException("多个审批节点包含同一审批人，流程不允许重复审批人");
-        used.addAll(ids);
         result.put(node.id(), ids);
       }
+    if (!Boolean.TRUE.equals(schema.allowRepeatApproval())) {
+      var approvals = schema.nodes().stream().filter(n -> "APPROVAL".equals(n.type())).toList();
+      for (var first : approvals)
+        for (var second : approvals) {
+          if (!first.id().equals(second.id())
+              && reachable(schema, first, second.id(), new HashSet<>())
+              && result.get(first.id()).stream().anyMatch(result.get(second.id())::contains))
+            throw new BusinessException("同一路径的多个审批节点包含同一审批人，流程不允许重复审批人");
+        }
+    }
     return result;
+  }
+
+  /** 互斥分支可由同一人员负责，只有实际可能串行经过的节点才触发重复人员限制。 */
+  private boolean reachable(Spec spec, Node node, String target, Set<String> visited) {
+    if (!visited.add(node.id()) || "END".equals(node.type())) return false;
+    List<String> exits = new ArrayList<>();
+    exits.add(node.next());
+    node.conditions().forEach(condition -> exits.add(condition.next()));
+    return exits.stream()
+        .anyMatch(id -> target.equals(id) || reachable(spec, spec.node(id), target, visited));
   }
 
   /** 申请入口只返回已发布版本的表单，避免使用未发布的设计草稿作为提交契约。 */
