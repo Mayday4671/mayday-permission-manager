@@ -2,6 +2,7 @@ import { useState } from "react";
 import { App, Button, Descriptions, Form, Input, Space } from "antd";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormModal } from "../components/FormModal";
+import { FormDrawer } from "../components/FormDrawer";
 import { QueryState, RefreshButton } from "../components/shared";
 import { api, jsonBody } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -237,11 +238,10 @@ function SiteAppearanceSettings({ data }: { data: SiteSettings }) {
           <AppearancePreview appearance={saved} portal />
         </div>
       </section>
-      <FormModal
+      <FormDrawer
         title="配置前台主题"
         open={open}
         form={form}
-        width={1040}
         onCancel={() => setOpen(false)}
         onSubmit={async (values) => {
           await api("/system/site-config", {
@@ -260,8 +260,8 @@ function SiteAppearanceSettings({ data }: { data: SiteSettings }) {
           void client.invalidateQueries({ queryKey: ["entries", "settings"] });
         }}
       >
-        <ThemeFormContent portal />
-      </FormModal>
+        <ThemeFormContent portal drawer />
+      </FormDrawer>
     </>
   );
 }

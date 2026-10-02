@@ -620,6 +620,92 @@
 .theme-scope .chart-legend i {
   background: var(--app-chart-1);
 }
+/* 主题抽屉单列显示设置，前台预览放入独立页签，避免设置与示例叠加成默认长滚动。 */
+.theme-settings-drawer .ant-drawer-header,
+.theme-settings-drawer .ant-drawer-body {
+  padding: 20px;
+}
+.theme-settings-drawer .ant-drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px;
+}
+.form-drawer-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.theme-drawer-editor {
+  grid-template-columns: minmax(0, 1fr);
+}
+.theme-drawer-editor .ant-tabs-content-holder {
+  min-height: 0;
+}
+.theme-drawer-editor .ant-tabs-nav {
+  margin-bottom: 20px;
+}
+.theme-drawer-editor .appearance-preview {
+  margin-top: 0;
+}
+/* 抽屉示例减少装饰间距与图表高度，保持控件尺寸，普通笔记本上无需默认滚动。 */
+.theme-drawer-editor .appearance-preview-head {
+  padding: 8px 10px;
+}
+.theme-drawer-editor .appearance-preview-body {
+  padding: 10px;
+}
+.theme-drawer-editor .appearance-preview-nav {
+  margin-bottom: 10px;
+  padding: 4px;
+}
+.theme-drawer-editor .appearance-preview-nav > span {
+  padding: 4px 8px;
+}
+.theme-drawer-editor .appearance-preview-content {
+  padding: 10px;
+}
+.theme-drawer-editor .appearance-preview-content h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.theme-drawer-editor .appearance-preview-actions {
+  margin-block: 8px;
+}
+.theme-drawer-editor .appearance-preview-chart {
+  margin-top: 10px;
+  padding: 8px;
+}
+.theme-drawer-editor .appearance-preview-chart svg {
+  height: 60px;
+}
+/* 矮窗口优先压缩留白，控件与底部操作仍保持可用；更小高度允许内容自然滚动。 */
+@media (max-height: 760px) {
+  .theme-settings-drawer .ant-drawer-header,
+  .theme-settings-drawer .ant-drawer-body {
+    padding: 16px;
+  }
+  .theme-settings-drawer .ant-drawer-footer {
+    padding: 10px 16px;
+  }
+  .theme-settings-drawer .appearance-description {
+    margin-bottom: 12px;
+  }
+  .theme-drawer-editor .ant-tabs-nav {
+    margin-bottom: 12px;
+  }
+  .theme-settings-drawer .theme-actions {
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+  .theme-drawer-editor .appearance-preview-body,
+  .theme-drawer-editor .appearance-preview-content {
+    padding: 8px;
+  }
+  .theme-drawer-editor .appearance-preview-chart svg {
+    height: 44px;
+  }
+}
 @media (max-width: 760px) {
   .appearance-editor {
     grid-template-columns: minmax(0, 1fr);
@@ -636,6 +722,19 @@
   }
   .theme-options[aria-label="主题预设"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .theme-settings-drawer .ant-drawer-header,
+  .theme-settings-drawer .ant-drawer-body {
+    padding: 16px;
+  }
+  .theme-settings-drawer .theme-actions {
+    gap: 8px;
+  }
+  .theme-settings-drawer .theme-actions .ant-btn {
+    padding-inline: 10px;
+  }
+  .theme-drawer-editor .theme-thumbnail {
+    height: 48px;
   }
 }
 /* 紧凑算法调整 Ant 控件；这里同步调整原生页面区域的间距，表格自己的密度工具仍可继续使用。 */

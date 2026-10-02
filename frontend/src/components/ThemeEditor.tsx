@@ -20,7 +20,7 @@ import {
   Tooltip,
 } from "antd";
 import { Check, Copy, Download, Palette, RotateCcw } from "lucide-react";
-import { FormModal } from "./FormModal";
+import { FormDrawer } from "./FormDrawer";
 import { ThemeScope } from "../lib/theme";
 import { useAdminAppearance } from "../lib/appearance-context";
 import {
@@ -163,10 +163,12 @@ export function AppearanceControls({
   value = ADMIN_APPEARANCE,
   onChange,
   portal = false,
+  previewPanel,
 }: {
   value?: Appearance;
   onChange?: (value: Appearance) => void;
   portal?: boolean;
+  previewPanel?: ReactNode;
 }) {
   const fieldId = useId();
   const change = (patch: Partial<Appearance>) =>
@@ -416,6 +418,9 @@ export function AppearanceControls({
             </div>
           ),
         },
+        ...(previewPanel
+          ? [{ key: "preview", label: "效果预览", children: previewPanel }]
+          : []),
       ]}
     />
   );
@@ -531,6 +536,7 @@ function ThemeActions({
       </Button>
       <Modal
         title="导入主题配置"
+        zIndex={1210}
         open={open}
         centered
         mask={{ closable: false }}
@@ -562,7 +568,13 @@ function ThemeActions({
   );
 }
 
-export function ThemeFormContent({ portal = false }: { portal?: boolean }) {
+export function ThemeFormContent({
+  portal = false,
+  drawer = false,
+}: {
+  portal?: boolean;
+  drawer?: boolean;
+}) {
   const form = Form.useFormInstance();
   const fallback = portal ? PORTAL_APPEARANCE : ADMIN_APPEARANCE;
   const appearance = Form.useWatch<Appearance>("appearance", form) ?? fallback;
@@ -570,14 +582,25 @@ export function ThemeFormContent({ portal = false }: { portal?: boolean }) {
     <>
       <p className="appearance-description">
         {portal
-          ? "在右侧预览前台效果，保存后统一应用到网站。"
+          ? "预览前台效果，保存后统一应用到网站。"
           : "调整即时预览，保存后保留；取消恢复原主题。"}
       </p>
-      <div className="appearance-editor">
+      <div
+        className={`appearance-editor ${drawer ? "theme-drawer-editor" : ""}`}
+      >
         <Form.Item name="appearance" noStyle>
-          <AppearanceControls portal={portal} />
+          <AppearanceControls
+            portal={portal}
+            previewPanel={
+              drawer && portal ? (
+                <AppearancePreview appearance={appearance} portal />
+              ) : undefined
+            }
+          />
         </Form.Item>
-        <AppearancePreview appearance={appearance} portal={portal} />
+        {!drawer && (
+          <AppearancePreview appearance={appearance} portal={portal} />
+        )}
       </div>
       <ThemeActions
         value={appearance}
@@ -616,11 +639,10 @@ export function AdminThemeButton() {
           }}
         />
       </Tooltip>
-      <FormModal
+      <FormDrawer
         title="后台主题"
         open={open}
         form={form}
-        width={1040}
         confirmDiscard={false}
         onCancel={close}
         onSubmit={async (values) => {
@@ -633,8 +655,8 @@ export function AdminThemeButton() {
             );
         }}
       >
-        <ThemeFormContent />
-      </FormModal>
+        <ThemeFormContent drawer />
+      </FormDrawer>
     </>
   );
 }

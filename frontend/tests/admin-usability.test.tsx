@@ -78,6 +78,7 @@ const { WorkspaceProvider, useWorkspace } =
   await import("../src/lib/workspace");
 const { ResourcePage } = await import("../src/components/ResourcePage");
 const { FormModal } = await import("../src/components/FormModal");
+const { FormDrawer } = await import("../src/components/FormDrawer");
 const { AppearanceProvider } = await import("../src/lib/theme");
 const { AdminThemeButton, ThemeFormContent } =
   await import("../src/components/ThemeEditor");
@@ -292,15 +293,41 @@ after(() => {
   });
 });
 
-/** 使用真实 Provider、弹窗、控件和存储，验证整页预览与保存值的边界，而不是模拟按钮状态。 */
-function ThemeHarness({ portalEditor = false }: { portalEditor?: boolean }) {
+/** 使用真实 Provider、抽屉、控件和存储，验证预览、提交和保存值的边界。 */
+function ThemeHarness({
+  portalEditor = false,
+  onSave,
+}: {
+  portalEditor?: boolean;
+  onSave?: () => Promise<void>;
+}) {
   const [form] = Form.useForm();
+  const [open, setOpen] = useState(false);
   return (
     <AppearanceProvider>
       {portalEditor ? (
-        <Form form={form} initialValues={{ appearance: PORTAL_APPEARANCE }}>
-          <ThemeFormContent portal />
-        </Form>
+        <>
+          <Button
+            onClick={() => {
+              form.setFieldsValue({ appearance: PORTAL_APPEARANCE });
+              setOpen(true);
+            }}
+          >
+            配置前台主题
+          </Button>
+          <FormDrawer
+            title="配置前台主题"
+            open={open}
+            form={form}
+            onCancel={() => setOpen(false)}
+            onSubmit={async () => {
+              await onSave?.();
+              setOpen(false);
+            }}
+          >
+            <ThemeFormContent portal drawer />
+          </FormDrawer>
+        </>
       ) : (
         <AdminThemeButton />
       )}
@@ -323,6 +350,12 @@ test("后台主题整页即时预览，取消恢复旧值，保存及重载保�
   const view = mount(<ThemeHarness />);
   await user.click(await screen.findByRole("button", { name: "后台主题" }));
   let dialog = screen.getByRole("dialog", { name: "后台主题" });
+  assert.ok(dialog.closest(".ant-drawer-right"));
+  assert.equal(
+    within(dialog).queryByLabelText("主题效果预览"),
+    null,
+    "后台直接预览整页，不重复显示示例",
+  );
   await user.click(
     within(dialog).getByRole("button", { name: "显示模式：深色" }),
   );
@@ -381,6 +414,7 @@ test("后台主题整页即时预览，取消恢复旧值，保存及重载保�
 test("前台草稿只作用于独立预览，不改变后台主题或保存值；导入未知字段被拒绝", async () => {
   const user = userEvent.setup();
   mount(<ThemeHarness portalEditor />);
+  await user.click(await screen.findByRole("button", { name: "配置前台主题" }));
   await user.click(
     await screen.findByRole("button", { name: "主题预设：暖橙" }),
   );
@@ -389,6 +423,7 @@ test("前台草稿只作用于独立预览，不改变后台主题或保存值�
     ADMIN_APPEARANCE.primaryColor,
   );
   assert.equal(localStorage.getItem("mayday.admin.appearance.v1"), null);
+  await user.click(screen.getByRole("tab", { name: "效果预览" }));
   const preview = screen
     .getByLabelText("主题效果预览")
     .closest(".theme-scope")!;
@@ -442,6 +477,68 @@ test("前台草稿只作用于独立预览，不改变后台主题或保存值�
       PORTAL_APPEARANCE.primaryColor,
     ),
   );
+});
+
+test("前台主题抽屉关闭保护、失败保留草稿和保存期间的关闭锁定", async () => {
+  const user = userEvent.setup();
+  let attempts = 0;
+  let complete: (() => void) | undefined;
+  mount(
+    <ThemeHarness
+      portalEditor
+      onSave={async () => {
+        attempts++;
+        if (attempts === 1) throw new Error("主题保存失败测试");
+        await new Promise<void>((resolve) => {
+          complete = resolve;
+        });
+      }}
+    />,
+  );
+  await user.click(await screen.findByRole("button", { name: "配置前台主题" }));
+  const drawer = screen.getByRole("dialog", { name: "配置前台主题" });
+  await user.click(
+    within(drawer).getByRole("button", { name: "主题预设：暖橙" }),
+  );
+  await user.click(within(drawer).getByRole("button", { name: "取 消" }));
+  const warning = await screen.findByRole("dialog", {
+    name: "放弃未保存的修改？",
+  });
+  await user.click(within(warning).getByRole("button", { name: "继续编辑" }));
+  assert.equal(
+    within(drawer)
+      .getByRole("button", { name: "主题预设：暖橙" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  await user.click(within(drawer).getByRole("button", { name: "保 存" }));
+  assert.ok(await screen.findByText("主题保存失败测试"));
+  assert.equal(attempts, 1);
+  assert.equal(
+    within(drawer)
+      .getByRole("button", { name: "主题预设：暖橙" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  await user.click(within(drawer).getByRole("button", { name: "保 存" }));
+  await waitFor(() => assert.ok(complete));
+  assert.ok(
+    within(drawer)
+      .getByRole("button", { name: "主题预设：暖橙" })
+      .matches(":disabled"),
+  );
+  assert.equal(
+    (within(drawer).getByRole("button", { name: "取 消" }) as HTMLButtonElement)
+      .disabled,
+    true,
+  );
+  await user.click(within(drawer).getByRole("button", { name: "取 消" }));
+  assert.ok(screen.getByRole("dialog", { name: "配置前台主题" }) === drawer);
+  await act(async () => complete!());
+  await waitFor(() =>
+    assert.ok(screen.queryByRole("dialog", { name: "配置前台主题" }) === null),
+  );
+  assert.equal(attempts, 2);
 });
 
 test("清空搜索输入后立即清除已提交条件，不必再次查询", async () => {
