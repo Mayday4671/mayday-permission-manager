@@ -15,6 +15,8 @@ import {
   ADMIN_APPEARANCE,
   PORTAL_APPEARANCE,
   normalizeAppearance,
+  chartColors,
+  themeBackground,
   type Appearance,
 } from "./theme-model";
 
@@ -68,6 +70,10 @@ export function ThemeScope({
       token: {
         colorPrimary: appearance.primaryColor,
         colorInfo: appearance.primaryColor,
+        colorSuccess: appearance.successColor,
+        colorWarning: appearance.warningColor,
+        colorError: appearance.errorColor,
+        colorBgLayout: themeBackground(appearance, dark),
         borderRadius: appearance.borderRadius,
         fontSize: portal ? 14 : 13,
         controlHeight: portal ? 42 : 34,
@@ -75,7 +81,6 @@ export function ThemeScope({
         ...(dark
           ? {}
           : {
-              colorBgLayout: portal ? "#f4f6f8" : "#f4f5f7",
               colorText: "#303642",
               colorTextSecondary: "#646b78",
             }),
@@ -104,6 +109,7 @@ export function ThemeScope({
       <ThemeVariables
         dark={dark}
         compact={appearance.compact}
+        appearance={appearance}
         documentScope={documentScope}
       >
         {children}
@@ -116,11 +122,13 @@ export function ThemeScope({
 function ThemeVariables({
   dark,
   compact,
+  appearance,
   documentScope,
   children,
 }: {
   dark: boolean;
   compact: boolean;
+  appearance: Appearance;
   documentScope: boolean;
   children: ReactNode;
 }) {
@@ -162,8 +170,44 @@ function ThemeVariables({
       "--app-radius": `${token.borderRadius}px`,
       "--app-shadow": token.boxShadowSecondary,
       "--app-on-primary": "#fff",
+      "--app-nav-bg":
+        appearance.menuStyle === "dark"
+          ? "#172333"
+          : appearance.menuStyle === "tinted"
+            ? `color-mix(in srgb, ${token.colorPrimary} 6%, ${token.colorBgContainer})`
+            : token.colorBgContainer,
+      "--app-nav-text":
+        appearance.menuStyle === "dark" ? "#f1f5f9" : token.colorText,
+      "--app-nav-muted":
+        appearance.menuStyle === "dark" ? "#b8c5d6" : token.colorTextSecondary,
+      "--app-nav-hover":
+        appearance.menuStyle === "dark" ? "#263a50" : token.colorPrimaryBgHover,
+      "--app-nav-active":
+        appearance.menuStyle === "dark" ? "#ffffff" : token.colorPrimaryText,
+      "--app-nav-active-bg":
+        appearance.menuStyle === "dark"
+          ? "#2c435c"
+          : appearance.menuStyle === "tinted"
+            ? token.colorPrimaryBgHover
+            : token.colorPrimaryBg,
+      "--app-nav-border":
+        appearance.menuStyle === "dark"
+          ? "#314254"
+          : token.colorBorderSecondary,
+      "--app-panel-border":
+        appearance.surfaceStyle === "border"
+          ? token.colorBorderSecondary
+          : "transparent",
+      "--app-panel-shadow":
+        appearance.surfaceStyle === "shadow" ? token.boxShadowTertiary : "none",
+      ...Object.fromEntries(
+        chartColors(appearance).map((color, index) => [
+          `--app-chart-${index + 1}`,
+          color,
+        ]),
+      ),
     }),
-    [token, dark],
+    [token, dark, appearance],
   );
   useLayoutEffect(() => {
     if (!documentScope) return;
@@ -191,6 +235,9 @@ function ThemeVariables({
       className="theme-scope"
       data-theme={dark ? "dark" : "light"}
       data-density={compact ? "compact" : "default"}
+      data-surface={appearance.surfaceStyle}
+      data-content-width={appearance.contentWidth}
+      data-menu-style={appearance.menuStyle}
       style={
         {
           ...variables,
@@ -213,6 +260,9 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     pathname.startsWith("/categories/");
   const site = useSite(portal);
   const [appearance, setAppearance] = useState(readPreference);
+  const [previewAppearance, setPreviewAppearance] = useState<Appearance | null>(
+    null,
+  );
   useEffect(() => {
     const sync = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY || event.key === null)
@@ -224,6 +274,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const save = (value: Appearance) => {
     const validated = normalizeAppearance(value, ADMIN_APPEARANCE);
     setAppearance(validated);
+    setPreviewAppearance(null);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(validated));
       return true;
@@ -233,9 +284,11 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   };
   const current = portal
     ? normalizeAppearance(site.data?.theme, PORTAL_APPEARANCE)
-    : appearance;
+    : (previewAppearance ?? appearance);
   return (
-    <AppearanceContext.Provider value={{ appearance, save }}>
+    <AppearanceContext.Provider
+      value={{ appearance, save, preview: setPreviewAppearance }}
+    >
       <ThemeScope appearance={current} portal={portal} documentScope>
         <App>{children}</App>
       </ThemeScope>

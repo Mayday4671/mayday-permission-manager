@@ -59,7 +59,12 @@ Content-Type: application/json
   "name": "内容作者",
   "description": "撰写自己的草稿",
   "enabled": true,
-  "permissions": ["dashboard:view", "notices:view", "notices:create", "notices:update"],
+  "permissions": [
+    "dashboard:view",
+    "notices:view",
+    "notices:create",
+    "notices:update"
+  ],
   "dataScopes": { "users": "SELF", "notices": "SELF" }
 }
 ```
@@ -90,7 +95,7 @@ Content-Type: application/json
 - 字典项：`/system/dictionaries/{id}/items`（GET/POST），`/system/dictionaries/{id}/items/{itemId}`（PUT/DELETE）。值在同一类型内唯一。
 - `/system/options/{kind}` 返回最小异步选择项；kind 支持 users/categories/tags/approvalcategories。
 - `/system/site-config`（GET/PUT）、`/system/site-config/refresh`（POST），保存时携带各项 version。公共配置与内部参数分开。
-- 前台主题使用 `site.theme` 参数，value 是仅含 `mode/primaryColor/borderRadius/compact` 的 JSON 字符串；单独提交该键的 value/version。`GET /public/site` 返回解析后的 theme 对象，保存需要 settings:update，非法值或未知字段拒绝，过期版本返回 409。
+- 前台主题使用 `site.theme` 参数，value 是白名单 JSON 字符串；单独提交该键的 value/version。`mode/primaryColor/borderRadius/compact` 必填，新增的导航、背景、容器、宽度、图表和状态色可缺省以兼容旧配置。字段枚举及默认值见 [主题配置](themes.md)。`GET /public/site` 返回完整、规范化的 theme 对象，保存需要 settings:update，非法显式值或未知字段拒绝，过期版本返回 409。
 - 部门增加 leaderId/icon，用户增加 postIds；角色自定义范围通过 scopeDepartments 传入，具体契约以 Contracts 为准。
 
 ## 通知与收件箱

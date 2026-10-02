@@ -5,6 +5,8 @@ import type { Appearance } from "./theme-model";
 export const AppearanceContext = createContext<{
   appearance: Appearance;
   save: (value: Appearance) => boolean;
+  /** 临时预览不写入存储；传入 null 恢复已保存偏好。 */
+  preview: (value: Appearance | null) => void;
 } | null>(null);
 
 export function useAdminAppearance() {

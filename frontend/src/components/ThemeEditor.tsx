@@ -1,17 +1,25 @@
-import { useId, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import {
   App,
   Button,
   ColorPicker,
   Form,
   Input,
+  Modal,
   Segmented,
   Select,
   Switch,
+  Tabs,
   Tag,
   Tooltip,
 } from "antd";
-import { Check, Monitor, Moon, Palette, Sun } from "lucide-react";
+import { Check, Copy, Download, Palette, RotateCcw } from "lucide-react";
 import { FormModal } from "./FormModal";
 import { ThemeScope } from "../lib/theme";
 import { useAdminAppearance } from "../lib/appearance-context";
@@ -19,99 +27,401 @@ import {
   ADMIN_APPEARANCE,
   PORTAL_APPEARANCE,
   THEME_COLORS,
+  THEME_PRESETS,
+  BACKGROUND_LABELS,
+  MENU_STYLE_LABELS,
+  CHART_PALETTE_LABELS,
+  chartColors,
+  importAppearance,
+  normalizeAppearance,
+  themeBackground,
   type Appearance,
 } from "../lib/theme-model";
 
-/** 共用的受控主题编辑器：个人偏好和站点配置仅保存方式不同，选项与预览保持一致。 */
-export function AppearanceControls({
-  value = ADMIN_APPEARANCE,
+interface ThemeOption<T extends string> {
+  value: T;
+  label: string;
+  preview: ReactNode;
+}
+
+/** 所有图示选项整块可点击，并暴露选中状态；键盘与鼠标共用同一更新入口。 */
+function ThemeOptions<T extends string>({
+  label,
+  value,
+  options,
   onChange,
 }: {
-  value?: Appearance;
-  onChange?: (value: Appearance) => void;
+  label: string;
+  value: T;
+  options: readonly ThemeOption<T>[];
+  onChange: (value: T) => void;
 }) {
-  const fieldId = useId();
-  const change = (patch: Partial<Appearance>) =>
-    onChange?.({ ...value, ...patch });
   return (
-    <div className="appearance-controls">
-      <div className="appearance-field">
-        <label>显示模式</label>
-        <Segmented<Appearance["mode"]>
-          block
-          aria-label="显示模式"
-          value={value.mode}
-          onChange={(mode) => change({ mode })}
-          options={[
-            { value: "light", label: "浅色", icon: <Sun size={16} /> },
-            { value: "dark", label: "深色", icon: <Moon size={16} /> },
-            { value: "system", label: "跟随系统", icon: <Monitor size={16} /> },
-          ]}
-        />
-      </div>
-      <div className="appearance-field">
-        <label>主题色</label>
-        <div className="appearance-colors" role="group" aria-label="预设主题色">
-          {THEME_COLORS.map((color) => (
-            <button
-              key={color.value}
-              type="button"
-              aria-label={color.name}
-              aria-pressed={value.primaryColor.toLowerCase() === color.value}
-              style={{ background: color.value }}
-              onClick={() => change({ primaryColor: color.value })}
-            >
-              {value.primaryColor.toLowerCase() === color.value && (
-                <Check size={17} />
-              )}
-            </button>
-          ))}
-        </div>
-        <ColorPicker
-          value={value.primaryColor}
-          disabledAlpha
-          format="hex"
-          showText
-          presets={[
-            {
-              label: "常用颜色",
-              colors: THEME_COLORS.map((color) => color.value),
-            },
-          ]}
-          onChange={(color) => change({ primaryColor: color.toHexString() })}
+    <div className="theme-options" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          type="button"
+          key={option.value}
+          aria-label={`${label}：${option.label}`}
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
         >
-          <Button className="custom-color-button" aria-label="自定义主题色">
-            <span style={{ background: value.primaryColor }} />
-            自定义颜色 <code>{value.primaryColor}</code>
-          </Button>
-        </ColorPicker>
-      </div>
-      <div className="appearance-field">
-        <label htmlFor={`${fieldId}-radius`}>圆角</label>
-        <Select
-          id={`${fieldId}-radius`}
-          aria-label="圆角"
-          value={value.borderRadius}
-          onChange={(borderRadius) => change({ borderRadius })}
-          options={[0, 4, 6, 8, 12, 16].map((size) => ({
-            value: size,
-            label: size === 0 ? "直角" : `${size} px`,
-          }))}
-        />
-      </div>
-      <div className="appearance-switch">
-        <label htmlFor={`${fieldId}-compact`}>紧凑布局</label>
-        <Switch
-          id={`${fieldId}-compact`}
-          checked={value.compact}
-          onChange={(compact) => change({ compact })}
-        />
-      </div>
+          {option.preview}
+          <span>{option.label}</span>
+          {value === option.value && (
+            <Check
+              className="theme-option-check"
+              size={14}
+              aria-hidden="true"
+            />
+          )}
+        </button>
+      ))}
     </div>
   );
 }
 
-/** 预览使用独立 ConfigProvider，尚未保存的前台主题不会污染后台表单、弹窗或公开网站。 */
+/** 缩略图由本地 HTML/CSS 组成，无外部图片依赖，也不会改变全局主题。 */
+function ThemeThumbnail({
+  appearance,
+  mode = "light",
+  portal = false,
+}: {
+  appearance: Appearance;
+  mode?: Appearance["mode"];
+  portal?: boolean;
+}) {
+  const dark = mode === "dark";
+  return (
+    <span
+      aria-hidden="true"
+      className={`theme-thumbnail ${portal ? "is-portal" : ""} ${mode === "system" ? "is-system" : ""}`}
+      style={
+        {
+          "--thumb-primary": appearance.primaryColor,
+          "--thumb-layout": themeBackground(appearance, dark),
+          "--thumb-surface": dark ? "#252525" : "#fff",
+          "--thumb-nav":
+            appearance.menuStyle === "dark"
+              ? "#172333"
+              : appearance.menuStyle === "tinted"
+                ? `color-mix(in srgb, ${appearance.primaryColor} 15%, ${dark ? "#252525" : "#fff"})`
+                : dark
+                  ? "#252525"
+                  : "#fff",
+        } as CSSProperties
+      }
+    >
+      <i className="thumb-navigation">
+        <b />
+        <b />
+        <b />
+      </i>
+      <i className="thumb-topbar" />
+      <i className="thumb-content">
+        <b />
+        <b />
+        <b />
+        <em />
+      </i>
+    </span>
+  );
+}
+
+function ThemeColorField({
+  label,
+  value,
+  onChange,
+  showLabel = true,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  showLabel?: boolean;
+}) {
+  return (
+    <div className="appearance-field">
+      {showLabel && <label>{label}</label>}
+      <ColorPicker
+        value={value}
+        disabledAlpha
+        format="hex"
+        onChange={(color) => onChange(color.toHexString())}
+      >
+        <Button className="custom-color-button" aria-label={`自定义${label}`}>
+          <span style={{ background: value }} />
+          {label}
+          <code>{value}</code>
+        </Button>
+      </ColorPicker>
+    </div>
+  );
+}
+
+/** 前后台共用的受控主题编辑器。配置只描述外观，保持现有单侧菜单、页签和业务权限。 */
+export function AppearanceControls({
+  value = ADMIN_APPEARANCE,
+  onChange,
+  portal = false,
+}: {
+  value?: Appearance;
+  onChange?: (value: Appearance) => void;
+  portal?: boolean;
+}) {
+  const fieldId = useId();
+  const change = (patch: Partial<Appearance>) =>
+    onChange?.({ ...value, ...patch });
+  const selectedPreset =
+    THEME_PRESETS.find((preset) =>
+      Object.entries(preset).every(
+        ([key, item]) =>
+          key === "name" || value[key as keyof Appearance] === item,
+      ),
+    )?.name ?? "";
+  return (
+    <Tabs
+      className="theme-editor-tabs"
+      items={[
+        {
+          key: "style",
+          label: "主题风格",
+          children: (
+            <div className="appearance-controls">
+              <div className="appearance-field">
+                <label>显示模式</label>
+                <ThemeOptions
+                  label="显示模式"
+                  value={value.mode}
+                  onChange={(mode) => change({ mode })}
+                  options={(
+                    [
+                      ["light", "浅色"],
+                      ["dark", "深色"],
+                      ["system", "跟随系统"],
+                    ] as const
+                  ).map(([mode, label]) => ({
+                    value: mode,
+                    label,
+                    preview: (
+                      <ThemeThumbnail
+                        appearance={value}
+                        mode={mode}
+                        portal={portal}
+                      />
+                    ),
+                  }))}
+                />
+              </div>
+              <div className="appearance-field">
+                <label>主题预设</label>
+                <ThemeOptions
+                  label="主题预设"
+                  value={selectedPreset}
+                  options={THEME_PRESETS.map((preset) => ({
+                    value: preset.name,
+                    label: preset.name,
+                    preview: (
+                      <ThemeThumbnail
+                        appearance={{ ...value, ...preset }}
+                        portal={portal}
+                      />
+                    ),
+                  }))}
+                  onChange={(name) => {
+                    const preset = THEME_PRESETS.find(
+                      (item) => item.name === name,
+                    );
+                    if (preset) {
+                      const { name: _name, ...patch } = preset;
+                      change(patch);
+                    }
+                  }}
+                />
+              </div>
+              <div className="appearance-field">
+                <label>主题色</label>
+                <div
+                  className="appearance-colors"
+                  role="group"
+                  aria-label="预设主题色"
+                >
+                  {THEME_COLORS.map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      aria-label={color.name}
+                      aria-pressed={
+                        value.primaryColor.toLowerCase() === color.value
+                      }
+                      style={{ background: color.value }}
+                      onClick={() => change({ primaryColor: color.value })}
+                    >
+                      {value.primaryColor.toLowerCase() === color.value && (
+                        <Check size={17} />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <ThemeColorField
+                  label="主题色"
+                  showLabel={false}
+                  value={value.primaryColor}
+                  onChange={(primaryColor) => change({ primaryColor })}
+                />
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "layout",
+          label: "布局外观",
+          children: (
+            <div className="appearance-controls">
+              <div className="appearance-field">
+                <label>{portal ? "导航风格" : "菜单风格"}</label>
+                <ThemeOptions
+                  label={portal ? "导航风格" : "菜单风格"}
+                  value={value.menuStyle}
+                  onChange={(menuStyle) => change({ menuStyle })}
+                  options={(
+                    Object.keys(MENU_STYLE_LABELS) as Appearance["menuStyle"][]
+                  ).map((menuStyle) => ({
+                    value: menuStyle,
+                    label: MENU_STYLE_LABELS[menuStyle],
+                    preview: (
+                      <ThemeThumbnail
+                        appearance={{ ...value, menuStyle }}
+                        portal={portal}
+                      />
+                    ),
+                  }))}
+                />
+              </div>
+              <div className="theme-field-pair">
+                <div className="appearance-field">
+                  <label>页面背景</label>
+                  <Select
+                    aria-label="页面背景"
+                    value={value.background}
+                    onChange={(background) => change({ background })}
+                    options={Object.entries(BACKGROUND_LABELS).map(
+                      ([value, label]) => ({ value, label }),
+                    )}
+                  />
+                </div>
+                <div className="appearance-field">
+                  <label htmlFor={`${fieldId}-radius`}>圆角</label>
+                  <Select
+                    id={`${fieldId}-radius`}
+                    aria-label="圆角"
+                    value={value.borderRadius}
+                    onChange={(borderRadius) => change({ borderRadius })}
+                    options={[0, 4, 6, 8, 12, 16].map((size) => ({
+                      value: size,
+                      label: size === 0 ? "直角" : `${size} px`,
+                    }))}
+                  />
+                </div>
+              </div>
+              <div className="appearance-field">
+                <label>容器样式</label>
+                <Segmented
+                  aria-label="容器样式"
+                  block
+                  value={value.surfaceStyle}
+                  options={[
+                    { value: "border", label: "边框" },
+                    { value: "shadow", label: "阴影" },
+                  ]}
+                  onChange={(surfaceStyle) =>
+                    change({
+                      surfaceStyle: surfaceStyle as Appearance["surfaceStyle"],
+                    })
+                  }
+                />
+              </div>
+              <div className="appearance-field">
+                <label>内容宽度</label>
+                <Segmented
+                  aria-label="内容宽度"
+                  block
+                  value={value.contentWidth}
+                  options={[
+                    { value: "full", label: "铺满" },
+                    { value: "boxed", label: "居中（1600 px）" },
+                  ]}
+                  onChange={(contentWidth) =>
+                    change({
+                      contentWidth: contentWidth as Appearance["contentWidth"],
+                    })
+                  }
+                />
+              </div>
+              <div className="appearance-switch">
+                <label htmlFor={`${fieldId}-compact`}>紧凑布局</label>
+                <Switch
+                  id={`${fieldId}-compact`}
+                  checked={value.compact}
+                  onChange={(compact) => change({ compact })}
+                />
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "colors",
+          label: "图表与状态",
+          children: (
+            <div className="appearance-controls">
+              <div className="appearance-field">
+                <label>图表色板</label>
+                <ThemeOptions
+                  label="图表色板"
+                  value={value.chartPalette}
+                  onChange={(chartPalette) => change({ chartPalette })}
+                  options={(
+                    Object.keys(
+                      CHART_PALETTE_LABELS,
+                    ) as Appearance["chartPalette"][]
+                  ).map((chartPalette) => ({
+                    value: chartPalette,
+                    label: CHART_PALETTE_LABELS[chartPalette],
+                    preview: (
+                      <span className="palette-swatch" aria-hidden="true">
+                        {chartColors({ ...value, chartPalette }).map(
+                          (color, index) => (
+                            <i key={index} style={{ background: color }} />
+                          ),
+                        )}
+                      </span>
+                    ),
+                  }))}
+                />
+              </div>
+              <ThemeColorField
+                label="成功色"
+                value={value.successColor}
+                onChange={(successColor) => change({ successColor })}
+              />
+              <ThemeColorField
+                label="警告色"
+                value={value.warningColor}
+                onChange={(warningColor) => change({ warningColor })}
+              />
+              <ThemeColorField
+                label="错误色"
+                value={value.errorColor}
+                onChange={(errorColor) => change({ errorColor })}
+              />
+            </div>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
+/** 独立范围预览：前台草稿不会污染后台控件，也不会在保存前写入公共站点。 */
 export function AppearancePreview({
   appearance,
   portal = false,
@@ -127,20 +437,18 @@ export function AppearancePreview({
       >
         <div className="appearance-preview-head">
           <b>{portal ? "客户服务中心" : "后台管理"}</b>
-          <Tag color="processing">效果预览</Tag>
+          <Tag>预览</Tag>
         </div>
         <div className="appearance-preview-body">
           <div className="appearance-preview-nav">
-            <span className="selected">
-              {portal ? "资讯与帮助" : "用户管理"}
-            </span>
-            <span>{portal ? "使用指南" : "角色权限"}</span>
+            <span className="selected">{portal ? "使用指南" : "用户管理"}</span>
+            <span>{portal ? "公告" : "角色权限"}</span>
           </div>
           <div className="appearance-preview-content">
-            <h3>{portal ? "服务公告" : "成员列表"}</h3>
+            <h3>{portal ? "最新内容" : "成员列表"}</h3>
             <div className="appearance-preview-actions">
               <Input placeholder="输入关键词" aria-label="预览搜索框" />
-              <Button type="primary">搜索</Button>
+              <Button type="primary">查询</Button>
             </div>
             <div className="appearance-preview-row">
               <span>{portal ? "账户使用指南" : "示例成员"}</span>
@@ -148,12 +456,109 @@ export function AppearancePreview({
             </div>
             <div className="appearance-preview-row">
               <span>{portal ? "近期产品更新" : "示例角色"}</span>
-              <Button type="link">查看</Button>
+              <Tag color="warning">{portal ? "更新" : "待处理"}</Tag>
             </div>
+            <div className="appearance-preview-row">
+              <span>{portal ? "服务公告" : "停用成员"}</span>
+              <Tag color="error">{portal ? "重要" : "停用"}</Tag>
+            </div>
+          </div>
+          <div className="appearance-preview-chart">
+            <svg viewBox="0 0 360 95" role="img" aria-label="图表色板预览">
+              <path
+                d="M8 74 L60 60 L115 69 L170 27 L225 41 L280 16 L350 31"
+                stroke="var(--app-chart-1)"
+              />
+              <path
+                d="M8 84 L60 72 L115 42 L170 51 L225 24 L280 45 L350 12"
+                stroke="var(--app-chart-2)"
+              />
+              <path
+                d="M8 60 L60 48 L115 58 L170 67 L225 51 L280 64 L350 52"
+                stroke="var(--app-chart-3)"
+              />
+            </svg>
+            <span>图表色板</span>
           </div>
         </div>
       </div>
     </ThemeScope>
+  );
+}
+
+/** 配置导入只接受 JSON 数据，经同一契约校验后才写入草稿；复制不会写入业务数据库。 */
+function ThemeActions({
+  value,
+  onChange,
+  fallback,
+}: {
+  value: Appearance;
+  onChange: (value: Appearance) => void;
+  fallback: Appearance;
+}) {
+  const { message } = App.useApp();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  return (
+    <div className="theme-actions">
+      <Button
+        icon={<Copy size={15} />}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(JSON.stringify(value, null, 2));
+            message.success("主题配置已复制");
+          } catch {
+            message.error("浏览器未允许复制，请检查剪贴板权限");
+          }
+        }}
+      >
+        复制配置
+      </Button>
+      <Button
+        icon={<Download size={15} />}
+        onClick={() => {
+          setText("");
+          setOpen(true);
+        }}
+      >
+        导入配置
+      </Button>
+      <Button
+        icon={<RotateCcw size={15} />}
+        onClick={() => onChange({ ...fallback })}
+      >
+        恢复默认
+      </Button>
+      <Modal
+        title="导入主题配置"
+        open={open}
+        centered
+        mask={{ closable: false }}
+        okText="导入"
+        cancelText="取消"
+        onCancel={() => setOpen(false)}
+        onOk={() => {
+          try {
+            onChange(importAppearance(text, fallback));
+            setOpen(false);
+            message.success("主题配置已导入，请保存以保留");
+          } catch (error) {
+            message.error(
+              error instanceof Error ? error.message : "主题配置无效",
+            );
+          }
+        }}
+      >
+        <Input.TextArea
+          aria-label="主题 JSON 配置"
+          placeholder="粘贴复制的主题 JSON 配置"
+          rows={10}
+          maxLength={2000}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+        />
+      </Modal>
+    </div>
   );
 }
 
@@ -165,31 +570,39 @@ export function ThemeFormContent({ portal = false }: { portal?: boolean }) {
     <>
       <p className="appearance-description">
         {portal
-          ? "保存后统一应用到前台首页与文章页。"
-          : "保存到当前浏览器，刷新后保留。"}
+          ? "在右侧预览前台效果，保存后统一应用到网站。"
+          : "调整即时预览，保存后保留；取消恢复原主题。"}
       </p>
       <div className="appearance-editor">
         <Form.Item name="appearance" noStyle>
-          <AppearanceControls />
+          <AppearanceControls portal={portal} />
         </Form.Item>
         <AppearancePreview appearance={appearance} portal={portal} />
       </div>
-      <Button
-        className="appearance-reset"
-        onClick={() => form.setFieldValue("appearance", { ...fallback })}
-      >
-        恢复默认值
-      </Button>
+      <ThemeActions
+        value={appearance}
+        fallback={fallback}
+        onChange={(value) => form.setFieldValue("appearance", value)}
+      />
     </>
   );
 }
 
-/** 后台始终通过弹窗配置主题，遵循现有操作习惯；取消不保存，保存失败明确告知持久化状态。 */
+/** 后台整页预览仅保留在内存；取消、关闭或卸载均恢复保存值，保存异常明确提示。 */
 export function AdminThemeButton() {
-  const { appearance, save } = useAdminAppearance();
+  const { appearance, save, preview } = useAdminAppearance();
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm<{ appearance: Appearance }>();
+  const draft = Form.useWatch<Appearance>("appearance", form);
+  useEffect(() => {
+    if (open && draft) preview(normalizeAppearance(draft, ADMIN_APPEARANCE));
+  }, [open, draft, preview]);
+  useEffect(() => () => preview(null), [preview]);
+  const close = () => {
+    preview(null);
+    setOpen(false);
+  };
   return (
     <>
       <Tooltip title="后台主题">
@@ -207,8 +620,9 @@ export function AdminThemeButton() {
         title="后台主题"
         open={open}
         form={form}
-        width={860}
-        onCancel={() => setOpen(false)}
+        width={1040}
+        confirmDiscard={false}
+        onCancel={close}
         onSubmit={async (values) => {
           const persisted = save(values.appearance);
           setOpen(false);

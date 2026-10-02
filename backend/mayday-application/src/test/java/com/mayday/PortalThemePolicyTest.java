@@ -19,6 +19,40 @@ class PortalThemePolicyTest {
     assertEquals("#aabbcc", parsed.primaryColor());
     assertTrue(parsed.compact());
     assertEquals(0, parsed.borderRadius());
+    assertEquals("light", parsed.menuStyle());
+    assertEquals("neutral", parsed.background());
+    assertEquals("full", parsed.contentWidth());
+    assertEquals("#52c41a", parsed.successColor());
+  }
+
+  @Test
+  void acceptsExtendedAppearanceAndRejectsInvalidExplicitValues() {
+    var parsed =
+        policy.parse(
+            PortalThemePolicy.DEFAULT_JSON.replace(
+                "}",
+                ",\"menuStyle\":\"dark\",\"background\":\"slate\",\"surfaceStyle\":\"shadow\",\"contentWidth\":\"boxed\",\"chartPalette\":\"soft\",\"successColor\":\"#AABBCC\",\"warningColor\":\"#123456\",\"errorColor\":\"#654321\"}"));
+    assertEquals("dark", parsed.menuStyle());
+    assertEquals("shadow", parsed.surfaceStyle());
+    assertEquals("boxed", parsed.contentWidth());
+    assertEquals("soft", parsed.chartPalette());
+    assertEquals("#aabbcc", parsed.successColor());
+    for (String invalid :
+        new String[] {
+          "\"menuStyle\":null",
+          "\"menuStyle\":\"css\"",
+          "\"background\":\"url(x)\"",
+          "\"surfaceStyle\":\"none\"",
+          "\"contentWidth\":1200",
+          "\"chartPalette\":[]",
+          "\"successColor\":\"#123\"",
+          "\"warningColor\":false",
+          "\"errorColor\":\"var(--error)\""
+        }) {
+      assertThrows(
+          BusinessException.class,
+          () -> policy.parse(PortalThemePolicy.DEFAULT_JSON.replace("}", "," + invalid + "}")));
+    }
   }
 
   @Test

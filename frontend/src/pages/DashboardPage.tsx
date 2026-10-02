@@ -163,12 +163,12 @@ export function DashboardPage() {
                         >
                           <stop
                             offset="0%"
-                            stopColor="var(--app-primary)"
+                            stopColor="var(--app-chart-1)"
                             stopOpacity={0.25}
                           />
                           <stop
                             offset="100%"
-                            stopColor="var(--app-primary)"
+                            stopColor="var(--app-chart-1)"
                             stopOpacity={0.01}
                           />
                         </linearGradient>
@@ -214,7 +214,7 @@ export function DashboardPage() {
                       <Area
                         type="monotone"
                         dataKey="count"
-                        stroke="var(--app-primary)"
+                        stroke="var(--app-chart-1)"
                         strokeWidth={2.5}
                         fill="url(#activityFill)"
                         dot={{

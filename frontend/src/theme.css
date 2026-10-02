@@ -222,18 +222,18 @@
 }
 .appearance-description {
   color: var(--app-text-secondary);
-  margin-bottom: 22px;
+  margin: 0 0 16px;
 }
 .appearance-editor {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.3fr);
+  grid-template-columns: minmax(320px, 1fr) minmax(280px, 1fr);
   gap: 28px;
   align-items: start;
 }
 .appearance-controls {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
   min-width: 0;
 }
 .appearance-field {
@@ -269,7 +269,7 @@
   place-items: center;
 }
 .appearance-colors button[aria-pressed="true"] {
-  outline: 2px solid var(--app-text-secondary);
+  outline: 2px solid var(--app-primary);
   outline-offset: 3px;
 }
 .custom-color-button {
@@ -300,7 +300,7 @@
   color: var(--app-text);
 }
 .appearance-preview-head {
-  padding: 15px;
+  padding: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -312,7 +312,7 @@
   margin: 0;
 }
 .appearance-preview-body {
-  padding: 16px;
+  padding: 12px;
 }
 .appearance-preview-nav {
   display: flex;
@@ -329,8 +329,9 @@
   background: var(--app-primary-bg);
 }
 .appearance-preview-content {
-  padding: 18px;
-  border: 1px solid var(--app-border);
+  padding: 12px;
+  border: 1px solid var(--app-panel-border);
+  box-shadow: var(--app-panel-shadow);
   border-radius: var(--app-radius);
   background: var(--app-surface);
 }
@@ -345,7 +346,7 @@
 .appearance-preview-actions {
   display: flex;
   gap: 8px;
-  margin-block: 18px;
+  margin-block: 12px;
 }
 .appearance-preview-actions .ant-input {
   min-width: 0;
@@ -355,7 +356,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 52px;
+  min-height: 40px;
   border-top: 1px solid var(--app-border);
 }
 .appearance-preview-row .ant-tag {
@@ -381,16 +382,272 @@
   border-radius: 3px;
   border: 1px solid var(--app-border);
 }
+
+/* 主题设置采用分页签，避免将全部选项堆成一个长表单。默认桌面尺寸下可完整看到保存按钮。 */
+.theme-editor-tabs {
+  min-width: 0;
+}
+.theme-editor-tabs .ant-tabs-content-holder {
+  min-height: 400px;
+}
+.theme-options[aria-label="主题预设"] {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.theme-options button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  min-width: 0;
+}
+.theme-options button:hover,
+.theme-options button[aria-pressed="true"] {
+  border-color: var(--app-primary);
+  color: var(--app-primary-text);
+  background: var(--app-primary-bg);
+}
+.theme-option-check {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+}
+.theme-thumbnail {
+  display: block;
+  position: relative;
+  height: 54px;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--thumb-primary) 12%, transparent);
+  border-radius: 3px;
+  background: var(--thumb-layout);
+}
+.theme-thumbnail i {
+  position: absolute;
+  display: block;
+}
+.thumb-navigation {
+  inset: 0 auto 0 0;
+  width: 24%;
+  background: var(--thumb-nav);
+  padding: 8px 4px;
+}
+.thumb-navigation b {
+  display: block;
+  height: 3px;
+  margin-bottom: 6px;
+  background: var(--thumb-primary);
+  opacity: 0.5;
+}
+.thumb-topbar {
+  top: 0;
+  left: 24%;
+  right: 0;
+  height: 9px;
+  background: var(--thumb-surface);
+}
+.thumb-content {
+  top: 15px;
+  left: 30%;
+  right: 6%;
+  bottom: 6px;
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+}
+.thumb-content b,
+.thumb-content em {
+  background: var(--thumb-surface);
+  border-radius: 2px;
+}
+.thumb-content em {
+  grid-column: 1 / -1;
+  border-bottom: 2px solid var(--thumb-primary);
+}
+.theme-thumbnail.is-system {
+  background: linear-gradient(90deg, #f4f5f7 50%, #141414 50%);
+}
+.theme-thumbnail.is-system .thumb-topbar {
+  background: linear-gradient(90deg, #fff 35%, #252525 35%);
+}
+.theme-thumbnail.is-portal .thumb-navigation {
+  inset: 0 0 auto;
+  width: 100%;
+  height: 10px;
+  padding: 3px 4px;
+  display: flex;
+  gap: 5px;
+}
+.theme-thumbnail.is-portal .thumb-navigation b {
+  width: 14%;
+}
+.theme-thumbnail.is-portal .thumb-topbar {
+  display: none;
+}
+.theme-thumbnail.is-portal .thumb-content {
+  left: 6%;
+}
+.theme-field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.palette-swatch {
+  display: flex;
+  width: 100%;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 3px;
+}
+.palette-swatch i {
+  flex: 1;
+}
+.theme-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--app-border);
+}
+.appearance-preview {
+  margin-top: 12px;
+}
+.appearance-preview-head,
+.appearance-preview-nav {
+  background: var(--app-nav-bg);
+  color: var(--app-nav-text);
+}
+.appearance-preview-nav {
+  padding: 6px;
+  border-radius: var(--app-radius);
+}
+.appearance-preview-nav > span {
+  color: var(--app-nav-muted);
+}
+.appearance-preview-nav .selected {
+  color: var(--app-nav-active);
+  background: var(--app-nav-active-bg);
+}
+.appearance-preview-chart {
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid var(--app-panel-border);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-panel-shadow);
+}
+.appearance-preview-chart svg {
+  width: 100%;
+  height: 80px;
+  display: block;
+}
+.appearance-preview-chart path {
+  fill: none;
+  stroke-width: 2.5;
+}
+.appearance-preview-chart > span {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+.theme-scope .panel,
+.theme-scope .site-results,
+.theme-scope .site-link-section,
+.theme-scope .site-support,
+.theme-scope .site-outline,
+.theme-scope .site-article,
+.theme-scope .site-article-row {
+  border: 1px solid var(--app-panel-border);
+  box-shadow: var(--app-panel-shadow);
+}
+
+/* 深色导航可以与浅色内容组合；仅导航内部覆盖文字变量，不影响弹窗和主内容区。 */
+.admin-layout .sidebar,
+.theme-scope .site-header {
+  --app-text: var(--app-nav-text);
+  --app-text-secondary: var(--app-nav-muted);
+  --app-text-tertiary: var(--app-nav-muted);
+  --app-primary-text: var(--app-nav-active);
+  --app-primary-bg: var(--app-nav-active-bg);
+  --app-fill: var(--app-nav-hover);
+  --purple: var(--app-nav-active);
+  --border: var(--app-nav-border);
+  background: var(--app-nav-bg);
+  border-color: var(--app-nav-border);
+}
+.site-header {
+  --site-muted: var(--app-nav-muted);
+  --site-accent: var(--app-nav-active);
+}
+.admin-layout .sidebar .ant-btn:not(.ant-btn-primary) {
+  color: var(--app-nav-text);
+}
+.site-header .site-contact-link {
+  color: var(--app-nav-text);
+  border-color: var(--app-nav-border);
+}
+.admin-layout .nav-group-trigger.is-current,
+.admin-layout .nav-item.active {
+  color: var(--app-nav-active);
+}
+.admin-layout .nav-item.active {
+  background: var(--app-nav-active-bg);
+}
+.admin-layout .nav-item:hover {
+  background: var(--app-nav-hover);
+  color: var(--app-nav-active);
+}
+
+/* 默认铺满，只有用户主动选择居中才限制宽度；小屏始终使用可用宽度。 */
+.theme-scope[data-content-width="boxed"] .admin-layout .page-content {
+  max-width: 1600px;
+  margin-inline: auto;
+}
+.theme-scope[data-content-width="boxed"] .site-container {
+  max-width: 1600px;
+}
+.theme-scope .chart-legend i {
+  background: var(--app-chart-1);
+}
+@media (max-width: 760px) {
+  .appearance-editor {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .theme-editor-tabs .ant-tabs-content-holder {
+    min-height: 0;
+  }
+  .theme-options {
+    gap: 8px;
+  }
+  .theme-options button {
+    padding: 6px;
+  }
+  .theme-options[aria-label="主题预设"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 /* 紧凑算法调整 Ant 控件；这里同步调整原生页面区域的间距，表格自己的密度工具仍可继续使用。 */
 .theme-scope[data-density="compact"]
   > .appearance-preview
   .appearance-preview-row {
-  min-height: 40px;
+  min-height: 32px;
 }
 .theme-scope[data-density="default"]
   > .appearance-preview
   .appearance-preview-row {
-  min-height: 52px;
+  min-height: 40px;
 }
 [data-density="compact"] .site-toolbar-inner {
   min-height: 84px;

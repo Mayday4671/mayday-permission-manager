@@ -1197,10 +1197,18 @@ test("真实 MySQL 权限与业务回归", async (t) => {
         "theme",
       ]);
       assert.deepEqual(Object.keys(site.theme).sort(), [
+        "background",
         "borderRadius",
+        "chartPalette",
         "compact",
+        "contentWidth",
+        "errorColor",
+        "menuStyle",
         "mode",
         "primaryColor",
+        "successColor",
+        "surfaceStyle",
+        "warningColor",
       ]);
     });
     await t.test(

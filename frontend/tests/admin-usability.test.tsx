@@ -78,6 +78,11 @@ const { WorkspaceProvider, useWorkspace } =
   await import("../src/lib/workspace");
 const { ResourcePage } = await import("../src/components/ResourcePage");
 const { FormModal } = await import("../src/components/FormModal");
+const { AppearanceProvider } = await import("../src/lib/theme");
+const { AdminThemeButton, ThemeFormContent } =
+  await import("../src/components/ThemeEditor");
+const { ADMIN_APPEARANCE, PORTAL_APPEARANCE } =
+  await import("../src/lib/theme-model");
 let activeId = 1;
 let requests = [];
 let clients = [];
@@ -285,6 +290,158 @@ after(() => {
     port1.close();
     port2.close();
   });
+});
+
+/** 使用真实 Provider、弹窗、控件和存储，验证整页预览与保存值的边界，而不是模拟按钮状态。 */
+function ThemeHarness({ portalEditor = false }: { portalEditor?: boolean }) {
+  const [form] = Form.useForm();
+  return (
+    <AppearanceProvider>
+      {portalEditor ? (
+        <Form form={form} initialValues={{ appearance: PORTAL_APPEARANCE }}>
+          <ThemeFormContent portal />
+        </Form>
+      ) : (
+        <AdminThemeButton />
+      )}
+      <div data-testid="theme-page">业务页面</div>
+    </AppearanceProvider>
+  );
+}
+
+test("后台主题整页即时预览，取消恢复旧值，保存及重载保留配置", async () => {
+  localStorage.setItem(
+    "mayday.admin.appearance.v1",
+    JSON.stringify({
+      mode: "light",
+      primaryColor: "#245da8",
+      borderRadius: 4,
+      compact: false,
+    }),
+  );
+  const user = userEvent.setup();
+  const view = mount(<ThemeHarness />);
+  await user.click(await screen.findByRole("button", { name: "后台主题" }));
+  let dialog = screen.getByRole("dialog", { name: "后台主题" });
+  await user.click(
+    within(dialog).getByRole("button", { name: "显示模式：深色" }),
+  );
+  await waitFor(() =>
+    assert.equal(document.documentElement.style.colorScheme, "dark"),
+  );
+  assert.equal(
+    JSON.parse(localStorage.getItem("mayday.admin.appearance.v1")!).mode,
+    "light",
+    "预览不写入持久化值",
+  );
+  await user.click(within(dialog).getByRole("button", { name: "取 消" }));
+  await waitFor(() =>
+    assert.equal(document.documentElement.style.colorScheme, "light"),
+  );
+  await user.click(screen.getByRole("button", { name: "后台主题" }));
+  dialog = screen.getByRole("dialog", { name: "后台主题" });
+  await user.click(
+    within(dialog).getByRole("button", { name: "主题预设：商务" }),
+  );
+  await waitFor(() =>
+    assert.equal(
+      document.documentElement.style.getPropertyValue("--app-nav-bg"),
+      "#172333",
+    ),
+  );
+  await user.click(within(dialog).getByRole("tab", { name: "图表与状态" }));
+  await user.click(
+    within(dialog).getByRole("button", { name: "图表色板：柔和" }),
+  );
+  await waitFor(() =>
+    assert.equal(
+      document.documentElement.style.getPropertyValue("--app-chart-1"),
+      "#6b8de3",
+    ),
+  );
+  await user.click(within(dialog).getByRole("button", { name: "保 存" }));
+  await waitFor(() =>
+    assert.equal(
+      JSON.parse(localStorage.getItem("mayday.admin.appearance.v1")!)
+        .chartPalette,
+      "soft",
+    ),
+  );
+  const saved = localStorage.getItem("mayday.admin.appearance.v1")!;
+  view.unmount();
+  mount(<ThemeHarness />);
+  await screen.findByRole("button", { name: "后台主题" });
+  assert.equal(
+    document.documentElement.style.getPropertyValue("--app-chart-1"),
+    "#6b8de3",
+  );
+  assert.equal(localStorage.getItem("mayday.admin.appearance.v1"), saved);
+});
+
+test("前台草稿只作用于独立预览，不改变后台主题或保存值；导入未知字段被拒绝", async () => {
+  const user = userEvent.setup();
+  mount(<ThemeHarness portalEditor />);
+  await user.click(
+    await screen.findByRole("button", { name: "主题预设：暖橙" }),
+  );
+  assert.equal(
+    document.documentElement.style.getPropertyValue("--app-primary"),
+    ADMIN_APPEARANCE.primaryColor,
+  );
+  assert.equal(localStorage.getItem("mayday.admin.appearance.v1"), null);
+  const preview = screen
+    .getByLabelText("主题效果预览")
+    .closest(".theme-scope")!;
+  assert.equal(
+    (preview as HTMLElement).style.getPropertyValue("--app-primary"),
+    "#d46b08",
+  );
+  await user.click(screen.getByRole("button", { name: "导入配置" }));
+  const dialog = screen.getByRole("dialog", { name: "导入主题配置" });
+  fireEvent.change(
+    within(dialog).getByRole("textbox", { name: "主题 JSON 配置" }),
+    {
+      target: {
+        value: JSON.stringify({ ...PORTAL_APPEARANCE, css: "body{}" }),
+      },
+    },
+  );
+  await user.click(within(dialog).getByRole("button", { name: "导 入" }));
+  assert.ok(await screen.findByText("主题配置缺少必填字段或含有不支持的字段"));
+  assert.equal(
+    (preview as HTMLElement).style.getPropertyValue("--app-primary"),
+    "#d46b08",
+  );
+  fireEvent.change(
+    within(dialog).getByRole("textbox", { name: "主题 JSON 配置" }),
+    {
+      target: {
+        value: JSON.stringify({
+          ...PORTAL_APPEARANCE,
+          menuStyle: "dark",
+          chartPalette: "vivid",
+        }),
+      },
+    },
+  );
+  await user.click(within(dialog).getByRole("button", { name: "导 入" }));
+  await waitFor(() =>
+    assert.equal(
+      (preview as HTMLElement).style.getPropertyValue("--app-nav-bg"),
+      "#172333",
+    ),
+  );
+  assert.equal(
+    document.documentElement.style.getPropertyValue("--app-nav-bg"),
+    "#ffffff",
+  );
+  await user.click(screen.getByRole("button", { name: "恢复默认" }));
+  await waitFor(() =>
+    assert.equal(
+      (preview as HTMLElement).style.getPropertyValue("--app-primary"),
+      PORTAL_APPEARANCE.primaryColor,
+    ),
+  );
 });
 
 test("清空搜索输入后立即清除已提交条件，不必再次查询", async () => {

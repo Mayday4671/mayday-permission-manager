@@ -93,6 +93,14 @@ test("前台主题权限、校验与一致性", { skip: !isolated }, async (t) =
     primaryColor: "#08979c",
     borderRadius: 8,
     compact: true,
+    menuStyle: "dark",
+    background: "slate",
+    surfaceStyle: "shadow",
+    contentWidth: "full",
+    chartPalette: "soft",
+    successColor: "#52c41a",
+    warningColor: "#faad14",
+    errorColor: "#ff4d4f",
   };
   const draft = async (value) => {
     const current = await api("/system/site-config", token);
@@ -108,10 +116,18 @@ test("前台主题权限、校验与一致性", { skip: !isolated }, async (t) =
     await t.test("匿名只读取公开主题，不能修改配置", async () => {
       const site = await api("/public/site");
       assert.deepEqual(Object.keys(site.theme).sort(), [
+        "background",
         "borderRadius",
+        "chartPalette",
         "compact",
+        "contentWidth",
+        "errorColor",
+        "menuStyle",
         "mode",
         "primaryColor",
+        "successColor",
+        "surfaceStyle",
+        "warningColor",
       ]);
       await api("/system/site-config", null, "GET", undefined, 401);
       await api("/system/site-config", null, "PUT", await draft(theme), 401);
@@ -137,6 +153,14 @@ test("前台主题权限、校验与一致性", { skip: !isolated }, async (t) =
         { ...theme, borderRadius: 1.5 },
         { ...theme, compact: "true" },
         { ...theme, css: "body{}" },
+        { ...theme, menuStyle: "url(https://example.test)" },
+        { ...theme, background: "red" },
+        { ...theme, surfaceStyle: "none" },
+        { ...theme, contentWidth: "9999px" },
+        { ...theme, chartPalette: ["#123456"] },
+        { ...theme, successColor: "#123" },
+        { ...theme, warningColor: null },
+        { ...theme, errorColor: "var(--error)" },
         {},
       ]) {
         await api("/system/site-config", token, "PUT", await draft(value), 400);

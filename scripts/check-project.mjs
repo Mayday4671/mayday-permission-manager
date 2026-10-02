@@ -42,6 +42,7 @@ run(process.execPath, [
   "tests/usability-model.test.mjs",
   "tests/portal-routing.test.mjs",
   "tests/module-model.test.mjs",
+  "tests/theme-model.test.mjs",
   "tests/generator.test.mjs",
 ]);
 run(

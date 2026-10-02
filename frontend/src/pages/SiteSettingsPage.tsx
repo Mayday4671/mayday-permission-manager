@@ -10,6 +10,9 @@ import { AppearancePreview, ThemeFormContent } from "../components/ThemeEditor";
 import {
   PORTAL_APPEARANCE,
   normalizeAppearance,
+  MENU_STYLE_LABELS,
+  BACKGROUND_LABELS,
+  CHART_PALETTE_LABELS,
   type Appearance,
 } from "../lib/theme-model";
 
@@ -204,6 +207,31 @@ function SiteAppearanceSettings({ data }: { data: SiteSettings }) {
                 label: "布局",
                 children: saved.compact ? "紧凑" : "标准",
               },
+              {
+                key: "menu",
+                label: "导航风格",
+                children: MENU_STYLE_LABELS[saved.menuStyle],
+              },
+              {
+                key: "background",
+                label: "页面背景",
+                children: BACKGROUND_LABELS[saved.background],
+              },
+              {
+                key: "surface",
+                label: "容器样式",
+                children: saved.surfaceStyle === "border" ? "边框" : "阴影",
+              },
+              {
+                key: "width",
+                label: "内容宽度",
+                children: saved.contentWidth === "full" ? "铺满" : "居中",
+              },
+              {
+                key: "palette",
+                label: "图表色板",
+                children: CHART_PALETTE_LABELS[saved.chartPalette],
+              },
             ]}
           />
           <AppearancePreview appearance={saved} portal />
@@ -213,7 +241,7 @@ function SiteAppearanceSettings({ data }: { data: SiteSettings }) {
         title="配置前台主题"
         open={open}
         form={form}
-        width={860}
+        width={1040}
         onCancel={() => setOpen(false)}
         onSubmit={async (values) => {
           await api("/system/site-config", {
