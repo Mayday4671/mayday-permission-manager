@@ -73,6 +73,7 @@ const { createMemoryRouter, RouterProvider, Routes, Route, Link } =
 const { QueryClient, QueryClientProvider } =
   await import("@tanstack/react-query");
 const { AuthProvider, useAuth } = await import("../src/lib/auth");
+const { ModulesProvider } = await import("../src/lib/modules");
 const { WorkspaceProvider, useWorkspace } =
   await import("../src/lib/workspace");
 const { ResourcePage } = await import("../src/components/ResourcePage");
@@ -87,7 +88,26 @@ let serverRows = [
   { id: 2, name: "Beta", enabled: false, version: 1 },
 ];
 globalThis.fetch = async (path, options) => {
-  const url = new URL(String(path), "http://localhost");
+  const url = new URL(
+    path instanceof Request ? path.url : String(path),
+    "http://localhost",
+  );
+  if (url.pathname === "/api/platform/features")
+    return Response.json({
+      success: true,
+      data: {
+        modules: {
+          content: true,
+          portal: true,
+          notifications: true,
+          approvals: true,
+          crawler: true,
+          udp: true,
+          scheduler: true,
+          workorders: false,
+        },
+      },
+    });
   if (url.pathname === "/api/auth/me")
     return Response.json({
       success: true,
@@ -99,18 +119,28 @@ globalThis.fetch = async (path, options) => {
           "users:create",
           "users:update",
           "roles:view",
-          "crawler:view", "crawler:create", "crawler:run", "crawler:download", "files:create",
+          "crawler:view",
+          "crawler:create",
+          "crawler:run",
+          "crawler:download",
+          "files:create",
         ],
         dataScopes: { users: "ALL" },
         admin: true,
       },
     });
-  if (url.pathname === "/api/crawler/tasks" || url.pathname === "/api/crawler/tasks/articles") {
+  if (
+    url.pathname === "/api/crawler/tasks" ||
+    url.pathname === "/api/crawler/tasks/articles"
+  ) {
     if (options?.method === "POST") {
       crawlerPayloads.push(JSON.parse(options.body));
       return Response.json({ success: true, data: { id: 50 } });
     }
-    return Response.json({ success: true, data: { items: [], total: 0, page: 1, size: 10 } });
+    return Response.json({
+      success: true,
+      data: { items: [], total: 0, page: 1, size: 10 },
+    });
   }
   requests.push(url.searchParams);
   const rows = serverRows.filter(
@@ -158,19 +188,21 @@ function mount(page, id = 1) {
           <QueryClientProvider client={client}>
             <ConfigProvider theme={{ token: { motion: false } }}>
               <App>
-                <AuthProvider>
-                  <Gate>
-                    <WorkspaceControls />
-                    <Routes>
-                      <Route path="/admin/users" element={page} />
-                      <Route
-                        path="/admin/roles"
-                        element={<div>角色页内容</div>}
-                      />
-                      <Route path="/admin" element={<div>工作台内容</div>} />
-                    </Routes>
-                  </Gate>
-                </AuthProvider>
+                <ModulesProvider>
+                  <AuthProvider>
+                    <Gate>
+                      <WorkspaceControls />
+                      <Routes>
+                        <Route path="/admin/users" element={page} />
+                        <Route
+                          path="/admin/roles"
+                          element={<div>角色页内容</div>}
+                        />
+                        <Route path="/admin" element={<div>工作台内容</div>} />
+                      </Routes>
+                    </Gate>
+                  </AuthProvider>
+                </ModulesProvider>
               </App>
             </ConfigProvider>
           </QueryClientProvider>
@@ -453,9 +485,11 @@ test("常用查询被本地篡改也不能恢复额外权限参数", async () =>
 });
 
 test("采集表单保存包含未显示的分页默认值，列表和详情规则相互独立", async () => {
-  const { CrawlConfigPage } = await import("../src/pages/operations/CrawlConfigPage");
+  const { CrawlConfigPage } =
+    await import("../src/pages/operations/CrawlConfigPage");
   const { defaultCrawlRules } = await import("../src/types/crawler");
-  const user = userEvent.setup(); crawlerPayloads.length = 0;
+  const user = userEvent.setup();
+  crawlerPayloads.length = 0;
   mount(<CrawlConfigPage />);
   assert.ok(await screen.findByRole("table"));
   assert.equal(screen.queryByRole("searchbox", { name: "搜索采集文章" }), null);
@@ -463,135 +497,359 @@ test("采集表单保存包含未显示的分页默认值，列表和详情规�
   await user.click(await screen.findByRole("button", { name: "新增配置" }));
   const dialog = await screen.findByRole("dialog", { name: "新增采集配置" });
   await user.type(within(dialog).getByLabelText("配置名称"), "表单回归");
-  await user.type(within(dialog).getByLabelText("入口页面 / 接口地址"), "https://example.com/gallery");
+  await user.type(
+    within(dialog).getByLabelText("入口页面 / 接口地址"),
+    "https://example.com/gallery",
+  );
   await user.click(within(dialog).getByRole("button", { name: "保 存" }));
   await waitFor(() => assert.equal(crawlerPayloads.length, 1));
-  const expected = defaultCrawlRules(); expected.entryUrl = "https://example.com/gallery";
+  const expected = defaultCrawlRules();
+  expected.entryUrl = "https://example.com/gallery";
   assert.deepEqual(crawlerPayloads[0], { name: "表单回归", rules: expected });
   assert.notEqual(expected.list, expected.detail);
-  await waitFor(() => assert.equal(screen.queryByRole("dialog", { name: "新增采集配置" }), null));
+  await waitFor(() =>
+    assert.equal(screen.queryByRole("dialog", { name: "新增采集配置" }), null),
+  );
 });
 
 test("采集数据只请求数据，不挂载配置或执行记录；两个菜单保留独立页签", async () => {
-  const { CrawlDataPage } = await import("../src/pages/operations/CrawlDataPage");
-  const { adminPages, normalizeTabs } = await import("../src/lib/workspace-model");
-  const original=globalThis.fetch, seen=[];
-  globalThis.fetch=(path,options)=>{seen.push(String(path));return original(path,options);};
+  const { CrawlDataPage } =
+    await import("../src/pages/operations/CrawlDataPage");
+  const { adminPages, normalizeTabs } =
+    await import("../src/lib/workspace-model");
+  const original = globalThis.fetch,
+    seen = [];
+  globalThis.fetch = (path, options) => {
+    seen.push(String(path));
+    return original(path, options);
+  };
   try {
     mount(<CrawlDataPage />);
     assert.ok(await screen.findByText("暂无采集数据"));
-    assert.equal(screen.queryByRole("table"),null);
-    assert.equal(screen.queryByRole("button",{name:"新增配置"}),null);
-    assert.equal(screen.queryByText("任务管理"),null);
-    assert(seen.some(url=>url.includes("/crawler/tasks/articles?")));
-    assert(!seen.some(url=>/\/crawler\/tasks(?:\?|$)/.test(url)));
-    const paths=["/admin/crawler","/admin/crawler-config"];
-    assert.deepEqual(paths.map(path=>adminPages.find(p=>p.path===path).title),["采集数据","采集配置"]);
-    assert.deepEqual(normalizeTabs(paths,paths,"/admin"),["/admin",...paths]);
-  } finally {cleanup();globalThis.fetch=original;}
+    assert.equal(screen.queryByRole("table"), null);
+    assert.equal(screen.queryByRole("button", { name: "新增配置" }), null);
+    assert.equal(screen.queryByText("任务管理"), null);
+    assert(seen.some((url) => url.includes("/crawler/tasks/articles?")));
+    assert(!seen.some((url) => /\/crawler\/tasks(?:\?|$)/.test(url)));
+    const paths = ["/admin/crawler", "/admin/crawler-config"];
+    assert.deepEqual(
+      paths.map((path) => adminPages.find((p) => p.path === path).title),
+      ["采集数据", "采集配置"],
+    );
+    assert.deepEqual(normalizeTabs(paths, paths, "/admin"), [
+      "/admin",
+      ...paths,
+    ]);
+  } finally {
+    cleanup();
+    globalThis.fetch = original;
+  }
 });
 
 test("UDP 是独立菜单，系统管理折叠不影响它的访问", async () => {
-  const { AdminNavigation }=await import("../src/components/AdminNavigation");
-  const items=[{id:901,path:"/admin/udp-relay",name:"UDP 转发"},{id:902,path:"/admin/users",name:"用户管理"}];
-  const router=createMemoryRouter([{path:"*",element:<AdminNavigation items={items} compact={false}/>}],{initialEntries:["/admin/udp-relay"]});
+  const { AdminNavigation } = await import("../src/components/AdminNavigation");
+  const items = [
+    { id: 901, path: "/admin/udp-relay", name: "UDP 转发" },
+    { id: 902, path: "/admin/users", name: "用户管理" },
+  ];
+  const router = createMemoryRouter(
+    [{ path: "*", element: <AdminNavigation items={items} compact={false} /> }],
+    { initialEntries: ["/admin/udp-relay"] },
+  );
   try {
-    render(<RouterProvider router={router}/>);
-    const link=screen.getByRole("link",{name:"UDP 转发"});
-    assert.equal(link.closest(".nav-group"),null);
-    assert.equal(screen.getByRole("button",{name:"系统管理"}).getAttribute("aria-expanded"),"false");
-    assert.equal(link.getAttribute("aria-current"),"page");
-  } finally {cleanup();router.dispose();}
+    render(<RouterProvider router={router} />);
+    const link = screen.getByRole("link", { name: "UDP 转发" });
+    assert.equal(link.closest(".nav-group"), null);
+    assert.equal(
+      screen
+        .getByRole("button", { name: "系统管理" })
+        .getAttribute("aria-expanded"),
+      "false",
+    );
+    assert.equal(link.getAttribute("aria-current"), "page");
+  } finally {
+    cleanup();
+    router.dispose();
+  }
 });
 
 test("UDP 页面配置真实提交，启停使用版本与批次，未知系统丢包不显示零", async () => {
   const { UdpRelayPage } = await import("../src/pages/operations/UdpRelayPage");
-  const original=globalThis.fetch, sent=[];
-  let config={id:1,version:0,bindIp:"0.0.0.0",bindPort:19000,targetIp:"127.0.0.1",targetPort:19001,receiveBufferMiB:16,sendBufferMiB:16,pendingMemoryMiB:64,sendIp:"127.0.0.1",sendPort:19003,transportMode:"NIO"};
-  let stats={runId:"",state:"STOPPED",transport:"NIO",startedAt:null,sampledAt:"2026-09-22T14:00:00Z",receivedPackets:1000,forwardedPackets:997,pendingPackets:0,invalidPackets:1,overflowPackets:0,sendFailures:2,receiveErrors:0,kernelDrops:null,receiveMbps:250,forwardMbps:249.9,receivePps:22000,forwardPps:21998,actualReceiveBuffer:4194304,actualSendBuffer:4194304,lastError:""};
-  globalThis.fetch=async(path,options)=>{
-    const url=new URL(String(path),"http://localhost");
-    if(url.pathname==="/api/auth/me") { const result=await (await original(path,options)).json();result.data.permissions.push("relay:view","relay:configure","relay:control");return Response.json(result); }
-    if(url.pathname.startsWith("/api/relay/")) {
-      if(url.pathname.endsWith("/interfaces"))return Response.json({success:true,data:[{name:"lo",displayName:"Loopback",ip:"127.0.0.1",prefixLength:8,mtu:65536,up:true,loopback:true}]});
-      if(options?.method) {
-        const body=JSON.parse(options.body);sent.push({path:url.pathname,body});
-        if(url.pathname.endsWith("/config"))config={...config,...body,version:config.version+1};
-        if(url.pathname.endsWith("/start"))stats={...stats,runId:"run-1",state:"RUNNING",sampledAt:"2026-09-22T14:00:01Z"};
-        if(url.pathname.endsWith("/stop"))stats={...stats,state:"STOPPED",sampledAt:"2026-09-22T14:00:02Z"};
-      }
-      return Response.json({success:true,data:url.pathname.endsWith("/config")?config:stats});
+  const original = globalThis.fetch,
+    sent = [];
+  let config = {
+    id: 1,
+    version: 0,
+    bindIp: "0.0.0.0",
+    bindPort: 19000,
+    targetIp: "127.0.0.1",
+    targetPort: 19001,
+    receiveBufferMiB: 16,
+    sendBufferMiB: 16,
+    pendingMemoryMiB: 64,
+    sendIp: "127.0.0.1",
+    sendPort: 19003,
+    transportMode: "NIO",
+  };
+  let stats = {
+    runId: "",
+    state: "STOPPED",
+    transport: "NIO",
+    startedAt: null,
+    sampledAt: "2026-09-22T14:00:00Z",
+    receivedPackets: 1000,
+    forwardedPackets: 997,
+    pendingPackets: 0,
+    invalidPackets: 1,
+    overflowPackets: 0,
+    sendFailures: 2,
+    receiveErrors: 0,
+    kernelDrops: null,
+    receiveMbps: 250,
+    forwardMbps: 249.9,
+    receivePps: 22000,
+    forwardPps: 21998,
+    actualReceiveBuffer: 4194304,
+    actualSendBuffer: 4194304,
+    lastError: "",
+  };
+  globalThis.fetch = async (path, options) => {
+    const url = new URL(
+      path instanceof Request ? path.url : String(path),
+      "http://localhost",
+    );
+    if (url.pathname === "/api/auth/me") {
+      const result = await (await original(path, options)).json();
+      result.data.permissions.push(
+        "relay:view",
+        "relay:configure",
+        "relay:control",
+      );
+      return Response.json(result);
     }
-    return original(path,options);
+    if (url.pathname.startsWith("/api/relay/")) {
+      if (url.pathname.endsWith("/interfaces"))
+        return Response.json({
+          success: true,
+          data: [
+            {
+              name: "lo",
+              displayName: "Loopback",
+              ip: "127.0.0.1",
+              prefixLength: 8,
+              mtu: 65536,
+              up: true,
+              loopback: true,
+            },
+          ],
+        });
+      if (options?.method) {
+        const body = JSON.parse(options.body);
+        sent.push({ path: url.pathname, body });
+        if (url.pathname.endsWith("/config"))
+          config = { ...config, ...body, version: config.version + 1 };
+        if (url.pathname.endsWith("/start"))
+          stats = {
+            ...stats,
+            runId: "run-1",
+            state: "RUNNING",
+            sampledAt: "2026-09-22T14:00:01Z",
+          };
+        if (url.pathname.endsWith("/stop"))
+          stats = {
+            ...stats,
+            state: "STOPPED",
+            sampledAt: "2026-09-22T14:00:02Z",
+          };
+      }
+      return Response.json({
+        success: true,
+        data: url.pathname.endsWith("/config") ? config : stats,
+      });
+    }
+    return original(path, options);
   };
   try {
-    const user=userEvent.setup();mount(<UdpRelayPage/>);
+    const user = userEvent.setup();
+    mount(<UdpRelayPage />);
     assert.ok(await screen.findByText("不可用"));
     assert.ok(screen.getByText("接收缓冲受限"));
-    assert.equal(document.querySelectorAll(".udp-relay-metrics .ant-statistic-content-value")[2].textContent,"3");
-    await user.click(screen.getByRole("button",{name:"配 置"}));
-    const dialog=await screen.findByRole("dialog",{name:"UDP 转发配置"});
-    const port=within(dialog).getByRole("spinbutton",{name:"接收端口"});await user.clear(port);await user.type(port,"19002");
-    await user.click(within(dialog).getByRole("button",{name:"保 存"}));
-    await waitFor(()=>assert.equal(screen.queryByRole("dialog",{name:"UDP 转发配置"}),null));
-    assert.equal(sent[0].body.bindPort,19002);assert.equal(sent[0].body.version,0);assert.equal(sent[0].body.receiveBufferMiB,16);
-    assert.equal(sent[0].body.sendIp,"127.0.0.1");assert.equal(sent[0].body.sendPort,19003);assert.equal(sent[0].body.transportMode,"NIO");
-    await user.click(screen.getByRole("button",{name:"启动转发"}));
-    await waitFor(()=>assert.equal(screen.getByRole("button",{name:"配 置"}).disabled,true));
-    assert.deepEqual(sent.find(r=>r.path.endsWith("/start")).body,{version:1});
-    await user.click(screen.getByRole("button",{name:"停止转发"}));
-    await waitFor(()=>assert.equal(screen.getByRole("button",{name:"配 置"}).disabled,false));
-    assert.deepEqual(sent.find(r=>r.path.endsWith("/stop")).body,{runId:"run-1"});
-  } finally {cleanup();globalThis.fetch=original;}
+    assert.equal(
+      document.querySelectorAll(
+        ".udp-relay-metrics .ant-statistic-content-value",
+      )[2].textContent,
+      "3",
+    );
+    await user.click(screen.getByRole("button", { name: "配 置" }));
+    const dialog = await screen.findByRole("dialog", { name: "UDP 转发配置" });
+    const port = within(dialog).getByRole("spinbutton", { name: "接收端口" });
+    await user.clear(port);
+    await user.type(port, "19002");
+    await user.click(within(dialog).getByRole("button", { name: "保 存" }));
+    await waitFor(() =>
+      assert.equal(
+        screen.queryByRole("dialog", { name: "UDP 转发配置" }),
+        null,
+      ),
+    );
+    assert.equal(sent[0].body.bindPort, 19002);
+    assert.equal(sent[0].body.version, 0);
+    assert.equal(sent[0].body.receiveBufferMiB, 16);
+    assert.equal(sent[0].body.sendIp, "127.0.0.1");
+    assert.equal(sent[0].body.sendPort, 19003);
+    assert.equal(sent[0].body.transportMode, "NIO");
+    await user.click(screen.getByRole("button", { name: "启动转发" }));
+    await waitFor(() =>
+      assert.equal(
+        screen.getByRole("button", { name: "配 置" }).disabled,
+        true,
+      ),
+    );
+    assert.deepEqual(sent.find((r) => r.path.endsWith("/start")).body, {
+      version: 1,
+    });
+    await user.click(screen.getByRole("button", { name: "停止转发" }));
+    await waitFor(() =>
+      assert.equal(
+        screen.getByRole("button", { name: "配 置" }).disabled,
+        false,
+      ),
+    );
+    assert.deepEqual(sent.find((r) => r.path.endsWith("/stop")).body, {
+      runId: "run-1",
+    });
+  } finally {
+    cleanup();
+    globalThis.fetch = original;
+  }
 });
 
 test("UDP 只读账号页面不显示配置与控制操作", async () => {
-  const { UdpRelayPage }=await import("../src/pages/operations/UdpRelayPage");
-  const original=globalThis.fetch;
-  globalThis.fetch=async(path,options)=>{
-    const url=new URL(String(path),"http://localhost");
-    if(url.pathname==="/api/auth/me") {const result=await (await original(path,options)).json();result.data.permissions=["relay:view"];return Response.json(result);}
-    if(url.pathname.startsWith("/api/relay/")) return Response.json({success:true,data:url.pathname.endsWith("/config")?{bindIp:"127.0.0.1",bindPort:19000,targetIp:"127.0.0.1",targetPort:19001,version:0}:{state:"STOPPED",runId:"",sampledAt:"2026-09-22T14:00:00Z",kernelDrops:null}});
-    return original(path,options);
+  const { UdpRelayPage } = await import("../src/pages/operations/UdpRelayPage");
+  const original = globalThis.fetch;
+  globalThis.fetch = async (path, options) => {
+    const url = new URL(
+      path instanceof Request ? path.url : String(path),
+      "http://localhost",
+    );
+    if (url.pathname === "/api/auth/me") {
+      const result = await (await original(path, options)).json();
+      result.data.permissions = ["relay:view"];
+      return Response.json(result);
+    }
+    if (url.pathname.startsWith("/api/relay/"))
+      return Response.json({
+        success: true,
+        data: url.pathname.endsWith("/config")
+          ? {
+              bindIp: "127.0.0.1",
+              bindPort: 19000,
+              targetIp: "127.0.0.1",
+              targetPort: 19001,
+              version: 0,
+            }
+          : {
+              state: "STOPPED",
+              runId: "",
+              sampledAt: "2026-09-22T14:00:00Z",
+              kernelDrops: null,
+            },
+      });
+    return original(path, options);
   };
-  try {mount(<UdpRelayPage/>);assert.ok(await screen.findByText("不可用"));assert.equal(screen.queryByRole("button",{name:"配 置"}),null);assert.equal(screen.queryByRole("button",{name:"启动转发"}),null);}
-  finally {cleanup();globalThis.fetch=original;}
+  try {
+    mount(<UdpRelayPage />);
+    assert.ok(await screen.findByText("不可用"));
+    assert.equal(screen.queryByRole("button", { name: "配 置" }), null);
+    assert.equal(screen.queryByRole("button", { name: "启动转发" }), null);
+  } finally {
+    cleanup();
+    globalThis.fetch = original;
+  }
 });
 
 test("执行记录按弹窗高度请求整页，缩放保留位置且筛选和结果缩减不留下空页", async () => {
-  const { CrawlExecutionRecords } = await import("../src/components/CrawlExecutionRecords");
+  const { CrawlExecutionRecords } =
+    await import("../src/components/CrawlExecutionRecords");
   const originalFetch = globalThis.fetch;
   const originalRect = HTMLElement.prototype.getBoundingClientRect;
   const originalHeight = window.innerHeight;
   const style = document.createElement("style");
   // jsdom 不执行布局；仅替代几何测量，使用真实弹窗、DataTable 和分页交互。
-  style.textContent = ".form-modal-body{padding-bottom:20px!important}.crawl-execution-results .ant-pagination{margin:12px 0 0!important}";
+  style.textContent =
+    ".form-modal-body{padding-bottom:20px!important}.crawl-execution-results .ant-pagination{margin:12px 0 0!important}";
   document.head.appendChild(style);
-  const rect = (top = 0, height = 0) => ({ x: 0, y: top, top, left: 0, right: 1000, bottom: top + height, width: 1000, height, toJSON() {} });
+  const rect = (top = 0, height = 0) => ({
+    x: 0,
+    y: top,
+    top,
+    left: 0,
+    right: 1000,
+    bottom: top + height,
+    width: 1000,
+    height,
+    toJSON() {},
+  });
   HTMLElement.prototype.getBoundingClientRect = function () {
     if (this.classList.contains("ant-modal-body")) return rect(100, 800);
-    if (this.classList.contains("crawl-execution-results")) return rect(240, 600);
-    if (this.classList.contains("ant-modal-header") || this.classList.contains("ant-modal-footer")) return rect(0, 60);
+    if (this.classList.contains("crawl-execution-results"))
+      return rect(240, 600);
+    if (
+      this.classList.contains("ant-modal-header") ||
+      this.classList.contains("ant-modal-footer")
+    )
+      return rect(0, 60);
     if (this.classList.contains("ant-table-thead")) return rect(0, 40);
     if (this.classList.contains("ant-table-row")) return rect(0, 64);
     if (this.classList.contains("ant-pagination")) return rect(0, 32);
     return originalRect.call(this);
   };
-  Object.defineProperty(window, "innerHeight", { configurable: true, value: 1080 });
+  Object.defineProperty(window, "innerHeight", {
+    configurable: true,
+    value: 1080,
+  });
   const seen = [];
   const all = Array.from({ length: 77 }, (_, index) => ({
-    id: index + 1, url: `https://images.example/${"long-address-".repeat(35)}${index + 1}.jpg`,
-    sourceUrl: `https://source.example/${index + 1}`, title: "", status: "SUCCESS", bytes: 1000, attempts: 1,
+    id: index + 1,
+    url: `https://images.example/${"long-address-".repeat(35)}${index + 1}.jpg`,
+    sourceUrl: `https://source.example/${index + 1}`,
+    title: "",
+    status: "SUCCESS",
+    bytes: 1000,
+    attempts: 1,
     error: index === 0 ? "完整错误说明".repeat(30) : null,
   }));
   let total = all.length;
   globalThis.fetch = async (path, options) => {
-    const url = new URL(String(path), "http://localhost");
-    if (url.pathname === "/api/crawler/tasks/15") return Response.json({ success: true, data: { id: 15, name: "执行记录尺寸检查", status: "COMPLETED", pageCount: 3, imageCount: 77, totalBytes: 10000 } });
+    const url = new URL(
+      path instanceof Request ? path.url : String(path),
+      "http://localhost",
+    );
+    if (url.pathname === "/api/crawler/tasks/15")
+      return Response.json({
+        success: true,
+        data: {
+          id: 15,
+          name: "执行记录尺寸检查",
+          status: "COMPLETED",
+          pageCount: 3,
+          imageCount: 77,
+          totalBytes: 10000,
+        },
+      });
     if (url.pathname === "/api/crawler/tasks/15/items") {
-      const page = Number(url.searchParams.get("page")), size = Number(url.searchParams.get("size"));
+      const page = Number(url.searchParams.get("page")),
+        size = Number(url.searchParams.get("size"));
       seen.push({ page, size, kind: url.searchParams.get("kind") });
-      return Response.json({ success: true, data: { total, page, size, items: all.slice(0, total).slice((page - 1) * size, page * size) } });
+      return Response.json({
+        success: true,
+        data: {
+          total,
+          page,
+          size,
+          items: all.slice(0, total).slice((page - 1) * size, page * size),
+        },
+      });
     }
     return originalFetch(path, options);
   };
@@ -599,140 +857,405 @@ test("执行记录按弹窗高度请求整页，缩放保留位置且筛选和�
     const user = userEvent.setup();
     function Records() {
       const [open, setOpen] = useState(true);
-      return open ? <CrawlExecutionRecords id={15} close={() => setOpen(false)} /> : <span>已关闭记录</span>;
+      return open ? (
+        <CrawlExecutionRecords id={15} close={() => setOpen(false)} />
+      ) : (
+        <span>已关闭记录</span>
+      );
     }
     mount(<Records />);
     const dialog = await screen.findByRole("dialog", { name: "执行记录" });
-    await waitFor(() => assert.equal(dialog.querySelectorAll(".ant-table-row").length, 10));
-    assert.equal(dialog.querySelector(".crawl-record-line[title^='https://images']").getAttribute("title"), all[0].url, "省略网址仍保留完整值");
-    assert.equal(dialog.querySelector(".crawl-record-note").getAttribute("title"), all[0].error);
+    await waitFor(() =>
+      assert.equal(dialog.querySelectorAll(".ant-table-row").length, 10),
+    );
+    assert.equal(
+      dialog
+        .querySelector(".crawl-record-line[title^='https://images']")
+        .getAttribute("title"),
+      all[0].url,
+      "省略网址仍保留完整值",
+    );
+    assert.equal(
+      dialog.querySelector(".crawl-record-note").getAttribute("title"),
+      all[0].error,
+    );
     await user.click(within(dialog).getByTitle("2"));
-    await waitFor(() => assert.equal(dialog.querySelector(".ant-table-row .table-sequence").textContent, "11"));
-    Object.defineProperty(window, "innerHeight", { configurable: true, value: 768 });
+    await waitFor(() =>
+      assert.equal(
+        dialog.querySelector(".ant-table-row .table-sequence").textContent,
+        "11",
+      ),
+    );
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 768,
+    });
     fireEvent(window, new Event("resize"));
-    await waitFor(() => assert.deepEqual(seen.at(-1), { page: 3, size: 5, kind: "IMAGE" }));
-    await waitFor(() => assert.equal(dialog.querySelectorAll(".ant-table-row").length, 5));
-    assert.equal(dialog.querySelector(".ant-table-row .table-sequence").textContent, "11");
-    Object.defineProperty(window, "innerHeight", { configurable: true, value: 640 });
+    await waitFor(() =>
+      assert.deepEqual(seen.at(-1), { page: 3, size: 5, kind: "IMAGE" }),
+    );
+    await waitFor(() =>
+      assert.equal(dialog.querySelectorAll(".ant-table-row").length, 5),
+    );
+    assert.equal(
+      dialog.querySelector(".ant-table-row .table-sequence").textContent,
+      "11",
+    );
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 640,
+    });
     fireEvent(window, new Event("resize"));
-    await waitFor(() => assert.deepEqual(seen.at(-1), { page: 4, size: 3, kind: "IMAGE" }));
-    await waitFor(() => assert.equal(dialog.querySelectorAll(".ant-table-row").length, 3));
-    await user.click(within(dialog).getByRole("combobox", { name: "记录类型" }));
-    await user.click(await screen.findByText("详情页", { selector: ".ant-select-item-option-content" }));
-    await waitFor(() => assert.deepEqual(seen.at(-1), { page: 1, size: 3, kind: "DETAIL" }));
+    await waitFor(() =>
+      assert.deepEqual(seen.at(-1), { page: 4, size: 3, kind: "IMAGE" }),
+    );
+    await waitFor(() =>
+      assert.equal(dialog.querySelectorAll(".ant-table-row").length, 3),
+    );
+    await user.click(
+      within(dialog).getByRole("combobox", { name: "记录类型" }),
+    );
+    await user.click(
+      await screen.findByText("详情页", {
+        selector: ".ant-select-item-option-content",
+      }),
+    );
+    await waitFor(() =>
+      assert.deepEqual(seen.at(-1), { page: 1, size: 3, kind: "DETAIL" }),
+    );
     await user.click(within(dialog).getByTitle("2"));
-    await waitFor(() => assert.equal(dialog.querySelector(".ant-table-row .table-sequence").textContent, "4"));
+    await waitFor(() =>
+      assert.equal(
+        dialog.querySelector(".ant-table-row .table-sequence").textContent,
+        "4",
+      ),
+    );
     total = 2;
     await user.click(within(dialog).getByRole("button", { name: "刷 新" }));
-    await waitFor(() => assert.equal(dialog.querySelectorAll(".ant-table-row").length, 2));
-    assert.equal(dialog.querySelector(".ant-table-row .table-sequence").textContent, "1");
+    await waitFor(() =>
+      assert.equal(dialog.querySelectorAll(".ant-table-row").length, 2),
+    );
+    assert.equal(
+      dialog.querySelector(".ant-table-row .table-sequence").textContent,
+      "1",
+    );
     await user.click(within(dialog).getByRole("button", { name: "关 闭" }));
     assert.ok(await screen.findByText("已关闭记录"));
   } finally {
-    cleanup(); globalThis.fetch = originalFetch; HTMLElement.prototype.getBoundingClientRect = originalRect; style.remove();
-    Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight });
+    cleanup();
+    globalThis.fetch = originalFetch;
+    HTMLElement.prototype.getBoundingClientRect = originalRect;
+    style.remove();
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: originalHeight,
+    });
   }
 });
 
 test("卡片按窗口容量请求服务端分页，窗口缩小时保留原来浏览位置", async () => {
-  const { CrawlArticleCards } = await import("../src/components/CrawlArticleCards");
+  const { CrawlArticleCards } =
+    await import("../src/components/CrawlArticleCards");
   const originalFetch = globalThis.fetch;
   const originalRect = HTMLElement.prototype.getBoundingClientRect;
   const originalHeight = window.innerHeight;
   let width = 1610;
   const seenPages = [];
-  const all = Array.from({ length: 37 }, (_, index) => ({ id: index + 1, taskId: 5, taskName: "尺寸测试", taskStatus: "COMPLETED", title: `尺寸文章 ${index + 1}`, sourceUrl: "https://source.example/" + index, collectedAt: "2026-09-22T10:00:00", pageCount: 1, imageCount: 0, pendingImages: 0, failedImages: 0 }));
+  const all = Array.from({ length: 37 }, (_, index) => ({
+    id: index + 1,
+    taskId: 5,
+    taskName: "尺寸测试",
+    taskStatus: "COMPLETED",
+    title: `尺寸文章 ${index + 1}`,
+    sourceUrl: "https://source.example/" + index,
+    collectedAt: "2026-09-22T10:00:00",
+    pageCount: 1,
+    imageCount: 0,
+    pendingImages: 0,
+    failedImages: 0,
+  }));
   HTMLElement.prototype.getBoundingClientRect = function () {
-    if (this.classList.contains("crawl-cards-viewport")) return { x: 0, y: 220, top: 220, left: 0, right: width, bottom: 220, width, height: 0, toJSON() {} };
-    if (this.classList.contains("crawl-pagination")) return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: 32, width, height: 32, toJSON() {} };
+    if (this.classList.contains("crawl-cards-viewport"))
+      return {
+        x: 0,
+        y: 220,
+        top: 220,
+        left: 0,
+        right: width,
+        bottom: 220,
+        width,
+        height: 0,
+        toJSON() {},
+      };
+    if (this.classList.contains("crawl-pagination"))
+      return {
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        right: width,
+        bottom: 32,
+        width,
+        height: 32,
+        toJSON() {},
+      };
     return originalRect.call(this);
   };
-  Object.defineProperty(window, "innerHeight", { configurable: true, value: 1000 });
+  Object.defineProperty(window, "innerHeight", {
+    configurable: true,
+    value: 1000,
+  });
   globalThis.fetch = async (path, options) => {
-    const url = new URL(String(path), "http://localhost");
+    const url = new URL(
+      path instanceof Request ? path.url : String(path),
+      "http://localhost",
+    );
     if (url.pathname === "/api/crawler/tasks/articles") {
-      const page = Number(url.searchParams.get("page")), size = Number(url.searchParams.get("size"));
+      const page = Number(url.searchParams.get("page")),
+        size = Number(url.searchParams.get("size"));
       seenPages.push({ page, size });
-      return Response.json({ success: true, data: { page, size, total: all.length, items: all.slice((page - 1) * size, page * size) } });
+      return Response.json({
+        success: true,
+        data: {
+          page,
+          size,
+          total: all.length,
+          items: all.slice((page - 1) * size, page * size),
+        },
+      });
     }
     return originalFetch(path, options);
   };
   try {
-    const user = userEvent.setup(); mount(<CrawlArticleCards active={false} />);
-    await waitFor(() => assert.equal(screen.getAllByRole("button", { name: /尺寸文章/ }).length, 21));
-    assert.equal(document.querySelector(".crawl-article-grid").style.getPropertyValue("--crawl-card-height"), "240px");
+    const user = userEvent.setup();
+    mount(<CrawlArticleCards active={false} />);
+    await waitFor(() =>
+      assert.equal(
+        screen.getAllByRole("button", { name: /尺寸文章/ }).length,
+        21,
+      ),
+    );
+    assert.equal(
+      document
+        .querySelector(".crawl-article-grid")
+        .style.getPropertyValue("--crawl-card-height"),
+      "240px",
+    );
     await user.click(within(screen.getByLabelText("文章分页")).getByTitle("2"));
     assert.ok(await screen.findByRole("button", { name: /尺寸文章 22 / }));
     width = 1010;
-    Object.defineProperty(window, "innerHeight", { configurable: true, value: 800 });
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 800,
+    });
     fireEvent(window, new Event("resize"));
-    await waitFor(() => assert.equal(screen.getAllByRole("button", { name: /尺寸文章/ }).length, 8));
-    assert.equal(document.querySelector(".crawl-article-grid").style.getPropertyValue("--crawl-card-height"), "260px", "行高变化需要同步到实际卡片样式");
+    await waitFor(() =>
+      assert.equal(
+        screen.getAllByRole("button", { name: /尺寸文章/ }).length,
+        8,
+      ),
+    );
+    assert.equal(
+      document
+        .querySelector(".crawl-article-grid")
+        .style.getPropertyValue("--crawl-card-height"),
+      "260px",
+      "行高变化需要同步到实际卡片样式",
+    );
     assert.ok(screen.getByRole("button", { name: /尺寸文章 22 / }));
     assert.deepEqual(seenPages.at(-1), { page: 3, size: 8 });
     await user.click(within(screen.getByLabelText("文章分页")).getByTitle("5"));
     assert.ok(await screen.findByRole("button", { name: /尺寸文章 37 / }));
     assert.equal(screen.getAllByRole("button", { name: /尺寸文章/ }).length, 5);
   } finally {
-    cleanup(); globalThis.fetch = originalFetch; HTMLElement.prototype.getBoundingClientRect = originalRect;
-    Object.defineProperty(window, "innerHeight", { configurable: true, value: originalHeight });
+    cleanup();
+    globalThis.fetch = originalFetch;
+    HTMLElement.prototype.getBoundingClientRect = originalRect;
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: originalHeight,
+    });
   }
 });
 
 test("抽屉图片分页不漏图，跨页放大保持绝对序号且正文按需打开", async () => {
-  const { CrawlArticleCards } = await import("../src/components/CrawlArticleCards");
+  const { CrawlArticleCards } =
+    await import("../src/components/CrawlArticleCards");
   const original = globalThis.fetch;
   const seen = [];
   let finished = false;
-  const article = { id: 9, taskId: 5, taskName: "文章测试", taskStatus: "COMPLETED", imageLimit: 50, title: "卡片文章", summary: "真实正文摘要", author: "来源作者", publishedAt: "2026-09-22", sourceUrl: "https://source.example/article/9", collectedAt: "2026-09-22T10:30:00", pageCount: 2, imageCount: 32, pendingImages: 0, failedImages: 0, coverItemId: 99 };
+  const article = {
+    id: 9,
+    taskId: 5,
+    taskName: "文章测试",
+    taskStatus: "COMPLETED",
+    imageLimit: 50,
+    title: "卡片文章",
+    summary: "真实正文摘要",
+    author: "来源作者",
+    publishedAt: "2026-09-22",
+    sourceUrl: "https://source.example/article/9",
+    collectedAt: "2026-09-22T10:30:00",
+    pageCount: 2,
+    imageCount: 32,
+    pendingImages: 0,
+    failedImages: 0,
+    coverItemId: 99,
+  };
   globalThis.fetch = async (path, options) => {
-    const url = new URL(String(path), "http://localhost");
+    const url = new URL(
+      path instanceof Request ? path.url : String(path),
+      "http://localhost",
+    );
     seen.push({ url, options });
-    if (url.pathname === "/api/crawler/tasks/5/articles") return Response.json({ success: true, data: { items: [finished ? article : { ...article, coverItemId: undefined, imageCount: 0, pendingImages: 1 }], total: 1, page: 1, size: 12 } });
-    if (url.pathname === "/api/crawler/tasks/5/articles/9") return Response.json({ success: true, data: { article, truncated: false, pages: [{ id: 1, sourceUrl: article.sourceUrl, body: "第一段正文", truncated: false }, { id: 2, sourceUrl: article.sourceUrl, body: "<script>不能执行</script>第二段正文", truncated: false }], images: Array.from({length:32},(_,i)=>({id:99+i,fileId:100+i,bytes:1})) } });
-    if (/^\/api\/crawler\/tasks\/5\/items\/\d+\/image$/.test(url.pathname)) return new Response(new Blob([new Uint8Array([1])], { type: "image/png" }));
+    if (url.pathname === "/api/crawler/tasks/5/articles")
+      return Response.json({
+        success: true,
+        data: {
+          items: [
+            finished
+              ? article
+              : {
+                  ...article,
+                  coverItemId: undefined,
+                  imageCount: 0,
+                  pendingImages: 1,
+                },
+          ],
+          total: 1,
+          page: 1,
+          size: 12,
+        },
+      });
+    if (url.pathname === "/api/crawler/tasks/5/articles/9")
+      return Response.json({
+        success: true,
+        data: {
+          article,
+          truncated: false,
+          pages: [
+            {
+              id: 1,
+              sourceUrl: article.sourceUrl,
+              body: "第一段正文",
+              truncated: false,
+            },
+            {
+              id: 2,
+              sourceUrl: article.sourceUrl,
+              body: "<script>不能执行</script>第二段正文",
+              truncated: false,
+            },
+          ],
+          images: Array.from({ length: 32 }, (_, i) => ({
+            id: 99 + i,
+            fileId: 100 + i,
+            bytes: 1,
+          })),
+        },
+      });
+    if (/^\/api\/crawler\/tasks\/5\/items\/\d+\/image$/.test(url.pathname))
+      return new Response(
+        new Blob([new Uint8Array([1])], { type: "image/png" }),
+      );
     return original(path, options);
   };
   function FinishingTask() {
     const [active, setActive] = useState(true);
-    return <><Button onClick={() => { finished = true;setActive(false); }}>结束采集</Button><CrawlArticleCards task={5} active={active} /></>;
+    return (
+      <>
+        <Button
+          onClick={() => {
+            finished = true;
+            setActive(false);
+          }}
+        >
+          结束采集
+        </Button>
+        <CrawlArticleCards task={5} active={active} />
+      </>
+    );
   }
   try {
-    const user = userEvent.setup();mount(<FinishingTask />);
+    const user = userEvent.setup();
+    mount(<FinishingTask />);
     assert.ok(await screen.findByText("1 张待采集"));
     await user.click(screen.getByRole("button", { name: "结束采集" }));
     await waitFor(() => assert.equal(screen.queryByText("1 张待采集"), null));
     await user.click(await screen.findByRole("button", { name: /卡片文章/ }));
     const dialog = await screen.findByRole("dialog", { name: "图文详情" });
     assert.ok(dialog.closest(".ant-drawer-right"));
-    assert.equal((await within(dialog).findAllByRole("button", {name:/放大查看第/})).length,12);
+    assert.equal(
+      (await within(dialog).findAllByRole("button", { name: /放大查看第/ }))
+        .length,
+      12,
+    );
     assert.ok(within(dialog).getByText("已采集 32 张"));
-    assert.equal(within(dialog).queryByText("第一段正文"), null, "图片默认视图不展开长正文");
+    assert.equal(
+      within(dialog).queryByText("第一段正文"),
+      null,
+      "图片默认视图不展开长正文",
+    );
     await user.click(within(dialog).getByRole("tab", { name: "文章正文" }));
     assert.ok(await within(dialog).findByText("第一段正文"));
-    assert.ok(await within(dialog).findByText("<script>不能执行</script>第二段正文"));
+    assert.ok(
+      await within(dialog).findByText("<script>不能执行</script>第二段正文"),
+    );
     assert.equal(dialog.querySelector("script"), null);
-    assert.equal(within(dialog).getByRole("link", { name: article.sourceUrl }).getAttribute("rel"), "noopener noreferrer");
+    assert.equal(
+      within(dialog)
+        .getByRole("link", { name: article.sourceUrl })
+        .getAttribute("rel"),
+      "noopener noreferrer",
+    );
     await user.click(within(dialog).getByRole("tab", { name: "图片 (32)" }));
-    const pager=within(dialog).getByLabelText("图片分页");
+    const pager = within(dialog).getByLabelText("图片分页");
     await user.click(within(pager).getByTitle("2"));
-    assert.equal(within(dialog).queryByRole("button", { name: "放大查看第 1 张图片" }), null);
-    assert.equal(within(dialog).getAllByRole("button", {name:/放大查看第/}).length,12);
-    await user.click(within(dialog).getByRole("button", {name:"放大查看第 24 张图片"}));
+    assert.equal(
+      within(dialog).queryByRole("button", { name: "放大查看第 1 张图片" }),
+      null,
+    );
+    assert.equal(
+      within(dialog).getAllByRole("button", { name: /放大查看第/ }).length,
+      12,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "放大查看第 24 张图片" }),
+    );
     assert.ok(await screen.findByText("24 / 32"));
-    const viewer=screen.getByRole("dialog",{name:""});
-    await user.click(within(viewer).getByRole("button", {name:"right"}));
+    const viewer = screen.getByRole("dialog", { name: "" });
+    await user.click(within(viewer).getByRole("button", { name: "right" }));
     assert.ok(await screen.findByText("25 / 32"), "大图可跨缩略图分页继续切换");
-    assert.ok(within(viewer).getByRole("button",{name:"zoomIn"}));
-    await user.click(within(viewer).getByRole("button",{name:"close"}));
-    assert.ok(screen.getByRole("dialog",{name:"图文详情"}));
-    assert.ok(within(dialog).getByRole("button", {name:"放大查看第 13 张图片"}), "关闭大图后保留缩略图页码");
+    assert.ok(within(viewer).getByRole("button", { name: "zoomIn" }));
+    await user.click(within(viewer).getByRole("button", { name: "close" }));
+    assert.ok(screen.getByRole("dialog", { name: "图文详情" }));
+    assert.ok(
+      within(dialog).getByRole("button", { name: "放大查看第 13 张图片" }),
+      "关闭大图后保留缩略图页码",
+    );
     await user.click(within(pager).getByTitle("3"));
-    assert.equal(within(dialog).getAllByRole("button", {name:/放大查看第/}).length,8);
-    await user.click(within(dialog).getByRole("button",{name:"放大查看第 32 张图片"}));
+    assert.equal(
+      within(dialog).getAllByRole("button", { name: /放大查看第/ }).length,
+      8,
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "放大查看第 32 张图片" }),
+    );
     assert.ok(await screen.findByText("32 / 32"));
-    await waitFor(() => assert.ok(seen.some(({ url }) => url.pathname.endsWith("/image"))));
+    await waitFor(() =>
+      assert.ok(seen.some(({ url }) => url.pathname.endsWith("/image"))),
+    );
     assert.ok(seen.every(({ url }) => url.hostname === "localhost"));
-    assert.ok(seen.filter(({ url }) => url.pathname.endsWith("/image")).every(({ options }) => options.headers.Authorization === "Bearer unit-test-token"));
-  } finally { cleanup();globalThis.fetch = original; }
+    assert.ok(
+      seen
+        .filter(({ url }) => url.pathname.endsWith("/image"))
+        .every(
+          ({ options }) =>
+            options.headers.Authorization === "Bearer unit-test-token",
+        ),
+    );
+  } finally {
+    cleanup();
+    globalThis.fetch = original;
+  }
 });

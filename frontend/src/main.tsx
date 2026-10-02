@@ -6,6 +6,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import "@fontsource-variable/dm-sans";
 import { AuthProvider } from "./lib/auth";
+import { ModulesProvider } from "./lib/modules";
 import { ApiError } from "./lib/api";
 import { AppearanceProvider } from "./lib/theme";
 import Application, { ErrorBoundary } from "./App";
@@ -31,11 +32,13 @@ const router = createBrowserRouter([
     path: "*",
     element: (
       <ErrorBoundary>
-        <AuthProvider>
-          <AppearanceProvider>
-            <Application />
-          </AppearanceProvider>
-        </AuthProvider>
+        <ModulesProvider>
+          <AuthProvider>
+            <AppearanceProvider>
+              <Application />
+            </AppearanceProvider>
+          </AuthProvider>
+        </ModulesProvider>
       </ErrorBoundary>
     ),
   },

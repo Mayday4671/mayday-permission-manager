@@ -1,5 +1,6 @@
 package com.mayday.security;
 
+import com.mayday.common.ModuleSwitches;
 import com.mayday.system.model.*;
 import com.mayday.system.repository.EntryRepository;
 import java.util.*;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AccessPolicy {
   private final EntryRepository entries;
+  private final ModuleSwitches modules;
 
   public SysUser current() {
     return (SysUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -27,11 +29,17 @@ public class AccessPolicy {
   }
 
   public Set<String> permissions() {
-    if (admin()) return Set.copyOf(PermissionCatalog.ALL);
+    if (admin())
+      return PermissionCatalog.ALL.stream()
+          .filter(modules::permissionEnabled)
+          .collect(java.util.stream.Collectors.toUnmodifiableSet());
     Set<String> result = new HashSet<>();
     current().getRoles().stream()
         .filter(SysRole::isEnabled)
         .forEach(r -> result.addAll(r.getPermissions()));
+    result.removeIf(
+        permission ->
+            !PermissionCatalog.ALL.contains(permission) || !modules.permissionEnabled(permission));
     return result;
   }
 
@@ -120,8 +128,7 @@ public class AccessPolicy {
   }
 
   /**
-   * 跨模块展示账号身份时也必须遵守用户查看权限与数据范围，不能把流程设计权、会话查看权当成全局通讯录权限。
-   * 仅校验可见性；修改账号、撤销他人会话等管理动作还需独立检查动作权限及角色管理边界。
+   * 跨模块展示账号身份时也必须遵守用户查看权限与数据范围，不能把流程设计权、会话查看权当成全局通讯录权限。 仅校验可见性；修改账号、撤销他人会话等管理动作还需独立检查动作权限及角色管理边界。
    */
   public boolean canViewUser(SysUser user) {
     return has("users:view") && contains("users", user.getId(), user.getDepartmentId());
@@ -129,7 +136,9 @@ public class AccessPolicy {
 
   /** 后台排期和审批处理复用同一规则，不伪造浏览器会话，也不长期缓存创建时的授权结果。 */
   public boolean hasFor(SysUser user, String permission) {
-    return user.isEnabled()
+    return PermissionCatalog.ALL.contains(permission)
+        && modules.permissionEnabled(permission)
+        && user.isEnabled()
         && user.getRoles().stream()
             .anyMatch(
                 r ->

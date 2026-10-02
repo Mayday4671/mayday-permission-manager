@@ -22,10 +22,12 @@ public class LegacyWorkflowImport implements CommandLineRunner {
   private final EntryRepository entries;
   private final UserRepository users;
   private final WorkflowJson json;
+  private final com.mayday.common.ModuleSwitches modules;
 
   @Override
   @Transactional
   public void run(String... args) {
+    if (!modules.isEnabled("approvals")) return;
     for (var d : definitions.findAll())
       if (d.getDraftSchema() == null) {
         var s = WorkflowDefinitions.legacy(d.getApproverIds());

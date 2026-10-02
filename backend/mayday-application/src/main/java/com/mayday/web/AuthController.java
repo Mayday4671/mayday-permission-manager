@@ -29,7 +29,8 @@ public class AuthController {
   private final EntryRepository entries;
 
   @PostMapping("/login")
-  public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
+  public ResponseEntity<ApiResponse<LoginView>> login(
+      @Valid @RequestBody LoginRequest req, HttpServletRequest request) {
     request.setAttribute("audit.username", req.username());
     if (!throttle.allowed(request.getRemoteAddr(), req.username()))
       return ResponseEntity.status(429).body(ApiResponse.error("尝试次数过多，请 15 分钟后重试"));
@@ -49,32 +50,33 @@ public class AuthController {
     request.setAttribute("audit.username", u.getUsername());
     return ResponseEntity.ok(
         ApiResponse.ok(
-            Map.of(
-                "token",
+            new LoginView(
                 tokens.issue(u, request.getRemoteAddr(), request.getHeader("User-Agent")))));
   }
 
   @GetMapping("/me")
-  public ApiResponse<?> me() {
+  public ApiResponse<SessionView> me() {
     SysUser u = access.current();
-    Map<String, Object> result = new LinkedHashMap<>();
-    result.put(
-        "user",
+    UserView user =
         UserView.from(
             u,
             u.getDepartmentId() == null
                 ? "未分配"
                 : entries.findById(u.getDepartmentId()).map(SystemEntry::getName).orElse("未分配"),
             true,
-            true));
-    result.put("permissions", access.permissions());
+            true);
     // 数据范围摘要随权限目录扩展；真正的接口授权仍由 AccessPolicy 按记录计算。
-    result.put(
-        "dataScopes",
+    var dataScopes =
         PermissionCatalog.SCOPED_RESOURCES.stream()
-            .collect(java.util.stream.Collectors.toMap(resource -> resource, access::scope)));
-    result.put("admin", access.admin());
-    return ApiResponse.ok(result);
+            .filter(resource -> access.has(resource + ":view"))
+            .collect(
+                java.util.stream.Collectors.toMap(
+                    resource -> resource,
+                    resource ->
+                        PermissionCatalog.SCOPES.contains(access.scope(resource))
+                            ? DataScope.valueOf(access.scope(resource))
+                            : DataScope.SELF));
+    return ApiResponse.ok(new SessionView(user, access.permissions(), dataScopes, access.admin()));
   }
 
   @PostMapping("/logout")

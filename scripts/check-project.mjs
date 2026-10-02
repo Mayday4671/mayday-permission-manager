@@ -1,0 +1,67 @@
+/** 跨平台工程检查入口；子进程使用参数数组，不拼接业务数据或数据库凭证到 shell。 */
+import { spawnSync } from "node:child_process";
+import { resolve, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const frontend = join(root, "frontend");
+function run(command, args, cwd = root) {
+  const result = spawnSync(command, args, {
+    cwd,
+    stdio: "inherit",
+    windowsHide: true,
+  });
+  if (result.error || result.status !== 0)
+    throw new Error(`工程检查未通过：${command}`, { cause: result.error });
+}
+run(process.execPath, [
+  join(frontend, "node_modules/prettier/bin/prettier.cjs"),
+  "--check",
+  "scripts",
+  "tests",
+  "tools/generator/examples",
+  "*.yaml",
+  ".github/workflows",
+]);
+run(
+  process.execPath,
+  [
+    join(frontend, "node_modules/prettier/bin/prettier.cjs"),
+    "--check",
+    "src",
+    "tests",
+    "vite.config.ts",
+  ],
+  frontend,
+);
+run(process.execPath, ["scripts/generate-api.mjs", "--offline", "--check"]);
+run(process.execPath, [
+  "--test",
+  "tests/workspace.test.mjs",
+  "tests/admin-ui-model.test.mjs",
+  "tests/usability-model.test.mjs",
+  "tests/portal-routing.test.mjs",
+  "tests/module-model.test.mjs",
+  "tests/generator.test.mjs",
+]);
+run(
+  process.execPath,
+  [
+    "--import",
+    "tsx",
+    "--test",
+    "tests/admin-usability.test.tsx",
+    "tests/grid-pagination.test.ts",
+  ],
+  frontend,
+);
+run(
+  process.execPath,
+  [join(frontend, "node_modules/typescript/bin/tsc"), "-b"],
+  frontend,
+);
+run(
+  process.execPath,
+  [join(frontend, "node_modules/vite/bin/vite.js"), "build"],
+  frontend,
+);

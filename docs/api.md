@@ -2,7 +2,7 @@
 
 ## 协议
 
-统一前缀 `/api`。除 `/auth/login`、`/auth/captcha/challenge`、`/auth/captcha/verify`、`/public/**` 和健康检查外都需要：
+统一前缀 `/api`。除 `/auth/login`、`/auth/captcha/challenge`、`/auth/captcha/verify`、`/platform/features`、`/public/**` 和健康检查外都需要：
 
 ```http
 Authorization: Bearer <登录返回的令牌>
@@ -10,7 +10,7 @@ Content-Type: application/json
 ```
 
 成功：`{ "success": true, "data": ..., "message": "操作成功" }`。
-失败：`{ "success": false, "data": null, "message": "可读错误信息" }`，同时返回真实 HTTP 状态：400 校验、401 认证、403 授权、404 公开内容不存在、409 冲突、429 限流、500 内部失败。
+失败：`{ "success": false, "data": null, "message": "可读错误信息" }`，同时返回真实 HTTP 状态：400 校验、401 认证、403 授权、404 资源不存在或模块关闭、409 冲突、429 限流、500 内部失败。
 
 列表 `data` 包含 `items`、`total`、`page`、`size`。页码从 1 开始，每页最多 100 条。默认按 ID 倒序；列表接受 `keyword/page/size`，用户和基础资料额外接受 `enabled`，内容接受 `published`，日志接受 `success`。用户还支持 `departmentId`。
 
@@ -135,3 +135,11 @@ V15 起，DELETE `/crawler/tasks/{id}` 对已经产生文章的配置采用归�
 - 到达审批节点、转交和加签会创建对应人员的待办及站内通知；结束时通知申请人。事件与审批事务共同提交，由后台每 3 秒扫描投递并重试失败事件；工作台和顶栏在页面可见时每 15 秒轮询，重新聚焦时也会刷新。它不是 WebSocket 推送；离线用户登录后可查看持久化通知。已读只影响消息数量，必须执行审批动作才能清除待办，处理结果会立即触发前端相关查询刷新。
 
 关键词按字面量匹配，`%`、`_` 不解释为通配符。客户端不得以角色名称推断权限；校验以实际 DTO、PermissionCatalog 和服务层为准。版本过期应重新取得最新记录并让用户核对，不能自动覆盖重试。
+
+## 可选模块和机器契约
+
+- `GET /platform/features`：公开返回有效模块状态，没有账号或配置秘密。关闭依赖的模块由服务端联动关闭。
+- `GET /platform/openapi`：管理员读取真实控制器生成的 OpenAPI；关闭的模块不出现在当前实例文档中。可用 `API_DOCS_ENABLED=false` 禁用。
+- `GET/POST /business/workorders`、`GET/PUT/DELETE /business/workorders/{id}`：可运行的生成器示例，默认关闭。读写分别检查 `workorders:view/create/update/delete` 和行级数据范围；编辑请求的 `version`、删除查询参数的 `version` 用于并发冲突检查。
+
+`contracts/openapi.json` 和 `frontend/src/types/generated/api.ts` 通过脚本生成和比对。新模块使用明确响应 DTO 与统一契约客户端，详见 [工程规范](engineering.md)。

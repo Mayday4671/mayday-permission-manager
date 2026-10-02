@@ -22,6 +22,7 @@ public class RoleController {
   private final UserRepository users;
   private final com.mayday.system.repository.EntryRepository entries;
   private final AccessPolicy access;
+  private final ModuleSwitches modules;
 
   @GetMapping
   @PreAuthorize("@access.has('roles:view')")
@@ -42,7 +43,10 @@ public class RoleController {
   @GetMapping("/permissions")
   @PreAuthorize("@access.has('roles:view')")
   public ApiResponse<?> permissions() {
-    return ApiResponse.ok(PermissionCatalog.GROUPS);
+    return ApiResponse.ok(
+        PermissionCatalog.GROUPS.stream()
+            .filter(group -> modules.permissionEnabled(group.key() + ":view"))
+            .toList());
   }
 
   @PostMapping

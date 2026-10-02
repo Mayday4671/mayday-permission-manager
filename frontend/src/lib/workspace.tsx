@@ -14,6 +14,8 @@ import { useBlocker, useLocation, useNavigate } from "react-router-dom";
 import { createLeaveGuards, type LeaveGuard } from "./leave-guards";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth";
+import { useModules } from "./modules";
+import { pageEnabled } from "./module-model";
 import {
   adminPages,
   closeTabs,
@@ -42,6 +44,7 @@ const WorkspaceContext = createContext<WorkspaceValue | null>(null);
  */
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
+  const modules = useModules();
   const location = useLocation();
   const navigate = useNavigate();
   const client = useQueryClient();
@@ -51,11 +54,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       adminPages
         .filter(
           (page) =>
-            page.permission === null ||
-            session?.permissions.includes(page.permission),
+            pageEnabled(page.path, modules) &&
+            (page.permission === null ||
+              session?.permissions.includes(page.permission)),
         )
         .map((page) => page.path),
-    [session?.permissions],
+    [session?.permissions, modules],
   );
   const pinned = allowed.includes("/admin") ? "/admin" : "/admin/profile";
   const storageKey = `mayday.workspace.tabs.${session!.user.id}`;

@@ -15,7 +15,7 @@ public final class PermissionCatalog {
     map.put("update", "编辑");
     map.put("delete", "删除");
     for (int i = 0; i < extras.length; i += 2) map.put(extras[i], extras[i + 1]);
-    return map;
+    return Collections.unmodifiableMap(map);
   }
 
   public static final List<Group> GROUPS =
@@ -54,13 +54,21 @@ public final class PermissionCatalog {
               actions("publish", "发布通知", "withdraw", "撤回通知", "all", "管理所有通知"),
               false),
           new Group("files", "文件中心", actions("download", "下载", "all", "管理所有文件"), false),
-          new Group("crawler", "图片采集", actions("run", "运行与规则预览", "stop", "停止任务", "download", "预览与下载图片", "all", "管理所有任务"), false),
+          new Group(
+              "crawler",
+              "图片采集",
+              actions("run", "运行与规则预览", "stop", "停止任务", "download", "预览与下载图片", "all", "管理所有任务"),
+              false),
           new Group("sessions", "在线会话", Map.of("view", "查看", "revoke", "强制下线"), false),
           new Group(
               "loginlogs", "登录日志", Map.of("view", "查看", "export", "导出", "delete", "清理历史日志"), false),
           new Group("userstats", "用户统计", Map.of("view", "查看"), false),
           new Group("monitor", "服务监控", Map.of("view", "查看"), false),
-          new Group("relay", "UDP 转发", Map.of("view", "查看统计", "configure", "配置地址与缓冲", "control", "启动与停止"), false),
+          new Group(
+              "relay",
+              "UDP 转发",
+              Map.of("view", "查看统计", "configure", "配置地址与缓冲", "control", "启动与停止"),
+              false),
           new Group("scheduler", "任务调度", actions("execute", "立即执行"), false),
           new Group("approvalcategories", "审批分类", actions(), false),
           new Group("workflows", "流程定义", actions("publish", "发布流程"), false),
@@ -77,17 +85,22 @@ public final class PermissionCatalog {
               "内容中心",
               actions("publish", "发布内容", "restore", "恢复内容", "purge", "永久删除"),
               true),
+          new Group("workorders", "工单管理", actions(), true),
+          // generator:permission-groups
           new Group(
               "logs", "操作日志", Map.of("view", "查看", "export", "导出", "delete", "清理历史日志"), false));
-  public static final Set<String> ALL = new HashSet<>();
+  public static final Set<String> ALL =
+      GROUPS.stream()
+          .flatMap(
+              group -> group.actions().keySet().stream().map(action -> group.key() + ":" + action))
+          .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
   /** 可配置行级数据范围的资源来自唯一权限目录，新增业务不再修改多个硬编码白名单。 */
   public static final Set<String> SCOPED_RESOURCES =
-      GROUPS.stream().filter(Group::scoped).map(Group::key).collect(java.util.stream.Collectors.toUnmodifiableSet());
-
-  static {
-    GROUPS.forEach(g -> g.actions().keySet().forEach(a -> ALL.add(g.key() + ":" + a)));
-  }
+      GROUPS.stream()
+          .filter(Group::scoped)
+          .map(Group::key)
+          .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
   public static final List<String> SCOPES =
       List.of("SELF", "DEPARTMENT", "DEPARTMENT_TREE", "CUSTOM", "ALL");

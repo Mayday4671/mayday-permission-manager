@@ -65,7 +65,8 @@ public class DashboardController {
                             (r, q, c) ->
                                 c.and(
                                     c.greaterThanOrEqualTo(r.get("createdAt"), date.atStartOfDay()),
-                                    c.lessThan(r.get("createdAt"), date.plusDays(1).atStartOfDay()))))));
+                                    c.lessThan(
+                                        r.get("createdAt"), date.plusDays(1).atStartOfDay()))))));
       }
     result.put("trend", trend);
     result.put(

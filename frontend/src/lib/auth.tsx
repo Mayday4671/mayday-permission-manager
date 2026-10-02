@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, tokenStore } from "./api";
+import { contractClient, unwrapContract } from "./contract-client";
 import type { AuthSession } from "../types";
 
 interface AuthValue {
@@ -30,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const client = useQueryClient();
   const refresh = useCallback(async () => {
-    setSession(await api<AuthSession>("/auth/me"));
+    setSession(unwrapContract(await contractClient.GET("/api/auth/me")));
   }, []);
   useEffect(() => {
     if (tokenStore.get())
@@ -68,10 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     captchaToken: string,
   ) => {
-    const result = await api<{ token: string }>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ username, password, captchaToken }),
-    });
+    const result = unwrapContract(
+      await contractClient.POST("/api/auth/login", {
+        body: { username, password, captchaToken },
+      }),
+    );
     client.clear();
     tokenStore.set(result.token);
     try {

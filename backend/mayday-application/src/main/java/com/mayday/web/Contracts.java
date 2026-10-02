@@ -14,6 +14,25 @@ public final class Contracts {
       @NotBlank @Size(max = 72) String password,
       @NotBlank(message = "请先完成滑动验证") @Size(max = 64) String captchaToken) {}
 
+  /** 登录响应只返回不透明会话令牌，不能把角色缓存当成请求授权依据。 */
+  public record LoginView(@NotBlank String token) {}
+
+  public enum DataScope {
+    SELF,
+    DEPARTMENT,
+    DEPARTMENT_TREE,
+    CUSTOM,
+    ALL
+  }
+
+  /** 会话响应采用明确 DTO，客户端类型与当前服务端字段保持一致。 */
+  @io.swagger.v3.oas.annotations.media.Schema(requiredProperties = {"admin"})
+  public record SessionView(
+      @NotNull UserView user,
+      @NotNull Set<String> permissions,
+      @NotNull Map<String, DataScope> dataScopes,
+      boolean admin) {}
+
   public record PasswordRequest(
       @NotBlank @Size(max = 72) String oldPassword,
       @NotBlank @Size(min = 10, max = 64) String newPassword) {}
@@ -44,13 +63,29 @@ public final class Contracts {
       Set<Long> postIds,
       Long version) {}
 
+  @io.swagger.v3.oas.annotations.media.Schema(
+      requiredProperties = {
+        "id",
+        "username",
+        "nickname",
+        "email",
+        "phone",
+        "departmentId",
+        "departmentName",
+        "enabled",
+        "roleIds",
+        "roleNames",
+        "postIds",
+        "createdAt",
+        "version"
+      })
   public record UserView(
       Long id,
       String username,
       String nickname,
-      String email,
-      String phone,
-      Long departmentId,
+      @io.swagger.v3.oas.annotations.media.Schema(nullable = true) String email,
+      @io.swagger.v3.oas.annotations.media.Schema(nullable = true) String phone,
+      @io.swagger.v3.oas.annotations.media.Schema(nullable = true) Long departmentId,
       String departmentName,
       boolean enabled,
       Set<Long> roleIds,

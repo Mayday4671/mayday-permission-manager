@@ -59,6 +59,16 @@ public class ApiExceptionHandler {
     return response(500, "服务暂时不可用，请稍后重试");
   }
 
+  /** 静态资源与不存在的 API 路径统一返回 404，不能被兜底异常处理误报为服务器故障。 */
+  @ExceptionHandler({
+    com.mayday.common.ResourceNotFoundException.class,
+    org.springframework.web.servlet.resource.NoResourceFoundException.class,
+    org.springframework.web.servlet.NoHandlerFoundException.class
+  })
+  ResponseEntity<?> notFound(Exception ex) {
+    return response(404, "请求的资源不存在");
+  }
+
   private ResponseEntity<?> response(int status, String message) {
     return ResponseEntity.status(status).body(ApiResponse.error(message));
   }

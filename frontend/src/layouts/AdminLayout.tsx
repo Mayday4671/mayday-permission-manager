@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useModules } from "../lib/modules";
+import { pageEnabled } from "../lib/module-model";
 import { useUnreadCount } from "../lib/personal-work";
 import { Brand, PersonAvatar } from "../components/shared";
 import { WorkspaceTabs, workspaceTabId } from "../components/WorkspaceTabs";
@@ -50,6 +52,7 @@ export function AdminLayout() {
 }
 
 function AdminShell() {
+  const modules = useModules();
   const { session, logout, can } = useAuth();
   const { revision, active, confirmLeave } = useWorkspace();
   const { message } = App.useApp();
@@ -119,7 +122,10 @@ function AdminShell() {
   // 配置决定顺序与显示名称，页面登记决定可实现的路由和真实权限；未知路由不进入搜索或菜单。
   const items = (navigation.data ?? []).filter((item) =>
     adminPages.some(
-      (page) => page.path === item.path && page.permission === item.permission,
+      (page) =>
+        page.path === item.path &&
+        page.permission === item.permission &&
+        pageEnabled(page.path, modules),
     ),
   );
   const current = items.find((item) => item.path === location.pathname);
@@ -182,15 +188,17 @@ function AdminShell() {
           )}
         </nav>
         <div className="sidebar-bottom">
-          <Link to="/" className="portal-shortcut">
-            <span className="portal-icon">
-              <Globe size={20} />
-            </span>
-            <span>
-              <b>前台门户</b>
-            </span>
-            <ArrowUpRight size={17} />
-          </Link>
+          {modules.portal && (
+            <Link to="/" className="portal-shortcut">
+              <span className="portal-icon">
+                <Globe size={20} />
+              </span>
+              <span>
+                <b>前台门户</b>
+              </span>
+              <ArrowUpRight size={17} />
+            </Link>
+          )}
           <button
             className="help-link"
             onClick={() => {

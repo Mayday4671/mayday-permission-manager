@@ -13,8 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 首次启动初始化，默认只建立管理员与必要基础资料，便于直接复用于新项目。
- * SEED_DEMO_DATA=true 才建立演示组织、普通角色、人员和文章；只在初始 admin 不存在时执行。
+ * 首次启动初始化，默认只建立管理员与必要基础资料，便于直接复用于新项目。 SEED_DEMO_DATA=true 才建立演示组织、普通角色、人员和文章；只在初始 admin 不存在时执行。
  * 两种模式均为同一事务，已有账号密码与权限不被重启覆盖，切换开关不会清理或追加既有业务数据。
  */
 @Component
@@ -194,13 +193,14 @@ public class BootstrapData implements CommandLineRunner {
   }
 
   /**
-   * 新项目模式不依赖演示部门、成员或文章。迁移已创建的菜单保留，仅补齐当前页面目录中的缺项。
-   * 分类和账号状态属于可编辑的基础资料，不会创建任何公开文章；管理员可在首次登录后设置组织及网站信息。
+   * 新项目模式不依赖演示部门、成员或文章。迁移已创建的菜单保留，仅补齐当前页面目录中的缺项。 分类和账号状态属于可编辑的基础资料，不会创建任何公开文章；管理员可在首次登录后设置组织及网站信息。
    */
   private void initializeClean(SysRole admin) {
     user("admin", "管理员", null, null, admin, password);
     Set<String> existingMenus = new HashSet<>();
-    entries.findByKindOrderBySortOrderAscIdAsc("menus").forEach(menu -> existingMenus.add(menu.getCode()));
+    entries
+        .findByKindOrderBySortOrderAscIdAsc("menus")
+        .forEach(menu -> existingMenus.add(menu.getCode()));
     int order = 0;
     for (var page : NavigationCatalog.PAGES) {
       if (existingMenus.contains(page.code())) continue;
@@ -215,7 +215,8 @@ public class BootstrapData implements CommandLineRunner {
     dictionaryItem(status, "停用", "false", 1);
     int categoryOrder = 0;
     for (String name : List.of("公告", "产品动态", "团队故事", "使用指南"))
-      entry("categories", name, "category_" + categoryOrder, null, "初始内容分类，可按业务调整", categoryOrder++);
+      entry(
+          "categories", name, "category_" + categoryOrder, null, "初始内容分类，可按业务调整", categoryOrder++);
     entry("settings", "平台名称", "site.name", null, "对外展示名称，请在网站配置中调整", 0).setValue("Mayday");
   }
 

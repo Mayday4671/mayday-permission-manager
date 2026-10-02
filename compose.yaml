@@ -13,7 +13,11 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: [CMD-SHELL, 'mysqladmin ping -h localhost -u root -p"$$MYSQL_ROOT_PASSWORD"']
+      test:
+        [
+          CMD-SHELL,
+          'mysqladmin ping -h localhost -u root -p"$$MYSQL_ROOT_PASSWORD"',
+        ]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -24,6 +28,16 @@ services:
       DB_USERNAME: ${MYSQL_USER:-mayday}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请配置 ADMIN_PASSWORD}
+      MODULE_CONTENT_ENABLED: ${MODULE_CONTENT_ENABLED:-true}
+      MODULE_PORTAL_ENABLED: ${MODULE_PORTAL_ENABLED:-true}
+      MODULE_NOTIFICATIONS_ENABLED: ${MODULE_NOTIFICATIONS_ENABLED:-true}
+      MODULE_APPROVALS_ENABLED: ${MODULE_APPROVALS_ENABLED:-true}
+      MODULE_CRAWLER_ENABLED: ${MODULE_CRAWLER_ENABLED:-true}
+      MODULE_SCHEDULER_ENABLED: ${MODULE_SCHEDULER_ENABLED:-true}
+      MODULE_UDP_ENABLED: ${MODULE_UDP_ENABLED:-true}
+      MODULE_WORKORDERS_ENABLED: ${MODULE_WORKORDERS_ENABLED:-false}
+      # generator:compose-environment
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
       TZ: Asia/Shanghai
     ports:
@@ -34,7 +48,7 @@ services:
       mysql:
         condition: service_healthy
     healthcheck:
-      test: [CMD, wget, --spider, -q, 'http://127.0.0.1:8080/actuator/health']
+      test: [CMD, wget, --spider, -q, "http://127.0.0.1:8080/actuator/health"]
       interval: 5s
       timeout: 3s
       retries: 30

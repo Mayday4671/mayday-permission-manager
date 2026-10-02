@@ -93,7 +93,8 @@ public class SessionController {
             .findFirst()
             .orElseThrow(() -> new BusinessException("会话已失效"));
     var user =
-        users.findById(s.getUserId())
+        users
+            .findById(s.getUserId())
             .orElseThrow(() -> new AccessDeniedException("会话所属账号不存在，不能操作"));
     if (!visible(user)) throw new AccessDeniedException("该会话不在您的授权范围内");
     // 猜到 UUID 也不能绕过列表范围；跨账号撤销还要防止低权限管理员强制下线高权限账号。

@@ -13,9 +13,11 @@ import org.springframework.stereotype.Component;
 public class WorkflowEventWorker {
   private final BusinessEventRepository events;
   private final WorkflowEvents delivery;
+  private final com.mayday.common.ModuleSwitches modules;
 
   @Scheduled(fixedDelay = 3000, initialDelay = 5000)
   public void run() {
+    if (!modules.isEnabled("approvals")) return;
     for (Long id : events.due(LocalDateTime.now(), PageRequest.of(0, 100)))
       try {
         delivery.deliver(id);

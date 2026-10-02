@@ -1,1 +1,17 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><parent><groupId>com.mayday</groupId><artifactId>mayday-parent</artifactId><version>1.0.0</version></parent><artifactId>mayday-operations</artifactId><dependencies><dependency><groupId>com.mayday</groupId><artifactId>mayday-security</artifactId><version>${project.version}</version></dependency></dependencies></project>
+<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.mayday</groupId>
+    <artifactId>mayday-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
+  <artifactId>mayday-operations</artifactId>
+  <dependencies>
+    <dependency>
+      <groupId>com.mayday</groupId>
+      <artifactId>mayday-security</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+</project>

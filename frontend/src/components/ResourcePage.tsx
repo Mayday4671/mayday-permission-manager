@@ -41,6 +41,14 @@ import {
 import { useBrowserPreference } from "../lib/useBrowserPreference";
 
 export interface ResourceConfig<T extends BaseRecord<string | number>> {
+  /** 可选契约客户端适配，保留通用分页、弹窗与权限行为，业务页无需重复实现列表交互。 */
+  transport?: {
+    save: (
+      values: Record<string, unknown>,
+      editing: T | null,
+    ) => Promise<unknown>;
+    remove: (record: T) => Promise<unknown>;
+  };
   resource: string;
   endpoint: string;
   /** 只供表格的可访问名称及业务提示使用；页面名称已有面包屑/标签页，正文不重复渲染标题或介绍。 */
@@ -213,17 +221,20 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
     const data = config.beforeSave
       ? config.beforeSave(values, editing)
       : values;
-    await api(`${endpoint}${editing ? `/${editing.id}` : ""}`, {
-      method: editing ? "PUT" : "POST",
-      body: jsonBody({ ...data, version: editing?.version }),
-    });
+    if (config.transport) await config.transport.save(data, editing);
+    else
+      await api(`${endpoint}${editing ? `/${editing.id}` : ""}`, {
+        method: editing ? "PUT" : "POST",
+        body: jsonBody({ ...data, version: editing?.version }),
+      });
     message.success(`${singular}已${editing ? "更新" : "创建"}`);
     setOpen(false);
     refresh();
   };
   const remove = async (record: T) => {
     try {
-      await api(`${endpoint}/${record.id}`, { method: "DELETE" });
+      if (config.transport) await config.transport.remove(record);
+      else await api(`${endpoint}/${record.id}`, { method: "DELETE" });
       message.success("已删除");
       refresh();
     } catch (error) {

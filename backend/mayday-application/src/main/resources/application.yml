@@ -33,3 +33,24 @@ mayday:
   admin-password: ${ADMIN_PASSWORD}
   # 仅首次空库初始化读取；正式新项目默认不创建演示人员、部门与文章。
   seed-demo-data: ${SEED_DEMO_DATA:false}
+  # 项目裁剪只需要调整开关并重启，未启用模块的数据、迁移和旧角色授权仍然保留。
+  modules:
+    enabled:
+      content: ${MODULE_CONTENT_ENABLED:true}
+      portal: ${MODULE_PORTAL_ENABLED:true}
+      notifications: ${MODULE_NOTIFICATIONS_ENABLED:true}
+      approvals: ${MODULE_APPROVALS_ENABLED:true}
+      crawler: ${MODULE_CRAWLER_ENABLED:true}
+      scheduler: ${MODULE_SCHEDULER_ENABLED:true}
+      udp: ${MODULE_UDP_ENABLED:true}
+      workorders: ${MODULE_WORKORDERS_ENABLED:false}
+      # generator:module-environment
+
+# 契约仅允许管理员读取；生产环境可以通过 API_DOCS_ENABLED=false 彻底关闭。
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
+    path: /api/platform/openapi
+  paths-to-match: /api/**
+  writer-with-order-by-keys: true
+  default-produces-media-type: application/json

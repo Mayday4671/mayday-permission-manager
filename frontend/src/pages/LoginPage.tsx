@@ -4,9 +4,11 @@ import { Alert, Button, Form, Input } from "antd";
 import { Brand } from "../components/shared";
 import { SlideCaptcha } from "../components/SlideCaptcha";
 import { useAuth } from "../lib/auth";
+import { useModules } from "../lib/modules";
 
 /** 登录使用真实认证接口。错误就地展示，初始凭证只写入项目说明，不在公共页面泄露。 */
 export function LoginPage() {
+  const modules = useModules();
   const { login, session, can } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -46,11 +48,13 @@ export function LoginPage() {
   return (
     <div className="login-page login-page-compact">
       <div className="login-form-side">
-        <Link to="/" className="back-to-portal">
-          前台门户
-        </Link>
+        {modules.portal && (
+          <Link to="/" className="back-to-portal">
+            前台门户
+          </Link>
+        )}
         <div className="login-form-wrap">
-          <Link to="/">
+          <Link to={modules.portal ? "/" : "/login"}>
             <Brand />
           </Link>
           <h2>后台登录</h2>

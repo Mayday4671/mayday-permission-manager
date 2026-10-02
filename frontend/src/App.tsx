@@ -13,6 +13,8 @@ import { AdminLayout } from "./layouts/AdminLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { PortalPage, ArticlePage } from "./pages/PortalPage";
 import { adminPages } from "./lib/workspace-model";
+import { useModules } from "./lib/modules";
+import { pageEnabled } from "./lib/module-model";
 import "./workflow.css";
 
 /** 按页面拆分代码，门户访客不下载后台图表及权限编辑器。 */
@@ -112,6 +114,13 @@ const ApprovalTasksPage = lazy(() =>
   })),
 );
 
+const WorkOrderPage = lazy(() =>
+  import("./pages/business/WorkOrderPage").then((module) => ({
+    default: module.WorkOrderPage,
+  })),
+);
+// generator:frontend-imports
+
 function Protected() {
   const { session, loading } = useAuth();
   const location = useLocation();
@@ -182,6 +191,7 @@ export class ErrorBoundary extends Component<
 }
 export default function Application() {
   const location = useLocation();
+  const modules = useModules();
   // 从列表进入详情时回到页面顶部；保留门户自身的锚点滚动行为。
   useEffect(() => {
     if (!location.hash) window.scrollTo(0, 0);
@@ -195,9 +205,18 @@ export default function Application() {
       }
     >
       <Routes>
-        <Route path="/" element={<PortalPage />} />
-        <Route path="/categories/:categoryId" element={<PortalPage />} />
-        <Route path="/articles/:id" element={<ArticlePage />} />
+        <Route
+          path="/"
+          element={
+            modules.portal ? <PortalPage /> : <Navigate to="/login" replace />
+          }
+        />
+        {modules.portal && (
+          <Route path="/categories/:categoryId" element={<PortalPage />} />
+        )}
+        {modules.portal && (
+          <Route path="/articles/:id" element={<ArticlePage />} />
+        )}
         <Route path="/login" element={<LoginPage />} />
         <Route element={<Protected />}>
           <Route path="/admin" element={<AdminLayout />}>
@@ -207,6 +226,8 @@ export default function Application() {
                   <Route key={page.path} index element={<DashboardRoute />} />
                 );
               const screens = {
+                workorders: WorkOrderPage,
+                // generator:frontend-screens
                 workflows: WorkflowsPage,
                 workflowDesigner: WorkflowDesignerPage,
                 requests: RequestsPage,
@@ -243,7 +264,9 @@ export default function Application() {
                   key={page.path}
                   path={page.path.slice("/admin/".length)}
                   element={
-                    page.permission ? (
+                    !pageEnabled(page.path, modules) ? (
+                      <Result status="404" title="该功能未启用" />
+                    ) : page.permission ? (
                       <Guard permission={page.permission}>{content}</Guard>
                     ) : (
                       content

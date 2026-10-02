@@ -11,9 +11,13 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - upgrade_data:/var/lib/mysql
-    healthcheck: &database-health
-      # 使用 TCP 与业务账号查询，避免初始化期间的临时 socket 服务被误判为可用。
-      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP --host=127.0.0.1 --user="$$MYSQL_USER" --database="$$MYSQL_DATABASE" --execute="SELECT 1" --silent']
+    healthcheck:
+      &database-health # 使用 TCP 与业务账号查询，避免初始化期间的临时 socket 服务被误判为可用。
+      test:
+        [
+          CMD-SHELL,
+          'MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP --host=127.0.0.1 --user="$$MYSQL_USER" --database="$$MYSQL_DATABASE" --execute="SELECT 1" --silent',
+        ]
       interval: 2s
       timeout: 3s
       retries: 60
@@ -23,6 +27,12 @@ services:
     volumes:
       - fresh_data:/var/lib/mysql
     healthcheck: *database-health
+  script-db:
+    image: mysql:8.4
+    environment: *database-environment
+    volumes:
+      - script_data:/var/lib/mysql
+    healthcheck: *database-health
   backend-upgrade:
     image: mayday-verification-backend:local
     build: ./backend
@@ -31,6 +41,16 @@ services:
       DB_USERNAME: mayday_verify
       DB_PASSWORD: ${VERIFY_DB_PASSWORD}
       ADMIN_PASSWORD: ${VERIFY_ADMIN_PASSWORD:?由验证脚本注入}
+      MODULE_CONTENT_ENABLED: ${MODULE_CONTENT_ENABLED:-true}
+      MODULE_PORTAL_ENABLED: ${MODULE_PORTAL_ENABLED:-true}
+      MODULE_NOTIFICATIONS_ENABLED: ${MODULE_NOTIFICATIONS_ENABLED:-true}
+      MODULE_APPROVALS_ENABLED: ${MODULE_APPROVALS_ENABLED:-true}
+      MODULE_CRAWLER_ENABLED: ${MODULE_CRAWLER_ENABLED:-true}
+      MODULE_SCHEDULER_ENABLED: ${MODULE_SCHEDULER_ENABLED:-true}
+      MODULE_UDP_ENABLED: ${MODULE_UDP_ENABLED:-true}
+      MODULE_WORKORDERS_ENABLED: "true"
+      # generator:compose-environment
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}
       SEED_DEMO_DATA: "false"
       TZ: Asia/Shanghai
     ports:
@@ -39,7 +59,7 @@ services:
       upgrade-db:
         condition: service_healthy
     healthcheck: &backend-health
-      test: [CMD, wget, --spider, -q, 'http://127.0.0.1:8080/actuator/health']
+      test: [CMD, wget, --spider, -q, "http://127.0.0.1:8080/actuator/health"]
       interval: 2s
       timeout: 3s
       retries: 60
@@ -55,6 +75,18 @@ services:
       fresh-db:
         condition: service_healthy
     healthcheck: *backend-health
+  backend-script:
+    image: mayday-verification-backend:local
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:mysql://script-db:3306/mayday_verify?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    ports:
+      - "127.0.0.1:${VERIFY_SCRIPT_PORT:-18084}:8080"
+    depends_on:
+      script-db:
+        condition: service_healthy
+    healthcheck: *backend-health
 volumes:
   upgrade_data:
   fresh_data:
+  script_data:

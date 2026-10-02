@@ -1,0 +1,30 @@
+{
+  "module": "workorders",
+  "entity": "WorkOrder",
+  "resource": "workorders",
+  "label": "工单管理",
+  "singular": "工单",
+  "table": "biz_work_order",
+  "fields": [
+    {
+      "name": "title",
+      "label": "标题",
+      "type": "string",
+      "maxLength": 160,
+      "required": true
+    },
+    {
+      "name": "description",
+      "label": "说明",
+      "type": "string",
+      "maxLength": 1000,
+      "required": false
+    },
+    {
+      "name": "enabled",
+      "label": "启用状态",
+      "type": "boolean",
+      "required": true
+    }
+  ]
+}

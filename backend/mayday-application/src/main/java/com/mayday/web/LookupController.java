@@ -21,6 +21,7 @@ public class LookupController {
   private final RoleRepository roles;
   private final UserRepository users;
   private final AccessPolicy access;
+  private final com.mayday.common.ModuleSwitches modules;
 
   /** 选择器遵守同一用户数据范围，永不因下拉框泄露范围外账号或联系方式。 */
   @GetMapping("/options/{kind}")
@@ -75,6 +76,7 @@ public class LookupController {
         entries.findByKindOrderBySortOrderAscIdAsc("menus").stream()
             .filter(SystemEntry::isEnabled)
             .filter(e -> NavigationCatalog.matches(e.getPath(), e.getPermission()))
+            .filter(e -> !"/admin/site-settings".equals(e.getPath()) || modules.isEnabled("portal"))
             .filter(e -> e.getPermission() != null && access.has(e.getPermission()))
             .toList());
   }

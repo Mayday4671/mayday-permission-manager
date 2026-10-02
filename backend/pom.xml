@@ -20,6 +20,8 @@
     <module>mayday-operations</module>
     <module>mayday-crawler</module>
     <module>mayday-netty</module>
+    <module>mayday-workorders</module>
+    <!-- generator:maven-modules -->
     <module>mayday-application</module>
   </modules>
   <properties>
@@ -27,6 +29,9 @@
     <!-- UDP 转发按约定锁定版本；统一解析，避免 Boot 将模块的传递依赖替换成另一版 Netty。 -->
     <netty.version>4.1.105.Final</netty.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <springdoc.version>3.0.3</springdoc.version>
+    <swagger-annotations.version>2.2.47</swagger-annotations.version>
+    <spotless.version>2.44.3</spotless.version>
   </properties>
   <dependencies>
     <dependency>
@@ -35,4 +40,25 @@
       <optional>true</optional>
     </dependency>
   </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+        <configuration>
+          <lineEndings>UNIX</lineEndings>
+          <java>
+            <googleJavaFormat><version>1.25.2</version></googleJavaFormat>
+            <removeUnusedImports />
+            <trimTrailingWhitespace />
+            <endWithNewline />
+          </java>
+        </configuration>
+        <executions>
+          <execution><id>java-style</id><phase>validate</phase><goals><goal>check</goal></goals></execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

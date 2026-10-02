@@ -13,10 +13,12 @@ import org.springframework.scheduling.annotation.*;
 public class JobSchedule {
   private final ScheduledJobRepository jobs;
   private final JobRunner runner;
+  private final com.mayday.common.ModuleSwitches modules;
   private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(JobSchedule.class);
 
   @Scheduled(fixedDelay = 10000)
   public void tick() {
+    if (!modules.isEnabled("scheduler")) return;
     for (var job : jobs.findByEnabledTrueAndNextRunAtLessThanEqual(LocalDateTime.now())) {
       try {
         runner.run(job.getId(), false);

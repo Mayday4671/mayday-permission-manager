@@ -36,6 +36,8 @@ public final class NavigationCatalog {
           page("approvalcategories", "审批分类", "/admin/approval-categories"),
           page("workflows", "流程定义", "/admin/workflows"),
           page("requests", "审批申请", "/admin/requests"),
+          page("workorders", "工单管理", "/admin/workorders"),
+          // generator:navigation-pages
           new Page("tasks", "审批待办", "/admin/tasks", "requests:approve"));
 
   private static Page page(String code, String name, String path) {

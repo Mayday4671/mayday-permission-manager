@@ -1,5 +1,6 @@
 package com.mayday.security;
 
+import com.mayday.common.ModuleSwitches;
 import com.mayday.system.model.AuditLog;
 import com.mayday.system.repository.AuditRepository;
 import jakarta.servlet.*;
@@ -26,6 +27,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class SecurityConfig {
   private final TokenService tokens;
   private final AuditRepository audits;
+  private final ModuleSwitches modules;
 
   @Bean
   PasswordEncoder passwordEncoder() {
@@ -51,10 +53,22 @@ public class SecurityConfig {
                         "/api/auth/login",
                         "/api/auth/captcha/challenge",
                         "/api/auth/captcha/verify",
+                        "/api/platform/features",
                         "/api/public/**",
                         "/actuator/health",
                         "/error")
                     .permitAll()
+                    .requestMatchers("/api/platform/openapi", "/api/platform/openapi/**")
+                    .access(
+                        (authentication, context) ->
+                            new org.springframework.security.authorization.AuthorizationDecision(
+                                authentication.get().getPrincipal()
+                                        instanceof com.mayday.system.model.SysUser user
+                                    && user.getRoles().stream()
+                                        .anyMatch(
+                                            role ->
+                                                role.isEnabled()
+                                                    && "admin".equals(role.getCode()))))
                     .anyRequest()
                     .authenticated())
         .exceptionHandling(
@@ -68,6 +82,11 @@ public class SecurityConfig {
                   HttpServletRequest req, HttpServletResponse res, FilterChain chain)
                   throws ServletException, IOException {
                 long start = System.nanoTime();
+                // 在认证与业务控制器之前阻断关闭模块，包括管理员、附件及猜测 ID 的直接请求。
+                if (!modules.pathEnabled(req.getServletPath())) {
+                  json(res, 404, "该功能未启用");
+                  return;
+                }
                 String auth = req.getHeader("Authorization");
                 if (auth != null && auth.startsWith("Bearer "))
                   tokens

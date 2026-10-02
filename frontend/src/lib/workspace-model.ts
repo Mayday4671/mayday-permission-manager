@@ -1,6 +1,15 @@
 /** 页签只接受已实现的后台路由；不从浏览器存储恢复任意地址或权限信息。 */
 export const adminPages = [
   {
+    path: "/admin/workorders",
+    title: "工单管理",
+    permission: "workorders:view",
+    screen: "workorders",
+    group: "独立入口",
+    icon: "notices",
+  },
+  // generator:frontend-pages
+  {
     path: "/admin/udp-relay",
     title: "UDP 转发",
     permission: "relay:view",

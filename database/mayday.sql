@@ -1,6 +1,6 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V17）
--- 唯一对外交付 SQL：40 张业务表、373 个业务字段、索引/外键及必要基础资料。
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V18）
+-- 唯一对外交付 SQL：41 张业务表、382 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
 -- 【使用方法】
@@ -12,7 +12,7 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V17 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V18+。
+-- 4. 本文件已包含 V18 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V19+。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
@@ -598,11 +598,11 @@ CREATE TABLE `sys_user_role` (
 
 
 -- Flyway 版本管理表：记录本文件对应的 V15 基线，后续仍按正常增量迁移升级。
--- BASELINE 不伪造 V1–V15 的执行校验和；它声明当前结构已处于版本 15。
+-- BASELINE 声明当前结构已处于版本 18；不伪造历史迁移的执行校验和。
 -- 参考：https://documentation.red-gate.com/flyway/flyway-concepts/baselines
 CREATE TABLE flyway_schema_history (
   installed_rank INT NOT NULL COMMENT '安装记录顺序；由 Flyway 后续维护',
-  version VARCHAR(50) DEFAULT NULL COMMENT '数据库迁移版本；本初始化基线为 15',
+  version VARCHAR(50) DEFAULT NULL COMMENT '数据库迁移版本；本初始化基线为 18',
   description VARCHAR(200) NOT NULL COMMENT '迁移描述或基线标记',
   type VARCHAR(20) NOT NULL COMMENT '记录类型；BASELINE 表示导入后的结构起点，后续 SQL 表示增量迁移',
   script VARCHAR(1000) NOT NULL COMMENT '迁移脚本名或标准基线标记',
@@ -614,6 +614,24 @@ CREATE TABLE flyway_schema_history (
   PRIMARY KEY (installed_rank),
   KEY flyway_schema_history_s_idx (success)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Flyway 迁移历史；由框架维护，禁止手动删除或修改已执行记录';
+
+-- 工单管理独立模块；创建者与部门在服务端确定，所有读写遵守动作权限和行级范围。
+CREATE TABLE `biz_work_order` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '记录主键；数据库自增，不接受客户端指定',
+  `title` varchar(160) NOT NULL COMMENT '标题；最大 160 个字符',
+  `description` varchar(1000) DEFAULT NULL COMMENT '说明；最大 1000 个字符',
+  `enabled` tinyint(1) NOT NULL COMMENT '启用状态；1 启用，0 停用',
+  `owner_id` bigint NOT NULL COMMENT '创建账号主键；服务器从有效登录身份赋值，普通编辑不可修改',
+  `department_id` bigint DEFAULT NULL COMMENT '创建时部门主键；用于部门及指定部门数据范围判断',
+  `created_at` datetime(6) NOT NULL COMMENT '创建时间；服务端生成，Asia/Shanghai',
+  `updated_at` datetime(6) NOT NULL COMMENT '最近修改时间；服务端在事务提交时维护',
+  `version` bigint NOT NULL DEFAULT '0' COMMENT '乐观锁版本；编辑和删除必须提交当前值，否则返回 409',
+  PRIMARY KEY (`id`),
+  KEY `idx_biz_work_order_owner` (`owner_id`),
+  KEY `idx_biz_work_order_department` (`department_id`),
+  CONSTRAINT `fk_biz_work_order_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_biz_work_order_department` FOREIGN KEY (`department_id`) REFERENCES `sys_entry` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='工单管理业务记录；模块关闭时保留数据';
 
 SET SESSION foreign_key_checks = @mayday_original_foreign_key_checks;
 
@@ -770,12 +788,12 @@ CREATE TABLE `udp_relay_config` (
   `receive_buffer_mib` int NOT NULL COMMENT '申请内核接收缓冲大小，单位 MiB，范围 1 至 64；实际大小受操作系统上限约束',
   `send_buffer_mib` int NOT NULL COMMENT '申请内核发送缓冲大小，单位 MiB，范围 1 至 64；页面展示实际授予值',
   `pending_memory_mib` int NOT NULL COMMENT '应用待发送缓冲内存上限，单位 MiB，范围 1 至 256；按缓冲容量及额外开销计量，超限计数丢弃',
-  `send_ip` varchar(64) NOT NULL DEFAULT '' COMMENT '发送本地源 IP；空字符串由系统路由选择，非空必须属于本机启用的网卡；不替代系统路由和 SO_BINDTODEVICE',
-  `send_port` int NOT NULL DEFAULT 0 COMMENT '发送本地 UDP 源端口；0 为系统分配，或指定 1024 至 65535；独立于接收端口，不自动处理回包',
-  `transport_mode` varchar(10) NOT NULL DEFAULT 'AUTO' COMMENT 'Netty UDP 传输模式：AUTO 优先 Linux EPOLL 否则 NIO；可固定 NIO 或 EPOLL 用于平台兼容验证，不可用的强制模式拒绝启动',
   `created_at` datetime(6) NOT NULL COMMENT '配置创建时间，服务器 Asia/Shanghai 时区；非数据包到达时间',
   `updated_at` datetime(6) NOT NULL COMMENT '最近配置保存时间；实时统计和启停不触发逐包数据库更新',
   `version` bigint DEFAULT NULL COMMENT 'JPA 乐观锁版本；保存和启动需提交当前版本，防止旧页面覆盖或启动过期配置',
+  `send_ip` varchar(64) NOT NULL DEFAULT '' COMMENT '发送本地源 IP；空字符串由系统路由选择，非空必须属于本机启用的网卡；不替代系统路由和 SO_BINDTODEVICE',
+  `send_port` int NOT NULL DEFAULT 0 COMMENT '发送本地 UDP 源端口；0 为系统分配，或指定 1024 至 65535；独立于接收端口，不自动处理回包',
+  `transport_mode` varchar(10) NOT NULL DEFAULT 'AUTO' COMMENT 'Netty UDP 传输模式：AUTO 优先 Linux EPOLL 否则 NIO；可固定 NIO 或 EPOLL 用于平台兼容验证，不可用的强制模式拒绝启动',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='独立 Netty UDP 转发的管理端配置；运行状态和计数仅保留于当前进程，重启默认停止';
 
@@ -786,12 +804,17 @@ INSERT INTO sys_entry(kind,name,code,path,permission,sort_order,enabled,created_
 SELECT 'menus','UDP 转发','relay','/admin/udp-relay','relay:view',110,1,NOW(6),NOW(6),0
 WHERE NOT EXISTS(SELECT 1 FROM sys_entry WHERE kind='menus' AND code='relay');
 
+-- 只补建导航，不自动授予普通角色权限，不修改已有菜单或业务记录。
+INSERT INTO sys_entry(kind,name,code,path,permission,sort_order,enabled,created_at,updated_at,version)
+SELECT 'menus','工单管理','workorders','/admin/workorders','workorders:view',200,1,NOW(6),NOW(6),0
+WHERE NOT EXISTS(SELECT 1 FROM sys_entry WHERE kind='menus' AND code='workorders');
+
 -- 全部建表及基础资料成功后才登记基线；如前面报错，必须停止，不能跳过失败语句。
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '17', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '18', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
--- 安装完成自检：应得到 40 张业务表、373 个业务字段，缺少注释数均为 0。
+-- 安装完成自检：应得到 41 张业务表、382 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。
 SELECT COUNT(*) AS business_tables, SUM(table_comment = '') AS missing_table_comments
 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history';

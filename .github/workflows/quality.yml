@@ -1,0 +1,48 @@
+name: Framework quality
+
+on:
+  push:
+    branches: [main, "codex/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: "backend/**/pom.xml"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+      - name: Frontend, generator and contract checks
+        run: node scripts/check-project.mjs
+      - name: Java format, unit tests and package
+        run: bash ./backend/mvnw -f backend/pom.xml verify
+      - name: Start isolated source database
+        run: |
+          node scripts/ci-bootstrap.mjs
+          docker compose up -d --build --wait --wait-timeout 180 mysql backend
+      - name: Fresh install, preserved upgrade, permission and module regression
+        run: node scripts/verify-baseline.mjs
+      - name: Stop CI services
+        if: always()
+        run: docker compose down --volumes --remove-orphans
+        # Only ephemeral CI volumes are removed. Local validation never removes the daily database volume.

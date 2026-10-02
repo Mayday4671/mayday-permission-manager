@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
+import { useModules } from "./modules";
 import type { Appearance } from "./theme-model";
 
 export interface SiteConfig {
@@ -27,9 +28,10 @@ export interface Taxonomy {
 
 /** 首页、详情与页脚共享缓存，只读取公开白名单；后台更改会在 30 秒内重新获取。 */
 export function useSite(enabled = true) {
+  const modules = useModules();
   return useQuery({
     queryKey: ["site"],
-    enabled,
+    enabled: enabled && modules.portal === true,
     queryFn: ({ signal }) => api<SiteConfig>("/public/site", { signal }),
     refetchInterval: 30000,
   });

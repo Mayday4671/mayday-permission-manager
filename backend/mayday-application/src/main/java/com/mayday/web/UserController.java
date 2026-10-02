@@ -17,7 +17,7 @@ public class UserController {
 
   @GetMapping
   @PreAuthorize("@access.has('users:view')")
-  public ApiResponse<?> list(
+  public ApiResponse<PageResult<UserView>> list(
       @RequestParam(defaultValue = "") String keyword,
       @RequestParam(required = false) Boolean enabled,
       @RequestParam(required = false) Long departmentId,
@@ -28,7 +28,7 @@ public class UserController {
 
   @GetMapping("/export")
   @PreAuthorize("@access.has('users:export') and @access.has('users:view')")
-  public ApiResponse<?> export(
+  public ApiResponse<PageResult<UserView>> export(
       @RequestParam(defaultValue = "") String keyword,
       @RequestParam(required = false) Boolean enabled,
       @RequestParam(required = false) Long departmentId,
@@ -39,13 +39,13 @@ public class UserController {
 
   @PostMapping
   @PreAuthorize("@access.has('users:create')")
-  public ApiResponse<?> create(@Valid @RequestBody UserRequest req) {
+  public ApiResponse<UserView> create(@Valid @RequestBody UserRequest req) {
     return ApiResponse.ok(service.save(null, req));
   }
 
   @PutMapping("/{id}")
   @PreAuthorize("@access.has('users:update')")
-  public ApiResponse<?> update(@PathVariable Long id, @Valid @RequestBody UserRequest req) {
+  public ApiResponse<UserView> update(@PathVariable Long id, @Valid @RequestBody UserRequest req) {
     return ApiResponse.ok(service.save(id, req));
   }
 

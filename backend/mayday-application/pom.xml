@@ -9,7 +9,20 @@
   <artifactId>mayday-application</artifactId>
   <dependencies>
     <dependency>
-      <groupId>com.mayday</groupId><artifactId>mayday-netty</artifactId><version>${project.version}</version>
+      <groupId>com.mayday</groupId>
+      <artifactId>mayday-workorders</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- generator:maven-dependencies -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+      <version>${springdoc.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.mayday</groupId>
+      <artifactId>mayday-netty</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.mayday</groupId>
