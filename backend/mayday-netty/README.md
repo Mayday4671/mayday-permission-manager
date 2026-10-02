@@ -51,6 +51,8 @@ relay.close();
 
 ## 可重复验收
 
+普通 `mvn test` 不要求预先调整宿主内核。配置边界与实际缓冲启动保护始终执行；三项 UDP 数据报集成测试仅在系统实际授予至少 4 MiB 收发缓冲时执行，否则 JUnit 明确记录为跳过。默认 Docker 构建可能出现这种跳过，不能视为已完成 UDP 转发验收。Linux 上提高 `net.core.rmem_max/wmem_max` 后重跑测试，应确认五项测试全部通过、没有跳过；高吞吐验收另需满足下面打流工具的速率、序号和字节要求。
+
 执行 `mvn test dependency:copy-dependencies -DincludeScope=runtime` 后，在本目录运行：
 
 ```sh

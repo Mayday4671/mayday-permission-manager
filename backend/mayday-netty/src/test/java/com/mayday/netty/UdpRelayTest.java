@@ -1,6 +1,7 @@
 package com.mayday.netty;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import org.junit.jupiter.api.Test;
 import java.net.*;
 import java.util.*;
@@ -8,6 +9,22 @@ import java.util.*;
 class UdpRelayTest {
   static int freePort() throws Exception { try(var socket=new DatagramSocket(0,InetAddress.getLoopbackAddress())) { return socket.getLocalPort(); } }
   static RelayConfig config(int bind,int target) { return new RelayConfig("127.0.0.1",bind,"127.0.0.1",target,4,4,16); }
+  /**
+   * 普通构建不能要求宿主机预先调整内核参数。只有完整授予 4 MiB 收发缓冲时才运行
+   * 数据报集成测试；不具备条件时 JUnit 明确记录 skipped，而不是放宽生产启动校验。
+   * 缓冲不足时拒绝启动及资源回收另有下面的测试，在默认 Docker 环境也会执行。
+   */
+  static boolean fullSocketBuffersAvailable() throws Exception {
+    try(var socket=new DatagramSocket()) {
+      socket.setReceiveBufferSize(4*1024*1024);
+      socket.setSendBufferSize(4*1024*1024);
+      return socket.getReceiveBufferSize()>=4*1024*1024 && socket.getSendBufferSize()>=4*1024*1024;
+    }
+  }
+  static void requireSocketBuffers() throws Exception {
+    assumeTrue(fullSocketBuffersAvailable(),
+        "UDP 数据报集成测试需要实际 4 MiB 收发缓冲；Linux 请配置 rmem_max/wmem_max 后重跑 mvn test");
+  }
   @Test void exactVersionAndConfigBoundaries() throws Exception {
     io.netty.util.Version.identify().values().forEach(v -> assertEquals("4.1.105.Final",v.artifactVersion()));
     assertThrows(IllegalArgumentException.class,()->config(19000,19000));
@@ -16,7 +33,33 @@ class UdpRelayTest {
     assertThrows(IllegalArgumentException.class,()->new RelayConfig("127.0.0.1",19000,"224.0.0.1",19001,4,4,16));
     assertThrows(IllegalArgumentException.class,()->new RelayConfig("127.0.0.1",19000,"127.0.0.1",19001,4,4,1000));
   }
+  @Test void startupHonorsActualSocketBufferLimitsAndReleasesPorts() throws Exception {
+    boolean enough=fullSocketBuffersAvailable();
+    for(String mode:io.netty.channel.epoll.Epoll.isAvailable()?new String[]{"NIO","EPOLL"}:new String[]{"NIO"}) {
+      int port=freePort(),target=freePort();
+      var cfg=new RelayConfig("127.0.0.1",port,"127.0.0.1",target,4,4,16,"",0,mode);
+      try(var relay=new UdpRelay()) {
+        if(enough) {
+          var result=relay.start(cfg);
+          assertEquals("RUNNING",result.state());
+          assertTrue(result.actualReceiveBuffer()>=4*1024*1024);
+          assertTrue(result.actualSendBuffer()>=4*1024*1024);
+          relay.stop();
+        } else {
+          var error=assertThrows(IllegalStateException.class,()->relay.start(cfg));
+          assertTrue(error.getMessage().contains("系统收发缓冲不足"));
+          assertEquals("FAILED",relay.snapshot().state());
+          assertEquals(0,relay.snapshot().receivedPackets());
+        }
+        // 无论正常停止还是启动失败，都不能遗留监听端口，下一次启动仍可占用。
+        try(var socket=new DatagramSocket(port,InetAddress.getLoopbackAddress())) {
+          assertEquals(port,socket.getLocalPort());
+        }
+      }
+    }
+  }
   @Test void patchesOnlyThirdAndFourthBytesAndNeverTruncatesLargeDatagrams() throws Exception {
+    requireSocketBuffers();
     try(var sink=new DatagramSocket(0,InetAddress.getLoopbackAddress());var sender=new DatagramSocket();var relay=new UdpRelay()) {
       sink.setSoTimeout(5000);sink.setReceiveBufferSize(4*1024*1024);
       int port=freePort();var cfg=config(port,sink.getLocalPort());relay.start(cfg);
@@ -39,6 +82,7 @@ class UdpRelayTest {
     }
   }
   @Test void occupiedPortFailsAndResourcesCanBeStartedAgain() throws Exception {
+    requireSocketBuffers();
     int port;
     try(var relay=new UdpRelay()) {
       try(var occupied=new DatagramSocket(0,InetAddress.getLoopbackAddress())) {
@@ -51,6 +95,7 @@ class UdpRelayTest {
     }
   }
   @Test void separateSourceBindingAndReceiveFromMultiplePeersOnBothTransports() throws Exception {
+    requireSocketBuffers();
     assertTrue(LocalInterfaces.list().stream().anyMatch(n -> n.ip().equals("127.0.0.1") && n.up()));
     for(String mode:io.netty.channel.epoll.Epoll.isAvailable()?new String[]{"NIO","EPOLL"}:new String[]{"NIO"}) {
       try(var sink=new DatagramSocket(0,InetAddress.getLoopbackAddress());var senderA=new DatagramSocket();var senderB=new DatagramSocket();var relay=new UdpRelay()) {

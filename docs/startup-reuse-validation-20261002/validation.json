@@ -1,0 +1,102 @@
+{
+  "date": "2026-10-02",
+  "baseline": {
+    "runId": "20261002032957025-b2ddb5",
+    "startedAt": "2026-10-02T03:29:57.027Z",
+    "finishedAt": "2026-10-02T03:35:45.729Z",
+    "status": "passed",
+    "cleanup": "passed",
+    "checks": [
+      {
+        "name": "原数据库一致性快照与 SQL 备份",
+        "status": "passed"
+      },
+      {
+        "name": "备份已在独立数据库成功恢复",
+        "status": "passed"
+      },
+      {
+        "name": "升级与空库安装迁移一致，原业务记录与角色授权不变",
+        "status": "passed"
+      },
+      {
+        "name": "所有业务表和字段的中文 COMMENT 完整且一致，原有字段定义保持不变",
+        "status": "passed",
+        "detail": {
+          "tables": 40,
+          "columns": 373
+        }
+      },
+      {
+        "name": "纯净初始化仅创建管理员及必要基础资料，不创建演示组织、人员或文章",
+        "status": "passed"
+      },
+      {
+        "name": "upgrade：真实 MySQL 接口回归",
+        "status": "passed"
+      },
+      {
+        "name": "fresh：真实 MySQL 接口回归",
+        "status": "passed"
+      },
+      {
+        "name": "接口回归结束后，原业务快照完全一致",
+        "status": "passed"
+      },
+      {
+        "name": "重启未重复初始化或改变迁移、原业务数据",
+        "status": "passed"
+      },
+      {
+        "name": "日常运行数据库未被本次验证更改",
+        "status": "passed"
+      }
+    ],
+    "api": {
+      "upgrade": {
+        "tests": 104,
+        "passed": 104,
+        "failed": 0
+      },
+      "fresh": {
+        "tests": 104,
+        "passed": 104,
+        "failed": 0
+      }
+    },
+    "databaseDocumentation": {
+      "tables": 40,
+      "columns": 373
+    }
+  },
+  "tests": {
+    "windowsUdp": {
+      "total": 5,
+      "passed": 5,
+      "skipped": 0
+    },
+    "dockerUdp": {
+      "total": 5,
+      "passed": 2,
+      "skipped": 3,
+      "reason": "Actual system socket buffers below 4 MiB"
+    },
+    "frontendModels": {
+      "passed": 25
+    },
+    "frontendComponents": {
+      "passed": 19
+    }
+  },
+  "visual": {
+    "portal": "verified",
+    "admin": "login-page-only"
+  },
+  "udpLoad": "not-run",
+  "sourceSha256": {
+    "backend/mayday-netty/src/test/java/com/mayday/netty/UdpRelayTest.java": "48681a25a88dc476ea7210cc7a4447a9d5f96dabe5a7f152171347863a7ff0f9",
+    "backend/mayday-netty/src/main/java/com/mayday/netty/UdpRelay.java": "dde58ebbcfc023ec885532ec0e447e234eda6f9ca221ddf2495c5b33f1b30213",
+    "tests/api.test.mjs": "6eaa0a9ec4e645b7755035f712dc515a2e14e55897d15dcae9c68506c70b92ae",
+    "database/mayday.sql": "abf0264652736938f98a46d88abf3885ce3e34a1bec1e28ea0ba62539981a1c1"
+  }
+}
