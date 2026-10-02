@@ -2,7 +2,8 @@ package com.mayday.crawler;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.mayday.common.BusinessException;
-import java.util.*;
+import java.util.List;
+import java.util.Locale;
 import org.jsoup.Jsoup;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -24,6 +25,7 @@ public record CrawlRules(
   public record ArticleRule(
       boolean enabled, String title, String content, String author, String publishedAt) {}
 
+  /** 历史任务没有 article 字段时仍默认采集正文，维持旧任务的可读兼容性。 */
   public ArticleRule articleRule() {
     return article == null ? new ArticleRule(true, "", "", "", "") : article;
   }
@@ -55,6 +57,7 @@ public record CrawlRules(
         null);
   }
 
+  /** 只支持链接、数值模板和 JSON 游标等确定性分页；不会执行任意网页脚本。 */
   public enum Mode {
     SINGLE,
     NEXT,
@@ -63,11 +66,13 @@ public record CrawlRules(
     CURSOR
   }
 
+  /** 页面解析格式，由任务显式指定，不根据服务端返回的任意正文猜测可执行内容。 */
   public enum Format {
     HTML,
     JSON
   }
 
+  /** 每组分页的独立规则，列表与每篇详情各有计数预算。 start/step 控制模板序号，maxPages 限制请求数量，JSON 字段采用标准 Pointer；模板不会执行表达式。 */
   public record PageRule(
       Mode mode,
       Format format,
@@ -83,14 +88,17 @@ public record CrawlRules(
 
   private static final JsonMapper JSON = JsonMapper.builder().build();
 
+  /** 将已验证的配置保存为快照；执行后不再允许编辑，重试使用同一规则。 */
   public String json() {
     return JSON.writeValueAsString(this);
   }
 
+  /** 读取数据库规则快照；损坏或未知字段结构须明确失败，不擅自扩宽采集域名与预算。 */
   public static CrawlRules parse(String json) {
     return JSON.readValue(json, CrawlRules.class);
   }
 
+  /** 在预览、保存和运行前校验域名、选择器及请求预算，浏览器的输入校验不能替代此边界。 */
   public CrawlRules validate() {
     WebAddress.parse(entryUrl);
     page(list);
@@ -170,6 +178,7 @@ public record CrawlRules(
     }
   }
 
+  /** 旧任务的可选定位字段允许为空，统一转为空串后再判断是否使用默认识别。 */
   public static String text(String value) {
     return value == null ? "" : value;
   }

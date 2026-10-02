@@ -1,7 +1,9 @@
 package com.mayday.crawler;
 
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.*;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.nodes.TextNode;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -9,11 +11,13 @@ import tools.jackson.databind.JsonNode;
  * 字符，截断会明确标记；标题/作者/日期均限制长度，日期保留来源文本而非猜测时区。
  */
 public final class ArticleExtractor {
+  /** 保存后的纯文本归档；来源日期保留原始文本，truncated 明确标记正文字符预算截断。 */
   public record Text(
       String title, String body, String author, String publishedAt, boolean truncated) {}
 
   private ArticleExtractor() {}
 
+  /** 优先使用显式 CSS 规则，再使用常见文章结构；只在克隆节点上清理，避免影响图片分页解析。 */
   public static Text html(Document document, CrawlRules.ArticleRule rule) {
     var body =
         first(
@@ -36,6 +40,7 @@ public final class ArticleExtractor {
     return text(title, body == null ? "" : plain(body.clone()), author, date);
   }
 
+  /** JSON Pointer 定位来源字段，HTML 型正文字段仍须净化为纯文本，不能返回可执行远端 HTML。 */
   public static Text json(JsonNode node, CrawlRules.ArticleRule rule) {
     return text(
         read(node, rule.title(), "/title"),
@@ -91,6 +96,7 @@ public final class ArticleExtractor {
         body.length() > 20000);
   }
 
+  /** 限制归档字段长度并保持完整 UTF-16 代理对，避免截断 emoji 后写入无效数据库字符。 */
   public static String limit(String value, int size) {
     if (value == null) return "";
     // 不从 UTF-16 代理对中间截断，避免 emoji 等字符变成无效 JSON/数据库字符。

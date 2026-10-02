@@ -22,6 +22,7 @@ export function cleanRichText(html: string): string {
     ALLOWED_ATTR: [],
   });
 }
+/** 正文展示只能使用清洗后的排版 HTML，不允许事件、外部嵌入和用户提供的元素属性。 */
 export function RichTextView({ content }: { content: string }) {
   return (
     <div

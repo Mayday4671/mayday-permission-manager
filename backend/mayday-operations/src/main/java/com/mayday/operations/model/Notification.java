@@ -1,9 +1,16 @@
 package com.mayday.operations.model;
 
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,7 +26,7 @@ public class Notification extends BaseEntity {
   @Column(length = 500)
   private String summary;
 
-  @Column(nullable = false, columnDefinition = "text")
+  @Column(nullable = false, columnDefinition = "longtext")
   private String content;
 
   @Column(nullable = false, length = 24)
@@ -40,11 +47,13 @@ public class Notification extends BaseEntity {
   private LocalDateTime expiresAt;
   private LocalDateTime withdrawnAt;
 
+  /** 关联业务标签由服务端白名单生成，不存任意页面 URL；打开关联记录仍独立鉴权。 */
   @Column(length = 24)
   private String targetType;
 
   private Long targetId;
 
+  /** 系统投递唯一事件键，重复重试返回原消息；手动发布通知无需该键。 */
   @Column(unique = true, length = 160)
   private String eventKey;
 

@@ -1,9 +1,12 @@
 package com.mayday.operations.model;
 
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
 /** 事务发件箱：仅存储最小站内通知数据，不把审批表单或内容正文复制到消息里。 */
 @Getter

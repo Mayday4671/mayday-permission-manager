@@ -80,6 +80,7 @@ export function encodeWorkflowValues(
   }
   return result;
 }
+/** 把已鉴权的文件编号恢复成上传控件状态；附件读取仍使用申请范围接口，不复用公开 URL。 */
 export function hydrateWorkflowValues(
   fields: WorkflowField[],
   values: Record<string, unknown>,
@@ -99,6 +100,7 @@ export function hydrateWorkflowValues(
       });
   return result;
 }
+/** 只展示后端已经按当前节点可读范围裁剪的字段，历史附件也走独立参与权校验。 */
 export function WorkflowValues({
   fields,
   values,

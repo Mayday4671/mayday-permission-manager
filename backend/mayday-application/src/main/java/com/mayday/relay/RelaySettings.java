@@ -2,7 +2,9 @@ package com.mayday.relay;
 
 import com.mayday.common.BaseEntity;
 import com.mayday.netty.RelayConfig;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -42,6 +44,7 @@ public class RelaySettings extends BaseEntity {
   @Column(nullable = false, length = 10)
   private String transportMode;
 
+  /** 将持久化配置投影为无 Spring/JPA 依赖的核心参数，由核心构造器统一验证网卡与范围。 */
   public RelayConfig toConfig() {
     return new RelayConfig(
         bindIp,
@@ -56,6 +59,7 @@ public class RelaySettings extends BaseEntity {
         transportMode);
   }
 
+  /** 只复制已校验配置的白名单字段，运行状态、统计数字和数据库版本不从请求覆盖。 */
   public void apply(RelayConfig value) {
     bindIp = value.bindIp();
     bindPort = value.bindPort();

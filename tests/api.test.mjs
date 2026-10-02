@@ -7,6 +7,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loginWithCaptcha } from "./support/captcha.mjs";
+import { purgeTestFiles } from "./support/files-cleanup.mjs";
 
 const base = process.env.API_BASE ?? "http://127.0.0.1:18080/api";
 const prefix = `qa_${Date.now().toString(36)}`;
@@ -2041,10 +2042,7 @@ test("真实 MySQL 权限与业务回归", async (t) => {
       await cleanup(() =>
         request(`/system/users/${id}`, { token: admin, method: "DELETE" }),
       );
-    for (const id of created.files.reverse())
-      await cleanup(() =>
-        request(`/operations/files/${id}`, { token: admin, method: "DELETE" }),
-      );
+    await cleanup(() => purgeTestFiles(base, admin, created.files));
     for (const id of created.tags.reverse())
       await cleanup(() =>
         request(`/system/entries/tags/${id}`, {

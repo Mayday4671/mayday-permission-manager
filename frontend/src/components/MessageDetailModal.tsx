@@ -77,7 +77,13 @@ function MessageReader({ id, onClose }: { id: number; onClose: () => void }) {
       ? "/admin/notices"
       : detail.data?.targetType === "APPROVAL" && can("requests:view")
         ? "/admin/requests"
-        : null;
+        : detail.data?.targetType === "FEEDBACK" && can("feedback:view")
+          ? "/admin/feedback"
+          : detail.data?.targetType === "SCHEDULER" && can("scheduler:view")
+            ? "/admin/scheduler"
+            : detail.data?.targetType === "MONITOR" && can("monitor:view")
+              ? "/admin/monitor"
+              : null;
   return (
     <DetailsModal
       title={

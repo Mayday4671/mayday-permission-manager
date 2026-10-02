@@ -2,6 +2,7 @@ package com.mayday.common;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
@@ -23,12 +24,14 @@ public class ModuleSwitches {
           "crawler",
           "udp",
           "scheduler",
-          "workorders"
+          "workorders",
+          "feedback"
           // generator:module-keys
           );
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
   private Map<String, Boolean> enabled = new LinkedHashMap<>();
 
+  /** 返回启动配置的不可变副本；依赖关系未在此展开，界面展示应使用有效开关快照。 */
   public Map<String, Boolean> getEnabled() {
     return Map.copyOf(enabled);
   }
@@ -37,7 +40,7 @@ public class ModuleSwitches {
   public void setEnabled(Map<String, Boolean> values) {
     if (values == null
         || !KEYS.containsAll(values.keySet())
-        || values.values().stream().anyMatch(java.util.Objects::isNull)) {
+        || values.values().stream().anyMatch(Objects::isNull)) {
       throw new IllegalArgumentException("模块配置包含未知名称或空值");
     }
     enabled = new LinkedHashMap<>(values);
@@ -63,6 +66,7 @@ public class ModuleSwitches {
     };
   }
 
+  /** 给菜单与前端公开最终有效开关，包含依赖联动；返回值不能用于修改服务端配置。 */
   public Map<String, Boolean> snapshot() {
     Map<String, Boolean> result = new LinkedHashMap<>();
     KEYS.stream().sorted().forEach(key -> result.put(key, isEnabled(key)));
@@ -81,6 +85,7 @@ public class ModuleSwitches {
           case "relay" -> "udp";
           case "scheduler" -> "scheduler";
           case "workorders" -> "workorders";
+          case "feedback" -> "feedback";
           // generator:permission-modules
           default -> null;
         };
@@ -106,6 +111,9 @@ public class ModuleSwitches {
             Map.entry("/api/operations/workflows/**", "approvals"),
             Map.entry("/api/operations/requests/**", "approvals"),
             Map.entry("/api/operations/messages/**", "notifications"),
+            Map.entry("/api/operations/realtime/**", "notifications"),
+            Map.entry("/api/operations/feedback/**", "feedback"),
+            Map.entry("/api/public/feedback/**", "feedback"),
             Map.entry("/api/operations/notifications/**", "notifications"),
             Map.entry("/api/operations/people", "notifications"),
             Map.entry("/api/operations/scheduler/**", "scheduler"),

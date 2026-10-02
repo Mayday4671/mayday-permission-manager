@@ -863,3 +863,8 @@
     animation: none !important;
   }
 }
+.site-feedback-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+}

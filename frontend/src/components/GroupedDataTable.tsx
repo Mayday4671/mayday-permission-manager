@@ -17,12 +17,16 @@ export function GroupedDataTable<T extends { id: string | number }>({
   groupBy,
   loading,
   size,
+  onColumnResize,
+  onColumnReorder,
 }: {
   rows: T[];
   columns: ColumnsType<T>;
   groupBy: (row: T) => string;
   loading: boolean;
   size: TableProps<T>["size"];
+  onColumnResize?: (key: string, width: number) => void;
+  onColumnReorder?: (source: string, target: string) => void;
 }) {
   const tree = useMemo(() => groupTableRows(rows, groupBy), [rows, groupBy]);
   const [expanded, setExpanded] = useState<Key[]>([]);
@@ -106,6 +110,8 @@ export function GroupedDataTable<T extends { id: string | number }>({
         aria-label="菜单层级"
         rowKey="key"
         columns={groupedColumns}
+        onColumnResize={onColumnResize}
+        onColumnReorder={onColumnReorder}
         dataSource={tree}
         sequence={(row) => row.sequence}
         pagination={false}

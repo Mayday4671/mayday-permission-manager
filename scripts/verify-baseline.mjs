@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import {
   readDatabaseMetadata,
+  readDatabaseConstraints,
   verifyDatabaseComments,
   structuralColumns,
 } from "./database-docs.mjs";
@@ -196,6 +197,10 @@ function verificationSnapshot(service) {
     ops_delivery: "id",
     ops_file: "id",
     ops_file_payload: "id",
+    ops_file_directory: "id",
+    sys_bulk_job: "id",
+    ops_feedback: "id",
+    ops_feedback_history: "id",
   };
   Object.assign(tables, {
     ops_flow_definition: "id",
@@ -245,6 +250,10 @@ function apiSuite(label, port) {
       "tests/captcha.test.mjs",
       "tests/crawler.test.mjs",
       "tests/business-module.test.mjs",
+      "tests/realtime-workflow.test.mjs",
+      "tests/file-center.test.mjs",
+      "tests/bulk-data.test.mjs",
+      "tests/general-platform.test.mjs",
     ],
     {
       env: {
@@ -439,7 +448,19 @@ try {
           };
         }),
       ),
-      structuralColumns(sourceSchema),
+      structuralColumns(
+        sourceSchema.map((table) => ({
+          ...table,
+          // V19只扩大通知正文容量以容纳中文上限；业务内容仍由快照证明未改，其余已有字段不可改型。
+          columns: table.columns.map((column) =>
+            table.name === "ops_notification" &&
+            column.name === "content" &&
+            column.type === "text"
+              ? { ...column, type: "longtext" }
+              : column,
+          ),
+        })),
+      ),
       "升级改变或删除了原有字段定义",
     );
   assert.deepEqual(
@@ -451,6 +472,35 @@ try {
     structuralColumns(scriptSchema),
     structuralColumns(freshSchema),
     "统一 SQL 与增量迁移的表结构不一致",
+  );
+  // 列定义一致仍可能遗漏唯一索引或外键动作；三种安装路径同时核对约束语义，忽略自动名称。
+  const upgradeConstraints = readDatabaseConstraints((sql) =>
+    query(checkCompose, "upgrade-db", sql),
+  );
+  const freshConstraints = readDatabaseConstraints((sql) =>
+    query(checkCompose, "fresh-db", sql),
+  );
+  const scriptConstraints = readDatabaseConstraints((sql) =>
+    query(checkCompose, "script-db", sql),
+  );
+  assert.deepEqual(
+    upgradeConstraints,
+    freshConstraints,
+    "空库与升级库的索引或外键语义不一致",
+  );
+  assert.deepEqual(
+    scriptConstraints,
+    freshConstraints,
+    "统一 SQL 与增量迁移的索引或外键语义不一致",
+  );
+  result.databaseConstraints = {
+    indexes: freshConstraints.indexes.length,
+    foreignKeys: freshConstraints.foreignKeys.length,
+    sha256: digest(JSON.stringify(freshConstraints)),
+  };
+  mark(
+    "空库、升级库与统一 SQL 的索引及外键约束一致",
+    result.databaseConstraints,
   );
   result.databaseDocumentation = {
     tables: freshSchema.length,

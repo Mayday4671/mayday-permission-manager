@@ -1,13 +1,26 @@
 package com.mayday.service;
 
-import com.mayday.common.*;
-import com.mayday.content.*;
+import com.mayday.common.BusinessException;
+import com.mayday.common.RichText;
+import com.mayday.content.ContentPublication;
+import com.mayday.content.ContentPublicationRepository;
+import com.mayday.content.ContentRevision;
+import com.mayday.content.ContentRevisionRepository;
+import com.mayday.content.Notice;
+import com.mayday.content.NoticeRepository;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.*;
-import com.mayday.web.ContentContracts.*;
+import com.mayday.system.repository.EntryRepository;
+import com.mayday.system.repository.UserRepository;
+import com.mayday.web.ContentContracts.Draft;
+import com.mayday.web.ContentContracts.Publish;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -29,8 +42,10 @@ public class ContentService {
   private final AccessPolicy access;
   private final ContentAssets assets;
   private final SettingService settings;
+  private final ChangeAuditService changeAudit;
   private final com.mayday.operations.repository.FlowRequestRepository approvalRequests;
 
+  /** 先验证内容查看权限与作者/部门范围，再选择普通读取或主记录行锁；所有管理用例复用此边界，行锁要求调用者处于事务。 */
   public Notice managed(Long id, boolean lock) {
     access.require("notices:view");
     var n =
@@ -40,6 +55,7 @@ public class ContentService {
     return n;
   }
 
+  /** 修订必须同时匹配内容ID，拒绝通过其他文章的修订ID越权读取正文；调用者应先授权对应主记录。 */
   public ContentRevision revision(Long id, Long noticeId) {
     return revisions
         .findById(id)
@@ -63,6 +79,7 @@ public class ContentService {
         .orElseThrow(() -> new BusinessException("分类或标签尚未登记，请先维护基础资料"));
   }
 
+  /** 投影不可变修订与登记分类、标签及附件；仅在已授权的管理或发布上下文使用，文件元数据不含存储密钥。 */
   public Map<String, Object> revisionView(ContentRevision r) {
     Map<String, Object> v = new LinkedHashMap<>();
     v.put("revisionId", r.getId());
@@ -98,6 +115,7 @@ public class ContentService {
     return v;
   }
 
+  /** 管理列表返回当前草稿和线上状态两个独立维度，线上正文仍由已发布修订决定；回收站和排期错误不会混同发布状态。 */
   public Map<String, Object> view(Notice n) {
     var v = revisionView(revision(n.getDraftRevisionId(), n.getId()));
     v.put("id", n.getId());
@@ -125,6 +143,7 @@ public class ContentService {
     return v;
   }
 
+  /** 授权主记录后按修订号倒序读取完整历史；保存新草稿不会改写已发布正文或旧审批绑定的修订。 */
   public List<Map<String, Object>> history(Long id) {
     managed(id, false);
     return revisions.findByNoticeIdOrderByRevisionNumberDesc(id).stream()
@@ -132,6 +151,7 @@ public class ContentService {
         .toList();
   }
 
+  /** 合并单篇审核要求与后台强制审核开关；发布和定时执行都重新读取，旧排期不能绕过后来开启的强制审核。 */
   public boolean approvalRequired(Notice n) {
     return n.isRequiresApproval()
         || Boolean.parseBoolean(settings.values().getOrDefault("content.requireApproval", "false"));
@@ -146,6 +166,7 @@ public class ContentService {
     if (n.getDeletedAt() != null) throw new BusinessException("请先从回收站恢复内容");
   }
 
+  /** 计算当前有效上线状态，排除回收站、无线上修订和已到下线时间的记录；后台与公开入口复用一致时间语义。 */
   public static boolean online(Notice n) {
     return n.getDeletedAt() == null
         && n.isPublished()
@@ -153,6 +174,7 @@ public class ContentService {
         && (n.getLiveOfflineAt() == null || n.getLiveOfflineAt().isAfter(LocalDateTime.now()));
   }
 
+  /** 在数据库查询层只选择有效上线且PUBLIC的修订，避免先分页再过滤导致数量泄露或公开草稿正文。 */
   public static Specification<Notice> publiclyVisible() {
     return (r, q, c) ->
         c.and(
@@ -165,6 +187,7 @@ public class ContentService {
                 c.greaterThan(r.get("liveOfflineAt"), LocalDateTime.now())));
   }
 
+  /** 按动作权限保存新不可变修订，校验版本、分类、标签和附件归属并清理富文本；兼容旧published字段也必须独立发布授权。 */
   @Transactional
   public Map<String, Object> save(Long id, Draft req) {
     access.require(id == null ? "notices:create" : "notices:update");
@@ -239,6 +262,7 @@ public class ContentService {
     return view(n);
   }
 
+  /** 锁定主记录并只发布当前已审核修订；重复发布同一版本可幂等返回，定时上线保存操作人并在执行时重新验证权限。 */
   @Transactional
   public Map<String, Object> publish(Long id, Publish req) {
     access.require("notices:publish");
@@ -283,6 +307,7 @@ public class ContentService {
 
   /** 下线是单一内部操作，人工操作、删除和定时器都关闭同一发布记录。 */
   private void takeOffline(Notice n, String reason) {
+    Map<String, Object> before = publicationSnapshot(n);
     var now = LocalDateTime.now();
     publications
         .findByNoticeIdAndOfflineAtIsNull(n.getId())
@@ -296,6 +321,7 @@ public class ContentService {
     n.setLiveRevision(null);
     n.setLiveOfflineAt(null);
     if ("PUBLISHED".equals(n.getDraftStatus())) n.setDraftStatus("OFFLINE");
+    changeAudit.record("内容", n.getId(), reason, before, publicationSnapshot(n));
   }
 
   private void goLive(
@@ -315,8 +341,20 @@ public class ContentService {
     p.setOperatorName(operator);
     p.setReason(reason);
     publications.save(p);
+    changeAudit.record("内容", n.getId(), reason, Map.of("线上修订ID", "—"), publicationSnapshot(n));
   }
 
+  /** 记录发布版本与状态，不复制文章正文、附件或客户联系方式到日志。 */
+  private static Map<String, Object> publicationSnapshot(Notice notice) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("内容标题", notice.getTitle());
+    snapshot.put("前台展示", notice.isPublished());
+    snapshot.put("线上修订ID", notice.getLiveRevisionId());
+    snapshot.put("定时下线", notice.getLiveOfflineAt());
+    return snapshot;
+  }
+
+  /** 人工下线要求发布权限、目标数据范围及当前版本；关闭线上发布记录与排期，不抹掉历史正文。 */
   @Transactional
   public Map<String, Object> offline(Long id, Long version) {
     access.require("notices:publish");
@@ -330,6 +368,7 @@ public class ContentService {
     return view(n);
   }
 
+  /** 删除先移入回收站并取消排期，若仍在线或已排期额外要求发布权限；历史修订继续保留以便恢复和审计。 */
   @Transactional
   public void delete(Long id) {
     access.require("notices:delete");
@@ -340,6 +379,7 @@ public class ContentService {
     n.setDeletedAt(LocalDateTime.now());
   }
 
+  /** 恢复只进入草稿状态，绝不自动重新上线；要求独立恢复权限及版本检查，防止旧弹窗改变回收站状态。 */
   @Transactional
   public Map<String, Object> restore(Long id, Long version) {
     access.require("notices:restore");
@@ -355,6 +395,7 @@ public class ContentService {
     return view(n);
   }
 
+  /** 仅彻底删除回收站中且没有审批历史引用的内容，独立purge权限保护不可逆动作；关联发布和修订先于主记录清理。 */
   @Transactional
   public void purge(Long id) {
     access.require("notices:purge");

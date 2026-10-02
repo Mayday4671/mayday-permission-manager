@@ -115,8 +115,10 @@ export function NotificationsPage() {
     enabled: selected !== null && detail.data?.status !== "DRAFT",
   });
   const refresh = () => void client.invalidateQueries();
+  /** 管理按钮按本人发件或独立全量权限显示，最终操作权仍由服务端检查。 */
   const own = (row: NotificationRecord) =>
     can("notifications:all") || row.senderId === session?.user.id;
+  /** 编辑前重取通知版本，不能沿用列表摘要作为正文或收件人范围的可信来源。 */
   const edit = async (row: NotificationRecord | null) => {
     try {
       const record = row
@@ -148,6 +150,7 @@ export function NotificationsPage() {
       message.error((error as Error).message);
     }
   };
+  /** 发布/撤回带版本；复制使用原记录读取授权并生成新草稿，绝不改写已发布正文。 */
   const action = async (
     row: NotificationRecord,
     verb: "publish" | "withdraw" | "copy",

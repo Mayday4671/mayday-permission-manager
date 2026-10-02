@@ -274,10 +274,6 @@
 .admin-layout .resource-panel {
   padding: 16px;
 }
-.admin-layout .resource-panel .ant-table {
-  border: 1px solid var(--app-table-border);
-  border-radius: var(--app-radius);
-}
 .admin-layout .table-actions {
   margin-left: auto;
 }

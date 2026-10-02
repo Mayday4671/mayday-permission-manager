@@ -1,7 +1,17 @@
 package com.mayday.content;
 
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,8 +21,10 @@ import lombok.Setter;
 @Entity
 @Table(name = "cms_notice")
 public class Notice extends BaseEntity {
+  /** 当前编辑修订；草稿调整不会影响正在门户展示的 liveRevisionId。 */
   private Long draftRevisionId;
 
+  /** 已上线的不可变修订指针；没有此指针时即使 published=true 也不能公开正文。 */
   @Column(name = "live_revision_id")
   private Long liveRevisionId;
 
@@ -25,23 +37,27 @@ public class Notice extends BaseEntity {
   private String draftStatus = "DRAFT";
 
   private boolean requiresApproval;
-  private java.time.LocalDateTime publishedAt;
-  private java.time.LocalDateTime liveOfflineAt;
+  private LocalDateTime publishedAt;
+  private LocalDateTime liveOfflineAt;
+
+  /** 排期独立引用修订，定时任务重新验证授权状态，不自动发布后续未审核的编辑内容。 */
   private Long scheduledRevisionId;
-  private java.time.LocalDateTime scheduledPublishAt;
-  private java.time.LocalDateTime scheduledOfflineAt;
+
+  private LocalDateTime scheduledPublishAt;
+  private LocalDateTime scheduledOfflineAt;
   private Long scheduledActorId;
 
   @Column(length = 500)
   private String scheduleError;
 
   private long viewCount;
-  private java.time.LocalDateTime deletedAt;
+  private LocalDateTime deletedAt;
 
+  /** 为旧客户端保留的标签文本快照；新客户端以修订中的稳定标签 ID 为准。 */
   @ElementCollection(fetch = FetchType.EAGER)
   @CollectionTable(name = "cms_notice_tag", joinColumns = @JoinColumn(name = "notice_id"))
   @Column(name = "tag", length = 32, nullable = false)
-  private java.util.Set<String> tags = new java.util.HashSet<>();
+  private Set<String> tags = new HashSet<>();
 
   @Column(nullable = false, length = 160)
   private String title;
@@ -58,6 +74,7 @@ public class Notice extends BaseEntity {
   @Column(nullable = false)
   private boolean published;
 
+  /** 作者与部门用于服务端数据范围；这些字段不允许由客户端随意替换。 */
   @Column(nullable = false)
   private Long authorId;
 

@@ -137,9 +137,11 @@ function Approvals({ tasks = false }: { tasks?: boolean }) {
     </>
   );
 }
+/** 发起与参与入口；申请信息由服务端范围过滤，不从全部待办中自行筛选。 */
 export function RequestsPage() {
   return <Approvals />;
 }
+/** 当前处理人与历史处理入口，使用同一审批详情和决定契约保证动作权限一致。 */
 export function ApprovalTasksPage() {
   return <Approvals tasks />;
 }

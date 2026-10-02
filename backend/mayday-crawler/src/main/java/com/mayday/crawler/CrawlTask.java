@@ -2,9 +2,12 @@ package com.mayday.crawler;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
 /** 规则随任务保存；开始后禁止原地修改，防止续跑时混用不同的分页语义。 */
 @Entity
@@ -21,6 +24,7 @@ public class CrawlTask extends BaseEntity {
   @Column(nullable = false, length = 64)
   private String ownerName;
 
+  /** 实际点击运行的账号；领取和提交结果都重新检查这个账号的实时授权。 */
   private Long runnerId;
 
   @Column(nullable = false, length = 20)
@@ -35,6 +39,7 @@ public class CrawlTask extends BaseEntity {
   @JsonIgnore
   private String rulesJson;
 
+  /** 每次领取生成新租约，停止、到期或重领后旧工作器的结果会被拒绝。 */
   @JsonIgnore
   @Column(length = 36)
   private String leaseToken;
@@ -50,6 +55,7 @@ public class CrawlTask extends BaseEntity {
   private int failedCount;
   private long totalBytes;
 
+  /** 对外展示解析后的受控规则；原始 JSON 和执行租约不会序列化到客户端。 */
   public CrawlRules getRules() {
     return CrawlRules.parse(rulesJson);
   }

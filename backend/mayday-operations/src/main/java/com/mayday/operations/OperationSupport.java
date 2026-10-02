@@ -7,6 +7,7 @@ import java.util.Objects;
 public final class OperationSupport {
   private OperationSupport() {}
 
+  /** 操作记录更新必须带当前乐观锁版本；缺失或过期抛出冲突并回滚，不能靠最后写入覆盖其他处理人。 */
   public static void version(BaseEntity entity, Long version) {
     if (version == null || !Objects.equals(entity.getVersion(), version))
       throw new org.springframework.dao.OptimisticLockingFailureException("记录已更新，请刷新后重试");

@@ -15,6 +15,7 @@ public class WorkflowEventWorker {
   private final WorkflowEvents delivery;
   private final com.mayday.common.ModuleSwitches modules;
 
+  /** 关闭审批模块后不扫描事件；每条已提交事件独立事务投递，失败另存退避状态。 */
   @Scheduled(fixedDelay = 3000, initialDelay = 5000)
   public void run() {
     if (!modules.isEnabled("approvals")) return;

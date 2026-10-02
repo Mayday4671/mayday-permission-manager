@@ -1,11 +1,18 @@
 package com.mayday.crawler;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.mayday.common.BusinessException;
-import java.net.*;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** 离线网页夹具覆盖两层分页、旧站编码和恶意地址；不会依赖第三方网站的内容稳定性。 */
@@ -49,10 +56,10 @@ class PageExtractorTest {
             html(
                 "https://example.com/list",
                 """
-      <title>图库</title><article><img data-src="/original.jpg" src="/small.jpg"><img src="/original.jpg">
-      <img src="http://evil.example/a.jpg"><img src="//cdn.example.com/ok.png"></article>
-      <a class="next disabled" href="/bad">下一页</a><a class="next" href="/list?page=2">下一页</a>
-      """),
+                <title>图库</title><article><img data-src="/original.jpg" src="/small.jpg"><img src="/original.jpg">
+                <img src="http://evil.example/a.jpg"><img src="//cdn.example.com/ok.png"></article>
+                <a class="next disabled" href="/bad">下一页</a><a class="next" href="/list?page=2">下一页</a>
+                """),
             simple(CrawlRules.Mode.NEXT),
             false,
             0,
@@ -74,7 +81,8 @@ class PageExtractorTest {
         PageExtractor.extract(
             html(
                 "https://example.com/list",
-                "<a class=detail href=/article/5.html>详情</a><article><img src=/thumb.png></article>"),
+                "<a class=detail href=/article/5.html>详情</a><article><img"
+                    + " src=/thumb.png></article>"),
             rules,
             false,
             0,
@@ -100,7 +108,8 @@ class PageExtractorTest {
     var response =
         html(
             "https://example.com/list",
-            "<a class=next href=?page=2>2</a><a class=next href=?page=2#x>2</a><a class=next href=?page=3>3</a>");
+            "<a class=next href=?page=2>2</a><a class=next href=?page=2#x>2</a><a class=next"
+                + " href=?page=3>3</a>");
     assertEquals(
         2,
         PageExtractor.extract(
@@ -267,11 +276,11 @@ class PageExtractorTest {
             html(
                 "https://example.com/list",
                 """
-      <title>网页标题</title><meta name=author content=来源作者><h1>文章标题</h1><time datetime=2026-09-22></time>
-      <nav>顶部菜单</nav><div class=entry-content><p>第一段</p><p>第二段<br>换行</p>
-      <script>alert('secret')</script><iframe src=https://evil.example></iframe><form>表单</form><nav>正文导航</nav>
-      <div class=addtoany_share_save_container><div class=addtoany_header>分享带来好运：</div></div></div>
-      """),
+                <title>网页标题</title><meta name=author content=来源作者><h1>文章标题</h1><time datetime=2026-09-22></time>
+                <nav>顶部菜单</nav><div class=entry-content><p>第一段</p><p>第二段<br>换行</p>
+                <script>alert('secret')</script><iframe src=https://evil.example></iframe><form>表单</form><nav>正文导航</nav>
+                <div class=addtoany_share_save_container><div class=addtoany_header>分享带来好运：</div></div></div>
+                """),
             simple(CrawlRules.Mode.SINGLE),
             false,
             0,

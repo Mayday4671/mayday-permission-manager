@@ -222,6 +222,7 @@ function safeTarget(root, name) {
   return target;
 }
 
+/** 验证模块与全部登记位置后生成可审阅计划，预览阶段不写文件、不连接数据库且拒绝覆盖既有业务。 */
 export function createGenerationPlan(root, input) {
   root = resolve(root);
   const config = validateModule(input);
@@ -517,6 +518,7 @@ export function createGenerationPlan(root, input) {
   return [...plan.values()];
 }
 
+/** 二次核对计划基线后写入，任何失败只回滚本次文件变更；调用方仍须格式化、契约生成与数据库验收。 */
 export function applyGenerationPlan(root, plan) {
   const applied = [];
   // 二次检查防止预览后被其他编辑修改，也避免半套注册产生无法启动的工程。

@@ -1,6 +1,46 @@
 /** 页签只接受已实现的后台路由；不从浏览器存储恢复任意地址或权限信息。 */
 export const adminPages = [
   {
+    path: "/admin/feedback",
+    title: "客户反馈",
+    permission: "feedback:view",
+    screen: "feedback",
+    group: "客户服务",
+    icon: "notices",
+  },
+  {
+    path: "/admin/scheduler",
+    title: "任务调度",
+    permission: "scheduler:view",
+    screen: "scheduler",
+    group: "系统管理",
+    icon: "settings",
+  },
+  {
+    path: "/admin/monitor",
+    title: "服务监控",
+    permission: "monitor:view",
+    screen: "monitor",
+    group: "系统管理",
+    icon: "dashboard",
+  },
+  {
+    path: "/admin/sessions",
+    title: "在线会话",
+    permission: "sessions:view",
+    screen: "sessions",
+    group: "系统管理",
+    icon: "users",
+  },
+  {
+    path: "/admin/changes",
+    title: "变更记录",
+    permission: "logs:view",
+    screen: "changes",
+    group: "系统管理",
+    icon: "logs",
+  },
+  {
     path: "/admin/workorders",
     title: "工单管理",
     permission: "workorders:view",

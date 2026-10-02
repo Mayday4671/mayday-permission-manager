@@ -24,6 +24,7 @@ export function Brand({
     </div>
   );
 }
+/** 仅用于有实际内容分区的标题与工具栏，后台整页标题由面包屑和页签承担。 */
 export function SectionTitle({
   title,
   subtitle,
@@ -54,6 +55,7 @@ export function Permission({
   const { can } = useAuth();
   return can(value) ? <>{children}</> : null;
 }
+/** 状态颜色和文字共同传达启停，调用方可替换业务术语，不能只靠颜色辨识状态。 */
 export function StatusTag({
   enabled,
   activeText = "启用",
@@ -70,6 +72,7 @@ export function StatusTag({
     </span>
   );
 }
+/** 未配置头像时使用姓名首字符和稳定配色；不向外站请求头像或暴露用户身份。 */
 export function PersonAvatar({
   name,
   size = 36,
@@ -126,6 +129,7 @@ export function QueryState({
     );
   return <>{children}</>;
 }
+/** 带可访问名称的列表刷新操作，旋转图标表示后台同步但不清空已有结果。 */
 export function RefreshButton({
   onClick,
   loading,
@@ -143,10 +147,12 @@ export function RefreshButton({
     </Tooltip>
   );
 }
+/** 统一人类可读的服务端时间格式，空值或无效日期显示占位而非 Invalid Date。 */
 export const formatTime = (value: string | null | undefined) =>
   value && dayjs(value).isValid()
     ? dayjs(value).format("YYYY-MM-DD HH:mm")
     : "—";
+/** 分类保留实际后台名称，并用常见类别配色辅助识别；未知类别仍可展示。 */
 export function CategoryTag({ value }: { value: string }) {
   return (
     <Tag
@@ -165,6 +171,7 @@ export function CategoryTag({ value }: { value: string }) {
     </Tag>
   );
 }
+/** 导航提示的纯展示组合，具体链接地址和点击权限由调用方提供，不自行推断入口。 */
 export function ArrowLink({ children }: { children: ReactNode }) {
   return (
     <span className="arrow-link">

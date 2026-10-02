@@ -1,6 +1,8 @@
 package com.mayday.service;
 
-import com.mayday.common.*;
+import com.mayday.common.BusinessException;
+import com.mayday.common.PageResult;
+import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.model.AuditLog;
 import com.mayday.system.repository.AuditRepository;
@@ -29,6 +31,7 @@ public class AuditQueryService {
             : c.notEqual(r.get("path"), "/api/auth/login");
   }
 
+  /** 按日期、结果和关键字分页查询当前授权的日志分类；导出同时要求该分类的查看与导出权限，每页最多100条。 */
   @Transactional(readOnly = true)
   public PageResult<AuditLog> list(
       boolean loginOnly,
@@ -66,6 +69,7 @@ public class AuditQueryService {
         audits.findAll(filter, PageResult.request(page, exporting ? 100 : size)));
   }
 
+  /** 只在当前日志分类内查找指定ID，防止拿登录日志ID绕过操作日志的独立授权；不存在时返回统一业务错误。 */
   @Transactional(readOnly = true)
   public AuditLog detail(boolean loginOnly, Long id) {
     access.require(resource(loginOnly) + ":view");

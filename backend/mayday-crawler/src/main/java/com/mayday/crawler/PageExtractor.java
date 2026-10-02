@@ -2,11 +2,16 @@ package com.mayday.crawler;
 
 import com.mayday.common.BusinessException;
 import java.io.ByteArrayInputStream;
-import java.net.*;
+import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.*;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -14,6 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 public final class PageExtractor {
   private static final JsonMapper JSON = JsonMapper.builder().build();
 
+  /** 同一页面的文章与去重链接结果；只输出通过任务域名规则检查的绝对地址。 */
   public record Links(
       String title,
       List<String> images,
@@ -27,6 +33,10 @@ public final class PageExtractor {
 
   private PageExtractor() {}
 
+  /**
+   * 基于有界响应解析链接与纯文本，ordinal 从 0 开始，rootUrl 固定为该分页组的首次地址。 单页模式和达到 maxPages
+   * 的分组不会继续产生分页链接，但仍允许当前页产生图片与详情。
+   */
   public static Links extract(
       WebFetcher.Response response, CrawlRules rules, boolean detail, int ordinal, String rootUrl)
       throws Exception {

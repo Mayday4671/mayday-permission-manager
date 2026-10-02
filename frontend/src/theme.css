@@ -44,6 +44,29 @@
   border: 1px solid var(--app-table-border);
   border-radius: var(--app-radius);
 }
+/* 外框统一承载底边，末行不再重复画线。收起的展开行仍保留在 DOM，需选最后可见行；
+   空表占位行、树节点及固定列共享单元格规则，分页位于外框之外，不受此规则影响。
+   汇总或页脚存在时保留正文分隔线，只移除真正末尾汇总行的重复底边。 */
+.data-table
+  .ant-table:not(:has(.ant-table-footer, .ant-table-summary))
+  > .ant-table-container
+  > :is(.ant-table-content, .ant-table-body)
+  > table
+  > .ant-table-tbody
+  > tr:not([hidden]):not([style*="display: none"]):not(
+    :has(~ tr:not([hidden]):not([style*="display: none"]))
+  )
+  > :is(th, td),
+.data-table
+  .ant-table:not(:has(.ant-table-footer))
+  > .ant-table-container
+  > :is(.ant-table-content, .ant-table-body, .ant-table-summary)
+  > table
+  > .ant-table-summary
+  > tr:last-child
+  > :is(th, td) {
+  border-bottom-width: 0;
+}
 .data-table-container {
   width: 100%;
   max-width: 100%;

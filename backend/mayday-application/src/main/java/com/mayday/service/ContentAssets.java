@@ -1,11 +1,16 @@
 package com.mayday.service;
 
-import com.mayday.common.*;
+import com.mayday.common.BusinessException;
+import com.mayday.common.FileUsage;
 import com.mayday.content.ContentRevisionRepository;
 import com.mayday.operations.model.StoredFile;
-import com.mayday.operations.repository.*;
+import com.mayday.operations.repository.StoredFileRepository;
+import com.mayday.operations.storage.StoredFileContent;
 import com.mayday.security.AccessPolicy;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -15,50 +20,36 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ContentAssets implements FileUsage {
   private final StoredFileRepository files;
-  private final FilePayloadRepository payloads;
+  private final StoredFileContent content;
   private final ContentRevisionRepository revisions;
   private final AccessPolicy access;
 
+  /** 在业务写事务中按固定顺序锁定附件，检查所有者和有效状态，阻止关联与回收之间的竞态。 */
   public void validate(Set<Long> attachmentIds, Long coverId) {
     Set<Long> ids = new HashSet<>(attachmentIds);
     if (coverId != null) ids.add(coverId);
-    var found = files.findAllById(ids);
-    if (found.size() != ids.size()) throw new BusinessException("文件已删除或不存在");
-    for (var file : found)
+    // 与回收任务使用同一文件行锁；验证到业务提交期间，附件不能被另一个请求回收。
+    for (Long identifier : ids.stream().sorted().toList()) {
+      var file = files.lock(identifier).orElseThrow(() -> new BusinessException("文件已删除或不存在"));
+      StoredFileContent.active(file);
       if (!access.has("files:all") && !Objects.equals(file.getOwnerId(), access.current().getId()))
         throw new AccessDeniedException("不能关联其他人的文件");
+    }
     if (coverId != null) imageType(coverId);
   }
 
+  /** 统一读取本地、对象存储或旧数据库正文的签名，封面格式不信任文件名或客户端声明。 */
   public String imageType(Long id) {
-    byte[] b = payloads.findById(id).orElseThrow(() -> new BusinessException("文件内容不存在")).getData();
-    if (b.length >= 8
-        && b[0] == (byte) 0x89
-        && b[1] == 'P'
-        && b[2] == 'N'
-        && b[3] == 'G'
-        && b[4] == 13
-        && b[5] == 10
-        && b[6] == 26
-        && b[7] == 10) return "image/png";
-    if (b.length >= 3 && b[0] == (byte) 0xff && b[1] == (byte) 0xd8 && b[2] == (byte) 0xff)
-      return "image/jpeg";
-    if (b.length >= 12
-        && b[0] == 'R'
-        && b[1] == 'I'
-        && b[2] == 'F'
-        && b[3] == 'F'
-        && b[8] == 'W'
-        && b[9] == 'E'
-        && b[10] == 'B'
-        && b[11] == 'P') return "image/webp";
-    throw new BusinessException("封面仅支持有效 PNG、JPEG 或 WebP 图片");
+    StoredFile file = files.findById(id).orElseThrow(() -> new BusinessException("文件不存在"));
+    return content.imageType(file);
   }
 
+  /** 返回附件元信息而不加载正文；调用者必须先完成所属内容的业务访问检查。 */
   public List<StoredFile> records(Set<Long> ids) {
     return files.findAllById(ids);
   }
 
+  /** 读取已授权内容的可选封面元信息，未配置或已不存在时返回空值供页面展示降级。 */
   public StoredFile record(Long id) {
     return id == null ? null : files.findById(id).orElse(null);
   }

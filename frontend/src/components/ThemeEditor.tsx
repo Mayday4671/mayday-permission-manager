@@ -568,6 +568,7 @@ function ThemeActions({
   );
 }
 
+/** 后台偏好和独立前台主题复用编辑控件；临时预览只影响当前界面，保存边界由外层表单负责。 */
 export function ThemeFormContent({
   portal = false,
   drawer = false,

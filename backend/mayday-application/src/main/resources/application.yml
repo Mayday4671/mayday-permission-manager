@@ -5,8 +5,9 @@ server:
 spring:
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 11MB
+      max-file-size: ${MAYDAY_STORAGE_MAX_MB:10}MB
+      # 单请求最多一个业务文件；CSV批量导入仍执行自己的行数/正文大小限制。
+      max-request-size: 101MB
   application:
     name: mayday-admin
   datasource:
@@ -44,6 +45,7 @@ mayday:
       scheduler: ${MODULE_SCHEDULER_ENABLED:true}
       udp: ${MODULE_UDP_ENABLED:true}
       workorders: ${MODULE_WORKORDERS_ENABLED:false}
+      feedback: ${MODULE_FEEDBACK_ENABLED:true}
       # generator:module-environment
 
 # 契约仅允许管理员读取；生产环境可以通过 API_DOCS_ENABLED=false 彻底关闭。

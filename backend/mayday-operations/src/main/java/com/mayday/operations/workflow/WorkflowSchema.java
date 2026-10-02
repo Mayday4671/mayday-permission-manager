@@ -3,7 +3,13 @@ package com.mayday.operations.workflow;
 import com.mayday.common.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * 运行引擎和设计器共用的发布契约。只支持无循环的审批/条件/结束节点，禁止把未实现的节点保存为可执行流程。 所有 ID 均稳定且与显示名称无关；已发布的 JSON
@@ -12,6 +18,7 @@ import java.util.*;
 public final class WorkflowSchema {
   private WorkflowSchema() {}
 
+  /** 字段 ID 稳定；类型和上下限同时控制前端输入与后端提交，宽度只参与页面排版。 */
   public record Field(
       String id,
       String label,
@@ -23,8 +30,10 @@ public final class WorkflowSchema {
       Integer maxLength,
       List<String> options) {}
 
+  /** 条件按列表顺序匹配，next 是稳定节点 ID；全部不命中时使用节点默认出口。 */
   public record Condition(String field, String operator, String value, String next) {}
 
+  /** 节点保存人员来源、会签规则、字段和动作授权；timeoutMinutes 为空表示不自动提醒。 */
   public record Node(
       String id,
       String name,
@@ -36,7 +45,36 @@ public final class WorkflowSchema {
       Set<String> readable,
       Set<String> writable,
       Set<String> actions,
-      List<Condition> conditions) {
+      List<Condition> conditions,
+      Integer timeoutMinutes) {
+    /** 旧流程 JSON 未包含超时配置时保持原行为，已有 Java 扩展调用也可继续使用原构造签名。 */
+    public Node(
+        String id,
+        String name,
+        String type,
+        String next,
+        String source,
+        List<Long> assigneeIds,
+        String mode,
+        Set<String> readable,
+        Set<String> writable,
+        Set<String> actions,
+        List<Condition> conditions) {
+      this(
+          id,
+          name,
+          type,
+          next,
+          source,
+          assigneeIds,
+          mode,
+          readable,
+          writable,
+          actions,
+          conditions,
+          null);
+    }
+
     public Node {
       assigneeIds = assigneeIds == null ? List.of() : List.copyOf(assigneeIds);
       readable = readable == null ? Set.of() : Set.copyOf(readable);
@@ -46,6 +84,7 @@ public final class WorkflowSchema {
     }
   }
 
+  /** 发布及提交冻结的完整流程契约，开关不会从未来草稿回灌到历史实例。 */
   public record Spec(
       List<Field> fields,
       List<Node> nodes,
@@ -61,6 +100,7 @@ public final class WorkflowSchema {
       applicantIds = applicantIds == null ? Set.of() : Set.copyOf(applicantIds);
     }
 
+    /** 缺少引用节点即终止解析，不能跳过非法节点把未完成申请当作通过。 */
     public Node node(String id) {
       return nodes.stream()
           .filter(n -> n.id().equals(id))
@@ -143,6 +183,9 @@ public final class WorkflowSchema {
           "可写字段必须同时可读，且字段必须存在");
       if ("APPROVAL".equals(n.type())) {
         require(
+            n.timeoutMinutes() == null || (n.timeoutMinutes() >= 1 && n.timeoutMinutes() <= 43200),
+            "超时提醒应为 1 至 43200 分钟，留空表示不提醒");
+        require(
             Set.of("USERS", "ROLES", "DEPARTMENT_LEADER")
                 .contains(Objects.toString(n.source(), "")),
             "请选择审批人来源");
@@ -158,6 +201,7 @@ public final class WorkflowSchema {
                 && n.actions().contains("REJECT"),
             "节点至少允许同意和驳回");
       }
+      require("APPROVAL".equals(n.type()) || n.timeoutMinutes() == null, "只有审批节点可以配置超时提醒");
       if ("CONDITION".equals(n.type())) {
         require(!n.conditions().isEmpty() && n.conditions().size() <= 10, "条件节点需要 1 至 10 条规则及默认出口");
         for (Condition c : n.conditions()) {
@@ -289,6 +333,7 @@ public final class WorkflowSchema {
     return result;
   }
 
+  /** 人员/部门/文件关联 ID 必须为正整数，不接受小数、科学计数或任意对象。 */
   public static Long positiveId(Object value, String label) {
     try {
       long id = Long.parseLong(value.toString());
@@ -298,6 +343,7 @@ public final class WorkflowSchema {
     throw new BusinessException(label + "关联 ID 无效");
   }
 
+  /** 只执行已经发布校验过的比较运算，不拼接表达式或执行来自页面的脚本。 */
   public static String next(Node n, Map<String, Object> values) {
     if ("CONDITION".equals(n.type()))
       for (Condition c : n.conditions()) {

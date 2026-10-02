@@ -52,6 +52,7 @@ public class PortalThemePolicy {
       String warningColor,
       String errorColor) {}
 
+  /** 严格解析后台提交的前台主题；枚举、颜色与范围均验证，旧版缺省扩展字段自动补齐，显式非法值拒绝保存。 */
   public Theme parse(String text) {
     try {
       Object value =

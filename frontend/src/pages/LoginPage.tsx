@@ -6,26 +6,38 @@ import { SlideCaptcha } from "../components/SlideCaptcha";
 import { useAuth } from "../lib/auth";
 import { useModules } from "../lib/modules";
 
+/** 登录凭证仅保存在当前表单和一次验证回调的内存中，不写入 URL 或浏览器持久存储。 */
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
 /** 登录使用真实认证接口。错误就地展示，初始凭证只写入项目说明，不在公共页面泄露。 */
 export function LoginPage() {
   const modules = useModules();
   const { login, session, can } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const requestedPath = (location.state as { from?: string } | null)?.from;
-  const destination = requestedPath?.startsWith("/admin")
+  // 导航状态不是可信数据；只接受后台路径，具体页面权限仍由路由守卫重新验证。
+  const navigationState: unknown = location.state;
+  const requestedPath =
+    navigationState &&
+    typeof navigationState === "object" &&
+    "from" in navigationState &&
+    typeof navigationState.from === "string" &&
+    /^\/admin(?:\/|$)/.test(navigationState.from)
+      ? navigationState.from
+      : undefined;
+  const destination = requestedPath
     ? requestedPath
     : can("dashboard:view")
       ? "/admin"
       : "/admin/profile";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [credentials, setCredentials] = useState<{
-    username: string;
-    password: string;
-  } | null>(null);
+  const [credentials, setCredentials] = useState<LoginCredentials | null>(null);
   const submitting = useRef(false);
-  const [form] = Form.useForm<{ username: string; password: string }>();
+  const [form] = Form.useForm<LoginCredentials>();
   /** 凭证只在内存中传递给一次登录；验证失败、取消或密码错误均须重新验证。 */
   const verifiedLogin = async (captchaToken: string) => {
     if (!credentials || submitting.current) return;
@@ -36,7 +48,7 @@ export function LoginPage() {
     setError("");
     try {
       await login(values.username, values.password, captchaToken);
-      navigate(requestedPath?.startsWith("/admin") ? requestedPath : "/admin");
+      navigate(requestedPath ?? "/admin");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -67,13 +79,10 @@ export function LoginPage() {
               className="login-error"
             />
           )}
-          <Form
+          <Form<LoginCredentials>
             form={form}
             layout="vertical"
-            onFinish={async (values: {
-              username: string;
-              password: string;
-            }) => {
+            onFinish={async (values) => {
               if (loading || credentials) return;
               setError("");
               setCredentials(values);

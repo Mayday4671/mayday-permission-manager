@@ -18,6 +18,7 @@ export function useDictionary(code: string) {
       ),
   });
 }
+/** 字典选择控件复用服务器启用选项，加载失败保留重试入口而非伪造一份硬编码选项。 */
 export function DictionarySelect({
   code,
   ...props
@@ -38,6 +39,7 @@ export function DictionarySelect({
     />
   );
 }
+/** 字典标签同步维护后的文字和颜色，历史值已删除或加载失败时保留调用方的安全显示文案。 */
 export function DictionaryTag({
   code,
   value,

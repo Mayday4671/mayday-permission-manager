@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Form, Input, Select, Switch, Tabs, Tag } from "antd";
+import { Alert, Button, Form, Input, Select, Switch, Tabs, Tag } from "antd";
 import { PermissionPicker } from "../components/PermissionPicker";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
@@ -48,6 +48,7 @@ function ScopeDepartments({
   );
 }
 
+/** 角色信息、动作授权与数据范围分标签配置；页面只辅助选择，最终委托边界由后端逐项核验。 */
 export function RolesPage() {
   const { can, session } = useAuth();
   const [editorTab, setEditorTab] = useState("basic");
@@ -87,8 +88,9 @@ export function RolesPage() {
           (values.scopeDepartments ?? []) as Role["scopeDepartments"]
         ).filter(
           (grant) =>
-            (values.dataScopes as Role["dataScopes"])[grant.resource] ===
-            "CUSTOM",
+            ((values.dataScopes ?? {}) as Role["dataScopes"])[
+              grant.resource
+            ] === "CUSTOM",
         ),
       })}
       createAllowed={can("roles:grant")}
@@ -212,7 +214,12 @@ export function RolesPage() {
                   {catalog.isError && (
                     <Alert
                       type="error"
-                      title="权限目录加载失败，请关闭后重试"
+                      title="权限目录加载失败"
+                      action={
+                        <Button onClick={() => void catalog.refetch()}>
+                          重试
+                        </Button>
+                      }
                     />
                   )}
                 </>

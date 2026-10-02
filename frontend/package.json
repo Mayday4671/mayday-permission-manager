@@ -9,7 +9,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test:api": "node --test ../tests/api.test.mjs",
     "test:workspace": "node --test ../tests/workspace.test.mjs",
-    "test:ui": "node --import tsx --test tests/admin-usability.test.tsx tests/grid-pagination.test.ts",
+    "test:ui": "node ../scripts/test-ui.mjs",
     "format": "prettier --write src vite.config.ts"
   },
   "dependencies": {

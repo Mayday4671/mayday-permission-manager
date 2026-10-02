@@ -1,7 +1,14 @@
 package com.mayday.operations.model;
 
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OrderColumn;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -32,11 +39,15 @@ public class FlowRequest extends BaseEntity {
 
   private int currentStep;
   private Long currentApproverId;
+
+  /** 实际提交时使用的发布版本；定义发布新版后此编号不会变化。 */
   private Long definitionVersionId;
 
+  /** 表单、图结构、人员来源、字段授权、节点期限的不可变提交快照。 */
   @Column(columnDefinition = "longtext")
   private String schemaSnapshot;
 
+  /** 当前表单数据，可写字段修改在决定记录中另存 before/after，原始提交另外保留。 */
   @Column(columnDefinition = "longtext")
   private String formData;
 
@@ -44,6 +55,7 @@ public class FlowRequest extends BaseEntity {
   @Column(columnDefinition = "longtext")
   private String submittedFormData;
 
+  /** 提交时解析全部节点人员；仅实际进入的节点会建立待办和参与范围。 */
   @Column(columnDefinition = "longtext")
   private String resolvedAssignees;
 
@@ -56,6 +68,9 @@ public class FlowRequest extends BaseEntity {
   private Long businessId;
   private Long businessRevisionId;
   private java.time.LocalDateTime completedAt;
+
+  /** 手动催办时间由持有申请行锁的事务更新；整个申请每 30 分钟最多发送一次。 */
+  private java.time.LocalDateTime lastRemindedAt;
 
   @ElementCollection(fetch = FetchType.EAGER)
   @CollectionTable(name = "ops_request_file", joinColumns = @JoinColumn(name = "request_id"))

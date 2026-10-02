@@ -57,6 +57,7 @@ interface DraftForm extends Omit<ContentRevision, "attachments" | "cover"> {
   coverFiles: UploadFile<FileRecord>[];
   requiresApproval: boolean;
 }
+/** 回显已上传附件只携带后端文件编号；不能把浏览器构造的 URL 当作文件归属凭据。 */
 const uploadValues = (files: FileRecord[]): UploadFile<FileRecord>[] =>
   files.map((file) => ({
     uid: String(file.id),
@@ -114,6 +115,7 @@ export function NoticesPage() {
   const revision =
     history.data?.find((r) => r.revisionId === previewRevision) ?? detail.data;
   const refresh = () => void client.invalidateQueries();
+  /** 每次编辑先重取当前修订和版本，避免沿用列表中的旧附件、旧审批状态或过期版本。 */
   const edit = async (row: ContentRecord | null) => {
     try {
       const record = row
@@ -144,6 +146,7 @@ export function NoticesPage() {
       message.error((error as Error).message);
     }
   };
+  /** 详情切换时同时重置修订、分页与标签，不能展示上一个内容记录的历史选择。 */
   const show = (row: ContentRecord, tab = "preview") => {
     setSelected(row.id);
     setPreviewRevision(null);
@@ -753,6 +756,7 @@ export function RecyclePage() {
   const { can } = useAuth();
   const { message, modal } = App.useApp();
   const client = useQueryClient();
+  /** 恢复携带乐观版本，永久删除必须显式确认；失败保留记录并向调用方传播以维持弹窗状态。 */
   const run = async (row: ContentRecord, purge: boolean) => {
     try {
       await api(`/content/notices/${row.id}/${purge ? "purge" : "restore"}`, {

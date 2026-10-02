@@ -1,19 +1,48 @@
 package com.mayday;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 
 import com.mayday.common.BusinessException;
-import com.mayday.crawler.*;
-import com.mayday.operations.repository.*;
-import com.mayday.system.model.*;
-import com.mayday.system.repository.*;
+import com.mayday.crawler.CrawlArticleImageRepository;
+import com.mayday.crawler.CrawlArticleRepository;
+import com.mayday.crawler.CrawlArticles;
+import com.mayday.crawler.CrawlController;
+import com.mayday.crawler.CrawlItemRepository;
+import com.mayday.crawler.CrawlRules;
+import com.mayday.crawler.CrawlStore;
+import com.mayday.crawler.CrawlTask;
+import com.mayday.crawler.CrawlTaskRepository;
+import com.mayday.crawler.CrawlWorker;
+import com.mayday.crawler.PageExtractor;
+import com.mayday.crawler.WebFetcher;
+import com.mayday.operations.repository.FilePayloadRepository;
+import com.mayday.operations.repository.StoredFileRepository;
+import com.mayday.system.model.SysRole;
+import com.mayday.system.model.SysUser;
+import com.mayday.system.repository.RoleRepository;
+import com.mayday.system.repository.UserRepository;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.*;
-import org.junit.jupiter.api.*;
+import java.util.Base64;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -103,15 +132,20 @@ class CrawlerIntegrationTest {
               String html =
                   switch (url) {
                     case ROOT ->
-                        "<a class=detail href=/article/1.html>一</a><a class=next href='?page=2'>下一页</a>";
+                        "<a class=detail href=/article/1.html>一</a><a class=next"
+                            + " href='?page=2'>下一页</a>";
                     case ROOT + "?page=2" ->
-                        "<a class=detail href=/article/2.html>二</a><a class=detail href=/article/1.html>重复</a>";
+                        "<a class=detail href=/article/2.html>二</a><a class=detail"
+                            + " href=/article/1.html>重复</a>";
                     case "https://fixture.example/article/1.html" ->
-                        "<h1>文章一</h1><article><p>第一段正文</p><img data-src=/a.png></article><a class=next href=/article/1_2.html>下页</a>";
+                        "<h1>文章一</h1><article><p>第一段正文</p><img data-src=/a.png></article><a"
+                            + " class=next href=/article/1_2.html>下页</a>";
                     case "https://fixture.example/article/1_2.html" ->
-                        "<h1>文章一续页</h1><article><p>第二段正文</p><img src=/b.png></article><a class=next href=/article/1.html>循环</a>";
+                        "<h1>文章一续页</h1><article><p>第二段正文</p><img src=/b.png></article><a class=next"
+                            + " href=/article/1.html>循环</a>";
                     case "https://fixture.example/article/2.html" ->
-                        "<h1>文章二</h1><article><p>另一篇正文</p><img src=/a.png><img src=/c.png></article>";
+                        "<h1>文章二</h1><article><p>另一篇正文</p><img src=/a.png><img"
+                            + " src=/c.png></article>";
                     default -> throw new IllegalArgumentException("未预期的 URL " + url);
                   };
               return new WebFetcher.Response(

@@ -21,6 +21,7 @@ import {
   type SiteConfig,
 } from "../lib/portal";
 import type { Article } from "../types";
+import { PortalFeedback } from "./PortalFeedback";
 
 /** 公共网站使用独立主题范围，阅读字号和触控尺寸不会影响后台表格密度。 */
 export function SiteFrame({
@@ -117,6 +118,7 @@ export function SiteFrame({
             </span>
           </div>
           {hasContact && <ContactDetails info={info} />}
+          <PortalFeedback />
         </div>
       </footer>
     </div>
@@ -236,6 +238,7 @@ export function useArticleDocument(content: string) {
   }, [content]);
 }
 
+/** 仅展示后台配置的公开联系信息；空字段不占位，不拼接后台入口或内部参数。 */
 export function ContactDetails({ info }: { info?: SiteConfig }) {
   return (
     <address className="site-contact-details">

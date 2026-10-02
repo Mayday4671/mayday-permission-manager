@@ -1,9 +1,17 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.operations.model.*;
-import com.mayday.operations.repository.*;
-import com.mayday.system.repository.*;
-import java.util.*;
+import com.mayday.operations.model.FlowTask;
+import com.mayday.operations.model.FlowVersion;
+import com.mayday.operations.repository.FlowDefinitionRepository;
+import com.mayday.operations.repository.FlowRequestRepository;
+import com.mayday.operations.repository.FlowTaskRepository;
+import com.mayday.operations.repository.FlowVersionRepository;
+import com.mayday.system.repository.EntryRepository;
+import com.mayday.system.repository.UserRepository;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
@@ -28,58 +36,60 @@ public class LegacyWorkflowImport implements CommandLineRunner {
   @Transactional
   public void run(String... args) {
     if (!modules.isEnabled("approvals")) return;
-    for (var d : definitions.findAll())
-      if (d.getDraftSchema() == null) {
-        var s = WorkflowDefinitions.legacy(d.getApproverIds());
-        var v = new FlowVersion();
-        v.setDefinitionId(d.getId());
-        v.setVersionNumber(1);
-        v.setSchemaJson(json.write(s));
-        v.setPublisherName("旧版迁移");
-        versions.saveAndFlush(v);
-        d.setDraftSchema(v.getSchemaJson());
-        d.setPublishedVersionId(v.getId());
-        if (d.getCategoryId() == null)
-          d.setCategoryId(
+    for (var definition : definitions.findAll())
+      if (definition.getDraftSchema() == null) {
+        var schema = WorkflowDefinitions.legacy(definition.getApproverIds());
+        var publishedVersion = new FlowVersion();
+        publishedVersion.setDefinitionId(definition.getId());
+        publishedVersion.setVersionNumber(1);
+        publishedVersion.setSchemaJson(json.write(schema));
+        publishedVersion.setPublisherName("旧版迁移");
+        versions.saveAndFlush(publishedVersion);
+        definition.setDraftSchema(publishedVersion.getSchemaJson());
+        definition.setPublishedVersionId(publishedVersion.getId());
+        if (definition.getCategoryId() == null)
+          definition.setCategoryId(
               entries.findByKindOrderBySortOrderAscIdAsc("approvalcategories").getFirst().getId());
       }
-    for (var r : requests.findAll())
-      if (r.getSchemaSnapshot() == null) {
-        var ids = new ArrayList<>(r.getApproverIds());
-        var s = WorkflowDefinitions.legacy(ids);
-        r.setSchemaSnapshot(json.write(s));
-        r.setFormData(json.write(Map.of("content", r.getContent())));
-        r.setSubmittedFormData(r.getFormData());
+    for (var request : requests.findAll())
+      if (request.getSchemaSnapshot() == null) {
+        var ids = new ArrayList<>(request.getApproverIds());
+        var schema = WorkflowDefinitions.legacy(ids);
+        request.setSchemaSnapshot(json.write(schema));
+        request.setFormData(json.write(Map.of("content", request.getContent())));
+        request.setSubmittedFormData(request.getFormData());
         Map<String, List<Long>> resolved = new LinkedHashMap<>();
-        for (var node : s.nodes())
+        for (var node : schema.nodes())
           if (node.type().equals("APPROVAL")) resolved.put(node.id(), node.assigneeIds());
-        r.setResolvedAssignees(json.write(resolved));
+        request.setResolvedAssignees(json.write(resolved));
         definitions
-            .findById(r.getDefinitionId())
-            .ifPresent(d -> r.setDefinitionVersionId(d.getPublishedVersionId()));
-        if (r.getStatus().equals("PENDING")) r.setCurrentNodeId("step" + r.getCurrentStep());
-        else r.setCompletedAt(r.getUpdatedAt());
-        r.setApproverIds(new ArrayList<>());
-        for (int i = 0; i < ids.size(); i++) {
-          if (r.getStatus().equals("PENDING") && i > r.getCurrentStep()) break;
-          Long uid = ids.get(i);
+            .findById(request.getDefinitionId())
+            .ifPresent(
+                definition -> request.setDefinitionVersionId(definition.getPublishedVersionId()));
+        if (request.getStatus().equals("PENDING"))
+          request.setCurrentNodeId("step" + request.getCurrentStep());
+        else request.setCompletedAt(request.getUpdatedAt());
+        request.setApproverIds(new ArrayList<>());
+        for (int index = 0; index < ids.size(); index++) {
+          if (request.getStatus().equals("PENDING") && index > request.getCurrentStep()) break;
+          Long userId = ids.get(index);
           var task = new FlowTask();
-          task.setRequestId(r.getId());
-          task.setNodeId("step" + i);
-          task.setNodeName("审批 " + (i + 1));
-          task.setAssigneeId(uid);
-          task.setAssigneeName(users.findById(uid).map(u -> u.getNickname()).orElse("已删除账号"));
+          task.setRequestId(request.getId());
+          task.setNodeId("step" + index);
+          task.setNodeName("审批 " + (index + 1));
+          task.setAssigneeId(userId);
+          task.setAssigneeName(users.findById(userId).map(u -> u.getNickname()).orElse("已删除账号"));
           task.setStatus(
-              i < r.getCurrentStep()
+              index < request.getCurrentStep()
                   ? "APPROVED"
-                  : switch (r.getStatus()) {
+                  : switch (request.getStatus()) {
                     case "PENDING" -> "PENDING";
                     case "APPROVED" -> "APPROVED";
                     case "REJECTED" -> "REJECTED";
                     default -> "CANCELLED";
                   });
           tasks.save(task);
-          if (!r.getApproverIds().contains(uid)) r.getApproverIds().add(uid);
+          if (!request.getApproverIds().contains(userId)) request.getApproverIds().add(userId);
         }
       }
   }

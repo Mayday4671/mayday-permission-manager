@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Button, Form, Input, Select, Space } from "antd";
+import { Button, Form, Input, InputNumber, Select, Space } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { FormModal } from "../FormModal";
 import { UserSelect } from "../LookupSelect";
@@ -9,6 +9,7 @@ import {
   type WorkflowNode,
   type WorkflowField,
 } from "../../types/workflow";
+/** 角色选择目录仍由后端限定；选择来源不会替当前账号扩大审批或通讯录查看权限。 */
 export function WorkflowRoleSelect(props: {
   value?: number[];
   onChange?: (value: number[]) => void;
@@ -53,7 +54,7 @@ export function NodeEditor({
   onClose: () => void;
   onSave: (node: WorkflowNode) => void;
 }) {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<WorkflowNode>();
   const type = Form.useWatch("type", form),
     source = Form.useWatch("source", form);
   useEffect(() => {
@@ -91,6 +92,8 @@ export function NodeEditor({
           readable: values.readable ?? [],
           writable: values.writable ?? [],
           actions: values.type === "APPROVAL" ? (values.actions ?? []) : [],
+          timeoutMinutes:
+            values.type === "APPROVAL" ? (values.timeoutMinutes ?? null) : null,
         });
       }}
     >
@@ -207,6 +210,19 @@ export function NodeEditor({
                     label: actionNames[value],
                     disabled: value === "APPROVE" || value === "REJECT",
                   }))}
+                />
+              </Form.Item>
+              <Form.Item
+                name="timeoutMinutes"
+                label="超时提醒（分钟）"
+                extra="留空不提醒。超时后仅发送一次站内提醒，不自动同意或驳回。"
+              >
+                <InputNumber
+                  min={1}
+                  max={43200}
+                  precision={0}
+                  style={{ width: "100%" }}
+                  placeholder="例如 1440（24 小时）"
                 />
               </Form.Item>
             </>

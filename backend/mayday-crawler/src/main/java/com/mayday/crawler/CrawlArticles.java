@@ -1,9 +1,15 @@
 package com.mayday.crawler;
 
-import com.mayday.common.*;
+import com.mayday.common.BusinessException;
+import com.mayday.common.PageResult;
+import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +28,7 @@ public class CrawlArticles {
   private final CrawlTaskRepository tasks;
   private final AccessPolicy access;
 
+  /** 列表摘要与真实采集计数；图片数只统计已保存的不同文件，不相信文章标题里的“10P”等提示。 */
   public record Card(
       Long id,
       String title,
@@ -40,12 +47,16 @@ public class CrawlArticles {
       String taskStatus,
       int imageLimit) {}
 
+  /** 文章的单页纯文本；保留源地址和截断标记，不能把多页正文无限制拼接成响应。 */
   public record Part(Long id, String sourceUrl, String body, boolean truncated) {}
 
+  /** 已完成图片的内部关联；客户端仍通过任务与条目鉴权接口读取正文，不使用公开存储路径。 */
   public record Picture(Long id, Long fileId, long bytes) {}
 
+  /** 详情一次最多返回 10 万字符，图片仍由页面按已保存关联分页展示。 */
   public record Detail(Card article, List<Part> pages, List<Picture> images, boolean truncated) {}
 
+  /** 以任务与分页组根地址确定文章，重试只更新当前页正文，不重复拼接已经保存的分页内容。 */
   public CrawlArticle savePage(CrawlStore.Work work, CrawlItem item, PageExtractor.Links parsed) {
     var text = parsed.article();
     if (text == null) return null;
@@ -79,6 +90,7 @@ public class CrawlArticles {
     return article;
   }
 
+  /** 图片队列可复用，但每篇文章的引用独立建立，防止去重后另一篇文章丢失图片。 */
   public void link(CrawlArticle article, CrawlItem image, int order) {
     if (article == null
         || image == null
@@ -90,14 +102,17 @@ public class CrawlArticles {
     links.save(link);
   }
 
+  /** 彻底清理任务数据时先清除文章图片关联，避免引用约束阻止后续队列和正文删除。 */
   public void deleteLinks(Long task) {
     links.deleteForTask(task);
   }
 
+  /** 判断配置删除应归档还是物理清理；已有文章的数据生命周期不受配置删除影响。 */
   public boolean hasData(Long task) {
     return articles.existsByTaskId(task);
   }
 
+  /** 仅彻底清理数据时移除归档文章，普通配置归档保留历史正文与来源。 */
   public void deleteArticles(Long task) {
     articles.deleteByTaskId(task);
     articles.flush();
@@ -142,6 +157,7 @@ public class CrawlArticles {
         task.getRules().maxImages());
   }
 
+  /** 跨任务列表在 SQL 内先应用所有者授权，再分页和统计，最多返回 24 篇摘要。 */
   @Transactional(readOnly = true)
   public PageResult<Card> list(Long task, String keyword, int page, int size) {
     access.require("crawler:view");
@@ -176,6 +192,7 @@ public class CrawlArticles {
                     byId.get(a.getTaskId()))));
   }
 
+  /** 调用方先检查任务访问权；文章编号必须确实属于该任务，正文按页序且受总字符预算约束。 */
   @Transactional(readOnly = true)
   public Detail detail(Long task, Long id) {
     var a =

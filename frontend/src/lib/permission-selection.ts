@@ -1,11 +1,13 @@
 /** 操作授权的依赖关系与旧授权规则一致；集中在此供单选、模块全选共用。 */
 export function permissionDependencies(key: string): string[] {
   const [resource, action] = key.split(":");
+  if (!resource || !action) return [key];
   return [
     ...new Set([
       key,
       `${resource}:view`,
       ...(resource === "userstats" ? ["users:view"] : []),
+      ...(resource === "users" && action === "import" ? ["users:create"] : []),
       ...(action.endsWith("-write")
         ? [`${resource}:${action.replace("-write", "-read")}`]
         : []),

@@ -14,6 +14,8 @@ Content-Type: application/json
 
 列表 `data` 包含 `items`、`total`、`page`、`size`。页码从 1 开始，每页最多 100 条。默认按 ID 倒序；列表接受 `keyword/page/size`，用户和基础资料额外接受 `enabled`，内容接受 `published`，日志接受 `success`。用户还支持 `departmentId`。
 
+文件和 CSV 上传使用 `multipart/form-data`，由客户端自动设置 boundary；下载返回二进制或 CSV，不使用 JSON 包装。SSE 流返回 `text/event-stream`。各接口的特殊条数上限以对应说明为准。
+
 ## 身份
 
 - `POST /auth/captcha/challenge`：`username`，返回 `challengeId/background/piece/width/height/pieceSize/y/expiresIn`。图片是 PNG data URL，不返回缺口横坐标；有效期 120 秒，换图作废该账号/来源的旧题。
@@ -31,7 +33,9 @@ Content-Type: application/json
 - `GET /dashboard`：授权范围内指标、7 日审计趋势、最近日志和内容。
 - `GET /system/navigation`：过滤权限后的启用菜单。
 - `GET /system/lookups`：最小化部门选项、可委托角色选项。
-- `GET /system/logs`：只读审计分页。
+- `GET /system/logs`、`GET /system/logs/{id}`：日志分页与详情，`loginOnly` 区分登录日志和操作日志，分别检查对应权限。支持 `keyword/success/from/to/page/size`。
+- `GET /system/logs/export`：相同筛选，按 100 条分批；`DELETE /system/logs`：`{before,loginOnly}`，至少保留最近 30 天，分别需要导出/清理权限。
+- `GET /system/changes`、`GET /system/changes/{id}`：关键业务字段变更审计，使用 `logs:view`；列表支持 `keyword/page/size`。返回白名单字段的 before/after，不提供任意实体或敏感字段查询。
 
 ## UDP 转发
 
@@ -41,10 +45,23 @@ Content-Type: application/json
 
 - `GET/POST /system/users`：查询或创建。
 - `PUT/DELETE /system/users/{id}`：编辑或删除。
+- `PUT /system/users/status`：`{rows:[{id,version}],enabled}`，单批 1–100 个账号，需 `users:update`，逐项检查数据范围、角色管理边界及内置账号保护，任一失败整批回滚。
 - `PUT /system/users/{id}/password`：`password`，独立重置密码。
 - `GET /system/users/export`：按 100 条分批获取，权限、筛选和脱敏与列表保持一致。
 
 创建字段：`username/nickname/password/email/phone/departmentId/enabled/roleIds`。编辑添加 `version`，用户名不允许修改；密码请使用独立接口。
+
+## CSV 导入与后台导出
+
+当前注册资源为 `users`，新增业务通过 `BulkResourceAdapter` 接入；不是所有表都自动具备导入导出能力。
+
+- `GET /bulk/users/template`：下载按当前写权限裁剪的 UTF-8 CSV 模板。
+- `POST /bulk/users/import/preview`：multipart `file`，最多 2 MB、1000 行，返回原记录号和逐行错误；只校验，不写业务数据，密码只显示是否提供。
+- `POST /bulk/users/import/commit?idempotencyKey=...`：重新上传校验后的原文件，键为 16–64 位字母/数字/连字符。同账号、资源、键和文件重复提交返回原任务；同键不同内容拒绝。只创建新用户，任一行失败整批回滚。
+- `POST /bulk/users/exports`：`{keyword,enabled,departmentId}`，创建后台 CSV 导出，最多 10 万行，复用用户列表范围与字段授权。
+- `GET /bulk/jobs`：当前账号最近 20 个任务；`GET /bulk/jobs/{id}`：状态与进度；`GET /bulk/jobs/{id}/download`：本人成功导出的结果。任务状态为 QUEUED/RUNNING/SUCCEEDED/FAILED。
+
+导入需要 `users:import/create` 和 ALL 用户范围，角色/部门/联系方式仍独立检查。导出需 `users:view/export`；执行和下载重新检查账号、权限和范围变化。结果保留 24 小时；每人最多 2 个活动导出，工作器及待执行队列有界。导出工作器当前单实例，重启将未完成导出标为失败，需重新创建；不是可跨节点恢复的长任务平台。
 
 ## 角色
 
@@ -105,7 +122,46 @@ Content-Type: application/json
 - `/{id}/recipients` 查实际投递/阅读记录；`/operations/notifications/options/{kind}` 取授权范围内目标选项。
 - `/operations/messages`、`/messages/unread`、`/messages/{id}`（GET）；`/messages/{id}/read`、`/messages/read-all`（POST）。message ID 是当前人的投递 ID，不是通知批次 ID。
 - 工作台未读预览使用 `/operations/messages?read=false&page=1&size=3`，`total` 是全部未读数量；顶栏使用 `/messages/unread`。两者都需要 `messages:view`，仅返回当前账号实际收到且尚未撤回/过期的投递。打开详情重新鉴权后标记已读，失败时保留重试入口。
-- 文件：`/operations/files`（GET/POST multipart file），`/operations/files/{id}`（DELETE）；业务附件分别走 `/operations/messages/{messageId}/attachments/{fileId}` 或 `/operations/notifications/{notificationId}/attachments/{fileId}`。
+- 业务附件分别走 `/operations/messages/{messageId}/attachments/{fileId}` 或 `/operations/notifications/{notificationId}/attachments/{fileId}`，再次检查当前业务查看权与实际附件关联。
+
+## 文件中心
+
+- `GET /operations/files`：`keyword/directoryId/deleted/page/size`；directoryId 不传查询全部目录，0 表示根目录。`GET .../{id}` 读取有权访问的元数据。
+- `POST /operations/files`：multipart `file` 与可选 directoryId；`GET .../storage-info` 只返回存储类型、上传字节上限和扩展名白名单。
+- `GET /operations/files/directories`；`POST .../directories`：`{name,parentId}`；`PUT .../directories/{id}`：`{name,parentId,version}`；`DELETE .../directories/{id}?version=...`。目录按所有者隔离，检查父链循环、重名和引用，不能删除非空目录。
+- `GET /operations/files/{id}/download`、`/preview`、`/thumbnail`：需要文件下载权及所有权/全量管理权。安全图片可预览，其余类型走附件下载，不能执行上传 HTML；缩略图与原图采用相同授权。
+- `DELETE /operations/files/{id}`：移入回收站。`POST /operations/files/batch`：`{action,ids,directoryId?}`，action 为 MOVE/RECYCLE/RESTORE/PURGE，单批最多 100 个 ID，任一所有权、关联或状态检查失败整批回滚。
+
+目录新增/修改/删除分别使用 `files:create/update/delete`；移动需要 `files:update`，回收、恢复、永久删除分别需要 `files:delete/restore/purge`。永久删除只接受回收站数据，先记录持久清理意图，后台删除存储对象成功后才删元数据；失败保留原因供重试，已提交永久删除不能恢复。通知、内容修订、审批及采集引用中的文件禁止回收/永久删除。
+
+新上传采用 LOCAL 或 S3，旧 MYSQL 正文仍可读；存储 key、对象端点和凭据不返回前端。默认上限 10 MB，可配置 1–100 MB；暂无恶意文件扫描与分片续传。
+
+## 实时刷新
+
+`GET /operations/realtime/stream` 复用 Authorization Bearer 头，至少具有 `messages:view` 或 `requests:view`。返回 ready/heartbeat/changed 事件，payload 只有 `{topics,time}`；topics 按当前权限裁剪为 messages/requests，没有业务正文或用户清单。主令牌不允许放入 URL。
+
+SSE 在业务事务提交后发送刷新提示，客户端重新调用授权查询；每次发送和 10 秒心跳重查会话与权限，失去某个领域权限后裁剪对应主题，全部订阅权限或会话失效时关闭。每账号最多 4 条、全站 500 条连接，5 分钟轮换。当前单实例、无历史事件重放，前端断线重连重新取数并保留 15 秒轮询兜底。
+
+## 客户反馈
+
+- `POST /public/feedback`：`{type,title,content,articleId?,contact?}`，type 为 QUESTION/SUGGESTION/CORRECTION，返回一次性展示的 48 位随机 receipt 与创建时间。
+- `POST /public/feedback/track`：`{receipt}`，只返回状态和公开回复；查询码仅放正文，数据库仅存摘要，无匿名列表/按 ID 查询。当前按连接来源每小时最多 10 次提交、120 次查询，计数为进程内状态。
+- `GET /operations/feedback`、`GET .../{id}`：后台按 keyword/status/page/size 查询，需 `feedback:view`；详情包含内部处理历史。
+- `POST .../{id}/process`：`{version,assigneeId,status,publicReply,internalNote}`，需 `feedback:process`，更改处理人另需 `feedback:assign`。status 为 OPEN/PROCESSING/RESOLVED/CLOSED，解决时必须填写公开回复。
+- `GET .../assignees?keyword=...`：分配候选仅返回有查看/处理权的有效账号 ID 与名称，不提供通讯录；分配成功可产生站内通知。
+
+公开回复和内部备注严格分离，匿名查询不会返回联系人、处理人或内部备注。当前是共享后台反馈权限，不按用户/部门划分处理范围。
+
+## 服务监控与任务调度
+
+- `GET /operations/monitor`：JVM 堆、进程 CPU、线程、运行时间、数据库连通与延迟快照，需 `monitor:view`。CPU 不可用返回 -1，不伪造 0。
+- `GET /operations/monitor/history?minutes=60`：本次进程节点最近 5–60 分钟、最多 120 点；每 30 秒采样，保留 7 天。进程重启开始新曲线。
+- `GET/PUT /operations/monitor/policy`：编辑包含 version/enabled/heapThresholdPercent/databaseThresholdMs/alertUserId，修改另需 `monitor:configure`。`GET .../recipients` 返回有监控查看权的有效接收人候选。启用后超阈值发站内提醒，冷却 30 分钟；数据库离线时不能向同一个故障库承诺持久化采样/提醒。
+- `GET /operations/scheduler/handlers`：实际注册的 JobHandler；`GET .../recipients`：有调度查看权的提醒接收人候选。
+- `GET/POST /operations/scheduler`、`PUT/DELETE .../{id}`：任务配置；编辑为 `{name,handler,cron,description,enabled,alertUserId,version}`，cron 为六段表达式。`POST .../{id}/run` 需独立 `scheduler:execute`。
+- `GET /operations/job-logs`：按 keyword/jobId/page/size 查询真实执行结果；删除配置不删除独立执行历史。失败先回滚业务事务，再保存失败记录；站内失败提醒独立重试最近一天未完成的最早 100 条，已投递项退出队列，不回滚执行结果。未配置或失效接收人明确跳过，恢复权限后不补发这批历史提醒；消息模块关闭时保留待发状态。
+
+调度只执行注册处理器，不接收任意 SQL、脚本、类名或 URL。默认数据库事务超时 30 秒，适合短维护用例，但不能强制中断任意 CPU 运算或外部调用；长任务应提交专用队列，外部副作用需自身幂等。监控和调度未作为集群故障管理平台验收。
 
 ## 图片采集
 
@@ -128,6 +184,7 @@ V15 起，DELETE `/crawler/tasks/{id}` 对已经产生文章的配置采用归�
 - schema 包含 fields、nodes、startNodeId、applicantType/applicantIds、allowSelfApproval、allowRepeatApproval、allowWithdraw。字段和节点均使用稳定 ID；详见 `WorkflowSchema.java` 与 `types/workflow.ts`。
 - `GET /operations/workflows/options?businessType=CONTENT` 只返回当前可发起的已发布流程和表单；`GET .../roles` 返回流程用角色选项。
 - `POST /operations/workflows/simulate` 输入 schema/applicantId/values，只校验并返回运行路径，不落审批数据或通知。
+- `GET /operations/workflows/templates` 返回可复用表单/节点模板，使用 `workflows:view`；模板复制为草稿后才可发布。节点可配置 timeoutMinutes，到期产生提醒，不自动审批。
 
 ## 审批实例
 
@@ -136,8 +193,9 @@ V15 起，DELETE `/crawler/tasks/{id}` 对已经产生文章的配置采用归�
 - `POST /operations/requests/{id}/decision`：`version/taskId/action/comment/targetUserId/values`。action 为 APPROVE/REJECT/WITHDRAW/COMMENT/TRANSFER/ADD_SIGN；驳回和评论需要内容，转交/加签需要目标用户。values 只能包含当前节点可写字段。
 - `GET .../{id}/files/{fileId}` 检查字段附件读权；`GET .../{id}/content-files/{fileId}` 检查送审内容快照附件。
 - `GET .../{id}/events`、`POST .../{id}/retry-notifications` 为审批管理员的可靠通知运维入口。
+- `POST /operations/requests/{id}/remind`：`{version}`，需 `requests:remind`，申请人可催办自己的运行中申请，审批管理员另需 `requests:manage`；30 分钟冷却，通知当前有效待办人。
 - 工作台待办使用 `/operations/requests?box=todo&page=1&size=3`，需要同时具有 `requests:view` 和 `requests:approve`。数据库按当前账号的待处理任务筛选，不会把后续尚未到达的节点或其他审批人的任务返回给首页。
-- 到达审批节点、转交和加签会创建对应人员的待办及站内通知；结束时通知申请人。事件与审批事务共同提交，由后台每 3 秒扫描投递并重试失败事件；工作台和顶栏在页面可见时每 15 秒轮询，重新聚焦时也会刷新。它不是 WebSocket 推送；离线用户登录后可查看持久化通知。已读只影响消息数量，必须执行审批动作才能清除待办，处理结果会立即触发前端相关查询刷新。
+- 到达审批节点、转交和加签会创建对应人员的待办及站内通知；结束时通知申请人。事件与审批事务共同提交，由后台每 3 秒扫描投递并重试失败事件。工作台和顶栏通过 SSE 提示立即重新取数，并在页面可见时每 15 秒轮询兜底，重新聚焦也刷新；离线登录后读取持久通知。已读只影响消息数量，必须执行审批动作才能清除待办；超时提醒同样不会代替业务决定。
 
 关键词按字面量匹配，`%`、`_` 不解释为通配符。客户端不得以角色名称推断权限；校验以实际 DTO、PermissionCatalog 和服务层为准。版本过期应重新取得最新记录并让用户核对，不能自动覆盖重试。
 

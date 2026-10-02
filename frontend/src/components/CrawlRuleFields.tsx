@@ -180,6 +180,7 @@ export function CrawlPaginationFields({
     </>
   );
 }
+/** 图片提取规则显式约束属性优先级、域名、篇数、图片数和间隔，服务端仍重复校验网络边界。 */
 export function CrawlImageFields() {
   return (
     <>
@@ -233,6 +234,7 @@ export function CrawlImageFields() {
     </>
   );
 }
+/** 采集入口和详情模式的公共表单，列表选择器仅在进入详情时要求填写，图片分页另行配置。 */
 export function CrawlBasicFields({ form }: { form: FormInstance }) {
   const enter = Form.useWatch(["rules", "enterDetails"], form);
   return (

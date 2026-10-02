@@ -9,6 +9,7 @@ import java.util.HexFormat;
 public final class ImageBytes {
   private ImageBytes() {}
 
+  /** 以实际字节签名判定允许的栅格格式，同时限制 8 MB 单图预算，拒绝远端返回的 HTML 验证页。 */
   public static String type(byte[] b) {
     if (b.length < 12 || b.length > 8 * 1024 * 1024) throw new BusinessException("图片为空或超过 8 MB");
     if ((b[0] & 255) == 137
@@ -26,6 +27,7 @@ public final class ImageBytes {
     throw new BusinessException("只支持 PNG、JPEG、GIF、WebP 图片，网站可能返回了验证页");
   }
 
+  /** SHA-256 正文摘要用于任务内重复图片复用，同一图片不重复保存或重复计入容量。 */
   public static String hash(byte[] data) {
     try {
       return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));
@@ -34,6 +36,7 @@ public final class ImageBytes {
     }
   }
 
+  /** URL 文本按 UTF-8 计算固定长度摘要，配合任务与资源类型唯一约束避免循环分页重复入队。 */
   public static String hash(String text) {
     return hash(text.getBytes(StandardCharsets.UTF_8));
   }

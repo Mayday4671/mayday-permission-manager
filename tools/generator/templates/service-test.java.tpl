@@ -25,11 +25,13 @@ class {{entity}}ServiceTest {
   @Mock private AccessPolicy access;
   private {{entity}}Service service;
 
+  /** 每项安全检查使用独立服务和仓储模拟，避免前一用例的授权结果残留。 */
   @BeforeEach
   void setUp() {
     service = new {{entity}}Service(repository, access);
   }
 
+  /** 动作未授权时必须在访问仓储前失败，不能先查询再隐藏结果。 */
   @Test
   void missingPermissionDoesNotReadRepository() {
     doThrow(new AccessDeniedException("denied")).when(access).require("{{resource}}:view");
@@ -37,6 +39,7 @@ class {{entity}}ServiceTest {
     verify(repository, never()).findById(anyLong());
   }
 
+  /** 删除与查看采用相同行级范围，不能用已有动作权限越过记录所有权。 */
   @Test
   void outOfScopeRecordCannotBeDeleted() {
     {{entity}} entity = existing();
@@ -46,6 +49,7 @@ class {{entity}}ServiceTest {
     verify(repository, never()).delete(entity);
   }
 
+  /** 过期版本不能保存或刷新实体，防止覆盖已经提交的新值。 */
   @Test
   void staleVersionCannotBeOverwritten() {
     when(repository.findById(1L)).thenReturn(Optional.of(existing()));

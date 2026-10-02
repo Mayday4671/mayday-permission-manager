@@ -15,9 +15,12 @@ const pageModules: Record<string, string> = {
   "/admin/crawler-config": "crawler",
   "/admin/udp-relay": "udp",
   "/admin/workorders": "workorders",
+  "/admin/feedback": "feedback",
+  "/admin/scheduler": "scheduler",
   // generator:frontend-modules
 };
 
+/** 将已登记页面映射到后端有效模块开关，设计器子路由统一归属审批模块。 */
 export function pageEnabled(
   path: string,
   modules: Readonly<Record<string, boolean>>,

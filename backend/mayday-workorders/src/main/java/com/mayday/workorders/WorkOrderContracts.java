@@ -40,6 +40,7 @@ public final class WorkOrderContracts {
       LocalDateTime createdAt,
       LocalDateTime updatedAt,
       Long version) {
+    /** 调用方先完成动作与范围检查，再映射公开字段；实体未来增加的内部属性不会自动输出。 */
     public static WorkOrderView from(WorkOrder entity) {
       return new WorkOrderView(
           entity.getId(),

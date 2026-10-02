@@ -1,15 +1,27 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.*;
-import com.mayday.security.*;
+import com.mayday.common.ApiResponse;
+import com.mayday.common.BusinessException;
+import com.mayday.security.AccessPolicy;
+import com.mayday.security.TokenService;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.*;
+import com.mayday.system.repository.SessionRepository;
+import com.mayday.system.repository.UserRepository;
 import java.time.Instant;
-import java.util.*;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /** 会话响应使用独立 UUID，绝不返回 token 或其摘要；管理员只能撤销自己有权管理的账号会话。 */
 @RestController
@@ -25,6 +37,7 @@ public class SessionController {
     return Objects.equals(user.getId(), access.current().getId()) || access.canViewUser(user);
   }
 
+  /** 查看在线会话仅返回设备摘要与固定失效时间，绝不返回原始令牌或可用于冒充登录的摘要。 */
   @GetMapping
   @Transactional(readOnly = true)
   public ApiResponse<?> list(
@@ -82,6 +95,7 @@ public class SessionController {
             limit));
   }
 
+  /** 撤销目标会话要求独立踢出权限及目标保护；撤销后认证与实时连接重新检查立即拒绝旧会话。 */
   @DeleteMapping("/{id}")
   @Transactional
   public ApiResponse<?> revoke(@PathVariable String id) {

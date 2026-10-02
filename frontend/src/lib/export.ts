@@ -4,8 +4,9 @@ import type { PageResult } from "../types";
 /** CSV 统一处理引号、换行和电子表格公式注入；各业务只定义列和服务端受权限保护的导出地址。 */
 export function csvCell(value: unknown) {
   const text = String(value ?? "");
-  return `"${(/^[=+\-@\t\r]/.test(text) ? "'" + text : text).replaceAll('"', '""')}"`;
+  return `"${(/^[\s]*[=+\-@]|^[\t\r\n]/.test(text) ? "'" + text : text).replaceAll('"', '""')}"`;
 }
+/** 兼容既有小规模导出：逐页调用受授权的专用接口；大数据资源应使用后台异步作业适配器。 */
 export async function exportCsv<T>({
   endpoint,
   params,

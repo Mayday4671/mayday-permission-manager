@@ -2,8 +2,12 @@ package com.mayday.crawler;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.Getter;
+import lombok.Setter;
 
 /** 每个任务内一个分页组对应一篇文章；正文按页保存在队列项，重试不会重复拼接正文。 */
 @Entity
@@ -33,5 +37,6 @@ public class CrawlArticle extends BaseEntity {
   private String author = "";
 
   @Column(nullable = false, length = 100)
+  /** 来源站点的日期文本，不强制猜测时区；采集时间由 BaseEntity.createdAt 单独记录。 */
   private String publishedAt = "";
 }

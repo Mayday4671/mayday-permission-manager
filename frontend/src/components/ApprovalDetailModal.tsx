@@ -7,6 +7,7 @@ import {
   Descriptions,
   Form,
   Input,
+  Popconfirm,
   Space,
   Tabs,
   Tag,
@@ -27,6 +28,7 @@ import { UserSelect } from "./LookupSelect";
 import { QueryState, formatTime } from "./shared";
 import { useAuth } from "../lib/auth";
 import { api, jsonBody } from "../lib/api";
+import { PERSONAL_WORK_POLL_MS } from "../lib/personal-work";
 import {
   actionNames,
   approvalStates,
@@ -48,7 +50,7 @@ export function ApprovalDetailModal({
   id: number | null;
   onClose: () => void;
 }) {
-  const { can } = useAuth(),
+  const { can, session } = useAuth(),
     { message } = App.useApp(),
     client = useQueryClient();
   const [action, setAction] = useState<WorkflowAction | null>(null);
@@ -57,6 +59,7 @@ export function ApprovalDetailModal({
     queryKey: ["approvals", "detail", id],
     queryFn: () => api<ApprovalDetail>(`/operations/requests/${id}`),
     enabled: id !== null,
+    refetchInterval: id !== null ? PERSONAL_WORK_POLL_MS : false,
   });
   const eventQuery = useQuery({
     queryKey: ["approvals", "events", id],
@@ -202,7 +205,7 @@ export function ApprovalDetailModal({
                         rowKey="id"
                         size="small"
                         dataSource={d.tasks}
-                        pagination={false}
+                        pagination={{ pageSize: 6 }}
                         columns={[
                           { title: "节点", dataIndex: "nodeName" },
                           { title: "审批人", dataIndex: "assigneeName" },
@@ -215,6 +218,21 @@ export function ApprovalDetailModal({
                             title: "加签",
                             dataIndex: "mandatory",
                             render: (v) => (v ? "必签" : "—"),
+                          },
+                          {
+                            title: "处理期限",
+                            dataIndex: "dueAt",
+                            render: (value, row) =>
+                              value ? (
+                                row.status === "PENDING" &&
+                                new Date(value).getTime() < Date.now() ? (
+                                  <Tag color="error">{formatTime(value)}</Tag>
+                                ) : (
+                                  formatTime(value)
+                                )
+                              ) : (
+                                "—"
+                              ),
                           },
                           {
                             title: "处理时间",
@@ -373,6 +391,43 @@ export function ApprovalDetailModal({
                   {d.canWithdraw && (
                     <Button onClick={() => start("WITHDRAW")}>撤回申请</Button>
                   )}
+                  {can("requests:remind") &&
+                    (d.applicantId === session?.user.id ||
+                      can("requests:manage")) && (
+                      <Popconfirm
+                        title="提醒当前节点审批人？"
+                        description="每项申请 30 分钟内只能催办一次。"
+                        disabled={!d.canRemind}
+                        onConfirm={async () => {
+                          try {
+                            await api(`/operations/requests/${d.id}/remind`, {
+                              method: "POST",
+                              body: jsonBody({ version: d.version }),
+                            });
+                            void client.invalidateQueries({
+                              queryKey: ["approvals"],
+                            });
+                            void client.invalidateQueries({
+                              queryKey: ["requests"],
+                            });
+                            message.success("已安排催办通知");
+                          } catch (error) {
+                            message.error((error as Error).message);
+                          }
+                        }}
+                      >
+                        <Button
+                          disabled={!d.canRemind}
+                          title={
+                            !d.canRemind
+                              ? "距离上次催办不足 30 分钟"
+                              : undefined
+                          }
+                        >
+                          催办
+                        </Button>
+                      </Popconfirm>
+                    )}
                 </Space>
               )}
             </>

@@ -1,0 +1,49 @@
+.monitor-page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.monitor-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.monitor-toolbar .muted-text {
+  margin-left: auto;
+}
+/* 指标在桌面横向排列；窄屏改为两列，防止单列拉长首屏并挤压趋势图。 */
+.monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+.monitor-grid .ant-statistic {
+  min-width: 0;
+}
+.monitor-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+.monitor-chart {
+  height: clamp(160px, 26vh, 290px);
+  margin-top: 14px;
+  min-width: 0;
+}
+.monitor-chart .recharts-wrapper:focus-visible {
+  outline: 1px solid var(--app-primary);
+}
+@media (max-width: 767px) {
+  .monitor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .monitor-charts {
+    grid-template-columns: 1fr;
+  }
+  .monitor-toolbar .muted-text {
+    margin-left: 0;
+  }
+}

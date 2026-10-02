@@ -1,13 +1,19 @@
 package com.mayday.crawler;
 
-import com.mayday.common.*;
+import com.mayday.common.BusinessException;
+import com.mayday.common.FileUsage;
 import com.mayday.operations.OperationSupport;
-import com.mayday.operations.model.*;
-import com.mayday.operations.repository.*;
+import com.mayday.operations.model.FilePayload;
+import com.mayday.operations.model.StoredFile;
+import com.mayday.operations.repository.FilePayloadRepository;
+import com.mayday.operations.repository.StoredFileRepository;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.repository.UserRepository;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
@@ -28,6 +34,7 @@ public class CrawlStore implements FileUsage {
   private final CrawlArticles articles;
   private static final Set<String> ACTIVE = Set.of("QUEUED", "RUNNING");
 
+  /** 不可变领取快照，网络工作器只能用原租约提交；配置、页组和序号不会由网页响应覆盖。 */
   public record Work(
       Long taskId,
       Long itemId,
@@ -38,6 +45,7 @@ public class CrawlStore implements FileUsage {
       int ordinal,
       CrawlRules rules) {}
 
+  /** 配置和数据共用任务所有者边界；需要改变状态时获取主任务行锁。 */
   public CrawlTask accessible(Long id, boolean locked) {
     access.require("crawler:view");
     var task =
@@ -55,6 +63,7 @@ public class CrawlStore implements FileUsage {
     return task;
   }
 
+  /** 规则只能编辑未运行草稿；新配置以账号行锁保护未结束任务的数量限制。 */
   public CrawlTask save(Long id, String name, CrawlRules rules, Long version) {
     access.require("crawler:view");
     access.require(id == null ? "crawler:create" : "crawler:update");
@@ -76,6 +85,7 @@ public class CrawlStore implements FileUsage {
     return tasks.saveAndFlush(task);
   }
 
+  /** 校验当前版本与执行/文件权限，初次入队、续跑和失败项重试分别处理，不重复创建成功结果。 */
   public CrawlTask start(Long id, Long version, boolean retry) {
     access.require("crawler:run");
     access.require("files:create");
@@ -111,6 +121,7 @@ public class CrawlStore implements FileUsage {
     return tasks.saveAndFlush(task);
   }
 
+  /** 停止立即撤销租约并将正在请求的条目回到队列，已经在网络中的旧结果不再允许提交。 */
   public CrawlTask stop(Long id, Long version) {
     access.require("crawler:stop");
     var task = configuration(id, true);
@@ -128,6 +139,7 @@ public class CrawlStore implements FileUsage {
     items.findByTaskIdAndStatus(task.getId(), "FETCHING").forEach(item -> item.setStatus("QUEUED"));
   }
 
+  /** 配置删除不级联销毁已有文章；有数据时只归档并停止剩余队列，没有数据才物理清理。 */
   public void delete(Long id) {
     access.require("crawler:delete");
     var task = configuration(id, true);
@@ -172,6 +184,7 @@ public class CrawlStore implements FileUsage {
             .isPresent();
   }
 
+  /** 从到期任务领取一条队列并生成 120 秒租约；数据库内串行领取，网络处理在提交后执行。 */
   public Work claim() {
     var now = LocalDateTime.now();
     for (Long id : tasks.ready(now, PageRequest.of(0, 10))) {
@@ -211,6 +224,7 @@ public class CrawlStore implements FileUsage {
     return null;
   }
 
+  /** 提交前重新验证租约与执行人权限，状态、正文、图片和新链接在同一事务保存。 失败最多重试 3 次并采用等待间隔；重复图片复用文件，容量达到上限后不继续扩张队列。 */
   public void finish(Work work, PageExtractor.Links links, byte[] image, String failure) {
     var task = tasks.lock(work.taskId()).orElse(null);
     if (task == null

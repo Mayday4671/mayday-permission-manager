@@ -2,6 +2,7 @@
 import { spawnSync } from "node:child_process";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readdirSync } from "node:fs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const frontend = join(root, "frontend");
@@ -14,6 +15,7 @@ function run(command, args, cwd = root) {
   if (result.error || result.status !== 0)
     throw new Error(`工程检查未通过：${command}`, { cause: result.error });
 }
+run(process.execPath, ["scripts/check-source-conventions.mjs"]);
 run(process.execPath, [
   join(frontend, "node_modules/prettier/bin/prettier.cjs"),
   "--check",
@@ -51,8 +53,9 @@ run(
     "--import",
     "tsx",
     "--test",
-    "tests/admin-usability.test.tsx",
-    "tests/grid-pagination.test.ts",
+    ...readdirSync(join(frontend, "tests"))
+      .filter((file) => /\.test\.tsx?$/.test(file))
+      .map((file) => join("tests", file)),
   ],
   frontend,
 );

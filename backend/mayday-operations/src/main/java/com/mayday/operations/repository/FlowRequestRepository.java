@@ -1,7 +1,10 @@
 package com.mayday.operations.repository;
 
 import com.mayday.operations.model.FlowRequest;
-import org.springframework.data.jpa.repository.*;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 
 /** 审批实例保留申请内容和审批人快照；使用版本号防止两个决策覆盖。 数据访问层。 */
 public interface FlowRequestRepository

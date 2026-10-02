@@ -6,6 +6,11 @@ import {
   type WorkflowField,
   type FieldType,
 } from "../../types/workflow";
+
+/** 编辑器将多行选项输入统一转换成模型数组，不把展示用字段写进发布契约。 */
+interface FieldDraft extends WorkflowField {
+  optionsText?: string;
+}
 /** 字段属性编辑与稳定 ID 分离，改名称不破坏节点引用。 */
 export function FieldEditor({
   field,
@@ -18,7 +23,7 @@ export function FieldEditor({
   onClose: () => void;
   onSave: (field: WorkflowField) => void;
 }) {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<FieldDraft>();
   const type = Form.useWatch("type", form) as FieldType | undefined;
   useEffect(() => {
     if (field) {

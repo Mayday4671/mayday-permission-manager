@@ -8,6 +8,7 @@ import type { components } from "../../types/generated/api";
 type {{entity}}View = components["schemas"]["{{entity}}View"];
 type {{entity}}Request = components["schemas"]["{{entity}}Request"];
 
+/** {{label}}沿用通用列表与编辑弹窗，页面权限只控制交互，最终授权和版本校验仍由后端完成。 */
 export function {{entity}}Page() {
   return (
     <ResourcePage<{{entity}}View>
@@ -18,6 +19,7 @@ export function {{entity}}Page() {
       statusField="enabled"
       defaults={{ {{frontendDefaults}} }}
       transport={{
+        // 从表单显式构造契约字段，编辑携带原版本，不接受额外身份或归属属性。
         save: async (values, editing) => {
           const body: {{entity}}Request = {
 {{frontendPayload}},
@@ -28,6 +30,7 @@ export function {{entity}}Page() {
           }));
           else unwrapContract(await contractClient.POST("/api/business/{{resource}}", { body }));
         },
+        // 删除同样提交页面读取到的版本，过期操作由服务端返回冲突后刷新列表。
         remove: async (record) => {
           unwrapContract(await contractClient.DELETE("/api/business/{{resource}}/{id}", {
             params: { path: { id: record.id }, query: { version: record.version } },

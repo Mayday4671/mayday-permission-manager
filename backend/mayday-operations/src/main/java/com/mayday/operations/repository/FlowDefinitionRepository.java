@@ -1,9 +1,12 @@
 package com.mayday.operations.repository;
 
 import com.mayday.operations.model.FlowDefinition;
-import org.springframework.data.jpa.repository.*;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 
-/** 顺序审批模板；实例提交时复制审批人顺序，模板后续调整不会改变已有实例。 数据访问层。 */
+/** 定义草稿写入使用行锁；发布版本和历史实例由各自仓储保存，不能覆盖历史快照。 */
 public interface FlowDefinitionRepository
     extends JpaRepository<FlowDefinition, Long>, JpaSpecificationExecutor<FlowDefinition> {
   @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)

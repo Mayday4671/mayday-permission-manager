@@ -54,8 +54,9 @@ public class OpenApiConfig {
             .getSchemas()
             .forEach(
                 (name, schema) -> {
+                  io.swagger.v3.oas.models.media.Schema<?> responseSchema = schema;
                   if (name.startsWith("ApiResponse"))
-                    schema.setRequired(List.of("success", "data", "message"));
+                    responseSchema.setRequired(List.of("success", "data", "message"));
                 });
       }
       if (api.getPaths() == null) return;

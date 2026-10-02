@@ -1,11 +1,27 @@
 package com.mayday.service;
 
-import com.mayday.common.*;
-import com.mayday.security.*;
-import com.mayday.system.model.*;
-import com.mayday.system.repository.*;
-import com.mayday.web.Contracts.*;
-import java.util.*;
+import com.mayday.common.BaseEntity;
+import com.mayday.common.BusinessException;
+import com.mayday.common.PageResult;
+import com.mayday.common.SearchPredicates;
+import com.mayday.security.AccessPolicy;
+import com.mayday.security.TokenService;
+import com.mayday.system.model.SysRole;
+import com.mayday.system.model.SysUser;
+import com.mayday.system.model.SystemEntry;
+import com.mayday.system.repository.EntryRepository;
+import com.mayday.system.repository.RoleRepository;
+import com.mayday.system.repository.UserRepository;
+import com.mayday.web.Contracts.UserRequest;
+import com.mayday.web.Contracts.UserStatusRequest;
+import com.mayday.web.Contracts.UserView;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
@@ -24,7 +40,9 @@ public class UserService {
   private final AccessPolicy access;
   private final PasswordEncoder encoder;
   private final TokenService tokens;
+  private final ChangeAuditService changeAudit;
 
+  /** 将账号转换为页面DTO，部门失效显示未分配；邮箱和电话按当前操作者的独立字段读取权限脱敏。 */
   public UserView view(SysUser u) {
     String dept =
         u.getDepartmentId() == null
@@ -34,6 +52,7 @@ public class UserService {
         u, dept, contactPermission("email", "read"), contactPermission("phone", "read"));
   }
 
+  /** 将有效用户数据范围合并到数据库查询，再应用搜索条件与分页；调用入口需先要求users:view，导出复用同一范围。 */
   @Transactional(readOnly = true)
   public PageResult<UserView> list(
       String keyword, Boolean enabled, Long departmentId, int page, int size) {
@@ -60,8 +79,10 @@ public class UserService {
     return u;
   }
 
+  /** 统一创建与编辑用例，校验版本、部门、岗位和可委托角色；受限联系方式拒绝越权修改，保存及白名单变更审计在同一事务提交。 */
   public UserView save(Long id, UserRequest req) {
     SysUser u = id == null ? new SysUser() : manageable(id);
+    Map<String, Object> before = id == null ? Map.of() : auditSnapshot(u);
     if (id != null) version(u, req.version());
     if (id != null && !u.getUsername().equals(req.username()))
       throw new BusinessException("用户名创建后不可修改");
@@ -118,15 +139,20 @@ public class UserService {
     else if (req.phone() != null && !Objects.equals(req.phone(), u.getPhone()))
       throw new AccessDeniedException("没有修改电话的权限");
     if (id != null && !req.enabled()) tokens.revokeUser(id);
-    return view(users.saveAndFlush(u));
+    users.saveAndFlush(u);
+    changeAudit.record(
+        "用户", u.getId(), id == null ? "创建账号" : "编辑账号/角色分配", before, auditSnapshot(u));
+    return view(u);
   }
 
+  /** 检查目标数据范围和角色授权等级后删除账号，保护当前账号、初始管理员和部门负责人；同步撤销会话并记录安全审计。 */
   public void delete(Long id) {
     SysUser u = manageable(id);
     if (entries.existsByLeaderId(id)) throw new BusinessException("此账号是部门负责人，请先调整部门负责人");
     if ("admin".equals(u.getUsername()) || id.equals(access.current().getId()))
       throw new BusinessException("不能删除初始管理员或当前账号");
     tokens.revokeUser(id);
+    changeAudit.record("用户", id, "删除账号", auditSnapshot(u), Map.of());
     users.delete(u);
   }
 
@@ -144,20 +170,37 @@ public class UserService {
       selected.add(user);
     }
     for (var user : selected) {
+      Map<String, Object> before = auditSnapshot(user);
       user.setEnabled(req.enabled());
       if (!req.enabled()) tokens.revokeUser(user.getId());
+      changeAudit.record(
+          "用户", user.getId(), req.enabled() ? "启用账号" : "停用账号", before, auditSnapshot(user));
     }
     users.saveAllAndFlush(selected);
   }
 
+  /** 在可管理目标范围内按密码策略重新加密凭据并撤销全部旧会话；审计仅记录重置行为，绝不保存密码或密码摘要。 */
   public void reset(Long id, String password) {
     SysUser u = manageable(id);
     validatePassword(password);
     u.setPasswordHash(encoder.encode(password));
     tokens.revokeUser(id);
     users.save(u);
+    changeAudit.record("用户", id, "重置登录凭据", Map.of("凭据状态", "原凭据"), Map.of("凭据状态", "已重置"));
   }
 
+  /** 审计白名单不包含姓名、电话、邮箱或密码摘要；角色编码排序后再比较，避免集合顺序噪声。 */
+  private static Map<String, Object> auditSnapshot(SysUser user) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("账号", user.getUsername());
+    snapshot.put("启用", user.isEnabled());
+    snapshot.put("部门ID", user.getDepartmentId());
+    snapshot.put("角色", user.getRoles().stream().map(SysRole::getCode).sorted().toList());
+    snapshot.put("岗位ID", user.getPostIds().stream().sorted().toList());
+    return snapshot;
+  }
+
+  /** 要求10至64字符且包含字母与数字，同时限制UTF-8编码不超过BCrypt的72字节，避免超长密码被静默截断。 */
   public static void validatePassword(String password) {
     if (password == null
         || password.length() < 10
@@ -172,6 +215,7 @@ public class UserService {
     return access.has("users:sensitive") || access.has("users:" + field + "-" + operation);
   }
 
+  /** 更新前必须提交当前乐观锁版本；缺失或过期统一抛出冲突，禁止用最后一次提交覆盖其他人的修改。 */
   public static void version(BaseEntity entity, Long version) {
     if (version == null || !Objects.equals(entity.getVersion(), version))
       throw new org.springframework.dao.OptimisticLockingFailureException("版本冲突");

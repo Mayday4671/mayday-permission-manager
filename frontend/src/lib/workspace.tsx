@@ -189,6 +189,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** 后台页签消费者共享关闭、刷新和离开保护上下文，表单与密码不能进入页签筛选缓存。 */
 export function useWorkspace() {
   const value = useContext(WorkspaceContext);
   if (!value) throw new Error("WorkspaceProvider 未挂载");

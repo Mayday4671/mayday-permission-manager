@@ -1,12 +1,21 @@
 package com.mayday.crawler;
 
 import com.mayday.common.BusinessException;
-import java.io.*;
-import java.net.*;
-import java.util.concurrent.*;
-import org.apache.hc.client5.http.*;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.UnknownHostException;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.apache.hc.client5.http.DnsResolver;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.config.*;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.util.Timeout;
@@ -40,6 +49,7 @@ public class SafeWebFetcher implements WebFetcher {
           },
           new ThreadPoolExecutor.AbortPolicy());
 
+  /** 有界 DNS 解析最多等待 8 秒，并要求所有候选 IP 均为公网；失败不回退到未审核地址。 */
   public static InetAddress[] resolvePublic(String host) throws UnknownHostException {
     Future<InetAddress[]> lookup = null;
     InetAddress[] addresses;
@@ -63,10 +73,12 @@ public class SafeWebFetcher implements WebFetcher {
     URI url = WebAddress.allowed(start, rules, image);
     var resolver =
         new DnsResolver() {
+          @Override
           public InetAddress[] resolve(String host) throws UnknownHostException {
             return resolvePublic(host);
           }
 
+          @Override
           public String resolveCanonicalHostname(String host) {
             return host;
           }
@@ -146,5 +158,6 @@ public class SafeWebFetcher implements WebFetcher {
     throw new BusinessException("重定向次数过多");
   }
 
+  /** 单次响应的两种互斥结果：受控重定向地址或有界正文，不自动跨域跟随跳转。 */
   private record FetchResult(URI redirect, Response response) {}
 }

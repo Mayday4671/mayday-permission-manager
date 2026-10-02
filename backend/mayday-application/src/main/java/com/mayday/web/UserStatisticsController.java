@@ -1,15 +1,26 @@
 package com.mayday.web;
 
-import com.mayday.common.*;
+import com.mayday.common.ApiResponse;
+import com.mayday.common.BusinessException;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.model.*;
+import com.mayday.system.model.AuditLog;
+import com.mayday.system.model.SysUser;
 import com.mayday.system.repository.UserRepository;
 import jakarta.persistence.EntityManager;
-import java.time.*;
-import java.util.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /** 所有账号指标复用用户数据范围；活跃人数按成功登录日志去重，不用访问次数或随机数估算。 */
 @RestController
@@ -20,6 +31,7 @@ public class UserStatisticsController {
   private final AccessPolicy access;
   private final EntityManager entityManager;
 
+  /** 统计窗口只允许 7/30/90 天；账号指标与成功登录均限于当前 SQL 授权范围。 */
   @GetMapping
   @Transactional(readOnly = true)
   public ApiResponse<?> statistics(@RequestParam(defaultValue = "7") int days) {
@@ -31,11 +43,18 @@ public class UserStatisticsController {
     var end = LocalDate.now().plusDays(1).atStartOfDay();
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("total", users.count(scope));
-    result.put("enabled", users.count(scope.and((r, q, c) -> c.isTrue(r.get("enabled")))));
-    result.put("disabled", users.count(scope.and((r, q, c) -> c.isFalse(r.get("enabled")))));
+    result.put(
+        "enabled",
+        users.count(scope.and((root, query, criteria) -> criteria.isTrue(root.get("enabled")))));
+    result.put(
+        "disabled",
+        users.count(scope.and((root, query, criteria) -> criteria.isFalse(root.get("enabled")))));
     result.put(
         "newUsers",
-        users.count(scope.and((r, q, c) -> c.greaterThanOrEqualTo(r.get("createdAt"), start))));
+        users.count(
+            scope.and(
+                (root, query, criteria) ->
+                    criteria.greaterThanOrEqualTo(root.get("createdAt"), start))));
     result.put("activeUsers", loginCount(start, end, true, true));
     result.put("loginSuccess", loginCount(start, end, false, true));
     // 登录失败没有经过认证的账号归属，不能强行归入某部门；仅有全部用户范围及登录日志权时返回。
@@ -45,8 +64,8 @@ public class UserStatisticsController {
     result.put("to", end.minusDays(1).toLocalDate());
     result.put("timezone", ZoneId.systemDefault().getId());
     List<Map<String, Object>> trend = new ArrayList<>();
-    for (int i = 0; i < days; i++) {
-      var day = start.plusDays(i);
+    for (int dayOffset = 0; dayOffset < days; dayOffset++) {
+      var day = start.plusDays(dayOffset);
       trend.add(
           Map.of(
               "date",
@@ -54,10 +73,10 @@ public class UserStatisticsController {
               "newUsers",
               users.count(
                   scope.and(
-                      (r, q, c) ->
-                          c.and(
-                              c.greaterThanOrEqualTo(r.get("createdAt"), day),
-                              c.lessThan(r.get("createdAt"), day.plusDays(1))))),
+                      (root, query, criteria) ->
+                          criteria.and(
+                              criteria.greaterThanOrEqualTo(root.get("createdAt"), day),
+                              criteria.lessThan(root.get("createdAt"), day.plusDays(1))))),
               "logins",
               loginCount(day, day.plusDays(1), false, true)));
     }

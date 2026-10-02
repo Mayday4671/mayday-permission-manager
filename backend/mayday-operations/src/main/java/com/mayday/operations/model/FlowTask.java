@@ -1,9 +1,12 @@
 package com.mayday.operations.model;
 
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
 
 /** 每人一条待办。申请主记录行锁保护整组会签；转交保留原任务为历史，加签标记为必签。 */
 @Getter
@@ -29,4 +32,10 @@ public class FlowTask extends BaseEntity {
 
   private boolean mandatory;
   private LocalDateTime decidedAt;
+
+  /** 从申请冻结的节点超时配置推算；转交和加签继承当前节点期限，不因换人重置。 */
+  private LocalDateTime dueAt;
+
+  /** 同一任务只投递一次自动超时提醒，轮询和服务重启不会重复轰炸。 */
+  private LocalDateTime timeoutNotifiedAt;
 }

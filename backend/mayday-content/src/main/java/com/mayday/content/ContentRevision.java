@@ -1,8 +1,17 @@
 package com.mayday.content;
 
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.*;
-import java.util.*;
+import com.mayday.system.model.SystemEntry;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -25,7 +34,7 @@ public class ContentRevision extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "category_id", insertable = false, updatable = false)
-  private com.mayday.system.model.SystemEntry categoryEntry;
+  private SystemEntry categoryEntry;
 
   @Column(length = 500)
   private String summary;
@@ -36,7 +45,9 @@ public class ContentRevision extends BaseEntity {
   @Column(nullable = false, length = 24)
   private String visibility = "PUBLIC";
 
+  /** 封面和附件仅保存授权文件 ID，展示时仍按当前内容版本重新验证关联。 */
   private Long coverId;
+
   private int sortOrder;
   private boolean pinned;
   private boolean recommended;
@@ -53,7 +64,9 @@ public class ContentRevision extends BaseEntity {
   @Column(nullable = false, length = 24)
   private String approvalStatus = "DRAFT";
 
+  /** 审批绑定此修订编号，旧审批结果不能授权后来产生的新修订。 */
   private Long approvalRequestId;
+
   private Long editorId;
 
   @Column(length = 64)

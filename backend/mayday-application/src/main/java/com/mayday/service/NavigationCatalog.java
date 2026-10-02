@@ -1,12 +1,14 @@
 package com.mayday.service;
 
 import com.mayday.common.BusinessException;
-import java.util.*;
+import java.util.List;
+import java.util.Set;
 
 /** 已实现页面的服务器登记。菜单权限必须与目标页面完全一致，站内地址格式不是授权白名单。 */
 public final class NavigationCatalog {
   private NavigationCatalog() {}
 
+  /** 已实现后台页面的固定路由、业务名称和查看权限；数据库菜单只能引用这些登记，不构成独立授权。 */
   public record Page(String code, String name, String path, String permission) {}
 
   public static final List<Page> PAGES =
@@ -37,6 +39,11 @@ public final class NavigationCatalog {
           page("workflows", "流程定义", "/admin/workflows"),
           page("requests", "审批申请", "/admin/requests"),
           page("workorders", "工单管理", "/admin/workorders"),
+          page("feedback", "客户反馈", "/admin/feedback"),
+          page("scheduler", "任务调度", "/admin/scheduler"),
+          page("monitor", "服务监控", "/admin/monitor"),
+          page("sessions", "在线会话", "/admin/sessions"),
+          new Page("changes", "变更记录", "/admin/changes", "logs:view"),
           // generator:navigation-pages
           new Page("tasks", "审批待办", "/admin/tasks", "requests:approve"));
 
@@ -56,11 +63,13 @@ public final class NavigationCatalog {
           "settings",
           "logs");
 
+  /** 校验路由与对应查看权限的完整组合，拒绝把低权限菜单配置成高权限页面入口。 */
   public static boolean matches(String path, String permission) {
     return PAGES.stream()
         .anyMatch(page -> page.path().equals(path) && page.permission().equals(permission));
   }
 
+  /** 保存菜单前验证页面与图标白名单；不接受任意外链、未实现页面或伪造权限配对。 */
   public static void validate(String path, String permission, String icon) {
     if (!matches(path, permission)) throw new BusinessException("请选择已实现的页面及其对应访问权限");
     if (icon != null && !icon.isBlank() && !ICONS.contains(icon))

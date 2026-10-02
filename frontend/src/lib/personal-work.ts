@@ -4,12 +4,14 @@ import { useAuth } from "./auth";
 import type { PageResult } from "../types";
 import type { InboxRecord } from "../types/notifications";
 import type { ApprovalRecord } from "../types/workflow";
+import { useRealtimeUpdates } from "./realtime";
 
 /** 工作台与顶栏共用轮询周期。切回窗口会重新查询；后台标签页停止定时轮询。 */
 export const PERSONAL_WORK_POLL_MS = 15000;
 
 /** 未读数按账号隔离缓存，读取后统一失效 messages/unread，避免顶栏与收件箱长期不一致。 */
 export function useUnreadCount() {
+  useRealtimeUpdates();
   const { session, can } = useAuth();
   return useQuery({
     queryKey: ["unread", session?.user.id],

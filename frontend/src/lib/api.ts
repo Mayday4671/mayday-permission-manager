@@ -8,6 +8,7 @@ export const tokenStore = {
   set: (token: string) => sessionStorage.setItem(TOKEN_KEY, token),
   clear: () => sessionStorage.removeItem(TOKEN_KEY),
 };
+/** 保留服务器 HTTP 状态，界面可以区分会话失效、授权拒绝和业务校验失败。 */
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -16,6 +17,7 @@ export class ApiError extends Error {
     super(message);
   }
 }
+/** 同源标准信封请求；合并取消和超时信号，仅同一令牌的 401 可以触发退出。 */
 export async function api<T>(
   path: string,
   options: RequestInit = {},
@@ -34,18 +36,34 @@ export async function api<T>(
       ? AbortSignal.any([options.signal, AbortSignal.timeout(20000)])
       : AbortSignal.timeout(20000),
   });
-  const result = await response.json().catch(() => ({
-    success: false,
-    message: "服务响应异常，请检查后端是否已启动",
-  }));
-  if (!response.ok || !result.success) {
-    if (response.status === 401 && path !== "/auth/login") {
+  const result: unknown = await response.json().catch(() => null);
+  const envelope =
+    typeof result === "object" &&
+    result !== null &&
+    "success" in result &&
+    typeof result.success === "boolean"
+      ? result
+      : null;
+  if (!response.ok || envelope?.success !== true || !("data" in envelope)) {
+    // 旧账号的慢请求不能在新账号登录后清除新令牌；只撤销发出本次请求的同一会话。
+    if (
+      response.status === 401 &&
+      path !== "/auth/login" &&
+      token === tokenStore.get()
+    ) {
       tokenStore.clear();
       window.dispatchEvent(new Event("mayday:unauthorized"));
     }
-    throw new ApiError(result.message || "操作失败，请重试", response.status);
+    const explanation =
+      envelope &&
+      "message" in envelope &&
+      typeof envelope.message === "string" &&
+      envelope.message
+        ? envelope.message
+        : "服务响应异常，请检查后端是否已启动";
+    throw new ApiError(explanation, response.status);
   }
-  return result.data as T;
+  return envelope.data as T;
 }
 /** 自动跳过空筛选项，保证 false/0 等合法值不会被误删。 */
 export function queryString(values: Record<string, unknown>): string {

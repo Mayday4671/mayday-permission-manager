@@ -43,14 +43,16 @@ import type { Entry } from "../types";
 /** 后台壳层：后端返回可访问导航；移动端使用可关闭的遮罩导航，全局搜索只检索当前有权访问的页面。 */
 export function AdminLayout() {
   const { session } = useAuth();
+  if (!session) return null;
   // 账号切换时重建整个页签上下文，避免复用上一账号的页面状态。
   return (
-    <WorkspaceProvider key={session!.user.id}>
+    <WorkspaceProvider key={session.user.id}>
       <AdminShell />
     </WorkspaceProvider>
   );
 }
 
+/** 导航、页签、主题与个人消息在同一后台壳层组合；业务授权仍由登记页和 API 决定。 */
 function AdminShell() {
   const modules = useModules();
   const { session, logout, can } = useAuth();
@@ -85,7 +87,7 @@ function AdminShell() {
         sidebarRef.current?.querySelectorAll<HTMLElement>(
           "a[href],button:not([disabled])",
         ) ?? [],
-      ).filter((el) => el.getClientRects().length);
+      ).filter((element) => element.getClientRects().length);
     focusable()[0]?.focus();
     const keyboard = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -133,15 +135,18 @@ function AdminShell() {
     current?.name ??
     adminPages.find((page) => page.path === active)?.title ??
     "页面不存在";
+  const matchingPages = items.filter((item) =>
+    item.name.toLocaleLowerCase().includes(keyword.trim().toLocaleLowerCase()),
+  );
   useEffect(() => {
     setMobile(false);
     document.title = `${currentTitle} · Mayday`;
   }, [location.pathname, currentTitle]);
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setSearchOpen((v) => !v);
+    const handler = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen((previous) => !previous);
       }
     };
     window.addEventListener("keydown", handler);
@@ -260,11 +265,13 @@ function AdminShell() {
               </kbd>
             </button>
             <AdminThemeButton />
-            <Tooltip title="打开前台门户">
-              <Link className="icon-link" to="/" aria-label="打开前台门户">
-                <Globe size={19} />
-              </Link>
-            </Tooltip>
+            {modules.portal && (
+              <Tooltip title="打开前台门户">
+                <Link className="icon-link" to="/" aria-label="打开前台门户">
+                  <Globe size={19} />
+                </Link>
+              </Tooltip>
+            )}
             {can("messages:view") && (
               <Badge
                 count={unread.isError ? 0 : (unread.data ?? 0)}
@@ -364,27 +371,23 @@ function AdminShell() {
           prefix={<Search size={18} />}
           placeholder="输入页面名称"
           value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
+          onChange={(event) => setKeyword(event.target.value)}
         />
         <div className="search-results">
-          {items
-            .filter((i) => i.name.includes(keyword))
-            .map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  navigate(item.path);
-                  setSearchOpen(false);
-                  setKeyword("");
-                }}
-              >
-                <span>{item.name}</span>
-                <ChevronRight size={16} />
-              </button>
-            ))}
-          {items.filter((i) => i.name.includes(keyword)).length === 0 && (
-            <p>没有匹配的页面</p>
-          )}
+          {matchingPages.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                navigate(item.path);
+                setSearchOpen(false);
+                setKeyword("");
+              }}
+            >
+              <span>{item.name}</span>
+              <ChevronRight size={16} />
+            </button>
+          ))}
+          {matchingPages.length === 0 && <p>没有匹配的页面</p>}
         </div>
       </Modal>
       <Modal

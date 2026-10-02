@@ -45,6 +45,8 @@ export interface WorkflowNode {
   writable?: string[];
   actions?: WorkflowAction[];
   conditions?: WorkflowCondition[];
+  /** 节点进入后计算期限，留空不提醒；同一任务最多一次自动超时提醒。 */
+  timeoutMinutes?: number | null;
 }
 export interface WorkflowSpec {
   fields: WorkflowField[];
@@ -86,6 +88,8 @@ export interface WorkflowTask extends BaseRecord {
   status: string;
   mandatory: boolean;
   decidedAt: string | null;
+  dueAt: string | null;
+  timeoutNotifiedAt: string | null;
 }
 export interface WorkflowHistory extends BaseRecord {
   actorName: string;
@@ -109,6 +113,7 @@ export interface ApprovalRecord extends BaseRecord {
   businessRevisionId: number | null;
   currentNodeName: string | null;
   completedAt: string | null;
+  lastRemindedAt: string | null;
 }
 export interface ApprovalDetail extends ApprovalRecord {
   fields: WorkflowField[];
@@ -122,6 +127,7 @@ export interface ApprovalDetail extends ApprovalRecord {
   writable: string[];
   canWithdraw: boolean;
   canComment: boolean;
+  canRemind: boolean;
   business:
     | (ContentRevision & {
         noticeId: number;
@@ -146,6 +152,7 @@ export const actionNames: Record<string, string> = {
   COMMENT: "评论",
   TRANSFER: "转交",
   ADD_SIGN: "加签",
+  REMIND: "催办",
 };
 export const fieldNames: Record<FieldType, string> = {
   TEXT: "单行文字",
@@ -159,6 +166,7 @@ export const fieldNames: Record<FieldType, string> = {
   DEPARTMENT: "部门",
   FILES: "附件",
 };
+/** 空白草稿提供最小可编辑骨架；审批人未指定时禁止发布，默认不自审或重复审批。 */
 export function initialSpec(): WorkflowSpec {
   return {
     fields: [

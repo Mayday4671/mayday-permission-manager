@@ -8,11 +8,11 @@ import { RoleSelect, PostSelect } from "../components/LookupSelect";
 import { DictionaryTag } from "../components/DictionarySelect";
 import { formatTime, PersonAvatar } from "../components/shared";
 import { api, jsonBody } from "../lib/api";
-import { exportCsv } from "../lib/export";
 import { usePageState } from "../lib/workspace";
 import { useAuth } from "../lib/auth";
 import type { User } from "../types";
 
+/** 数据范围名称只用于展示；实际记录授权由后端合并各有效角色的范围集合。 */
 export const scopeNames: Record<string, string> = {
   SELF: "仅本人",
   DEPARTMENT: "本部门",
@@ -83,23 +83,7 @@ function ResetPassword({ user }: { user: User }) {
   );
 }
 
-async function exportUsers(params: Record<string, unknown>) {
-  return exportCsv<User>({
-    endpoint: "/system/users/export",
-    params,
-    name: "Mayday-用户",
-    headers: ["用户名", "姓名", "部门", "角色", "邮箱", "电话", "状态"],
-    row: (user) => [
-      user.username,
-      user.nickname,
-      user.departmentName,
-      user.roleNames.join("、"),
-      user.email,
-      user.phone,
-      user.enabled ? "启用" : "停用",
-    ],
-  });
-}
+/** 用户管理复用授权列表、组织筛选与批量作业；浏览器字段显隐不替代服务器的读写校验。 */
 export function UsersPage() {
   const { can, session } = useAuth();
   const [departmentId, setDepartmentId] = usePageState<number | undefined>(
@@ -110,7 +94,7 @@ export function UsersPage() {
   const emailWrite = can("users:sensitive") || can("users:email-write");
   const phoneRead = can("users:sensitive") || can("users:phone-read");
   const phoneWrite = can("users:sensitive") || can("users:phone-write");
-  const isSelf = (u: User) => u.id === session?.user.id;
+  const isSelf = (user: User) => user.id === session?.user.id;
   return (
     <ResourcePage<User>
       resource="users"
@@ -136,7 +120,7 @@ export function UsersPage() {
       singular="用户"
       statusField="enabled"
       defaults={{ roleIds: [] }}
-      exportRows={exportUsers}
+      bulkResource="users"
       canSelect={(user) => user.username !== "admin" && !isSelf(user)}
       batchActions={[true, false].map((enabled) => ({
         key: String(enabled),
@@ -154,24 +138,24 @@ export function UsersPage() {
         },
       }))}
       createAllowed={session?.dataScopes.users === "ALL"}
-      canDelete={(u) => u.username !== "admin" && !isSelf(u)}
-      extraActions={(u) =>
-        can("users:reset") ? <ResetPassword user={u} /> : null
+      canDelete={(user) => user.username !== "admin" && !isSelf(user)}
+      extraActions={(user) =>
+        can("users:reset") ? <ResetPassword user={user} /> : null
       }
       columns={[
         {
           title: "成员",
           key: "user",
           width: 220,
-          render: (_, u) => (
+          render: (_, user) => (
             <div className="person-cell">
-              <PersonAvatar name={u.nickname} />
+              <PersonAvatar name={user.nickname} />
               <div>
                 <strong>
-                  {u.nickname}
-                  {isSelf(u) && <span className="you-label">你</span>}
+                  {user.nickname}
+                  {isSelf(user) && <span className="you-label">你</span>}
                 </strong>
-                <small>@{u.username}</small>
+                <small>@{user.username}</small>
               </div>
             </div>
           ),

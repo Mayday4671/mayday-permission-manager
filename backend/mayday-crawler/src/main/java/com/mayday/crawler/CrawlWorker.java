@@ -1,6 +1,7 @@
 package com.mayday.crawler;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.ModuleSwitches;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -11,8 +12,9 @@ import org.springframework.stereotype.Component;
 public class CrawlWorker {
   private final CrawlStore store;
   private final WebFetcher fetcher;
-  private final com.mayday.common.ModuleSwitches modules;
+  private final ModuleSwitches modules;
 
+  /** 关闭模块时不领取队列；网络处理在任务锁外执行，成功与失败均带租约回到持久事务提交。 */
   @Scheduled(
       scheduler = "crawlerScheduler",
       fixedDelayString = "${mayday.crawler.tick-ms:1000}",

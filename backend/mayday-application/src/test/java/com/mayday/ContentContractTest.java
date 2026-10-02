@@ -1,6 +1,7 @@
 package com.mayday;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.mayday.common.RichText;
 import com.mayday.web.ContentContracts;

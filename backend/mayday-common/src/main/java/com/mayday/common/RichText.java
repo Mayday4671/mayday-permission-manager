@@ -29,6 +29,7 @@ public final class RichText {
               "li",
               "blockquote");
 
+  /** 持久化前以服务端白名单清理正文，并同时限制原文及清理后长度；空正文和超长正文按业务错误拒绝。 */
   public static String clean(String input, int limit) {
     if (input == null || input.length() > limit) throw new BusinessException("正文超出允许长度");
     String html = Jsoup.clean(input, "", ALLOWED, new Document.OutputSettings().prettyPrint(false));

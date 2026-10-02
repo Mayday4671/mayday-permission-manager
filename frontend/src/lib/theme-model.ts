@@ -121,6 +121,7 @@ const BACKGROUNDS = {
   blue: { light: "#eef3fb", dark: "#101827" },
   warm: { light: "#f6f3ee", dark: "#1d1915" },
 };
+/** 明暗外观只解析设计层的固定背景色板，用户配置不直接成为可执行 CSS 文本。 */
 export function themeBackground(appearance: Appearance, dark: boolean) {
   return BACKGROUNDS[appearance.background][dark ? "dark" : "light"];
 }

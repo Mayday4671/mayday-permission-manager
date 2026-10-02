@@ -827,6 +827,123 @@ test("UDP 是独立菜单，系统管理折叠不影响它的访问", async () =
   }
 });
 
+test("客户反馈使用授权导航入口，点击客户服务名称即可展开和折叠整组", async () => {
+  const { AdminNavigation } = await import("../src/components/AdminNavigation");
+  const items = [
+    {
+      id: 910,
+      path: "/admin/feedback",
+      name: "客户反馈",
+      permission: "feedback:view",
+    },
+    {
+      id: 911,
+      path: "/admin/users",
+      name: "用户管理",
+      permission: "users:view",
+    },
+  ];
+  const router = createMemoryRouter(
+    [{ path: "*", element: <AdminNavigation items={items} compact={false} /> }],
+    { initialEntries: ["/admin"] },
+  );
+  try {
+    render(<RouterProvider router={router} />);
+    const customerGroup = screen.getByRole("button", { name: "客户服务" });
+    const user = userEvent.setup();
+    assert.equal(customerGroup.getAttribute("aria-expanded"), "false");
+    assert.equal(screen.queryByRole("link", { name: "客户反馈" }), null);
+    // 直接点组名称文字，证明整行按钮负责折叠，不要求用户寻找小箭头或图标。
+    await user.click(within(customerGroup).getByText("客户服务"));
+    assert.equal(customerGroup.getAttribute("aria-expanded"), "true");
+    assert.equal(
+      screen.getByRole("link", { name: "客户反馈" }).getAttribute("href"),
+      "/admin/feedback",
+    );
+    await user.click(within(customerGroup).getByText("客户服务"));
+    assert.equal(customerGroup.getAttribute("aria-expanded"), "false");
+    assert.equal(screen.queryByRole("link", { name: "客户反馈" }), null);
+    // 进入反馈路由后自动定位客户服务组，但不会擅自展开其他组。
+    await act(() => router.navigate("/admin/feedback"));
+    assert.equal(customerGroup.getAttribute("aria-expanded"), "true");
+    assert.equal(
+      screen
+        .getByRole("link", { name: "客户反馈" })
+        .getAttribute("aria-current"),
+      "page",
+    );
+    assert.equal(
+      screen
+        .getByRole("button", { name: "系统管理" })
+        .getAttribute("aria-expanded"),
+      "false",
+    );
+  } finally {
+    cleanup();
+    router.dispose();
+  }
+});
+
+test("未授权客户反馈不因前端页面登记出现，整个空客户服务分组也不显示", async () => {
+  const { AdminNavigation } = await import("../src/components/AdminNavigation");
+  // 导航接口未返回反馈入口；即使地址栏指向该路由，展示层也不能自行补出权限入口。
+  const items = [
+    {
+      id: 911,
+      path: "/admin/users",
+      name: "用户管理",
+      permission: "users:view",
+    },
+  ];
+  const router = createMemoryRouter(
+    [{ path: "*", element: <AdminNavigation items={items} compact={false} /> }],
+    { initialEntries: ["/admin/feedback"] },
+  );
+  try {
+    render(<RouterProvider router={router} />);
+    assert.equal(screen.queryByRole("button", { name: "客户服务" }), null);
+    assert.equal(
+      screen.queryByRole("link", { name: "客户反馈", hidden: true }),
+      null,
+    );
+    assert.ok(screen.getByRole("button", { name: "系统管理" }));
+  } finally {
+    cleanup();
+    router.dispose();
+  }
+});
+
+test("缩窄侧栏仍可通过客户服务快捷菜单访问已授权反馈", async () => {
+  const { AdminNavigation } = await import("../src/components/AdminNavigation");
+  const items = [
+    {
+      id: 910,
+      path: "/admin/feedback",
+      name: "客户反馈",
+      permission: "feedback:view",
+    },
+  ];
+  const router = createMemoryRouter(
+    [{ path: "*", element: <AdminNavigation items={items} compact /> }],
+    { initialEntries: ["/admin"] },
+  );
+  try {
+    render(<RouterProvider router={router} />);
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "客户服务" }));
+    assert.equal(
+      (await screen.findByRole("link", { name: "客户反馈" })).getAttribute(
+        "href",
+      ),
+      "/admin/feedback",
+    );
+  } finally {
+    cleanup();
+    router.dispose();
+  }
+});
+
 test("UDP 页面配置真实提交，启停使用版本与批次，未知系统丢包不显示零", async () => {
   const { UdpRelayPage } = await import("../src/pages/operations/UdpRelayPage");
   const original = globalThis.fetch,

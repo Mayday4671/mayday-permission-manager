@@ -16,6 +16,7 @@ import { adminPages } from "./lib/workspace-model";
 import { useModules } from "./lib/modules";
 import { pageEnabled } from "./lib/module-model";
 import "./workflow.css";
+import "./components/table-tools.css";
 
 /** 按页面拆分代码，门户访客不下载后台图表及权限编辑器。 */
 const DashboardPage = lazy(() =>
@@ -120,6 +121,31 @@ const WorkOrderPage = lazy(() =>
   })),
 );
 // generator:frontend-imports
+const FeedbackPage = lazy(() =>
+  import("./pages/operations/FeedbackPage").then((module) => ({
+    default: module.FeedbackPage,
+  })),
+);
+const SchedulerPage = lazy(() =>
+  import("./pages/operations/SchedulerPage").then((module) => ({
+    default: module.SchedulerPage,
+  })),
+);
+const MonitorPage = lazy(() =>
+  import("./pages/operations/MonitorPage").then((module) => ({
+    default: module.MonitorPage,
+  })),
+);
+const SessionsPage = lazy(() =>
+  import("./pages/operations/SystemPages").then((module) => ({
+    default: module.SessionsPage,
+  })),
+);
+const ChangesPage = lazy(() =>
+  import("./pages/ChangesPage").then((module) => ({
+    default: module.ChangesPage,
+  })),
+);
 
 function Protected() {
   const { session, loading } = useAuth();
@@ -189,6 +215,7 @@ export class ErrorBoundary extends Component<
     );
   }
 }
+/** 应用路由总入口：门户使用后台独立主题配置，后台路由同时等待会话和模块状态；权限隐藏不能替代服务器校验。 */
 export default function Application() {
   const location = useLocation();
   const modules = useModules();
@@ -226,6 +253,11 @@ export default function Application() {
                   <Route key={page.path} index element={<DashboardRoute />} />
                 );
               const screens = {
+                feedback: FeedbackPage,
+                scheduler: SchedulerPage,
+                monitor: MonitorPage,
+                sessions: SessionsPage,
+                changes: ChangesPage,
                 workorders: WorkOrderPage,
                 // generator:frontend-screens
                 workflows: WorkflowsPage,

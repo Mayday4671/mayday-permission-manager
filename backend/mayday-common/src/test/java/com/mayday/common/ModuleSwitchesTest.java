@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 /** 验证模块依赖、关闭后的直接接口、附件和相似路径，避免只隐藏菜单的伪开关。 */
 class ModuleSwitchesTest {
+  /** 消费模块显式开启仍不能绕过依赖关闭，未配置的新模块遵循各自默认值。 */
   @Test
   void disablingDependenciesAlsoDisablesConsumers() {
     ModuleSwitches modules = new ModuleSwitches();
@@ -20,6 +21,7 @@ class ModuleSwitchesTest {
     assertFalse(modules.isEnabled("workorders"));
   }
 
+  /** 覆盖集合、单条、附件直接请求，同时验证相似路径不会被模糊前缀误伤。 */
   @Test
   void disabledModulesBlockCollectionsItemsAndAttachments() {
     ModuleSwitches modules = new ModuleSwitches();
@@ -47,6 +49,7 @@ class ModuleSwitchesTest {
     assertTrue(modules.pathEnabled("/api/crawler-extra"));
   }
 
+  /** 拼写错误应在配置边界失败，避免静默忽略后留下意外开放的业务入口。 */
   @Test
   void invalidNamesFailInsteadOfSilentlyLeavingModulesEnabled() {
     ModuleSwitches modules = new ModuleSwitches();

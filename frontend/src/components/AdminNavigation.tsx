@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   FileText,
   FolderTree,
+  Headset,
   LayoutDashboard,
   Menu,
   Settings2,
@@ -24,6 +25,7 @@ const groups = [
   { name: "内容管理", icon: FileText },
   { name: "通知中心", icon: Bell },
   { name: "审批中心", icon: ClipboardCheck },
+  { name: "客户服务", icon: Headset },
   { name: "系统管理", icon: Settings2 },
 ];
 const icons: Record<string, typeof Users> = {

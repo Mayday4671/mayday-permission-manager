@@ -21,7 +21,9 @@ contractClient.use({
   onResponse({ request, response }) {
     if (
       response.status === 401 &&
-      !new URL(request.url).pathname.endsWith("/auth/login")
+      !new URL(request.url).pathname.endsWith("/auth/login") &&
+      request.headers.get("Authorization") ===
+        (tokenStore.get() ? `Bearer ${tokenStore.get()}` : null)
     ) {
       tokenStore.clear();
       window.dispatchEvent(new Event("mayday:unauthorized"));

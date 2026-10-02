@@ -6,6 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loginWithCaptcha } from "./support/captcha.mjs";
+import { purgeTestFiles } from "./support/files-cleanup.mjs";
 import { spawnSync } from "node:child_process";
 const base = process.env.API_BASE;
 const project = process.env.API_TEST_COMPOSE_PROJECT;
@@ -79,7 +80,7 @@ const ids = (list) => {
   assert(list.every(Number.isSafeInteger));
   return list.length ? list.join(",") : "-1";
 };
-function sql(statement) {
+function sql(statement, administrator = false) {
   assert(isolated, "只允许独立验收项目");
   const result = spawnSync(
     "docker",
@@ -94,7 +95,9 @@ function sql(statement) {
       database,
       "sh",
       "-c",
-      'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --skip-column-names',
+      administrator
+        ? 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --skip-column-names'
+        : 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --skip-column-names',
     ],
     {
       input: statement,
@@ -786,40 +789,58 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
       async () => {
         const d = await create(schema([node([a.id])])),
           r = await submit(d);
-        // 只在隔离数据库中的这条专用事件模拟存储失败；生产接口没有注入故障入口。
+        const trigger = prefix + "_delivery_" + r.id;
+        assert.match(trigger, /^[a-zA-Z0-9_]{1,64}$/);
+        // 800字符正文现在是合法输入，不能再冒充失败；在保存投递时制造真实数据库错误，验证已写通知完整回滚。
+        // 触发器仅匹配本次隔离申请，使用容器内管理账号创建并在 finally 精确删除，生产接口没有故障入口。
         sql(
-          "START TRANSACTION;SELECT id FROM ops_event WHERE request_id=" +
-            r.id +
-            " FOR UPDATE;DELETE d FROM ops_delivery d JOIN ops_notification n ON n.id=d.notification_id WHERE n.target_type='APPROVAL' AND n.target_id=" +
-            r.id +
-            ";DELETE t FROM ops_notification_target t JOIN ops_notification n ON n.id=t.notification_id WHERE n.target_type='APPROVAL' AND n.target_id=" +
-            r.id +
-            ";DELETE FROM ops_notification WHERE target_type='APPROVAL' AND target_id=" +
-            r.id +
-            ";UPDATE ops_event SET body=REPEAT('x',800),status='PENDING',next_attempt_at=NOW() WHERE request_id=" +
-            r.id +
-            ";COMMIT;",
+          `DELIMITER $$
+CREATE TRIGGER ${trigger} BEFORE INSERT ON ops_delivery FOR EACH ROW
+BEGIN
+  IF EXISTS(SELECT 1 FROM ops_notification WHERE id=NEW.notification_id AND target_type='APPROVAL' AND target_id=${r.id}) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='isolated workflow delivery failure';
+  END IF;
+END$$
+DELIMITER ;`,
+          true,
         );
         let events;
-        const deadline = Date.now() + 12000;
-        do {
-          events = await call(
-            "/operations/requests/" + r.id + "/events",
-            admin,
-          );
-          if (events[0].attempts > 0) break;
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        } while (Date.now() < deadline);
-        assert(events[0].attempts > 0);
-        assert.equal(events[0].status, "PENDING");
-        assert.equal(
+        try {
           sql(
-            "SELECT COUNT(*) FROM ops_notification WHERE target_type='APPROVAL' AND target_id=" +
+            "START TRANSACTION;SELECT id FROM ops_event WHERE request_id=" +
               r.id +
-              ";",
-          ).trim(),
-          "0",
-        );
+              " FOR UPDATE;DELETE d FROM ops_delivery d JOIN ops_notification n ON n.id=d.notification_id WHERE n.target_type='APPROVAL' AND n.target_id=" +
+              r.id +
+              ";DELETE t FROM ops_notification_target t JOIN ops_notification n ON n.id=t.notification_id WHERE n.target_type='APPROVAL' AND n.target_id=" +
+              r.id +
+              ";DELETE FROM ops_notification WHERE target_type='APPROVAL' AND target_id=" +
+              r.id +
+              ";UPDATE ops_event SET body='通知事务回滚验收',attempts=0,status='PENDING',next_attempt_at=NOW() WHERE request_id=" +
+              r.id +
+              ";COMMIT;",
+          );
+          const deadline = Date.now() + 12000;
+          do {
+            events = await call(
+              "/operations/requests/" + r.id + "/events",
+              admin,
+            );
+            if (events[0].attempts > 0) break;
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          } while (Date.now() < deadline);
+          assert(events[0].attempts > 0);
+          assert.equal(events[0].status, "PENDING");
+          assert.equal(
+            sql(
+              "SELECT COUNT(*) FROM ops_notification WHERE target_type='APPROVAL' AND target_id=" +
+                r.id +
+                ";",
+            ).trim(),
+            "0",
+          );
+        } finally {
+          sql("DROP TRIGGER IF EXISTS " + trigger + ";", true);
+        }
         sql(
           "UPDATE ops_event SET body='通知重试验收' WHERE request_id=" +
             r.id +
@@ -995,8 +1016,7 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
       await call("/content/notices/" + id, admin, "DELETE");
       await call("/content/notices/" + id + "/purge", admin, "DELETE");
     }
-    for (const id of made.files)
-      await call("/operations/files/" + id, admin, "DELETE");
+    await purgeTestFiles(base, admin, made.files);
     if (dept?.leaderId)
       await call("/system/entries/departments/" + dept.id, admin, "PUT", {
         ...dept,

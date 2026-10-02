@@ -49,6 +49,7 @@ const profiles = [
       SCHEDULER: false,
       UDP: false,
       WORKORDERS: false,
+      FEEDBACK: false,
     },
     content: false,
     notifications: false,
@@ -64,6 +65,7 @@ const profiles = [
       SCHEDULER: false,
       UDP: false,
       WORKORDERS: false,
+      FEEDBACK: false,
     },
     content: true,
     notifications: true,
@@ -108,6 +110,7 @@ for (const profile of profiles) {
     const state = await request("/platform/features");
     assert.equal(state.modules.portal, false);
     assert.equal(state.modules.approvals, false);
+    assert.equal(state.modules.feedback, false);
     assert.equal(state.modules.content, profile.content);
     token = (
       await loginWithCaptcha(base, "admin", process.env.VERIFY_ADMIN_PASSWORD)
@@ -127,12 +130,15 @@ for (const profile of profiles) {
       "/relay/stats",
       "/operations/scheduler",
       "/business/workorders",
+      "/operations/feedback",
     ])
       await request(path, token, 404);
     for (const path of [
       "/crawler/tasks/1/start",
       "/operations/workflows/1/publish",
       "/relay/start",
+      "/public/feedback",
+      "/public/feedback/track",
     ])
       await request(path, token, 404, "POST");
     await request("/content/notices", token, profile.content ? 200 : 404);
@@ -150,6 +156,7 @@ for (const profile of profiles) {
       "requests:",
       "workorders:",
       "scheduler:",
+      "feedback:",
     ])
       assert.equal(
         session.permissions.some((permission) => permission.startsWith(prefix)),

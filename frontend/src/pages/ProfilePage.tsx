@@ -7,6 +7,20 @@ import { api, jsonBody, tokenStore } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useUnsavedChanges } from "../lib/useUnsavedChanges";
 
+/** 自助资料只允许修改下列字段，角色和部门完全不进入提交对象。 */
+interface ProfileDraft {
+  nickname: string;
+  email?: string | null;
+  phone?: string | null;
+}
+
+/** 确认密码只用于前端一致性校验，服务端请求只携带当前密码和新密码。 */
+interface PasswordDraft {
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 /** 自助资料接口独立于用户管理，只提交昵称与联系方式，不能自行修改角色和组织归属。 */
 export function ProfilePage() {
   const { session, refresh } = useAuth();
@@ -15,11 +29,12 @@ export function ProfilePage() {
   const [changing, setChanging] = useState(false);
   const [profileDirty, setProfileDirty] = useState(false);
   const [passwordDirty, setPasswordDirty] = useState(false);
-  const [profileForm] = Form.useForm();
+  const [profileForm] = Form.useForm<ProfileDraft>();
   const profileSubmitting = useRef(false);
   const passwordSubmitting = useRef(false);
   const navigate = useNavigate();
   const user = session!.user;
+  // 保存成功后更新比较基线；失败保留输入与离开保护，不能把未保存修改当作已完成。
   const original = useRef(
     JSON.stringify({
       nickname: user.nickname,
@@ -58,7 +73,7 @@ export function ProfilePage() {
         <div className="profile-forms">
           <section className="panel">
             <SectionTitle title="基本资料" />
-            <Form
+            <Form<ProfileDraft>
               form={profileForm}
               layout="vertical"
               disabled={saving}
@@ -122,7 +137,7 @@ export function ProfilePage() {
           </section>
           <section className="panel">
             <SectionTitle title="账号安全" subtitle="修改密码后需要重新登录" />
-            <Form
+            <Form<PasswordDraft>
               layout="vertical"
               disabled={changing}
               onValuesChange={(_, values) =>
@@ -140,6 +155,7 @@ export function ProfilePage() {
                       newPassword: values.newPassword,
                     }),
                   });
+                  // 后端已撤销旧会话，当前标签页必须同步清空身份和缓存，禁止继续以旧令牌操作。
                   tokenStore.clear();
                   window.dispatchEvent(new Event("mayday:unauthorized"));
                   message.success("密码已更新，请重新登录");

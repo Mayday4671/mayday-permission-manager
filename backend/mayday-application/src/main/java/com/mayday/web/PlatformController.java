@@ -21,5 +21,6 @@ public class PlatformController {
     return ApiResponse.ok(new FeatureView(modules.snapshot()));
   }
 
+  /** 客户端导航所需的模块启用清单；只反映部署功能，不代表当前账号已被授予访问权限。 */
   public record FeatureView(Map<String, Boolean> modules) {}
 }

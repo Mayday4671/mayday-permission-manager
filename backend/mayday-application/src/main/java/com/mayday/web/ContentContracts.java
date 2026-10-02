@@ -1,6 +1,12 @@
 package com.mayday.web;
 
-import jakarta.validation.constraints.*;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.Set;
 
@@ -8,6 +14,8 @@ import java.util.Set;
 public final class ContentContracts {
   private ContentContracts() {}
 
+  /** 草稿修订的白名单输入。封面和附件只接受已获授权的受管文件 ID，HTML 将在服务端清洗； 可见范围、审批要求和旧 published 兼容项不能绕过独立发布权限与审批状态检查。 */
+  @Schema(name = "ContentDraft")
   public record Draft(
       @NotBlank @Size(max = 160) String title,
       Long categoryId,
@@ -30,11 +38,14 @@ public final class ContentContracts {
       Boolean published,
       Long version) {}
 
+  /** 发布指定修订及生效/下线时间；主记录 version 防止发布过期草稿或覆盖并发发布操作。 */
   public record Publish(
       @NotNull Long version,
       @NotNull Long revisionId,
       LocalDateTime publishAt,
       LocalDateTime offlineAt) {}
 
+  /** 下线、回收和恢复等状态操作仅携带当前版本，不接受隐式修改正文或作者。 */
+  @Schema(name = "ContentVersion")
   public record Version(@NotNull Long version) {}
 }

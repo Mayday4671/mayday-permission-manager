@@ -2,11 +2,13 @@
 
 ## 模块依赖
 
-`mayday-common` 提供基础响应与契约；system 保存组织、账号和配置；security 依赖 system 实施授权；content 保存内容修订；operations 保存通知、文件、流程并实现运行引擎；crawler 依赖 operations 的文件契约，实现双层分页图片采集、持久队列和安全网络访问；application 组合所有模块并实现跨模块业务绑定。
+`mayday-common` 提供基础响应与契约；system 保存组织、账号和配置；security 依赖 system 实施授权；content 保存内容修订；operations 保存通知、文件、流程、反馈、监控及调度并实现运行引擎和实时刷新；crawler 依赖 operations 的文件契约，实现双层分页图片采集、持久队列和安全网络访问；application 组合所有模块，并实现跨模块业务绑定、批量资源适配和变更审计。
 
 `ContentService` 负责草稿、修订、排期和发布，`NotificationService` 负责接收范围与投递，`WorkflowDefinitions` 负责模型发布和人员解析，`WorkflowEngine` 负责申请及节点流转。控制器只做协议转换、分页和调用。`WorkflowBusiness` 是审批与其他业务之间的契约，`ContentApprovalBinding` 在 application 层实现它，避免内容模块与审批模块循环依赖。
 
-Spring Data JPA 负责数据访问，Hibernate 使用 `ddl-auto=validate`，不会自动改动已有结构。空库可由 Flyway 初始化，或一次导入 `database/mayday.sql`（内含 V17 基线）；已有库升级统一由 Flyway 执行。新增字段须创建下一份迁移文件，不能改写任何已执行迁移（当前 V1–V17）。V12 补齐原有业务表/字段中文注释，V13 增加图片采集任务与队列，V14 增加文章归档、逐页正文及文章配图关联，V15 拆分采集数据与配置并增加配置归档标记，V16 增加 UDP 转发持久配置，V17 增加发送源 IP/端口与 NIO/EPOLL 传输模式。`mayday-netty` 使用独立 POM，仅依赖 Netty，不进入 JPA 链路；管理端适配位于应用模块 `com.mayday.relay`。后续新增表或字段须同步更新单文件初始化 SQL 的结构、基础资料及基线版本，通过 `node scripts/database-docs.mjs --check` 检查注释完整性。
+Spring Data JPA 负责数据访问，Hibernate 使用 `ddl-auto=validate`，不会自动改动已有结构。空库可由 Flyway 初始化，或一次导入 `database/mayday.sql`（内含 V19 基线）；已有库升级统一由 Flyway 执行。新增字段须创建下一份迁移文件，不能改写任何已执行迁移（当前 V1–V19，下一个未占用版本是 V20）。V12 补齐原有业务表/字段中文注释，V13–V15 建立采集队列、图文数据及配置归档；V16–V17 增加 UDP 配置与网卡/传输模式；V18 增加工单示例；V19 增加文件存储/目录/回收站、批量任务、反馈、监控采样/策略、审批催办/到期及关键字段审计。新增表或字段须同步更新单文件初始化 SQL 的结构、基础资料及基线版本，通过 `node scripts/database-docs.mjs --check` 检查注释完整性。
+
+`mayday-netty` 使用独立 POM，仅依赖 Netty，不进入 JPA 链路；管理端适配位于应用模块 `com.mayday.relay`。
 
 ## 通用组件
 
@@ -17,26 +19,27 @@ Spring Data JPA 负责数据访问，Hibernate 使用 `ddl-auto=validate`，不�
 - 新建/编辑弹窗、表单验证、版本提交、防止重复保存。
 - 权限按钮、删除确认、成功/失败提示、业务缓存刷新。
 - 扩展插槽：表单、额外按钮、导出、额外保存转换。
+- 表格序号、按视口测量的默认分页、窄屏卡片、列显隐/顺序/宽度、密度及保存筛选；显式选择每页条数时保留用户选择。
 
 模块页面只提供 `columns`、`fields`、`endpoint` 和资源规则。`shared.tsx` 的状态标签、人物标识、QueryState 在全站复用。列表主操作统一放入工具栏，不重复展示页面大标题和宣传文案。后台布局样式集中在 `admin.css`，主题由 `lib/theme.tsx` 统一提供。
 
 页面名称已有导航、面包屑和标签页，正文禁止再放“数据概览”之类泛化标题、介绍横幅或重复预览。`ResourcePage.title` 仅用于表格可访问名称和业务提示，不渲染页面标题。数据面板保留能区分业务内容的分区名，统计口径等必要帮助放到对应字段旁；首页刷新复用标签栏“刷新当前页”，不为日期/刷新另占一行。
 
-`PersonalWorkPanel` 是工作台的个人待办/未读消息区，复用 `ApprovalDetailModal` 和 `MessageDetailModal`。个人查询与轮询周期集中在 `lib/personal-work.ts`：请求键包含账号 ID；审批同时检查查看、处理权限；收件箱详情重新鉴权后标记已读，关闭后释放正文缓存。阅读操作统一刷新 `messages`、`unread` 查询，审批完成刷新业务查询；不在页面本地手工减少总数，避免并发处理、消息撤回或权限变化后产生错误计数。通知投递与审批执行语义独立，读消息不意味着完成审批。
+`PersonalWorkPanel` 是工作台的个人待办/未读消息区，复用 `ApprovalDetailModal` 和 `MessageDetailModal`。个人查询与 15 秒兜底轮询周期集中在 `lib/personal-work.ts`：请求键包含账号 ID；审批同时检查查看、处理权限；收件箱详情重新鉴权后标记已读，关闭后释放正文缓存。实时连接仅触发 React Query 失效后重新查询，不把 SSE 提示当成业务记录。阅读操作统一刷新 `messages`、`unread` 查询，审批完成刷新业务查询；不在页面本地手工减少总数，避免并发处理、消息撤回或权限变化后产生错误计数。通知投递与审批执行语义独立，读消息不意味着完成审批。
 
-`FormModal<T>` 是业务表单的统一弹窗组件，用户、角色、部门、内容、菜单、字典、参数的新增/编辑以及密码重置均复用它。默认宽度 640px，密码重置 480px、内容编辑 1040px、权限配置 880px；窄屏限制为视口宽度减 32px，双列表单自动改成单列。标题和底部按钮固定，只有超出可用高度的正文滚动。
+`FormModal<T>` 是业务表单的统一弹窗组件，用户、角色、部门、内容、菜单、字典、参数的新增/编辑以及密码重置均复用它。默认宽度 640px，密码重置 480px、内容编辑 1000px、角色权限配置 900px；窄屏限制为视口宽度减 32px，双列表单自动改成单列。标题和底部按钮固定，只有超出可用高度的正文滚动。
 
-业务页面使用 Form 实例设置初始值，提交回调只处理已校验的数据及成功反馈。弹窗集中处理校验定位、同步提交锁、请求失败提示和保存中的关闭保护；点击遮罩不丢失输入，普通状态可通过 Esc、关闭按钮或取消退出。失败保留输入，关闭动画结束后清空表单，表单内容不进入页签缓存。
+业务页面使用 Form 实例设置初始值，提交回调只处理已校验的数据及成功反馈。弹窗集中处理校验定位、同步提交锁、请求失败提示和保存中的关闭保护；点击遮罩不丢失输入，普通状态可通过 Esc、关闭按钮或取消退出，有未提交改动时先确认丢弃。失败保留输入，关闭动画结束后清空表单，表单内容不进入页签缓存。
 
 设计参考 [Art Design Pro 的用户表单](https://github.com/Daymychen/art-design-pro/blob/main/src/views/system/user/modules/user-dialog.vue)、[表格体系](https://www.artd.pro/docs/zh/pro/ui/table-list.html)和[后端权限分层](https://www.artd.pro/docs/zh/pro/server/permission-system.html)：统一表格与表单行为，分开处理页面可见性、接口操作授权和记录范围。本项目对应到 React 公共组件、Spring Security / AccessPolicy 和模块化 Java 服务，不迁移参考项目的 Vue / NestJS 技术栈。前台门户继续通过公开站点配置与发布内容接口取得数据。
 
 ## 前后台主题
 
-使用 [Ant Design 定制主题](https://ant.design/docs/react/customize-theme-cn/)的 `ConfigProvider`、明暗/紧凑算法和设计 Token。`theme-model.ts` 定义四字段契约与安全默认值，`ThemeScope` 把 Token 同步为普通 HTML、图表和富文本可以读取的 CSS 变量。新增页面应消费 `--app-*` 语义变量，不写死底色、文字、边框或主色。预览使用 `inherit: false` 的独立作用域，不影响外层页面；业务弹窗继续使用当前主题上下文。
+使用 [Ant Design 定制主题](https://ant.design/docs/react/customize-theme-cn/)的 `ConfigProvider`、明暗/紧凑算法和设计 Token。`theme-model.ts` 定义白名单契约与安全默认值，除基础颜色/圆角/密度，还支持导航、背景、容器、宽度、图表和状态色，字段见 [主题配置](themes.md)。`ThemeScope` 把 Token 同步为普通 HTML、图表和富文本可以读取的 CSS 变量。新增页面应消费 `--app-*` 语义变量，不写死底色、文字、边框或主色，滚动条与焦点态也复用主题变量。预览使用 `inherit: false` 的独立作用域，不影响外层页面；业务弹窗继续使用当前主题上下文。
 
-`AppearanceControls`、`AppearancePreview`、`ThemeFormContent` 在前后台配置弹窗中复用。后台偏好只保存在当前浏览器 `mayday.admin.appearance.v1`，刷新保留、同源标签页通过 storage 事件同步；不可写存储时仅应用当前页面并提示。`appearance-context.ts` 独立维护 Context，避免主题模块热更新重建上下文。
+`AppearanceControls`、`AppearancePreview`、`ThemeFormContent` 在后台主题抽屉与后台配置的前台主题抽屉中复用；普通业务表单继续用弹窗。后台偏好只保存在当前浏览器 `mayday.admin.appearance.v1`，刷新保留、同源标签页通过 storage 事件同步；不可写存储时仅应用当前页面并提示。`appearance-context.ts` 独立维护 Context，避免主题模块热更新重建上下文。
 
-网站配置的“前台主题”单独提交 `site.theme` 值和打开弹窗时的版本；普通站点文本保存不包含此键。服务器 `PortalThemePolicy` 严格校验 mode、六位 HEX primaryColor、整数 borderRadius（0–16）、布尔 compact，拒绝未知字段、任意 CSS 和尾随 JSON。网站配置与通用参数写入均经过同一校验，沿用 `settings:view/update` 权限、乐观锁与事务回滚。公开接口只返回解析后的四个字段；旧库没有该键或存在非法遗留值时使用浅色蓝色默认主题，无需修改数据库结构。前台访客不提供后台入口或全站主题编辑入口。
+网站配置的“前台主题”单独提交 `site.theme` 值和打开抽屉时的版本；普通站点文本保存不包含此键。服务器 `PortalThemePolicy` 严格校验基础及扩展白名单字段，拒绝未知字段、任意 CSS 和尾随 JSON。网站配置与通用参数写入均经过同一校验，沿用 `settings:view/update` 权限、乐观锁与事务回滚。公开接口返回规范化的完整主题对象；旧配置省略扩展字段时补默认值，缺失或非法遗留配置回退安全默认主题。前台访客不提供后台入口或全站主题编辑入口。
 
 跟随系统监听 `prefers-color-scheme`。门户初次加载配置前使用默认主题；已打开页面按现有公开配置查询的刷新机制获取更新。验收与截图见 [主题验证记录](theme-validation/README.md)。
 
@@ -73,9 +76,19 @@ Spring Data JPA 负责数据访问，Hibernate 使用 `ddl-auto=validate`，不�
 
 事务内只插入 ops_event，后台工作器另起事务创建通知。eventKey 唯一、事件行锁、单用户投递唯一约束共同防重。失败回滚通知半成品，再记录退避时间；重启继续处理待投递事件。此机制只负责本地站内消息，不含外部邮件/短信。
 
+`RealtimeStreams` 在事务提交后向受影响账号发送 SSE 刷新主题，连接、发送及心跳重查会话与当前权限，不推送业务正文。前端使用带 Bearer 头的流请求，不能将令牌写进 URL。连接与事件分发为单实例内存状态，没有历史重放；断线/轮换重连重新取数，轮询兜底。多实例需共享消息总线，不能以数据库里的可靠通知事件等同于可靠推送流。
+
 `WorkflowFields` 共享申请/处理/模拟表单，`ApprovalDetailModal` 共享详情和操作。流程设计器使用数据路由守卫与 Workspace 离开守卫：侧栏、页签、浏览器后退以及页签刷新/关闭先确认，再改变页面；草稿内容不进入 sessionStorage。嵌套审批操作弹窗显式高于详情，丢弃提醒再高一层。
 
 新业务接入审批需实现 WorkflowBusiness：提交时绑定准确业务版本，完成时仅更新该版本的审核状态，业务自己的发布/执行动作继续独立鉴权。
+
+## V19 通用能力扩展边界
+
+- **文件**：`FileStorage` 统一 LOCAL/S3 的写入、读取和幂等删除；现有 MYSQL 正文继续可读，采集入库未自动改为外部存储。随机 key 由服务端生成，不进入前端 DTO。`FileUsage` 检查业务引用，关联和批量回收共同锁文件行，防止附件并发失效。上传回滚补偿存储对象；永久删除先写持久意图，失败保留元数据并由工作器重试，不在数据库事务中假定外部删除可以回滚。
+- **批量**：`BulkResourceAdapter` 定义模板、预览、提交和分页导出，当前只有用户适配器；预览不落业务数据，提交重新校验且全批原子写入。CSV 输入最多 2 MB/1000 行，不保留原文件和明文密码；导出最多 10 万行，结果保留 24 小时，每批及下载检查当前授权。工作器和队列有界、仅单实例，重启未完成导出标失败，不能承诺长任务断点恢复。接入步骤见 [批量数据](bulk-data.md)。
+- **反馈**：匿名提交返回高熵查询码，库内仅存摘要；公开查询和后台详情使用不同 DTO，公开回复与内部备注分离。处理记录、状态和分配通知同事务；共享反馈权限不是租户或部门隔离。来源限频当前在进程内。
+- **监控与调度**：监控每 30 秒采样本进程指标，趋势按节点保存 7 天；阈值与有效接收人版本化配置，提醒有冷却。`JobHandler` 仅注册受控短维护用例，事务失败另存执行记录，通知失败不回滚结果。正常领取有行锁保护，但失败阶段和外部副作用仍需业务幂等；长任务应转专用队列，未验收集群调度与故障恢复。
+- **审计**：`ChangeAuditService` 由业务显式传入安全字段快照，与业务事务提交；用户、角色及内容已有关键字段差异。新资源自行补白名单，不传密码、令牌、联系方式或正文。它不替代原 HTTP 操作日志和审批字段历史，也没有防篡改保证。
 
 ## 部署约定
 
@@ -83,10 +96,12 @@ Spring Data JPA 负责数据访问，Hibernate 使用 `ddl-auto=validate`，不�
 
 Compose 使用命名数据卷，镜像中后端使用非 root 用户。前台、后台共用一个 React 项目与设计系统，路由空间分别是 `/` 和 `/admin`，API 公开空间与认证空间分开。
 
+新上传默认 `MAYDAY_STORAGE_MODE=LOCAL`，`MAYDAY_STORAGE_LOCAL_ROOT` 必须指向可写持久目录并独立备份；`MAYDAY_STORAGE_MAX_MB` 默认 10，允许 1–100。S3 模式从 `MAYDAY_STORAGE_S3_ENDPOINT/REGION/BUCKET/ACCESS_KEY/SECRET_KEY` 读取配置，凭据不写数据库或前端，bucket 与权限由部署方配置。切换存储不会自动搬迁旧数据，已有文件按各自 provider 读取。文件类型与安全图片检查不等于恶意文件扫描，当前没有超大文件分片/断点续传。
+
 当前采用同源 Bearer API，无 Cookie 自动认证，因此不依赖跨站 Cookie；Spring Security 关闭 Session 与 CSRF。反向代理上线时保留同源模型，并使用 HTTPS。
 
 ## 已验证与未覆盖
 
-当前已验证前端生产构建、后端 Maven 测试/打包、真实 MySQL 建表初始化与 API 回归、浏览器登录/列表/表单/权限页和手机布局。
+前端构建、后端 Maven 检查、真实 MySQL 三种安装路径及接口/浏览器检查的最新结果见 [本轮通用平台验收](general-platform-validation-20261002/README.md)。历史主题及页面截图保留对应版本，不自动证明后续新增功能通过。
 
 这里没有宣称生产负载测试、浏览器全组合兼容测试或第三方安全认证。大规模用户量时应对角色关联加载、批量导出、审计保留和限流存储单独优化。

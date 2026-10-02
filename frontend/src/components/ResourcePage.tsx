@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   Trash2,
   X,
+  Printer,
 } from "lucide-react";
 import { api, jsonBody, queryString } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -34,11 +35,14 @@ import { DataTable } from "./DataTable";
 import { GroupedDataTable } from "./GroupedDataTable";
 import { SavedQueries } from "./SavedQueries";
 import {
-  readPageSize,
+  readPageSizePreference,
   validPage,
   type FilterValue,
 } from "../lib/list-preferences";
 import { useBrowserPreference } from "../lib/useBrowserPreference";
+import { exportVisibleTable, printVisibleTable } from "../lib/table-output";
+import { BulkDataTools } from "./BulkDataTools";
+import { useTablePageSize } from "../lib/useTablePageSize";
 
 export interface ResourceConfig<T extends BaseRecord<string | number>> {
   /** 可选契约客户端适配，保留通用分页、弹窗与权限行为，业务页无需重复实现列表交互。 */
@@ -77,6 +81,8 @@ export interface ResourceConfig<T extends BaseRecord<string | number>> {
   rowActions?: (record: T, refresh: () => void) => RowAction[];
   createAllowed?: boolean;
   exportRows?: (params: Record<string, unknown>) => Promise<void>;
+  /** 显式注册批量适配器后提供模板导入和后台异步导出，不能从普通 CRUD 自动推断导入接口。 */
+  bulkResource?: string;
   queryParams?: Record<string, unknown>;
   /** 任务等有持续进度的页面可轮询，浏览器隐藏时由 React Query 暂停，普通列表默认关闭。 */
   refetchInterval?: number | false;
@@ -112,6 +118,7 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
   config: ResourceConfig<T>,
 ) {
   const { resource, endpoint, columns, title, singular } = config;
+  const panelRef = useRef<HTMLDivElement>(null);
   const screens = Grid.useBreakpoint();
   const { can, refresh: refreshAuth } = useAuth();
   const { message, modal } = App.useApp();
@@ -124,10 +131,18 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
     undefined,
   );
   const [page, setPage] = usePageState(stateKey + "page", 1);
-  const [size, setSize] = useBrowserPreference(
-    `${endpoint}.${stateKey}table.pageSize`,
-    readPageSize,
+  // 目录首列始终作为树展开锚点；只有真实业务列参与尺寸和顺序偏好。
+  const preferences = useTablePreferences(
+    columns,
+    `${endpoint}.${stateKey}`,
+    Boolean(config.groupBy),
   );
+  const [preferredSize, setPreferredSize] = useBrowserPreference(
+    `${endpoint}.${stateKey}table.pageSize`,
+    readPageSizePreference,
+  );
+  const automaticSize = useTablePageSize(panelRef, preferences.density);
+  const size = preferredSize ?? automaticSize;
   const filterKey = JSON.stringify(config.queryParams);
   const previousFilter = useRef(filterKey);
   useEffect(() => {
@@ -148,12 +163,6 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
     [endpoint, search, status, page, size, JSON.stringify(config.queryParams)],
   );
   const [form] = Form.useForm();
-  // 目录名称是分组表的树形锚点，不能因旧的列显隐偏好而消失。
-  const preferences = useTablePreferences(
-    columns,
-    `${endpoint}.${stateKey}`,
-    Boolean(config.groupBy),
-  );
   const params = {
     ...config.queryParams,
     keyword: search,
@@ -328,7 +337,7 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
         ];
   return (
     <>
-      <div className="panel resource-panel">
+      <div className="panel resource-panel" ref={panelRef}>
         <div className="table-toolbar">
           <div className="filters">
             <Input
@@ -408,6 +417,14 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
               </Permission>
             )}
             {config.extraToolbar}
+            {config.bulkResource && (
+              <BulkDataTools
+                resource={config.bulkResource}
+                title={singular}
+                filters={params}
+                onImported={refresh}
+              />
+            )}
             {(!config.extraFilters || config.savedFilters) && (
               <SavedQueries
                 namespace={`${endpoint}.${stateKey}`}
@@ -446,11 +463,53 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
                 </Button>
               </Permission>
             )}
+            {can(`${resource}:export`) &&
+              can(`${resource}:view`) &&
+              !config.groupBy && (
+                <Space size={4}>
+                  <Tooltip title="导出当前页显示列">
+                    <Button
+                      aria-label="导出当前页"
+                      icon={<Download size={15} />}
+                      disabled={!query.data?.items.length}
+                      onClick={() =>
+                        panelRef.current &&
+                        exportVisibleTable(panelRef.current, title)
+                      }
+                    />
+                  </Tooltip>
+                  <Tooltip title="打印当前页显示列">
+                    <Button
+                      aria-label="打印当前页"
+                      icon={<Printer size={15} />}
+                      disabled={!query.data?.items.length}
+                      onClick={() => {
+                        if (
+                          panelRef.current &&
+                          !printVisibleTable(panelRef.current, title)
+                        )
+                          message.warning("请允许浏览器打开打印窗口");
+                      }}
+                    />
+                  </Tooltip>
+                </Space>
+              )}
             <RefreshButton
               onClick={() => void query.refetch()}
               loading={query.isFetching}
             />
             {preferences.tools}
+            {preferredSize !== null && !config.groupBy && (
+              <Button
+                size="small"
+                onClick={() => {
+                  setPreferredSize(null);
+                  setPage(1);
+                }}
+              >
+                自适应条数
+              </Button>
+            )}
           </Space>
         </div>
         {selectedKeys.length > 0 && (
@@ -509,6 +568,8 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
             <GroupedDataTable<T>
               rows={query.data?.items ?? []}
               columns={[...preferences.columns, ...actions]}
+              onColumnResize={preferences.resize}
+              onColumnReorder={preferences.reorder}
               groupBy={config.groupBy}
               size={preferences.density}
               loading={query.isLoading || query.isFetching}
@@ -518,6 +579,8 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
               aria-label={title}
               rowKey="id"
               columns={[...preferences.columns, ...actions]}
+              onColumnResize={preferences.resize}
+              onColumnReorder={preferences.reorder}
               size={preferences.density}
               dataSource={query.data?.items ?? []}
               rowSelection={
@@ -542,9 +605,10 @@ export function ResourcePage<T extends BaseRecord<string | number>>(
                 showTotal: (total) => `共 ${total} 条记录`,
                 onChange: (p, s) => {
                   setPage(s !== size ? 1 : p);
-                  setSize(s);
+                  // 翻页不能把当前自动值变成永久偏好，只记录用户明确改变的每页条数。
+                  if (s !== size) setPreferredSize(s);
                 },
-                pageSizeOptions: [10, 20, 50],
+                pageSizeOptions: [1, 3, 5, 10, 20, 50],
               }}
             />
           )}

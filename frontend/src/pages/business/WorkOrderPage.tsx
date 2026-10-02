@@ -8,6 +8,7 @@ import type { components } from "../../types/generated/api";
 type WorkOrderView = components["schemas"]["WorkOrderView"];
 type WorkOrderRequest = components["schemas"]["WorkOrderRequest"];
 
+/** 工单管理沿用通用列表与编辑弹窗，页面权限只控制交互，最终授权和版本校验仍由后端完成。 */
 export function WorkOrderPage() {
   return (
     <ResourcePage<WorkOrderView>
@@ -18,6 +19,7 @@ export function WorkOrderPage() {
       statusField="enabled"
       defaults={{ title: "", description: "", enabled: true }}
       transport={{
+        // 从表单显式构造契约字段，编辑携带原版本，不接受额外身份或归属属性。
         save: async (values, editing) => {
           const body: WorkOrderRequest = {
             title: String(values.title ?? "").trim(),
@@ -37,6 +39,7 @@ export function WorkOrderPage() {
               await contractClient.POST("/api/business/workorders", { body }),
             );
         },
+        // 删除同样提交页面读取到的版本，过期操作由服务端返回冲突后刷新列表。
         remove: async (record) => {
           unwrapContract(
             await contractClient.DELETE("/api/business/workorders/{id}", {

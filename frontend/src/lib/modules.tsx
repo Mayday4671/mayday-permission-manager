@@ -37,6 +37,7 @@ export function ModulesProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** 只消费服务器实际开关；Provider 不可用时明确报错，禁止猜测模块默认全部开放。 */
 export function useModules() {
   const modules = useContext(ModulesContext);
   if (!modules) throw new Error("ModulesProvider 未挂载");

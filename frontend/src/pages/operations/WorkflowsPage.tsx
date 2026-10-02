@@ -23,23 +23,45 @@ interface Version {
   publisherName: string;
   schema: WorkflowSpec;
 }
+interface WorkflowTemplate {
+  key: string;
+  name: string;
+  description: string;
+  schema: WorkflowSpec;
+}
+interface WorkflowDraft {
+  name: string;
+  code: string;
+  categoryId: number;
+  businessType: WorkflowDefinition["businessType"];
+  description?: string;
+  enabled: boolean;
+}
 /** 流程列表负责启停和版本入口；设计器独立标签页，新增/修改基础资料使用统一弹窗。 */
 export function WorkflowsPage() {
   const { can } = useAuth(),
     { message } = App.useApp(),
     client = useQueryClient(),
     navigate = useNavigate();
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<WorkflowDraft>();
   const [editing, setEditing] = useState<WorkflowDefinition | null>(null),
     [copying, setCopying] = useState<WorkflowDefinition | null>(null),
     [open, setOpen] = useState(false),
     [selected, setSelected] = useState<number | null>(null);
+  const [templateKey, setTemplateKey] = useState<string | undefined>();
+  const templates = useQuery({
+    queryKey: ["workflows", "templates"],
+    queryFn: () => api<WorkflowTemplate[]>("/operations/workflows/templates"),
+    enabled: open && !editing && !copying,
+    staleTime: 60000,
+  });
   const history = useQuery({
     queryKey: ["workflows", "versions", selected],
     queryFn: () => api<Version[]>(`/operations/workflows/${selected}/versions`),
     enabled: selected !== null,
   });
   const show = (row: WorkflowDefinition | null, copy = false) => {
+    setTemplateKey(undefined);
     setEditing(copy ? null : row);
     setCopying(copy ? row : null);
     form.resetFields();
@@ -167,7 +189,13 @@ export function WorkflowsPage() {
               method: editing ? "PUT" : "POST",
               body: jsonBody({
                 ...values,
-                schema: editing?.schema ?? copying?.schema ?? initialSpec(),
+                schema:
+                  editing?.schema ??
+                  copying?.schema ??
+                  templates.data?.find(
+                    (template) => template.key === templateKey,
+                  )?.schema ??
+                  initialSpec(),
                 version: editing?.version,
               }),
             },
@@ -180,6 +208,41 @@ export function WorkflowsPage() {
       >
         {open && (
           <>
+            {!editing && !copying && (
+              <Form.Item
+                label="常用模板"
+                extra={
+                  templates.data?.find(
+                    (template) => template.key === templateKey,
+                  )?.description ??
+                  "可选择模板创建草稿，审批人和发布仍由你确认。"
+                }
+              >
+                <Select
+                  allowClear
+                  loading={templates.isLoading}
+                  value={templateKey}
+                  status={templates.isError ? "error" : undefined}
+                  placeholder="从空白流程开始"
+                  options={templates.data?.map((template) => ({
+                    value: template.key,
+                    label: template.name,
+                  }))}
+                  onChange={(key) => {
+                    setTemplateKey(key);
+                    const template = templates.data?.find(
+                      (item) => item.key === key,
+                    );
+                    if (template)
+                      form.setFieldsValue({
+                        name: template.name,
+                        description: template.description,
+                        businessType: "GENERAL",
+                      });
+                  }}
+                />
+              </Form.Item>
+            )}
             <Form.Item
               name="name"
               label="流程名称"

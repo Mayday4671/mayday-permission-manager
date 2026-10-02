@@ -13,6 +13,18 @@ export interface FileRecord extends BaseRecord {
   ownerId: number;
   ownerName: string;
   contentType: string;
+  directoryId: number | null;
+  storageProvider: "MYSQL" | "LOCAL" | "S3";
+  deletedAt: string | null;
+  purgeRequestedAt: string | null;
+  purgeError: string | null;
+}
+/** 业务目录只控制文件组织，不改变所有者或附件原有的访问授权。 */
+export interface FileDirectory extends BaseRecord {
+  name: string;
+  parentId: number;
+  ownerId: number;
+  ownerName: string;
 }
 export interface SessionRecord extends BaseRecord<string> {
   username: string;

@@ -45,6 +45,7 @@ function ParameterInput({
     />
   );
 }
+/** 参数使用登记类型校验；内置参数不可删除或更名，公共门户只读取后端明确公开的配置。 */
 export function SettingsPage() {
   const { can } = useAuth();
   const { message } = App.useApp();

@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,21 +31,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
   const client = useQueryClient();
+  const identityRevision = useRef(0);
   const refresh = useCallback(async () => {
-    setSession(unwrapContract(await contractClient.GET("/api/auth/me")));
+    const requestedToken = tokenStore.get();
+    const revision = ++identityRevision.current;
+    const updated = unwrapContract(await contractClient.GET("/api/auth/me"));
+    // 并发刷新只接纳最新响应；退出或切换账号后到达的旧响应不能恢复旧身份。
+    if (
+      revision === identityRevision.current &&
+      requestedToken === tokenStore.get()
+    )
+      setSession(updated);
   }, []);
   useEffect(() => {
-    if (tokenStore.get())
-      refresh()
+    const initialToken = tokenStore.get();
+    if (initialToken) {
+      const initialRefresh = refresh();
+      const initialRevision = identityRevision.current;
+      initialRefresh
         .catch((error) => {
+          if (
+            initialToken !== tokenStore.get() ||
+            initialRevision !== identityRevision.current
+          )
+            return;
           // 短暂断网或后端重启不撤销仍有效的令牌；只有明确的 401 才清理认证。
           if (error instanceof ApiError && error.status === 401)
             tokenStore.clear();
           setSession(null);
         })
         .finally(() => setLoading(false));
-    else setLoading(false);
+    } else setLoading(false);
     const expired = () => {
+      identityRevision.current++;
       setSession(null);
       client.clear();
     };
@@ -75,21 +94,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     );
     client.clear();
+    identityRevision.current++;
     tokenStore.set(result.token);
     try {
       await refresh();
     } catch (error) {
-      tokenStore.clear();
+      if (result.token === tokenStore.get()) {
+        identityRevision.current++;
+        tokenStore.clear();
+        setSession(null);
+      }
       throw error;
     }
   };
   const logout = async () => {
+    const requestedToken = tokenStore.get();
+    identityRevision.current++;
     try {
       await api("/auth/logout", { method: "POST" });
     } finally {
-      tokenStore.clear();
-      setSession(null);
-      client.clear();
+      if (requestedToken === tokenStore.get()) {
+        identityRevision.current++;
+        tokenStore.clear();
+        setSession(null);
+        client.clear();
+      }
     }
   };
   return (
@@ -100,15 +129,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         refresh,
-        can: (p) => session?.permissions.includes(p) ?? false,
+        can: (permission) => session?.permissions.includes(permission) ?? false,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
+/** 会话和按钮可用性取自同一个上下文；此处只控制界面，服务端仍独立鉴权。 */
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("AuthProvider 未挂载");
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("AuthProvider 未挂载");
+  return context;
 }

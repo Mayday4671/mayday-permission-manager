@@ -1,7 +1,10 @@
 package com.mayday.operations.model;
 
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.*;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,6 +13,17 @@ import lombok.Setter;
 @Setter
 @Entity
 @Table(name = "ops_job_execution")
+@Schema(
+    requiredProperties = {
+      "id",
+      "version",
+      "jobId",
+      "jobName",
+      "status",
+      "result",
+      "durationMs",
+      "createdAt"
+    })
 public class JobExecution extends BaseEntity {
   private Long jobId;
 
@@ -23,4 +37,7 @@ public class JobExecution extends BaseEntity {
   private String result;
 
   private long durationMs;
+
+  /** 失败提醒已投递或接收人失效跳过的时间；为空表示待重试，成功执行不参与提醒扫描。 */
+  private java.time.LocalDateTime failureNotifiedAt;
 }

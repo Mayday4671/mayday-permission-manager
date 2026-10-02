@@ -1,13 +1,17 @@
 package com.mayday.crawler;
 
 import com.mayday.common.BusinessException;
-import java.net.*;
-import java.util.*;
+import java.net.IDN;
+import java.net.InetAddress;
+import java.net.URI;
+import java.util.Locale;
+import java.util.Set;
 
 /** 所有入口、翻页、详情、图片及重定向共用 URL 边界；DNS 校验还必须在实际建连阶段再次执行。 */
 public final class WebAddress {
   private WebAddress() {}
 
+  /** 规范化公网 HTTP(S) 地址，拒绝内网主机、非默认端口及账号信息；保留原始查询转义。 */
   public static URI parse(String value) {
     try {
       if (value == null
@@ -37,6 +41,7 @@ public final class WebAddress {
     }
   }
 
+  /** 允许域名须准确匹配，国际域名转换为 ASCII；不支持通配符、协议、端口及路径。 */
   public static String host(String raw) {
     if (raw == null
         || raw.isBlank()
@@ -51,6 +56,7 @@ public final class WebAddress {
     }
   }
 
+  /** 列表、详情和分页只能在入口站内，图片可额外使用任务明确登记的图片域名。 */
   public static URI allowed(String value, CrawlRules rules, boolean image) {
     URI url = parse(value);
     String origin = parse(rules.entryUrl()).getHost();
@@ -61,6 +67,7 @@ public final class WebAddress {
     return url;
   }
 
+  /** 校验实际解析的每个地址，拒绝本机、私有、保留和协议特殊网段，供建连阶段防 SSRF 使用。 */
   public static boolean publicIp(InetAddress address) {
     if (address.isAnyLocalAddress()
         || address.isLoopbackAddress()
@@ -96,6 +103,7 @@ public final class WebAddress {
         && !(a == 203 && c == 0 && d == 113);
   }
 
+  /** 相对链接转换成受控绝对地址；不可用链接返回 null，不让单个网页坏链接中止整页解析。 */
   public static String resolve(URI base, String value) {
     try {
       String relative = value.trim();

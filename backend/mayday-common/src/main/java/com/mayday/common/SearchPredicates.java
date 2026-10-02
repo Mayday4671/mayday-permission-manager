@@ -12,6 +12,7 @@ import java.util.Locale;
 public final class SearchPredicates {
   private SearchPredicates() {}
 
+  /** 生成大小写无关的字面量包含条件；空关键词匹配所有非空字段，资源与数据范围必须由调用方另外限定。 */
   public static Predicate contains(
       CriteriaBuilder builder, Expression<String> field, String keyword) {
     String escaped =

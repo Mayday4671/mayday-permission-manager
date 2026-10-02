@@ -20,8 +20,8 @@ node scripts/generate-module.mjs --config tools/generator/examples/your-module.j
 生成后按照以下顺序完成交付：
 
 1. 审查字段和注释，添加真实业务校验。后端服务是授权边界，不能只在按钮或控制器中校验。
-2. 运行后端格式化。Windows 使用 `backend/mvnw.cmd`，其他系统使用 `bash backend/mvnw`：`-f backend/pom.xml -pl '!mayday-netty' spotless:apply`。
-3. 运行 `npm run format --prefix frontend`，再执行后端 `verify`。UDP 独立模块保持自身构建配置。
+2. 运行后端格式化。Windows 使用 `backend/mvnw.cmd`，其他系统使用 `bash backend/mvnw`：`-f backend/pom.xml spotless:apply`，包含独立 UDP 模块。
+3. 运行 `npm run format --prefix frontend`，执行源码约定检查与后端 `verify`。
 4. 在独立数据库开启新模块、执行迁移，运行 `node scripts/generate-api.mjs` 同步接口契约与前端类型。
 5. 执行前端检查和真实数据库的权限/版本/升级测试，确认测试记录完整清理。
 6. 已有业务库只通过新 Flyway 迁移升级，不重新导入统一初始化 SQL。
@@ -40,6 +40,7 @@ node scripts/generate-module.mjs --config tools/generator/examples/your-module.j
 - `SCHEDULER`：调度配置、执行记录及自动调度。
 - `UDP`：已有测试功能。
 - `WORKORDERS`：可运行的生成器示例，默认关闭。
+- `FEEDBACK`：客户反馈与后台处理，可独立关闭；门户提供入口，消息启用时发送分配提醒。
 
 关闭依赖时自动关闭消费模块，例如内容关闭则门户关闭，消息关闭则审批关闭。无效模块名称会拒绝启动，避免拼写错误导致功能仍然开启。关闭模块后：
 
@@ -71,9 +72,11 @@ node scripts/generate-api.mjs --offline --check
 
 Java 类使用 PascalCase，方法和字段使用 camelCase，常量使用 UPPER_SNAKE_CASE；数据库表/列使用 lower_snake_case；新业务表使用 `biz_` 前缀。前端组件使用 PascalCase，普通函数和变量使用 camelCase。权限统一 `resource:action`，动作不得复用来绕过独立授权。
 
-`.editorconfig` 统一 UTF-8、LF 和两空格缩进。Java 由 Spotless 和 Google Java Format 格式化，在 Maven `validate` 阶段检查；前端使用 Prettier。新增代码优先显式导入，禁用 `any` 绕过类型；请求 DTO 不直接使用 JPA 实体。组件优先复用 `ResourcePage`、`FormModal`、选择器和统一网络边界。
+`.editorconfig` 统一 UTF-8、LF 和两空格缩进。Java 由 Spotless 和 Google Java Format 格式化，在 Maven `validate` 阶段检查；前端使用 Prettier。新旧手写源码统一显式导入，禁用 `any` 绕过类型；请求 DTO 不直接使用 JPA 实体。组件优先复用 `ResourcePage`、`FormModal`、选择器和统一网络边界。
 
 类和公开业务边界说明职责；注释解释权限、字段来源、状态变化、事务、并发、失败语义及设计原因，不能只复述代码。数据库每张业务表和每个字段必须写中文 COMMENT，说明含义、来源、单位/枚举、空值和重要约束。迁移文件不可重写历史校验和。
+
+`node scripts/check-source-conventions.mjs` 通过语法树检查手写 Java 的通配导入、类型与公开业务方法说明，以及 TypeScript 的 `any` 和导出函数说明。该检查已接入统一项目检查及 CI；生成类型按真实契约生成并格式化，生成器输出采用同一套注释模板。已有源码也纳入，不只约束后续新文件。
 
 ## 持续集成
 

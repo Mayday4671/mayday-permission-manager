@@ -36,6 +36,7 @@ export function useSite(enabled = true) {
     refetchInterval: 30000,
   });
 }
+/** 公共分类和标签共享查询缓存，只请求后端公开分类白名单，不携带后台字典实体。 */
 export function useTaxonomy() {
   return useQuery({
     queryKey: ["public", "taxonomy"],
@@ -61,6 +62,7 @@ export {
   legacyCategoryHref,
 } from "./portal-routing";
 
+/** 路由挂载时设置可读标题和 SEO 元数据，离开时还原原标签，避免跨页面残留。 */
 export function useSeo(title: string, description: string, keywords: string) {
   useEffect(() => {
     document.title = title;

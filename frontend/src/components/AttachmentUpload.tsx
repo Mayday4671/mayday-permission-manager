@@ -6,9 +6,13 @@ import type { FileRecord } from "../types/operations";
 export const attachmentAccept =
   ".pdf,.txt,.csv,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.zip";
 /** 统一前端校验与后端上传。服务器再次校验类型、大小和操作权限，浏览器校验不替代安全边界。 */
-export async function uploadAttachment(file: File): Promise<FileRecord> {
-  if (!file.size || file.size > 10 * 1024 * 1024)
-    throw new Error("文件大小须为 1 字节到 10 MB");
+export async function uploadAttachment(
+  file: File,
+  options: { directoryId?: number; maximumBytes?: number } = {},
+): Promise<FileRecord> {
+  const maximumBytes = options.maximumBytes ?? 10 * 1024 * 1024;
+  if (!file.size || file.size > maximumBytes)
+    throw new Error(`文件大小须为 1 字节到 ${maximumBytes / 1024 / 1024} MB`);
   if (
     !attachmentAccept
       .split(",")
@@ -17,7 +21,13 @@ export async function uploadAttachment(file: File): Promise<FileRecord> {
     throw new Error("不支持此文件类型");
   const body = new FormData();
   body.append("file", file);
-  return api<FileRecord>("/operations/files", { method: "POST", body });
+  const directory = options.directoryId
+    ? `?directoryId=${options.directoryId}`
+    : "";
+  return api<FileRecord>(`/operations/files${directory}`, {
+    method: "POST",
+    body,
+  });
 }
 /** 附件只通过鉴权接口读取，不将令牌拼到下载地址或在新窗口中暴露。 */
 export async function downloadAttachment(
@@ -93,6 +103,10 @@ export function AttachmentUpload({
     </Upload>
   );
 }
+/**
+ * 仅已完成上传且获得服务器文件 ID 的记录可以提交，上传中或失败记录会阻止表单保存。
+ * 从控件移除附件只移除本次业务关联，不删除服务器文件。
+ */
 export function attachmentIds(files: UploadFile<FileRecord>[] = []) {
   if (files.some((file) => file.status === "uploading"))
     throw new Error("附件正在上传，请稍候再提交");

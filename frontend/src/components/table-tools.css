@@ -1,0 +1,82 @@
+.table-column-title {
+  position: relative;
+  display: block;
+  min-width: 0;
+  padding-right: 10px;
+}
+.table-column-title[draggable="true"] {
+  cursor: grab;
+}
+.table-column-resize {
+  position: absolute;
+  inset: -12px -8px -12px auto;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.table-column-resize:hover,
+.table-column-resize:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--ant-color-primary, #1677ff) 18%,
+    transparent
+  );
+  outline: 1px solid var(--ant-color-primary, #1677ff);
+}
+.table-mobile-cards {
+  display: grid;
+  gap: 12px;
+}
+.table-mobile-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-radius: var(--ant-border-radius, 6px);
+}
+.table-mobile-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.table-mobile-card dl {
+  margin: 10px 0 0;
+  display: grid;
+  gap: 8px;
+}
+.table-mobile-card dl > div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+}
+.table-mobile-card dt {
+  color: var(--ant-color-text-secondary, #666);
+}
+.table-mobile-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.table-mobile-cards + .ant-pagination {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.bulk-import-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.bulk-import-summary {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.bulk-row-errors {
+  color: var(--ant-color-error, #ff4d4f);
+}

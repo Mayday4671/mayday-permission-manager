@@ -1,11 +1,17 @@
 package com.mayday.security;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** 服务端唯一权限字典。菜单只是导航，真正授权使用 resource:action 标识。 新业务接入时先在此注册，再在接口上标注 @PreAuthorize；未知权限一律拒绝保存。 */
 public final class PermissionCatalog {
   private PermissionCatalog() {}
 
+  /** 资源动作的只读注册项；scoped 标记是否允许角色配置行级范围，不代表自动获得任何操作权限。 */
   public record Group(String key, String name, Map<String, String> actions, boolean scoped) {}
 
   private static Map<String, String> actions(String... extras) {
@@ -18,6 +24,7 @@ public final class PermissionCatalog {
     return Collections.unmodifiableMap(map);
   }
 
+  /** 服务端授予界面的完整目录；菜单展示名可变，但资源和动作键作为稳定授权契约使用。 */
   public static final List<Group> GROUPS =
       List.of(
           new Group("dashboard", "工作台", Map.of("view", "查看"), false),
@@ -27,6 +34,8 @@ public final class PermissionCatalog {
               actions(
                   "export",
                   "导出",
+                  "import",
+                  "导入账号",
                   "reset",
                   "重置密码",
                   "assign",
@@ -53,7 +62,16 @@ public final class PermissionCatalog {
               "通知管理",
               actions("publish", "发布通知", "withdraw", "撤回通知", "all", "管理所有通知"),
               false),
-          new Group("files", "文件中心", actions("download", "下载", "all", "管理所有文件"), false),
+          new Group(
+              "files",
+              "文件中心",
+              actions("download", "下载", "all", "管理所有文件", "restore", "恢复文件", "purge", "永久删除"),
+              false),
+          new Group(
+              "feedback",
+              "客户反馈",
+              Map.of("view", "查看", "process", "处理与回复", "assign", "分配处理人"),
+              false),
           new Group(
               "crawler",
               "图片采集",
@@ -63,7 +81,7 @@ public final class PermissionCatalog {
           new Group(
               "loginlogs", "登录日志", Map.of("view", "查看", "export", "导出", "delete", "清理历史日志"), false),
           new Group("userstats", "用户统计", Map.of("view", "查看"), false),
-          new Group("monitor", "服务监控", Map.of("view", "查看"), false),
+          new Group("monitor", "服务监控", Map.of("view", "查看", "configure", "配置告警"), false),
           new Group(
               "relay",
               "UDP 转发",
@@ -75,7 +93,9 @@ public final class PermissionCatalog {
           new Group(
               "requests",
               "审批中心",
-              Map.of("view", "查看参与的申请", "create", "发起申请", "approve", "审批", "manage", "查看全部申请"),
+              Map.of(
+                  "view", "查看参与的申请", "create", "发起申请", "approve", "审批", "manage", "查看全部申请",
+                  "remind", "催办自己的申请"),
               false),
           new Group("menus", "菜单管理", actions(), false),
           new Group("dictionaries", "数据字典", actions(), false),
@@ -89,19 +109,19 @@ public final class PermissionCatalog {
           // generator:permission-groups
           new Group(
               "logs", "操作日志", Map.of("view", "查看", "export", "导出", "delete", "清理历史日志"), false));
+
+  /** 所有合法动作键的不可变集合，供角色保存校验和实际请求授权共同使用。 */
   public static final Set<String> ALL =
       GROUPS.stream()
           .flatMap(
               group -> group.actions().keySet().stream().map(action -> group.key() + ":" + action))
-          .collect(java.util.stream.Collectors.toUnmodifiableSet());
+          .collect(Collectors.toUnmodifiableSet());
 
   /** 可配置行级数据范围的资源来自唯一权限目录，新增业务不再修改多个硬编码白名单。 */
   public static final Set<String> SCOPED_RESOURCES =
-      GROUPS.stream()
-          .filter(Group::scoped)
-          .map(Group::key)
-          .collect(java.util.stream.Collectors.toUnmodifiableSet());
+      GROUPS.stream().filter(Group::scoped).map(Group::key).collect(Collectors.toUnmodifiableSet());
 
+  /** 界面摘要的范围顺序；CUSTOM 是独立部门集合，实际授权不得按本列表顺序求并集。 */
   public static final List<String> SCOPES =
       List.of("SELF", "DEPARTMENT", "DEPARTMENT_TREE", "CUSTOM", "ALL");
 }

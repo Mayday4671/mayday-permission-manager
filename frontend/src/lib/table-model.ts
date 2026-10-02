@@ -6,6 +6,69 @@ export interface GroupedRow<T> {
   children?: GroupedRow<T>[];
 }
 
+/** 列偏好只存业务列键与尺寸，读取时过滤损坏值，避免浏览器旧数据撑开列表。 */
+export function readColumnLayout(raw: unknown): {
+  order: string[];
+  widths: Record<string, number>;
+} {
+  if (!raw || typeof raw !== "object") return { order: [], widths: {} };
+  const value = raw as Record<string, unknown>;
+  const order = Array.isArray(value.order)
+    ? [
+        ...new Set(
+          value.order.filter(
+            (key): key is string =>
+              typeof key === "string" && key.length <= 160,
+          ),
+        ),
+      ].slice(0, 100)
+    : [];
+  const widths: Record<string, number> = {};
+  if (value.widths && typeof value.widths === "object") {
+    for (const [key, width] of Object.entries(value.widths)) {
+      if (
+        key.length <= 160 &&
+        typeof width === "number" &&
+        Number.isFinite(width)
+      )
+        widths[key] = Math.max(80, Math.min(800, Math.round(width)));
+    }
+  }
+  return { order, widths };
+}
+
+/** 拖拽不制造新列：未授权或已删除的键自然丢弃，新加列追加到当前配置顺序。 */
+export function orderColumnKeys(keys: string[], preferred: string[]): string[] {
+  return [
+    ...new Set([...preferred.filter((key) => keys.includes(key)), ...keys]),
+  ];
+}
+
+/** 序号和操作列在固定位置，业务列拖到目标之前；目标不存在时保持原顺序。 */
+export function moveColumnKey(
+  keys: string[],
+  source: string,
+  target: string,
+): string[] {
+  if (source === target || !keys.includes(source) || !keys.includes(target))
+    return keys;
+  const next = keys.filter((key) => key !== source);
+  next.splice(next.indexOf(target), 0, source);
+  return next;
+}
+
+/** 自动档位按可读行高选择；用户主动设置的分页大小由调用方优先，不在此覆盖。 */
+export function fitPageSize(
+  availableHeight: number,
+  rowHeight: number,
+): number {
+  const capacity = Math.max(
+    1,
+    Math.floor(Math.max(0, availableHeight) / Math.max(32, rowHeight)),
+  );
+  return capacity >= 10 ? 10 : capacity >= 5 ? 5 : capacity >= 3 ? 3 : 1;
+}
+
 /**
  * 声明列宽是阅读偏好，不是表格的强制最小宽度。
  * 可用空间足够时保留偏好；不足时按各列可压缩量分摊，操作列等 minimum=preferred 的列不会被挤掉。

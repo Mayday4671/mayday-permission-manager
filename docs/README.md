@@ -4,6 +4,9 @@
 
 - [项目说明和快速启动](../README.md)：技术栈、启动、常用验证命令。
 - [模块生成器、功能裁剪与工程规范](engineering.md)：模块生成、统一代码风格、接口类型生成和 GitHub Actions。
+- [通用平台能力与扩展方法](general-platform.md)：文件存储、实时消息、数据交换、调度监控、反馈、变更审计及部署边界。
+- [批量数据交换](bulk-data.md)：CSV 模板与校验、幂等导入、异步导出、权限检查和资源适配器。
+- [2026-10-02 通用能力验收](general-platform-validation-20261002/README.md)：全量源码规范、文件/实时审批/数据交换/调度/反馈/审计、V19 数据保留与桌面手机实测。
 - [2026-10-02 工程底座验收](engineering-validation-20261002/README.md)：前三项扩展的交付范围、数据库升级、模块关闭和契约检查结果。
 - [复用与上线指南](reuse.md)：适用边界、纯净初始化、模块接入、配置和上线准备。
 - [2026-10-02 启动与复用检查](startup-reuse-validation-20261002/README.md)：默认 Docker 构建修正、本机页面、二次开发边界和最近回归结果。
@@ -13,12 +16,12 @@
 - [主题配置](themes.md)：前后台独立主题、图示预设、即时预览、配置导入及旧版本兼容。
 - [2026-10-02 主题升级检查](theme-refresh-validation-20261002/README.md)：主题模型、真实数据库权限和兼容性的初始验收证据。
 - [2026-10-02 主题抽屉验收](theme-drawer-validation-20261002/README.md)：右侧抽屉、取消恢复、草稿保护、深色主题及桌面/手机实屏与滚动检查。
-- [数据库初始化脚本](../database/mayday.sql)：空库安装、41 张业务表、382 个字段注释、索引/外键、必要基础资料及 V18 版本基线。
+- [数据库初始化脚本](../database/mayday.sql)：空库安装、详细字段注释、索引/外键、必要基础资料及 V19 版本基线。
 - [UDP 转发](udp-relay.md)：独立 Netty 模块、页面配置、实时统计、权限、部署及持续打流验收。
 - [图片采集](image-crawler.md)：列表与详情分页配置、HTML/JSON 示例、任务、文件结果、权限和支持范围。
 - [图片采集验收](crawler-validation-20260922/README.md)：数据库升级、权限回归、真实网络采集及未完成的页面验收。
 - [升级与恢复](upgrade.md)：备份、隔离验收、本机升级及故障处理。
-- [本轮复用验收](reuse-validation/README.md)：本轮结论、补齐内容、测试证据和未覆盖能力。
+- [早期复用验收](reuse-validation/README.md)：对应日期的补齐内容、测试证据和未覆盖能力。
 - [工作台待办与消息](work-notifications-validation/README.md)：审批到人、站内通知、首页入口、权限要求和最近验收记录。
 - [后台查询与编辑体验](admin-usability-validation-20260922/README.md)：常用查询、表格偏好、离开保护、问题修复和本轮验证范围。
 

@@ -95,7 +95,10 @@ export function WorkflowDesignerPage() {
     [existing, setExisting] = useState(false);
   const [simulating, setSimulating] = useState(false),
     [result, setResult] = useState<Simulation | null>(null),
-    [simulateForm] = Form.useForm();
+    [simulateForm] = Form.useForm<{
+      applicantId?: number;
+      values: Record<string, unknown>;
+    }>();
   const editable = can("workflows:update");
   useEffect(() => {
     if (id) setSavedId(id);
@@ -109,6 +112,7 @@ export function WorkflowDesignerPage() {
     }
   }, [query.data, id]);
   useUnsavedChanges(dirty);
+  /** 本地编辑使上一次模拟失效，防止将旧路径结果当作新草稿的执行结论。 */
   const update = (next: WorkflowSpec) => {
     setSpec(next);
     setDirty(true);
@@ -121,6 +125,7 @@ export function WorkflowDesignerPage() {
     if (spec) update({ ...spec, [key]: value });
   };
   const leave = () => navigate("/admin/workflows");
+  /** 先保存再以返回版本发布；保存失败不继续发布，发布失败保留已保存草稿供继续修正。 */
   const save = async (publish = false) => {
     if (!record || !spec) return;
     setSaving(true);
@@ -151,10 +156,11 @@ export function WorkflowDesignerPage() {
       setSaving(false);
     }
   };
+  /** ID 与显示名称分离且不复用当前图中的编号，已有节点名称变化不会破坏边引用。 */
   const newId = (prefix: string, used: string[]) => {
-    let n = 1;
-    while (used.includes(prefix + n)) n++;
-    return prefix + n;
+    let suffix = 1;
+    while (used.includes(prefix + suffix)) suffix++;
+    return prefix + suffix;
   };
   if (!id)
     return (

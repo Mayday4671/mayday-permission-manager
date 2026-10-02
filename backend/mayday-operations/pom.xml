@@ -8,10 +8,31 @@
   </parent>
   <artifactId>mayday-operations</artifactId>
   <dependencies>
+    <!-- DTO的契约说明随模块移动，避免应用层维护另一份手写响应类型。 -->
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-annotations-jakarta</artifactId>
+      <version>${swagger-annotations.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.mayday</groupId>
       <artifactId>mayday-security</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <!-- 使用同步流式传输，避免文件模块再次引入不同版本的 Netty。 -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>2.55.10</version>
+      <exclusions>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache-client</artifactId></exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>url-connection-client</artifactId>
+      <version>2.55.10</version>
     </dependency>
   </dependencies>
 </project>

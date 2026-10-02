@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import openapiTS, {
   astToString,
 } from "../frontend/node_modules/openapi-typescript/dist/index.mjs";
+import { format } from "../frontend/node_modules/prettier/index.mjs";
 import { loginWithCaptcha } from "../tests/support/captcha.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -80,9 +81,11 @@ if (
 )
   throw new Error("后端未返回合法 OpenAPI 契约");
 const contract = JSON.stringify(canonicalize(schema), null, 2) + "\n";
-const types =
+const types = await format(
   "/** 自动从 contracts/openapi.json 生成；请修改服务端 DTO 后重新生成，禁止手工编辑。 */\n" +
-  astToString(await openapiTS(JSON.parse(contract), { alphabetize: true }));
+    astToString(await openapiTS(JSON.parse(contract), { alphabetize: true })),
+  { parser: "typescript" },
+);
 if (args.includes("--check")) {
   if (readFileSync(schemaFile, "utf8") !== contract)
     throw new Error("后端契约已变化，请生成并提交 contracts/openapi.json");
