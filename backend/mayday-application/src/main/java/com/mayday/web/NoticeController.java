@@ -35,14 +35,25 @@ public class NoticeController {
   private final ContentPublicationRepository publications;
   private final ContentService service;
   private final AccessPolicy access;
+  private final com.mayday.service.PortalStructureService portal;
 
-  /** 内容范围与未回收条件进入分页 SQL，分类按当前草稿修订筛选，响应由安全视图投影。 */
+  /** 内容编辑所用的栏目与分类选项只要求内容查看权，不能用于修改门户配置。 */
+  @GetMapping("/portal-options")
+  public ApiResponse<java.util.List<com.mayday.service.PortalStructureService.ChannelView>>
+      portalOptions() {
+    return ApiResponse.ok(portal.options());
+  }
+
+  /** 内容范围进入分页 SQL；普通管理筛选草稿，公开内容选择器按线上修订搜索、过滤栏目与模板。 */
   @GetMapping
   public ApiResponse<?> list(
       @RequestParam(defaultValue = "") String keyword,
       @RequestParam(required = false) Boolean published,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) Long categoryId,
+      @RequestParam(required = false) Long portalChannelId,
+      @RequestParam(required = false) String portalTemplate,
+      @RequestParam(required = false) Boolean publiclyVisible,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     access.require("notices:view");
@@ -53,14 +64,20 @@ public class NoticeController {
                 (root, query, criteria) ->
                     criteria.and(
                         criteria.isNull(root.get("deletedAt")),
-                        SearchPredicates.contains(criteria, root.get("title"), keyword),
+                        SearchPredicates.contains(
+                            criteria,
+                            Boolean.TRUE.equals(publiclyVisible)
+                                ? root.get("liveRevision").get("title")
+                                : root.get("title"),
+                            keyword),
                         published == null
                             ? criteria.conjunction()
                             : criteria.equal(root.get("published"), published),
                         status == null || status.isBlank()
                             ? criteria.conjunction()
                             : criteria.equal(root.get("draftStatus"), status)));
-    if (categoryId != null)
+    if (Boolean.TRUE.equals(publiclyVisible)) spec = spec.and(ContentService.publiclyVisible());
+    if (categoryId != null || portalChannelId != null || portalTemplate != null)
       spec =
           spec.and(
               (root, query, criteria) -> {
@@ -68,8 +85,22 @@ public class NoticeController {
                 var revision = categoryQuery.from(ContentRevision.class);
                 categoryQuery
                     .select(revision.get("id"))
-                    .where(criteria.equal(revision.get("categoryId"), categoryId));
-                return root.get("draftRevisionId").in(categoryQuery);
+                    .where(
+                        criteria.and(
+                            categoryId == null
+                                ? criteria.conjunction()
+                                : criteria.equal(revision.get("categoryId"), categoryId),
+                            portalChannelId == null
+                                ? criteria.conjunction()
+                                : criteria.equal(revision.get("portalChannelId"), portalChannelId),
+                            portalTemplate == null
+                                ? criteria.conjunction()
+                                : criteria.equal(
+                                    revision.get("portalChannel").get("template"),
+                                    portalTemplate)));
+                return root.get(
+                        Boolean.TRUE.equals(publiclyVisible) ? "liveRevisionId" : "draftRevisionId")
+                    .in(categoryQuery);
               });
     return ApiResponse.ok(
         PageResult.from(notices.findAll(spec, PageResult.request(page, size)).map(service::view)));

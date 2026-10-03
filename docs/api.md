@@ -203,6 +203,17 @@ V15 起，DELETE `/crawler/tasks/{id}` 对已经产生文章的配置采用归�
 
 关键词按字面量匹配，`%`、`_` 不解释为通配符。客户端不得以角色名称推断权限；校验以实际 DTO、PermissionCatalog 和服务层为准。版本过期应重新取得最新记录并让用户核对，不能自动覆盖重试。
 
+## 门户栏目与首页
+
+- `GET /portal-management/channels`、`GET /portal-management/category-options`、`GET /portal-management/home`：要求 `portal:view`，分别返回管理栏目、有序分类候选、首页编排与原版本。
+- `POST /portal-management/channels`、`PUT /portal-management/channels/{id}`、`DELETE /portal-management/channels/{id}?version=...`：要求对应 create/update/delete 及 view 权限。字段为 `code/name/template/description/sortOrder/enabled/categoryIds/version`；template 为 GUIDE/NOTICE/UPDATE/STORY，分类列表顺序即展示次序。访问名称创建后固定，历史引用禁止移走或删除。
+- `PUT /portal-management/home`：`version/heroArticleId/noticeArticleId/featuredArticleIds/allowThemeToggle/nightPrimaryColor`；要求 `portal:update` 与查看权。逐篇检查公开线上状态及 `notices:view` 数据范围，公告必须属于 NOTICE 模板，精选最多 12 篇且不能重复。
+- `PUT /portal-management/theme-policy`：仅更新 `version/allowThemeToggle/nightPrimaryColor`，同样要求 `portal:view/update`；不改写首页文章选择，也不因已有文章下线而阻止主题策略修改。
+- `GET /content/notices/portal-options`：要求 `notices:view`，内容编辑者可以取得栏目与分类选项，无须额外获得栏目管理权限。管理内容列表支持 `portalChannelId/categoryId/portalTemplate/publiclyVisible`；公开选择模式按线上标题与归属过滤，仍受作者/部门数据范围限制。响应 `liveTitle/livePortalChannelId` 与当前草稿字段分开。
+- `GET /public/site`：匿名白名单配置、启用栏目及栏目内启用分类、独立主题策略；不返回后台管理版本或凭据。
+- `GET /public/home`：匿名返回当前公开主视觉、公告与有序精选，指定内容下线后不泄露配置 ID。自动主视觉和公告独立查询对应模板。
+- `GET /public/articles?channel=<code>&categoryId=<id>&keyword=...&page=1&size=12`：栏目、分类、有效期、线上修订进入分页 SQL；不存在或停用栏目返回 404。正文、封面与附件使用相同公开边界。页面约定与运营规则见 [门户说明](portal.md)。
+
 ## 可选模块和机器契约
 
 - `GET /platform/features`：公开返回有效模块状态，没有账号或配置秘密。关闭依赖的模块由服务端联动关闭。

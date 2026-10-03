@@ -29,7 +29,8 @@ import { ResourcePage } from "../components/ResourcePage";
 import { FormModal } from "../components/FormModal";
 import { DetailsModal } from "../components/DetailsModal";
 import { QueryState, formatTime } from "../components/shared";
-import { CategorySelect, TagSelect } from "../components/LookupSelect";
+import { TagSelect } from "../components/LookupSelect";
+import type { PortalChannel } from "../lib/portal";
 import { RichTextEditor } from "../components/RichTextEditor";
 import { RichTextView } from "../components/RichTextView";
 import {
@@ -82,6 +83,21 @@ export function NoticesPage() {
   const [editing, setEditing] = useState<ContentRecord | null>(null);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm<DraftForm>();
+  const portalOptions = useQuery({
+    queryKey: ["content", "portal-options"],
+    queryFn: ({ signal }) =>
+      api<PortalChannel[]>("/content/notices/portal-options", { signal }),
+  });
+  const selectedChannel = Form.useWatch("portalChannelId", form);
+  const [portalChannelId, setPortalChannelId] = usePageState<
+    number | undefined
+  >("contentChannel", undefined);
+  const filterCategories = (portalOptions.data ?? [])
+    .filter((channel) => !portalChannelId || channel.id === portalChannelId)
+    .flatMap((channel) => channel.categories);
+  const formCategories =
+    portalOptions.data?.find((channel) => channel.id === selectedChannel)
+      ?.categories ?? [];
   const [publishing, setPublishing] = useState<ContentRecord | null>(null);
   const [publishForm] = Form.useForm<{
     publishAt?: string;
@@ -168,10 +184,15 @@ export function NoticesPage() {
         fields={() => null}
         deleteDescription="内容将移入回收站，取消上线排期并立即从前台撤下。"
         actionsWidth={180}
-        queryParams={{ status, categoryId }}
+        queryParams={{ status, categoryId, portalChannelId }}
         savedFilters={{
-          keys: ["status", "categoryId"],
+          keys: ["status", "categoryId", "portalChannelId"],
           apply: (values) => {
+            setPortalChannelId(
+              typeof values.portalChannelId === "number"
+                ? values.portalChannelId
+                : undefined,
+            );
             setStatus(
               typeof values.status === "string" &&
                 contentStatuses.some((item) => item.value === values.status)
@@ -185,10 +206,15 @@ export function NoticesPage() {
             );
           },
         }}
-        hasExtraFilters={status !== undefined || categoryId !== undefined}
+        hasExtraFilters={
+          status !== undefined ||
+          categoryId !== undefined ||
+          portalChannelId !== undefined
+        }
         onResetFilters={() => {
           setStatus(undefined);
           setCategoryId(undefined);
+          setPortalChannelId(undefined);
         }}
         extraFilters={
           <>
@@ -200,8 +226,28 @@ export function NoticesPage() {
               placeholder="全部状态"
               options={contentStatuses}
             />
-            <CategorySelect
+            <Select
+              aria-label="所属栏目筛选"
+              placeholder="全部栏目"
+              allowClear
+              value={portalChannelId}
+              onChange={(id) => {
+                setPortalChannelId(id);
+                setCategoryId(undefined);
+              }}
+              options={(portalOptions.data ?? []).map((channel) => ({
+                value: channel.id,
+                label: channel.name,
+              }))}
+            />
+            <Select
               aria-label="内容分类筛选"
+              placeholder="全部分类"
+              allowClear
+              options={filterCategories.map((category) => ({
+                value: category.id,
+                label: category.name,
+              }))}
               value={categoryId}
               onChange={(v) =>
                 setCategoryId(typeof v === "number" ? v : undefined)
@@ -429,18 +475,40 @@ export function NoticesPage() {
             </Form.Item>
             <div className="form-two-columns">
               <Form.Item
-                name="categoryId"
-                label="分类"
-                rules={[{ required: true }]}
+                name="portalChannelId"
+                label="所属栏目"
+                rules={[{ required: true, message: "请选择所属栏目" }]}
               >
-                <CategorySelect
-                  initialOptions={
-                    editing
-                      ? [{ value: editing.categoryId, label: editing.category }]
-                      : []
-                  }
+                <Select
+                  loading={portalOptions.isLoading}
+                  placeholder="选择所属栏目"
+                  options={(portalOptions.data ?? []).map((channel) => ({
+                    value: channel.id,
+                    label: channel.name,
+                    disabled: !channel.enabled,
+                  }))}
+                  onChange={() => form.setFieldValue("categoryId", undefined)}
                 />
               </Form.Item>
+              <Form.Item
+                name="categoryId"
+                label="栏目内分类"
+                rules={[{ required: true }]}
+              >
+                <Select
+                  placeholder={
+                    selectedChannel ? "选择栏目内分类" : "先选择所属栏目"
+                  }
+                  disabled={!selectedChannel}
+                  options={formCategories.map((category) => ({
+                    value: category.id,
+                    label: category.name,
+                    disabled: !category.enabled,
+                  }))}
+                />
+              </Form.Item>
+            </div>
+            <div className="form-two-columns">
               <Form.Item
                 name="tagIds"
                 label="标签"
@@ -455,7 +523,7 @@ export function NoticesPage() {
             <Form.Item
               name="coverFiles"
               label="封面"
-              extra="支持 PNG、JPEG、WebP；不上传时前台使用无图列表。"
+              extra="支持 PNG、JPEG、WebP；不上传时前台使用栏目默认配图。"
             >
               <AttachmentUpload
                 picture

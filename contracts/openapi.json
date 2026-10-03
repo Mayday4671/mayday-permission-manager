@@ -95,6 +95,25 @@
         ],
         "type": "object"
       },
+      "ApiResponseChannelView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ChannelView"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponseFeatureView": {
         "properties": {
           "data": {
@@ -175,6 +194,25 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/FileDirectory"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
+      "ApiResponseHomeView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HomeView"
           },
           "message": {
             "type": "string"
@@ -271,6 +309,50 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/AlertRecipientOption"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
+      "ApiResponseListCategoryOption": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryOption"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
+      "ApiResponseListChannelView": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelView"
             },
             "type": "array"
           },
@@ -813,6 +895,40 @@
         },
         "type": "object"
       },
+      "CategoryOption": {
+        "properties": {
+          "channelId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CategoryView": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ChallengeRequest": {
         "properties": {
           "username": {
@@ -869,6 +985,96 @@
           "resource",
           "version"
         ],
+        "type": "object"
+      },
+      "ChannelDraft": {
+        "properties": {
+          "categoryIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "minItems": 0,
+            "type": "array"
+          },
+          "code": {
+            "minLength": 1,
+            "pattern": "[a-z][a-z0-9-]{0,47}",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "minLength": 0,
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 40,
+            "minLength": 0,
+            "type": "string"
+          },
+          "sortOrder": {
+            "format": "int32",
+            "maximum": 9999,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "template": {
+            "pattern": "GUIDE|NOTICE|UPDATE|STORY",
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "categoryIds",
+          "code",
+          "name",
+          "template"
+        ],
+        "type": "object"
+      },
+      "ChannelView": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryView"
+            },
+            "type": "array"
+          },
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "template": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
         "type": "object"
       },
       "Cleanup": {
@@ -939,6 +1145,10 @@
           },
           "pinned": {
             "type": "boolean"
+          },
+          "portalChannelId": {
+            "format": "int64",
+            "type": "integer"
           },
           "published": {
             "type": "boolean"
@@ -1669,6 +1879,74 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "HomeDraft": {
+        "properties": {
+          "allowThemeToggle": {
+            "type": "boolean"
+          },
+          "featuredArticleIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "maxItems": 12,
+            "minItems": 0,
+            "type": "array"
+          },
+          "heroArticleId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "nightPrimaryColor": {
+            "pattern": "#[0-9a-fA-F]{6}",
+            "type": "string"
+          },
+          "noticeArticleId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "featuredArticleIds",
+          "nightPrimaryColor",
+          "version"
+        ],
+        "type": "object"
+      },
+      "HomeView": {
+        "properties": {
+          "allowThemeToggle": {
+            "type": "boolean"
+          },
+          "featuredArticleIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "heroArticleId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "nightPrimaryColor": {
+            "type": "string"
+          },
+          "noticeArticleId": {
+            "format": "int64",
+            "type": "integer"
           },
           "version": {
             "format": "int64",
@@ -2939,6 +3217,26 @@
         },
         "type": "object"
       },
+      "ThemePolicyDraft": {
+        "properties": {
+          "allowThemeToggle": {
+            "type": "boolean"
+          },
+          "nightPrimaryColor": {
+            "pattern": "#[0-9a-fA-F]{6}",
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "nightPrimaryColor",
+          "version"
+        ],
+        "type": "object"
+      },
       "Track": {
         "properties": {
           "receipt": {
@@ -4142,6 +4440,31 @@
           },
           {
             "in": "query",
+            "name": "portalChannelId",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "portalTemplate",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "publiclyVisible",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
             "name": "page",
             "required": false,
             "schema": {
@@ -4200,6 +4523,31 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "notice-controller"
+        ]
+      }
+    },
+    "/api/content/notices/portal-options": {
+      "get": {
+        "operationId": "NoticeController_portalOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListChannelView"
                 }
               }
             },
@@ -8565,6 +8913,271 @@
         ]
       }
     },
+    "/api/portal-management/category-options": {
+      "get": {
+        "operationId": "PortalStructureController_categoryOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListCategoryOption"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portal-structure-controller"
+        ]
+      }
+    },
+    "/api/portal-management/channels": {
+      "get": {
+        "operationId": "PortalStructureController_channels",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListChannelView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portal-structure-controller"
+        ]
+      },
+      "post": {
+        "operationId": "PortalStructureController_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseChannelView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portal-structure-controller"
+        ]
+      }
+    },
+    "/api/portal-management/channels/{id}": {
+      "delete": {
+        "operationId": "PortalStructureController_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portal-structure-controller"
+        ]
+      },
+      "put": {
+        "operationId": "PortalStructureController_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseChannelView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portal-structure-controller"
+        ]
+      }
+    },
+    "/api/portal-management/home": {
+      "get": {
+        "operationId": "PortalStructureController_home",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHomeView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portal-structure-controller"
+        ]
+      },
+      "put": {
+        "operationId": "PortalStructureController_saveHome",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HomeDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHomeView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portal-structure-controller"
+        ]
+      }
+    },
+    "/api/portal-management/theme-policy": {
+      "put": {
+        "operationId": "PortalStructureController_saveThemePolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemePolicyDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHomeView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portal-structure-controller"
+        ]
+      }
+    },
     "/api/public/articles": {
       "get": {
         "operationId": "PublicController_list",
@@ -8594,6 +9207,14 @@
             "schema": {
               "format": "int64",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -8848,6 +9469,27 @@
         "security": [],
         "tags": [
           "public-feedback-controller"
+        ]
+      }
+    },
+    "/api/public/home": {
+      "get": {
+        "operationId": "PublicController_home",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [],
+        "tags": [
+          "public-controller"
         ]
       }
     },

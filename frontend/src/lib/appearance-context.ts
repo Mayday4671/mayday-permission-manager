@@ -9,6 +9,20 @@ export const AppearanceContext = createContext<{
   preview: (value: Appearance | null) => void;
 } | null>(null);
 
+/** 访客只能修改当前浏览器的明暗偏好；是否提供开关由门户后台控制。 */
+export const PortalAppearanceContext = createContext<{
+  dark: boolean;
+  allowed: boolean;
+  toggle: () => void;
+} | null>(null);
+
+/** 前台主题开关复用 Provider 的实际显示状态，系统模式也能准确切换。 */
+export function usePortalAppearance() {
+  const context = useContext(PortalAppearanceContext);
+  if (!context) throw new Error("缺少门户主题上下文");
+  return context;
+}
+
 /** 后台主题消费者复用保存和临时预览边界，缺少 Provider 时明确失败而非使用错误默认主题。 */
 export function useAdminAppearance() {
   const context = useContext(AppearanceContext);

@@ -10,7 +10,11 @@ import { App, ConfigProvider, theme, type ThemeConfig } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { useLocation } from "react-router-dom";
 import { useSite } from "./portal";
-import { AppearanceContext } from "./appearance-context";
+import {
+  AppearanceContext,
+  PortalAppearanceContext,
+} from "./appearance-context";
+import { isPortalPath } from "./portal-routing";
 import {
   ADMIN_APPEARANCE,
   PORTAL_APPEARANCE,
@@ -32,7 +36,7 @@ function readPreference() {
   }
 }
 /** 监听系统明暗变化；只有选择“跟随系统”的主题使用此值，手动选择不会被覆盖。 */
-function useSystemDark() {
+export function useSystemDark() {
   const [dark, setDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
@@ -74,16 +78,29 @@ export function ThemeScope({
         colorWarning: appearance.warningColor,
         colorError: appearance.errorColor,
         colorBgLayout: themeBackground(appearance, dark),
+        ...(portal
+          ? {
+              colorBgLayout: dark ? "#0d1626" : "#f5f8fc",
+              colorBgContainer: dark ? "#17253b" : "#ffffff",
+              colorBgElevated: dark ? "#1c2e47" : "#ffffff",
+              colorBorder: dark ? "#31485e" : "#dce5ef",
+              colorBorderSecondary: dark ? "#253c54" : "#e5edf5",
+              colorText: dark ? "#eef5ff" : "#182c46",
+              colorTextSecondary: dark ? "#b5c6da" : "#5f7188",
+            }
+          : {}),
         borderRadius: appearance.borderRadius,
         fontSize: portal ? 14 : 13,
         controlHeight: portal ? 42 : 34,
         fontFamily: '"Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
         ...(dark
           ? {}
-          : {
-              colorText: "#303642",
-              colorTextSecondary: "#646b78",
-            }),
+          : portal
+            ? {}
+            : {
+                colorText: "#303642",
+                colorTextSecondary: "#646b78",
+              }),
       },
       components: {
         Button: { primaryShadow: "none" },
@@ -254,11 +271,19 @@ function ThemeVariables({
 /** 后台偏好保存在本浏览器；门户只读取服务端公开主题，访客不能通过后台偏好改变全站外观。 */
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
-  const portal =
-    pathname === "/" ||
-    pathname.startsWith("/articles/") ||
-    pathname.startsWith("/categories/");
+  const portal = isPortalPath(pathname);
   const site = useSite(portal);
+  const systemDark = useSystemDark();
+  const [visitorMode, setVisitorMode] = useState<"light" | "dark" | null>(
+    () => {
+      try {
+        const mode = localStorage.getItem("mayday.portal.mode.v1");
+        return mode === "dark" || mode === "light" ? mode : null;
+      } catch {
+        return null;
+      }
+    },
+  );
   const [appearance, setAppearance] = useState(readPreference);
   const [previewAppearance, setPreviewAppearance] = useState<Appearance | null>(
     null,
@@ -282,16 +307,53 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       return false;
     }
   };
+  const portalBase = normalizeAppearance(site.data?.theme, PORTAL_APPEARANCE);
+  const portalMode = site.data?.allowThemeToggle
+    ? (visitorMode ?? portalBase.mode)
+    : portalBase.mode;
+  const portalDark =
+    portalMode === "dark" || (portalMode === "system" && systemDark);
+  const togglePortal = () => {
+    if (!site.data?.allowThemeToggle) return;
+    const mode = portalDark ? "light" : "dark";
+    setVisitorMode(mode);
+    try {
+      localStorage.setItem("mayday.portal.mode.v1", mode);
+    } catch {
+      /* 存储受限时仍在本次访问生效。 */
+    }
+  };
   const current = portal
-    ? normalizeAppearance(site.data?.theme, PORTAL_APPEARANCE)
+    ? {
+        ...portalBase,
+        // 门户阅读布局遵循已确认的蓝白/海军蓝设计；保留旧配置字段但不继承后台布局预设。
+        menuStyle: "light" as const,
+        background: "neutral" as const,
+        surfaceStyle: "border" as const,
+        contentWidth: "full" as const,
+        borderRadius: 6,
+        compact: false,
+        mode: portalMode,
+        primaryColor: portalDark
+          ? (site.data?.nightPrimaryColor ?? "#53d5be")
+          : portalBase.primaryColor,
+      }
     : (previewAppearance ?? appearance);
   return (
     <AppearanceContext.Provider
       value={{ appearance, save, preview: setPreviewAppearance }}
     >
-      <ThemeScope appearance={current} portal={portal} documentScope>
-        <App>{children}</App>
-      </ThemeScope>
+      <PortalAppearanceContext.Provider
+        value={{
+          dark: portalDark,
+          allowed: site.data?.allowThemeToggle ?? false,
+          toggle: togglePortal,
+        }}
+      >
+        <ThemeScope appearance={current} portal={portal} documentScope>
+          <App>{children}</App>
+        </ThemeScope>
+      </PortalAppearanceContext.Provider>
     </AppearanceContext.Provider>
   );
 }

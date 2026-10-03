@@ -3,6 +3,7 @@ import type { FileRecord } from "./operations";
 import type { LookupOption } from "../components/LookupSelect";
 
 export interface ContentRevision {
+  portalChannelId: number;
   revisionId: number;
   revisionNumber: number;
   title: string;
@@ -40,6 +41,9 @@ export interface ContentRecord extends BaseRecord, ContentRevision {
   requiresApproval: boolean;
   effectiveApprovalRequired: boolean;
   liveRevisionId: number | null;
+  /** 首页编排按线上修订选择；草稿改名或换栏目不能改变正在展示的版本。 */
+  liveTitle: string | null;
+  livePortalChannelId: number | null;
   publishedAt: string | null;
   liveOfflineAt: string | null;
   deletedAt: string | null;

@@ -37,6 +37,7 @@ public class PublicController {
   private final ContentRevisionRepository revisions;
   private final EntryRepository entries;
   private final SettingService settingService;
+  private final com.mayday.service.PortalStructureService portal;
   private final ContentAssets assets;
 
   /** 匿名门户只读取公开站点键、前台专用主题与启用分类，不公开后台主题或内部配置。 */
@@ -54,6 +55,10 @@ public class PublicController {
     result.put("copyright", settings.get("site.copyright"));
     result.put("icp", settings.get("site.icp"));
     result.put("theme", settingService.publicTheme());
+    result.put("channels", portal.publicChannels());
+    var home = portal.home(false);
+    result.put("allowThemeToggle", home.allowThemeToggle());
+    result.put("nightPrimaryColor", home.nightPrimaryColor());
     result.put(
         "categories",
         entries.findByKindOrderBySortOrderAscIdAsc("categories").stream()
@@ -85,6 +90,10 @@ public class PublicController {
     view.put("summary", revision.getSummary());
     view.put("content", detail ? revision.getContent() : null);
     view.put("categoryId", revision.getCategoryId());
+    view.put("portalChannelId", revision.getPortalChannelId());
+    view.put("channelCode", revision.getPortalChannel().getCode());
+    view.put("channelName", revision.getPortalChannel().getName());
+    view.put("channelTemplate", revision.getPortalChannel().getTemplate());
     view.put(
         "category",
         entries.findById(revision.getCategoryId()).map(SystemEntry::getName).orElse(""));
@@ -123,16 +132,95 @@ public class PublicController {
     return view;
   }
 
+  private Map<String, Object> visibleArticle(Long id) {
+    if (id == null) return null;
+    return notices
+        .findOne(ContentService.publiclyVisible().and((r, q, c) -> c.equal(r.get("id"), id)))
+        .map(n -> article(n, false))
+        .orElse(null);
+  }
+
+  /** 自动主视觉和公告分别按模板查询，避免其他栏目的大量新内容挤出首页必要入口。 */
+  private Map<String, Object> automaticArticle(String template) {
+    return notices
+        .findAll(
+            ContentService.publiclyVisible()
+                .and(
+                    (root, query, criteria) ->
+                        criteria.equal(
+                            root.get("liveRevision").get("portalChannel").get("template"),
+                            template)),
+            PageRequest.of(
+                0,
+                1,
+                Sort.by(
+                    Sort.Order.desc("liveRevision.recommended"),
+                    Sort.Order.desc("liveRevision.pinned"),
+                    Sort.Order.desc("liveRevision.sortOrder"),
+                    Sort.Order.desc("publishedAt"),
+                    Sort.Order.desc("id"))))
+        .stream()
+        .findFirst()
+        .map(n -> article(n, false))
+        .orElse(null);
+  }
+
+  /** 首页编排只投影当前公开版本；下线、停用、内部内容不会连同配置 ID 泄露，手动精选保持顺序。 */
+  @GetMapping("/home")
+  public ResponseEntity<?> home() {
+    var config = portal.home(false);
+    var recent =
+        notices
+            .findAll(
+                ContentService.publiclyVisible(),
+                PageRequest.of(
+                    0,
+                    12,
+                    Sort.by(
+                        Sort.Order.desc("liveRevision.recommended"),
+                        Sort.Order.desc("liveRevision.pinned"),
+                        Sort.Order.desc("publishedAt"),
+                        Sort.Order.desc("id"))))
+            .stream()
+            .map(n -> article(n, false))
+            .toList();
+    Map<String, Object> result = new LinkedHashMap<>();
+    var automaticHero = config.heroArticleId() == null ? automaticArticle("GUIDE") : null;
+    result.put(
+        "hero",
+        config.heroArticleId() == null
+            ? (automaticHero != null
+                ? automaticHero
+                : (recent.isEmpty() ? null : recent.getFirst()))
+            : visibleArticle(config.heroArticleId()));
+    result.put(
+        "notice",
+        config.noticeArticleId() == null
+            ? automaticArticle("NOTICE")
+            : visibleArticle(config.noticeArticleId()));
+    result.put(
+        "featured",
+        config.featuredArticleIds().isEmpty()
+            ? recent.stream().limit(3).toList()
+            : config.featuredArticleIds().stream()
+                .map(this::visibleArticle)
+                .filter(java.util.Objects::nonNull)
+                .toList());
+    return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.ok(result));
+  }
+
   /** 将公开可见、上线修订和有效期约束合入分页 SQL，置顶排序且响应禁止缓存已下线内容。 */
   @GetMapping("/articles")
   public ResponseEntity<?> list(
       @RequestParam(defaultValue = "") String keyword,
       @RequestParam(defaultValue = "") String category,
       @RequestParam(required = false) Long categoryId,
+      @RequestParam(required = false) String channel,
       @RequestParam(required = false) Long tagId,
       @RequestParam(required = false) Boolean recommended,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "9") int size) {
+    Long channelId = channel == null ? null : portal.publicChannel(channel).getId();
     var specification =
         ContentService.publiclyVisible()
             .and(
@@ -144,6 +232,10 @@ public class PublicController {
                             ? criteria.conjunction()
                             : criteria.equal(
                                 root.get("liveRevision").get("categoryId"), categoryId),
+                        channelId == null
+                            ? criteria.conjunction()
+                            : criteria.equal(
+                                root.get("liveRevision").get("portalChannelId"), channelId),
                         category.isBlank()
                             ? criteria.conjunction()
                             : criteria.equal(

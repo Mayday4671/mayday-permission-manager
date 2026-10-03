@@ -400,6 +400,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/content/notices/portal-options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["NoticeController_portalOptions"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/content/notices/recycle": {
     parameters: {
       query?: never;
@@ -1600,6 +1616,86 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/portal-management/category-options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PortalStructureController_categoryOptions"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/portal-management/channels": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PortalStructureController_channels"];
+    put?: never;
+    post: operations["PortalStructureController_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/portal-management/channels/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PortalStructureController_update"];
+    post?: never;
+    delete: operations["PortalStructureController_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/portal-management/home": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PortalStructureController_home"];
+    put: operations["PortalStructureController_saveHome"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/portal-management/theme-policy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PortalStructureController_saveThemePolicy"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/public/articles": {
     parameters: {
       query?: never;
@@ -1706,6 +1802,22 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["PublicFeedbackController_track"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/public/home": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicController_home"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2241,6 +2353,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseChannelView: {
+      data: components["schemas"]["ChannelView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseFeatureView: {
       data: components["schemas"]["FeatureView"];
       message: string;
@@ -2266,6 +2383,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseHomeView: {
+      data: components["schemas"]["HomeView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseImportPreview: {
       data: components["schemas"]["ImportPreview"];
       message: string;
@@ -2288,6 +2410,16 @@ export interface components {
     };
     ApiResponseListAlertRecipientOption: {
       data: components["schemas"]["AlertRecipientOption"][];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseListCategoryOption: {
+      data: components["schemas"]["CategoryOption"][];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseListChannelView: {
+      data: components["schemas"]["ChannelView"][];
       message: string;
       success: boolean;
     };
@@ -2430,6 +2562,20 @@ export interface components {
       /** Format: int32 */
       count?: number;
     };
+    CategoryOption: {
+      /** Format: int64 */
+      channelId?: number;
+      enabled?: boolean;
+      /** Format: int64 */
+      id?: number;
+      name?: string;
+    };
+    CategoryView: {
+      enabled?: boolean;
+      /** Format: int64 */
+      id?: number;
+      name?: string;
+    };
     ChallengeRequest: {
       username: string;
     };
@@ -2446,6 +2592,32 @@ export interface components {
       resourceId?: number;
       /** Format: int64 */
       version: number;
+    };
+    ChannelDraft: {
+      categoryIds: number[];
+      code: string;
+      description?: string;
+      enabled?: boolean;
+      name: string;
+      /** Format: int32 */
+      sortOrder?: number;
+      template: string;
+      /** Format: int64 */
+      version?: number;
+    };
+    ChannelView: {
+      categories?: components["schemas"]["CategoryView"][];
+      code?: string;
+      description?: string;
+      enabled?: boolean;
+      /** Format: int64 */
+      id?: number;
+      name?: string;
+      /** Format: int32 */
+      sortOrder?: number;
+      template?: string;
+      /** Format: int64 */
+      version?: number;
     };
     Cleanup: {
       /** Format: date */
@@ -2468,6 +2640,8 @@ export interface components {
       /** Format: int64 */
       coverId?: number;
       pinned?: boolean;
+      /** Format: int64 */
+      portalChannelId?: number;
       published?: boolean;
       recommended?: boolean;
       requiresApproval?: boolean;
@@ -2691,6 +2865,28 @@ export interface components {
       parentId?: number;
       /** Format: date-time */
       updatedAt?: string;
+      /** Format: int64 */
+      version?: number;
+    };
+    HomeDraft: {
+      allowThemeToggle?: boolean;
+      featuredArticleIds: number[];
+      /** Format: int64 */
+      heroArticleId?: number;
+      nightPrimaryColor: string;
+      /** Format: int64 */
+      noticeArticleId?: number;
+      /** Format: int64 */
+      version: number;
+    };
+    HomeView: {
+      allowThemeToggle?: boolean;
+      featuredArticleIds?: number[];
+      /** Format: int64 */
+      heroArticleId?: number;
+      nightPrimaryColor?: string;
+      /** Format: int64 */
+      noticeArticleId?: number;
       /** Format: int64 */
       version?: number;
     };
@@ -3102,6 +3298,12 @@ export interface components {
       key?: string;
       name?: string;
       schema?: components["schemas"]["Spec"];
+    };
+    ThemePolicyDraft: {
+      allowThemeToggle?: boolean;
+      nightPrimaryColor: string;
+      /** Format: int64 */
+      version: number;
     };
     Track: {
       receipt: string;
@@ -3683,6 +3885,9 @@ export interface operations {
         categoryId?: number;
         keyword?: string;
         page?: number;
+        portalChannelId?: number;
+        portalTemplate?: string;
+        publiclyVisible?: boolean;
         published?: boolean;
         size?: number;
         status?: string;
@@ -3967,6 +4172,26 @@ export interface operations {
         };
         content: {
           "application/json": Record<string, never>;
+        };
+      };
+    };
+  };
+  NoticeController_portalOptions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseListChannelView"];
         };
       };
     };
@@ -6172,11 +6397,194 @@ export interface operations {
       };
     };
   };
+  PortalStructureController_categoryOptions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseListCategoryOption"];
+        };
+      };
+    };
+  };
+  PortalStructureController_channels: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseListChannelView"];
+        };
+      };
+    };
+  };
+  PortalStructureController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChannelDraft"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseChannelView"];
+        };
+      };
+    };
+  };
+  PortalStructureController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChannelDraft"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseChannelView"];
+        };
+      };
+    };
+  };
+  PortalStructureController_delete: {
+    parameters: {
+      query: {
+        version: number;
+      };
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseVoid"];
+        };
+      };
+    };
+  };
+  PortalStructureController_home: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseHomeView"];
+        };
+      };
+    };
+  };
+  PortalStructureController_saveHome: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HomeDraft"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseHomeView"];
+        };
+      };
+    };
+  };
+  PortalStructureController_saveThemePolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ThemePolicyDraft"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseHomeView"];
+        };
+      };
+    };
+  };
   PublicController_list: {
     parameters: {
       query?: {
         category?: string;
         categoryId?: number;
+        channel?: string;
         keyword?: string;
         page?: number;
         recommended?: boolean;
@@ -6333,6 +6741,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponseFeedbackPublicView"];
+        };
+      };
+    };
+  };
+  PublicController_home: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": Record<string, never>;
         };
       };
     };

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Alert, Button, Input, Skeleton } from "antd";
+import { Alert, Button, Dropdown, Input, Skeleton } from "antd";
 import {
   Headphones,
   Mail,
@@ -10,52 +10,48 @@ import {
   ChevronRight,
   X,
   Eye,
+  Sun,
+  Moon,
+  ChevronDown,
 } from "lucide-react";
 import { cleanRichText } from "./RichTextView";
 import {
-  categoryHref,
+  channelHref,
   categoryPurpose,
   portalReturnPath,
   useSite,
-  useTaxonomy,
   type SiteConfig,
 } from "../lib/portal";
 import type { Article } from "../types";
+import { usePortalAppearance } from "../lib/appearance-context";
 import { PortalFeedback } from "./PortalFeedback";
 
-/** 公共网站使用独立主题范围，阅读字号和触控尺寸不会影响后台表格密度。 */
+/** 客户门户使用独立栏目导航与主题；搜索保留所属栏目，访客没有后台跳转入口。 */
 export function SiteFrame({
   children,
-  activeCategoryId,
+  activeChannelCode,
 }: {
   children: ReactNode;
-  activeCategoryId?: number;
+  activeChannelCode?: string;
 }) {
   const { data: info } = useSite();
-  const { data: taxonomy } = useTaxonomy();
   const location = useLocation();
   const navigate = useNavigate();
-  const activeCategory = activeCategoryId ? String(activeCategoryId) : null;
-  const params = new URLSearchParams(location.search);
+  const appearance = usePortalAppearance();
   const search = (keyword: string) => {
-    // 栏目内搜索仍停留在该栏目，文章详情的搜索则进入其所属栏目。
     const next = new URLSearchParams(
       location.pathname.startsWith("/articles/") ? "" : location.search,
     );
     next.delete("page");
-    next.delete("category");
     if (keyword) next.set("q", keyword);
     else next.delete("q");
     const query = next.toString();
     navigate(
-      `${activeCategoryId ? categoryHref(activeCategoryId) : "/"}${query ? `?${query}` : ""}`,
+      (activeChannelCode ? channelHref(activeChannelCode) : "/") +
+        (query ? "?" + query : ""),
     );
   };
-  const primary = [...(taxonomy?.categories ?? [])].sort(
-    (a, b) => categoryPurpose(a.name).order - categoryPurpose(b.name).order,
-  );
   const hasContact = !!(info?.contact || info?.phone || info?.address);
-  // React 路由切换不重新加载文档；显式处理页脚锚点，让详情页的联系入口也能准确定位。
   useEffect(() => {
     if (location.hash !== "#contact") return;
     const frame = requestAnimationFrame(() => {
@@ -78,26 +74,72 @@ export function SiteFrame({
           <nav aria-label="网站导航">
             <Link
               to="/"
-              aria-current={location.pathname === "/" ? "page" : undefined}
+              aria-current={
+                !activeChannelCode && location.pathname === "/"
+                  ? "page"
+                  : undefined
+              }
             >
-              首页
+              <span>首页</span>
             </Link>
-            {primary.map((category) => (
+            {(info?.channels ?? []).slice(0, 4).map((channel) => (
               <Link
-                key={category.id}
-                to={categoryHref(category.id)}
+                key={channel.id}
+                to={channelHref(channel.code)}
+                title={channel.name}
                 aria-current={
-                  activeCategory === String(category.id) ? "page" : undefined
+                  activeChannelCode === channel.code ? "page" : undefined
                 }
               >
-                {category.name}
+                <span>{channel.name}</span>
               </Link>
             ))}
+            {(info?.channels.length ?? 0) > 4 && (
+              <Dropdown
+                trigger={["click"]}
+                menu={{
+                  items: (info?.channels ?? []).slice(4).map((channel) => ({
+                    key: channel.code,
+                    label: (
+                      <Link to={channelHref(channel.code)}>{channel.name}</Link>
+                    ),
+                  })),
+                  selectedKeys: activeChannelCode ? [activeChannelCode] : [],
+                }}
+              >
+                <Button
+                  type="text"
+                  className="site-nav-more"
+                  aria-label="更多栏目"
+                >
+                  <span>
+                    {(info?.channels ?? [])
+                      .slice(4)
+                      .find((channel) => channel.code === activeChannelCode)
+                      ?.name ?? "更多"}
+                  </span>
+                  <ChevronDown size={14} />
+                </Button>
+              </Dropdown>
+            )}
           </nav>
-          <PortalSearch keyword={params.get("q") ?? ""} onSearch={search} />
+          <PortalSearch
+            keyword={new URLSearchParams(location.search).get("q") ?? ""}
+            onSearch={search}
+          />
+          {appearance.allowed && (
+            <Button
+              type="text"
+              className="site-mode-toggle"
+              aria-label={appearance.dark ? "切换浅色模式" : "切换暗夜模式"}
+              title={appearance.dark ? "切换浅色模式" : "切换暗夜模式"}
+              icon={appearance.dark ? <Sun size={18} /> : <Moon size={18} />}
+              onClick={appearance.toggle}
+            />
+          )}
           {hasContact && (
             <Link
-              to={`${location.pathname}${location.search}#contact`}
+              to={location.pathname + location.search + "#contact"}
               className="site-contact-link"
             >
               <Headphones size={17} />
@@ -113,8 +155,11 @@ export function SiteFrame({
             <strong>{info?.name || "Mayday"}</strong>
             <span>
               {info?.copyright ||
-                `© ${new Date().getFullYear()} ${info?.name || "Mayday"}`}
-              {info?.icp && <> · {info.icp}</>}
+                "© " +
+                  new Date().getFullYear() +
+                  " " +
+                  (info?.name || "Mayday")}
+              {info?.icp && " · " + info.icp}
             </span>
           </div>
           {hasContact && <ContactDetails info={info} />}
@@ -300,13 +345,16 @@ export function PortalSearch({
 
 /** 列表与侧栏使用同一封面规则。优先显示后台配置的图片；缺省图片只表达内容类别，
  * 不虚构文章信息。各分类封面使用固定比例，图片失败时回退，避免破图造成卡片跳动。 */
-function ArticleCover({ article }: { article: Article }) {
+export function ArticleCover({ article }: { article: Article }) {
   const [failedCover, setFailedCover] = useState<string | null>(null);
-  const kind = categoryPurpose(article.category ?? "").kind;
+  const kind =
+    { GUIDE: "guide", NOTICE: "notice", UPDATE: "update", STORY: "topic" }[
+      article.channelTemplate
+    ] ?? categoryPurpose(article.category ?? "").kind;
   const cover =
     article.coverUrl && failedCover !== article.coverUrl
       ? article.coverUrl
-      : `/images/portal-${kind}-topic.webp`;
+      : `/images/${{ guide: "portal-redesign-hero.png", notice: "portal-notice.webp", update: "portal-update.webp", topic: "portal-redesign-team.png" }[kind]}`;
   return (
     <img
       src={cover}
@@ -360,7 +408,7 @@ export function ArticleTeaser({
         {article.summary && <p>{article.summary}</p>}
         <div className="site-card-footer">
           <Link
-            to={categoryHref(article.categoryId)}
+            to={channelHref(article.channelCode, article.categoryId)}
             className="site-card-category"
           >
             {article.category || "未分类"}

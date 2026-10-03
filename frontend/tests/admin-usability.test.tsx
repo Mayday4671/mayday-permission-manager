@@ -423,6 +423,8 @@ test("前台草稿只作用于独立预览，不改变后台主题或保存值�
   const user = userEvent.setup();
   mount(<ThemeHarness portalEditor />);
   await user.click(await screen.findByRole("button", { name: "配置前台主题" }));
+  assert.equal(screen.queryByRole("tab", { name: "布局外观" }), null);
+  assert.equal(screen.queryByRole("tab", { name: "图表与状态" }), null);
   await user.click(
     await screen.findByRole("button", { name: "主题预设：暖橙" }),
   );
@@ -468,10 +470,11 @@ test("前台草稿只作用于独立预览，不改变后台主题或保存值�
     },
   );
   await user.click(within(dialog).getByRole("button", { name: "导 入" }));
+  // 历史布局字段可以导入保存，但新门户固定阅读导航，不能继承后台的深色菜单布局。
   await waitFor(() =>
     assert.equal(
       (preview as HTMLElement).style.getPropertyValue("--app-nav-bg"),
-      "#172333",
+      "#ffffff",
     ),
   );
   assert.equal(

@@ -11,9 +11,6 @@ import { AppearancePreview, ThemeFormContent } from "../components/ThemeEditor";
 import {
   PORTAL_APPEARANCE,
   normalizeAppearance,
-  MENU_STYLE_LABELS,
-  BACKGROUND_LABELS,
-  CHART_PALETTE_LABELS,
   type Appearance,
 } from "../lib/theme-model";
 
@@ -29,7 +26,9 @@ interface SiteSettings {
   preview: Record<string, string>;
 }
 /** 字段定义来自后端白名单；编辑时冻结原版本，不能用后台刷新后的新版本覆盖他人的修改。 */
-export function SiteSettingsPage() {
+export function SiteSettingsPage({
+  themeOnly = false,
+}: { themeOnly?: boolean } = {}) {
   const { can } = useAuth();
   const { message } = App.useApp();
   const client = useQueryClient();
@@ -50,38 +49,40 @@ export function SiteSettingsPage() {
       error={query.error}
       retry={() => void query.refetch()}
     >
-      <section className="panel module-panel">
-        <div className="module-toolbar module-toolbar-actions">
-          <Space>
-            <RefreshButton
-              onClick={() => void query.refetch()}
-              loading={query.isFetching}
-            />
-            {can("settings:update") && (
-              <Button
-                type="primary"
-                onClick={() => {
-                  setOriginal(query.data?.entries ?? []);
-                  form.resetFields();
-                  form.setFieldsValue(query.data?.preview);
-                  setOpen(true);
-                }}
-              >
-                编辑配置
-              </Button>
-            )}
-          </Space>
-        </div>
-        <Descriptions
-          bordered
-          column={{ xs: 1, sm: 2 }}
-          items={fields.map((field) => ({
-            key: field.key,
-            label: field.label,
-            children: query.data?.preview[field.key] || "—",
-          }))}
-        />
-      </section>
+      {!themeOnly && (
+        <section className="panel module-panel">
+          <div className="module-toolbar module-toolbar-actions">
+            <Space>
+              <RefreshButton
+                onClick={() => void query.refetch()}
+                loading={query.isFetching}
+              />
+              {can("settings:update") && (
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    setOriginal(query.data?.entries ?? []);
+                    form.resetFields();
+                    form.setFieldsValue(query.data?.preview);
+                    setOpen(true);
+                  }}
+                >
+                  编辑配置
+                </Button>
+              )}
+            </Space>
+          </div>
+          <Descriptions
+            bordered
+            column={{ xs: 1, sm: 2 }}
+            items={fields.map((field) => ({
+              key: field.key,
+              label: field.label,
+              children: query.data?.preview[field.key] || "—",
+            }))}
+          />
+        </section>
+      )}
       {query.data?.fields.some((field) => field.key === "site.theme") && (
         <SiteAppearanceSettings data={query.data} />
       )}
@@ -190,7 +191,7 @@ function SiteAppearanceSettings({ data }: { data: SiteSettings }) {
               },
               {
                 key: "color",
-                label: "主题色",
+                label: "浅色主色",
                 children: (
                   <span className="theme-color-value">
                     <i style={{ background: saved.primaryColor }} />
@@ -199,39 +200,9 @@ function SiteAppearanceSettings({ data }: { data: SiteSettings }) {
                 ),
               },
               {
-                key: "radius",
-                label: "圆角",
-                children: `${saved.borderRadius} px`,
-              },
-              {
-                key: "compact",
-                label: "布局",
-                children: saved.compact ? "紧凑" : "标准",
-              },
-              {
-                key: "menu",
-                label: "导航风格",
-                children: MENU_STYLE_LABELS[saved.menuStyle],
-              },
-              {
-                key: "background",
-                label: "页面背景",
-                children: BACKGROUND_LABELS[saved.background],
-              },
-              {
-                key: "surface",
-                label: "容器样式",
-                children: saved.surfaceStyle === "border" ? "边框" : "阴影",
-              },
-              {
-                key: "width",
-                label: "内容宽度",
-                children: saved.contentWidth === "full" ? "铺满" : "居中",
-              },
-              {
-                key: "palette",
-                label: "图表色板",
-                children: CHART_PALETTE_LABELS[saved.chartPalette],
+                key: "layout",
+                label: "阅读布局",
+                children: "蓝白 / 海军蓝，随窗口调整，不跟随后台个人布局",
               },
             ]}
           />

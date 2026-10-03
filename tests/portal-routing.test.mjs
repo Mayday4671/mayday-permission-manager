@@ -5,6 +5,8 @@ import {
   positiveInteger,
   portalReturnPath,
   legacyCategoryHref,
+  channelHref,
+  isPortalPath,
 } from "../frontend/src/lib/portal-routing.ts";
 
 test("栏目导航使用独立路径，旧书签保留搜索和页码并丢弃无关参数", () => {
@@ -14,6 +16,22 @@ test("栏目导航使用独立路径，旧书签保留搜索和页码并丢弃�
     "/categories/28?q=%E6%9D%83%E9%99%90&page=2",
   );
   assert.equal(legacyCategoryHref("?tag=12"), null);
+});
+
+test("栏目路径与内部分类分离，频道书签和主题作用域只接受前台路径", () => {
+  assert.equal(channelHref("guides", 28), "/channels/guides?category=28");
+  assert.equal(channelHref("updates"), "/channels/updates");
+  const from = "/channels/guides?category=28&q=test&page=2";
+  assert.equal(portalReturnPath({ from }), from);
+  for (const path of ["/", "/channels/guides", "/articles/1", "/categories/28"])
+    assert.equal(isPortalPath(path), true);
+  for (const path of [
+    "/admin",
+    "/login",
+    "/admin/portal",
+    "/channels/guides/../../admin",
+  ])
+    assert.equal(isPortalPath(path), false);
 });
 test("错误栏目不回退成首页全部文章", () => {
   for (const invalid of [

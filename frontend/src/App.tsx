@@ -12,6 +12,7 @@ import { useAuth } from "./lib/auth";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { PortalPage, ArticlePage } from "./pages/PortalPage";
+import { PortalChannelPage } from "./pages/PortalChannelPage";
 import { adminPages, adminRouteTarget } from "./lib/workspace-model";
 import { useModules } from "./lib/modules";
 import { pageEnabled } from "./lib/module-model";
@@ -62,6 +63,11 @@ const UserStatisticsPage = lazy(() =>
 const SiteSettingsPage = lazy(() =>
   import("./pages/SiteSettingsPage").then((m) => ({
     default: m.SiteSettingsPage,
+  })),
+);
+const PortalStructurePage = lazy(() =>
+  import("./pages/PortalStructurePage").then((m) => ({
+    default: m.PortalStructurePage,
   })),
 );
 const SettingsPage = lazy(() =>
@@ -247,6 +253,12 @@ export default function Application() {
           <Route path="/categories/:categoryId" element={<PortalPage />} />
         )}
         {modules.portal && (
+          <Route
+            path="/channels/:channelCode"
+            element={<PortalChannelPage />}
+          />
+        )}
+        {modules.portal && (
           <Route path="/articles/:id" element={<ArticlePage />} />
         )}
         <Route path="/login" element={<LoginPage />} />
@@ -275,6 +287,7 @@ export default function Application() {
                 loginlogs: LoginLogsPage,
                 userstats: UserStatisticsPage,
                 site: SiteSettingsPage,
+                portalStructure: PortalStructurePage,
                 settings: SettingsPage,
                 notifications: NotificationsPage,
                 messages: MessagesPage,

@@ -36,7 +36,8 @@ public final class ContentContracts {
       @Size(max = 500) String seoDescription,
       Boolean requiresApproval,
       Boolean published,
-      Long version) {}
+      Long version,
+      Long portalChannelId) {}
 
   /** 发布指定修订及生效/下线时间；主记录 version 防止发布过期草稿或覆盖并发发布操作。 */
   public record Publish(

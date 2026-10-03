@@ -1,0 +1,109 @@
+{
+  "date": "2026-10-03",
+  "scope": "批准原型的门户重构、栏目分类分离及真实后台控制",
+  "overallAcceptance": "pending-admin-browser-captcha-consent",
+  "sourceBaseline": "20261003061856556-02e369",
+  "database": {
+    "status": "passed",
+    "migration": "V21",
+    "paths": [
+      "backup-restore-upgrade",
+      "flyway-empty-install",
+      "single-sql-empty-install"
+    ],
+    "businessTables": 51,
+    "columns": 506,
+    "indexes": 128,
+    "foreignKeys": 48,
+    "constraintSha256": "16954525af3bf95fe912a174e904fb5565ec3899c1a5706bf310073492f5d25f",
+    "historicalMigrationsChanged": false,
+    "businessAndRoleSnapshotsPreserved": true,
+    "allBusinessTableAndColumnCommentsChecked": true,
+    "soleExternalInstaller": "database/mayday.sql"
+  },
+  "finalHttpTests": {
+    "upgrade": { "tests": 147, "passed": 147, "failed": 0, "skipped": 0 },
+    "fresh": { "tests": 147, "passed": 147, "failed": 0, "skipped": 0 },
+    "localEvidence": [
+      ".local/portal-api-final-upgrade.log",
+      ".local/portal-api-final-fresh.log"
+    ]
+  },
+  "engineering": {
+    "status": "passed",
+    "javaSourceFiles": 223,
+    "frontendSourceFiles": 121,
+    "sourceConventionIssues": 0,
+    "contractPaths": 145,
+    "models": { "tests": 35, "passed": 35, "failed": 0, "skipped": 0 },
+    "frontend": { "tests": 156, "passed": 154, "failed": 0, "skipped": 2 },
+    "java": { "tests": 102, "passed": 87, "failed": 0, "skipped": 15 },
+    "conditionalSkips": [
+      "OA real-Java component prerequisites",
+      "UDP platform buffers",
+      "external crawler network",
+      "real S3 environment"
+    ],
+    "productionBuilds": "passed",
+    "localEvidence": [
+      ".local/portal-engineering-final.log",
+      ".local/portal-backend-final-build.log"
+    ]
+  },
+  "publicBrowser": {
+    "status": "passed",
+    "browser": "user-approved independent Edge via Playwright",
+    "deviceScaleFactor": 1,
+    "viewports": ["1440x1000", "1366x768", "1280x720", "2560x1389", "390x844"],
+    "homeWithThreeFeaturedArticles": {
+      "1440x1000": { "scrollWidth": 1440, "scrollHeight": 1000 },
+      "1280x720": { "scrollWidth": 1280, "scrollHeight": 720 },
+      "390x844": { "scrollWidth": 390, "scrollHeight": 2193 }
+    },
+    "pageErrors": 0,
+    "brokenImages": 0,
+    "publicAdminLinks": 0,
+    "interactionCoverage": [
+      "channel navigation",
+      "within-channel category",
+      "search",
+      "second page",
+      "filter resets page",
+      "invalid category empty state",
+      "article outline",
+      "back restores query",
+      "legacy bookmark",
+      "theme toggle",
+      "theme reload preference"
+    ],
+    "fixtureNotes": "30 extra articles and 4 categories exist only in isolation; long-menu response and standalone preview are labeled component checks"
+  },
+  "adminBrowser": {
+    "status": "pending-action-time-captcha-consent",
+    "remaining": [
+      "channel modal and ordering",
+      "content dependent category and publish",
+      "home ordered selections",
+      "visitor theme policy",
+      "theme drawer save"
+    ],
+    "authBypassUsed": false
+  },
+  "dailyUpgrade": {
+    "run": "20261003073051071",
+    "status": "passed",
+    "backupBytes": 43581516,
+    "backupSha256": "c705a7a02502049af3b91f9b9dbd36245bded7323d38f1ce894c4969aff2b114",
+    "oldImagesRetained": true,
+    "businessAndRoleSnapshotsPreserved": true,
+    "publicLightAndDarkBrowser": "passed",
+    "localEvidence": ".local/upgrades/20261003073051071/result.json",
+    "finalFrontendPolish": {
+      "status": "passed",
+      "onlyFrontendRecreated": true,
+      "productionImageSha256": "5510a344513f6b9de8e7c6e00d4f36d8e15dd4d5df10b8ca8d8b9c1f238c3ef7",
+      "dailyKeyboardFocus": "30-daily-keyboard-focus.png",
+      "localBuildEvidence": ".local/portal-frontend-focus-build.log"
+    }
+  }
+}

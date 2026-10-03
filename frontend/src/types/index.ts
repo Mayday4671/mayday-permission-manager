@@ -64,6 +64,10 @@ export interface Notice extends BaseRecord {
   departmentId: number | null;
 }
 export interface Article {
+  portalChannelId: number;
+  channelCode: string;
+  channelName: string;
+  channelTemplate: "GUIDE" | "NOTICE" | "UPDATE" | "STORY";
   id: number;
   title: string;
   category: string;

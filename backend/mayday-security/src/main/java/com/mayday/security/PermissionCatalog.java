@@ -56,6 +56,7 @@ public final class PermissionCatalog {
           new Group("posts", "岗位管理", actions(), false),
           new Group("categories", "内容分类", actions(), false),
           new Group("tags", "内容标签", actions(), false),
+          new Group("portal", "门户栏目", actions(), false),
           new Group("messages", "消息中心", Map.of("view", "查看自己的消息"), false),
           new Group(
               "notifications",

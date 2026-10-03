@@ -79,6 +79,7 @@ public class ModuleSwitches {
     String module =
         switch (resource) {
           case "notices", "categories", "tags" -> "content";
+          case "portal" -> "portal";
           case "notifications", "messages" -> "notifications";
           case "workflows", "requests", "approvalcategories" -> "approvals";
           case "crawler" -> "crawler";
@@ -100,6 +101,7 @@ public class ModuleSwitches {
     Map<String, String> patterns =
         Map.ofEntries(
             Map.entry("/api/public/**", "portal"),
+            Map.entry("/api/portal-management/**", "portal"),
             Map.entry("/api/system/site-config/**", "portal"),
             Map.entry("/api/content/**", "content"),
             Map.entry("/api/system/entries/categories/**", "content"),

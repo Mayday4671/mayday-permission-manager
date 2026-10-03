@@ -4,7 +4,7 @@ export interface Appearance {
   primaryColor: string;
   borderRadius: number;
   compact: boolean;
-  /** 导航外观独立于页面明暗；前台使用同一选项配置顶部导航。 */
+  /** 后台导航外观独立于页面明暗；门户保留此字段兼容旧配置，实际使用固定阅读导航。 */
   menuStyle: "light" | "dark" | "tinted";
   background: "neutral" | "slate" | "blue" | "warm";
   surfaceStyle: "border" | "shadow";

@@ -11,6 +11,8 @@ public interface ContentRevisionRepository
 
   boolean existsByCategoryId(Long categoryId);
 
+  boolean existsByPortalChannelId(Long portalChannelId);
+
   boolean existsByTagIdsContains(Long tagId);
 
   boolean existsByCoverId(Long coverId);

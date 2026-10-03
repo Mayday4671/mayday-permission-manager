@@ -3,6 +3,10 @@
  * 不修改部署存储配置，不操作日常目录；所有账户、目录、文件和业务引用均登记精确 ID 后清理。
  */
 import test from "node:test";
+import {
+  bindTestPortalCategory,
+  deleteTestPortalChannel,
+} from "./support/portal.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { deflateSync } from "node:zlib";
@@ -115,6 +119,7 @@ test(
       directories: [],
       notices: [],
       categories: [],
+      portalChannels: [],
     };
     const permissions = [
       "files:view",
@@ -486,6 +491,9 @@ test(
             },
           );
           made.categories.push(category.id);
+          made.portalChannels.push(
+            await bindTestPortalCategory(base, admin, category),
+          );
           const draft = {
             title: prefix + "_draft",
             categoryId: category.id,
@@ -588,6 +596,8 @@ test(
         );
       for (const id of made.users.reverse())
         await cleanup(() => call(`/system/users/${id}`, admin, "DELETE"));
+      for (const channel of made.portalChannels.reverse())
+        await cleanup(() => deleteTestPortalChannel(base, admin, channel));
       for (const id of made.roles.reverse())
         await cleanup(() => call(`/system/roles/${id}`, admin, "DELETE"));
       await cleanup(() => call("/auth/logout", admin, "POST"));

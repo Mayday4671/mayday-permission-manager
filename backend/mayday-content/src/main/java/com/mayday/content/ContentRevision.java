@@ -36,6 +36,14 @@ public class ContentRevision extends BaseEntity {
   @JoinColumn(name = "category_id", insertable = false, updatable = false)
   private SystemEntry categoryEntry;
 
+  /** 栏目归属随修订冻结，不由分类名称或前端路由推断；旧修订由升级迁移补齐。 */
+  @Column(name = "portal_channel_id")
+  private Long portalChannelId;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "portal_channel_id", insertable = false, updatable = false)
+  private PortalChannel portalChannel;
+
   @Column(length = 500)
   private String summary;
 

@@ -1,6 +1,14 @@
 /** 页签只接受已实现的后台路由；不从浏览器存储恢复任意地址或权限信息。 */
 export const adminPages = [
   {
+    path: "/admin/portal",
+    title: "门户栏目",
+    permission: "portal:view",
+    screen: "portalStructure",
+    group: "内容管理",
+    icon: "notices",
+  },
+  {
     path: "/admin/feedback",
     title: "客户反馈",
     permission: "feedback:view",

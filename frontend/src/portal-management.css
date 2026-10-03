@@ -1,0 +1,35 @@
+/* 门户编排复用后台主题与弹窗尺寸；分类和精选顺序操作保持紧凑，不另建展示主题。 */
+.portal-category-order {
+  margin: 0 0 18px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+}
+.portal-category-order > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 12px;
+}
+.portal-category-order > div + div {
+  border-top: 1px solid var(--app-border);
+}
+.portal-feature-order {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.portal-feature-order .ant-form-item {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+.portal-order-label {
+  display: block;
+  margin: 0 0 12px;
+}
+.portal-theme-policy {
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid var(--app-border);
+}

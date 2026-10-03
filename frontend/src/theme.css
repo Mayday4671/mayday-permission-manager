@@ -547,6 +547,80 @@
 .appearance-preview {
   margin-top: 12px;
 }
+/* 门户主题预览使用实际配图与相同阅读色；不显示门户没有使用的表格或图表配置。 */
+.portal-appearance-preview {
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-layout);
+  color: var(--app-text);
+}
+.portal-preview-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+.portal-preview-navigation b {
+  font-size: 16px;
+}
+.portal-preview-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-surface);
+}
+.portal-preview-hero > div {
+  padding: 12px;
+}
+.portal-preview-hero h3 {
+  font-size: 15px;
+  color: var(--app-primary-text);
+  margin: 0 0 8px;
+}
+.portal-preview-hero p,
+.portal-preview-articles p {
+  font-size: 11px;
+  color: var(--app-text-secondary);
+  margin: 6px 0 10px;
+}
+.portal-preview-hero > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.portal-preview-articles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.portal-preview-articles > div {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-surface);
+}
+.portal-preview-articles img {
+  display: block;
+  width: 100%;
+  height: 62px;
+  object-fit: cover;
+}
+.portal-preview-articles b,
+.portal-preview-articles p {
+  display: block;
+  padding-inline: 8px;
+  font-size: 11px;
+}
+.portal-preview-articles b {
+  margin-top: 8px;
+}
 .appearance-preview-head,
 .appearance-preview-nav {
   background: var(--app-nav-bg);

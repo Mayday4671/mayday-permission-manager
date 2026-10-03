@@ -1,5 +1,6 @@
 /** 页面模块归属只控制展示；实际开关值由服务端计算，权限与数据范围始终在后端执行。 */
 const pageModules: Record<string, string> = {
+  "/admin/portal": "portal",
   "/admin/site-settings": "portal",
   "/admin/notices": "content",
   "/admin/categories": "content",

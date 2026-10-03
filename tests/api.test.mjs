@@ -8,6 +8,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loginWithCaptcha } from "./support/captcha.mjs";
 import { purgeTestFiles } from "./support/files-cleanup.mjs";
+import {
+  bindTestPortalCategory,
+  deleteTestPortalChannel,
+} from "./support/portal.mjs";
 
 const base = process.env.API_BASE ?? "http://127.0.0.1:18080/api";
 const prefix = `qa_${Date.now().toString(36)}`;
@@ -57,6 +61,7 @@ test("真实 MySQL 权限与业务回归", async (t) => {
     notifications: [],
     files: [],
     categories: [],
+    portalChannels: [],
     tags: [],
   };
   const entry = (name) => ({
@@ -1186,13 +1191,16 @@ test("真实 MySQL 权限与业务回归", async (t) => {
       const site = await request("/public/site");
       assert.deepEqual(Object.keys(site).sort(), [
         "address",
+        "allowThemeToggle",
         "categories",
+        "channels",
         "contact",
         "copyright",
         "description",
         "icp",
         "keywords",
         "name",
+        "nightPrimaryColor",
         "phone",
         "seoTitle",
         "theme",
@@ -1234,6 +1242,9 @@ test("真实 MySQL 权限与业务回归", async (t) => {
           entry("cms_category"),
         );
         created.categories.push(category.id);
+        created.portalChannels.push(
+          await bindTestPortalCategory(base, admin, category),
+        );
         const tag = await post("/system/entries/tags", admin, entry("cms_tag"));
         created.tags.push(tag.id);
         const uploadFile = async (name, bytes) => {
@@ -2057,6 +2068,8 @@ test("真实 MySQL 权限与业务回归", async (t) => {
           method: "DELETE",
         }),
       );
+    for (const channel of created.portalChannels.reverse())
+      await cleanup(() => deleteTestPortalChannel(base, admin, channel));
     for (const id of created.posts.reverse())
       await cleanup(() =>
         request(`/system/entries/posts/${id}`, {

@@ -191,6 +191,9 @@ function verificationSnapshot(service) {
     cms_revision_tag: "revision_id,tag_id",
     cms_revision_file: "revision_id,file_id",
     cms_publication: "id",
+    cms_portal_channel: "id",
+    cms_portal_category: "category_id",
+    cms_portal_home: "id",
     ops_notification: "id",
     ops_notification_target: "notification_id,target_id",
     ops_notification_file: "notification_id,file_id",
@@ -254,6 +257,7 @@ function apiSuite(label, port) {
       "tests/file-center.test.mjs",
       "tests/bulk-data.test.mjs",
       "tests/general-platform.test.mjs",
+      "tests/portal.test.mjs",
     ],
     {
       env: {

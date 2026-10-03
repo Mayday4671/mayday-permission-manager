@@ -16,6 +16,21 @@ export interface SiteConfig {
   copyright: string;
   icp: string;
   categories: string[];
+  channels: PortalChannel[];
+  allowThemeToggle: boolean;
+  nightPrimaryColor: string;
+}
+/** 导航是独立栏目；分类只能在所属栏目的页面内筛选，不生成新的菜单。 */
+export interface PortalChannel {
+  id: number;
+  version: number | null;
+  code: string;
+  name: string;
+  template: "GUIDE" | "NOTICE" | "UPDATE" | "STORY";
+  description: string;
+  sortOrder: number;
+  enabled: boolean;
+  categories: Array<{ id: number; name: string; enabled: boolean }>;
 }
 export interface PublicCategory {
   id: number;
@@ -60,6 +75,7 @@ export {
   positiveInteger,
   portalReturnPath,
   legacyCategoryHref,
+  channelHref,
 } from "./portal-routing";
 
 /** 路由挂载时设置可读标题和 SEO 元数据，离开时还原原标签，避免跨页面残留。 */

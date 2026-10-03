@@ -19,6 +19,7 @@ public final class NavigationCatalog {
           page("departments", "组织部门", "/admin/departments"),
           page("posts", "岗位管理", "/admin/posts"),
           page("notices", "内容中心", "/admin/notices"),
+          page("portal", "门户栏目", "/admin/portal"),
           page("menus", "菜单管理", "/admin/menus"),
           page("dictionaries", "数据字典", "/admin/dictionaries"),
           page("settings", "系统参数", "/admin/settings"),

@@ -43,6 +43,7 @@ public class ContentService {
   private final ContentAssets assets;
   private final SettingService settings;
   private final ChangeAuditService changeAudit;
+  private final PortalStructureService portal;
   private final com.mayday.operations.repository.FlowRequestRepository approvalRequests;
 
   /** 先验证内容查看权限与作者/部门范围，再选择普通读取或主记录行锁；所有管理用例复用此边界，行锁要求调用者处于事务。 */
@@ -86,6 +87,7 @@ public class ContentService {
     v.put("revisionNumber", r.getRevisionNumber());
     v.put("title", r.getTitle());
     v.put("categoryId", r.getCategoryId());
+    v.put("portalChannelId", r.getPortalChannelId());
     v.put(
         "category", entries.findById(r.getCategoryId()).map(SystemEntry::getName).orElse("已删除分类"));
     var tags = entries.findAllById(r.getTagIds());
@@ -130,9 +132,16 @@ public class ContentService {
     v.put("requiresApproval", n.isRequiresApproval());
     v.put("effectiveApprovalRequired", approvalRequired(n));
     v.put("liveRevisionId", n.getLiveRevisionId());
+    // 首页选择器使用线上标题和栏目；未发布的新草稿不能改变可选公告或已编排内容的名称。
+    var live = n.getLiveRevisionId() == null ? null : revision(n.getLiveRevisionId(), n.getId());
+    v.put("liveTitle", live == null ? null : live.getTitle());
+    v.put("livePortalChannelId", live == null ? null : live.getPortalChannelId());
     v.put(
         "publiclyVisible",
-        online(n) && "PUBLIC".equals(revision(n.getLiveRevisionId(), n.getId()).getVisibility()));
+        online(n)
+            && notices.exists(
+                publiclyVisible()
+                    .and((root, query, criteria) -> criteria.equal(root.get("id"), n.getId()))));
     v.put("publishedAt", n.getPublishedAt());
     v.put("liveOfflineAt", n.getLiveOfflineAt());
     v.put("deletedAt", n.getDeletedAt());
@@ -182,6 +191,8 @@ public class ContentService {
             c.isTrue(r.get("published")),
             c.isNotNull(r.get("liveRevisionId")),
             c.equal(r.get("liveRevision").get("visibility"), "PUBLIC"),
+            c.isTrue(r.get("liveRevision").get("categoryEntry").get("enabled")),
+            c.isTrue(r.get("liveRevision").get("portalChannel").get("enabled")),
             c.or(
                 c.isNull(r.get("liveOfflineAt")),
                 c.greaterThan(r.get("liveOfflineAt"), LocalDateTime.now())));
@@ -235,6 +246,7 @@ public class ContentService {
     r.setRevisionNumber(number);
     r.setTitle(n.getTitle());
     r.setCategoryId(category.getId());
+    r.setPortalChannelId(portal.contentChannel(category.getId(), req.portalChannelId()));
     r.setSummary(req.summary());
     r.setContent(html);
     r.setVisibility(req.visibility() == null ? "PUBLIC" : req.visibility());
@@ -278,6 +290,7 @@ public class ContentService {
     var r = revision(req.revisionId(), id);
     checkApproval(n, r);
     option("categories", r.getCategoryId());
+    portal.contentChannel(r.getCategoryId(), r.getPortalChannelId());
     for (Long tag : r.getTagIds()) option("tags", tag);
     LocalDateTime now = LocalDateTime.now(),
         start = req.publishAt() == null ? now : req.publishAt();
@@ -326,6 +339,8 @@ public class ContentService {
 
   private void goLive(
       Notice n, ContentRevision r, LocalDateTime offlineAt, String operator, String reason) {
+    option("categories", r.getCategoryId());
+    portal.contentChannel(r.getCategoryId(), r.getPortalChannelId());
     takeOffline(n, "被新发布替换");
     n.setLiveRevisionId(r.getId());
     n.setLiveRevision(r);

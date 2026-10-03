@@ -43,6 +43,7 @@ public class BootstrapData implements CommandLineRunner {
   private final ContentRevisionRepository revisions;
   private final ContentPublicationRepository publications;
   private final PasswordEncoder encoder;
+  private final PortalStructureService portal;
 
   @Value("${mayday.admin-password}")
   private String password;
@@ -58,6 +59,7 @@ public class BootstrapData implements CommandLineRunner {
     SysRole admin = role("admin", "超级管理员", "完整管理权限，内置角色受保护", PermissionCatalog.ALL, "ALL");
     if (!seedDemoData) {
       initializeClean(admin);
+      portal.initializeCategories();
       return;
     }
     SysRole editor =
@@ -156,6 +158,7 @@ public class BootstrapData implements CommandLineRunner {
     entry("settings", "平台名称", "site.name", null, "应用展示名称；业务扩展可通过参数服务读取", 1).setValue("Mayday");
     entry("settings", "联系邮箱", "site.contact", null, "公开联络方式，请勿在参数表保存密钥", 2)
         .setValue("hello@mayday.example");
+    portal.initializeCategories();
     article(
         owner,
         "你好，Mayday。让每一份协作都有回响。",
@@ -320,6 +323,7 @@ public class BootstrapData implements CommandLineRunner {
             .orElseThrow()
             .getId());
     r.setEditorId(owner.getId());
+    r.setPortalChannelId(portal.contentChannel(r.getCategoryId(), null));
     r.setEditorName(owner.getNickname());
     revisions.saveAndFlush(r);
     n.setDraftRevisionId(r.getId());

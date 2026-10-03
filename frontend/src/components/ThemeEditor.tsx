@@ -21,7 +21,8 @@ import {
 } from "antd";
 import { Check, Copy, Download, Palette, RotateCcw } from "lucide-react";
 import { FormDrawer } from "./FormDrawer";
-import { ThemeScope } from "../lib/theme";
+import { ThemeScope, useSystemDark } from "../lib/theme";
+import { useSite } from "../lib/portal";
 import { useAdminAppearance } from "../lib/appearance-context";
 import {
   ADMIN_APPEARANCE,
@@ -177,7 +178,9 @@ export function AppearanceControls({
     THEME_PRESETS.find((preset) =>
       Object.entries(preset).every(
         ([key, item]) =>
-          key === "name" || value[key as keyof Appearance] === item,
+          key === "name" ||
+          (portal && key !== "primaryColor") ||
+          value[key as keyof Appearance] === item,
       ),
     )?.name ?? "";
   return (
@@ -235,13 +238,15 @@ export function AppearanceControls({
                     );
                     if (preset) {
                       const { name: _name, ...patch } = preset;
-                      change(patch);
+                      change(
+                        portal ? { primaryColor: patch.primaryColor } : patch,
+                      );
                     }
                   }}
                 />
               </div>
               <div className="appearance-field">
-                <label>主题色</label>
+                <label>{portal ? "浅色主色" : "主题色"}</label>
                 <div
                   className="appearance-colors"
                   role="group"
@@ -421,7 +426,9 @@ export function AppearanceControls({
         ...(previewPanel
           ? [{ key: "preview", label: "效果预览", children: previewPanel }]
           : []),
-      ]}
+      ].filter(
+        (item) => !portal || item.key === "style" || item.key === "preview",
+      )}
     />
   );
 }
@@ -434,6 +441,58 @@ export function AppearancePreview({
   appearance: Appearance;
   portal?: boolean;
 }) {
+  const site = useSite(portal);
+  const systemDark = useSystemDark();
+  const dark =
+    appearance.mode === "dark" || (appearance.mode === "system" && systemDark);
+  if (portal)
+    return (
+      <ThemeScope
+        appearance={{
+          ...appearance,
+          menuStyle: "light",
+          primaryColor: dark
+            ? (site.data?.nightPrimaryColor ?? "#53d5be")
+            : appearance.primaryColor,
+        }}
+        portal
+      >
+        <div className="portal-appearance-preview" aria-label="主题效果预览">
+          <div className="portal-preview-navigation">
+            <b>Mayday</b>
+            <span>首页</span>
+            <span>使用指南</span>
+            <span>公告</span>
+          </div>
+          <div className="portal-preview-hero">
+            <div>
+              <h3>开始使用 Mayday</h3>
+              <p>查找操作指南和服务资料</p>
+              <Button type="primary" size="small">
+                查看指南
+              </Button>
+            </div>
+            <img
+              src="/images/portal-redesign-hero.png"
+              alt="明亮办公桌上的笔记本电脑"
+            />
+          </div>
+          <div className="portal-preview-articles">
+            {[
+              ["使用指南", "/images/portal-guide.webp"],
+              ["产品动态", "/images/portal-update.webp"],
+              ["团队故事", "/images/portal-redesign-team.png"],
+            ].map(([name, src]) => (
+              <div key={name}>
+                <img src={src} alt="" />
+                <b>{name}</b>
+                <p>阅读最新内容与服务信息</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </ThemeScope>
+    );
   return (
     <ThemeScope appearance={appearance} portal={portal}>
       <div
@@ -583,7 +642,7 @@ export function ThemeFormContent({
     <>
       <p className="appearance-description">
         {portal
-          ? "预览前台效果，保存后统一应用到网站。"
+          ? "配置默认明暗和浅色主色；暗夜强调色与访客切换在门户栏目中设置。"
           : "调整即时预览，保存后保留；取消恢复原主题。"}
       </p>
       <div
