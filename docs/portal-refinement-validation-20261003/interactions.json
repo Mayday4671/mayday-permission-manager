@@ -1,0 +1,32 @@
+[
+  {
+    "name": "more-opens-all-content",
+    "passed": true
+  },
+  {
+    "name": "category-stays-in-channel",
+    "passed": true
+  },
+  {
+    "name": "search-keeps-channel-category",
+    "passed": true
+  },
+  {
+    "name": "article-opens",
+    "passed": true
+  },
+  {
+    "name": "no-public-admin-entry",
+    "passed": true
+  },
+  {
+    "name": "keyboard-card-focus",
+    "passed": true,
+    "outline": "rgb(36, 93, 168)"
+  },
+  {
+    "name": "no-script-errors",
+    "passed": true,
+    "errors": []
+  }
+]

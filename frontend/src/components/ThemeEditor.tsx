@@ -473,15 +473,15 @@ export function AppearancePreview({
               </Button>
             </div>
             <img
-              src="/images/portal-redesign-hero.png"
-              alt="明亮办公桌上的笔记本电脑"
+              src={`/images/portal-hero-panorama${dark ? "-dark" : ""}.png`}
+              alt="门户办公场景摄影预览"
             />
           </div>
           <div className="portal-preview-articles">
             {[
-              ["使用指南", "/images/portal-guide.webp"],
+              ["使用指南", "/images/portal-hero-refined.png"],
               ["产品动态", "/images/portal-update.webp"],
-              ["团队故事", "/images/portal-redesign-team.png"],
+              ["团队故事", "/images/portal-team-board.png"],
             ].map(([name, src]) => (
               <div key={name}>
                 <img src={src} alt="" />

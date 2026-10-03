@@ -1,0 +1,34 @@
+[
+  {
+    "name": "theme-reload",
+    "passed": true
+  },
+  {
+    "url": "/channels/guides",
+    "h1": "从这里，开始高效使用",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "brokenImages": 0
+  },
+  {
+    "url": "/channels/notices",
+    "h1": "重要信息，及时了解",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "brokenImages": 0
+  },
+  {
+    "url": "/channels/updates",
+    "h1": "持续改进，让协作更便捷",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "brokenImages": 0
+  },
+  {
+    "url": "/channels/stories",
+    "h1": "真实的人，真实的故事",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "brokenImages": 0
+  }
+]

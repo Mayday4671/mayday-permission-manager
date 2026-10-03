@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Empty } from "antd";
+import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 import { SiteFrame, PortalState } from "../components/Portal";
 import {
   PortalHero,
@@ -50,11 +52,18 @@ export function PortalHomePage() {
           >
             <div className="portal-section-heading">
               <h2 id="portal-featured-title">精选内容</h2>
+              <Link to="/?q=">
+                查看更多 <ArrowRight size={15} />
+              </Link>
             </div>
             {home.data?.featured.length ? (
               <div className="portal-card-grid">
                 {home.data.featured.map((article) => (
-                  <PortalArticleCard key={article.id} article={article} />
+                  <PortalArticleCard
+                    key={article.id}
+                    article={article}
+                    showCategory={false}
+                  />
                 ))}
               </div>
             ) : (

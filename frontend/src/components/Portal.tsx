@@ -343,9 +343,16 @@ export function PortalSearch({
   );
 }
 
-/** 列表与侧栏使用同一封面规则。优先显示后台配置的图片；缺省图片只表达内容类别，
- * 不虚构文章信息。各分类封面使用固定比例，图片失败时回退，避免破图造成卡片跳动。 */
-export function ArticleCover({ article }: { article: Article }) {
+/** 列表与侧栏共用封面规则，首页精选可以选择更适合横向裁切的缺省摄影。
+ * 后台配置的封面始终优先，只有缺省/失败时才使用模板照片；不改变文章内容或分类。
+ * 图片占位比例固定，加载失败回退，避免卡片跳动。 */
+export function ArticleCover({
+  article,
+  featured = false,
+}: {
+  article: Article;
+  featured?: boolean;
+}) {
   const [failedCover, setFailedCover] = useState<string | null>(null);
   const kind =
     { GUIDE: "guide", NOTICE: "notice", UPDATE: "update", STORY: "topic" }[
@@ -354,7 +361,7 @@ export function ArticleCover({ article }: { article: Article }) {
   const cover =
     article.coverUrl && failedCover !== article.coverUrl
       ? article.coverUrl
-      : `/images/${{ guide: "portal-redesign-hero.png", notice: "portal-notice.webp", update: "portal-update.webp", topic: "portal-redesign-team.png" }[kind]}`;
+      : `/images/${{ guide: featured ? "portal-hero-refined.png" : "portal-redesign-hero.png", notice: "portal-notice.webp", update: "portal-update.webp", topic: featured ? "portal-team-board.png" : "portal-redesign-team.png" }[kind]}`;
   return (
     <img
       src={cover}

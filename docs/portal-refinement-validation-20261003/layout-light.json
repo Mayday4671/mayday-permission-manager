@@ -1,0 +1,30 @@
+[
+  {
+    "width": 1440,
+    "height": 1000,
+    "scrollWidth": 1440,
+    "scrollHeight": 1000,
+    "brokenImages": 0
+  },
+  {
+    "width": 2560,
+    "height": 1389,
+    "scrollWidth": 2560,
+    "scrollHeight": 1389,
+    "brokenImages": 0
+  },
+  {
+    "width": 1280,
+    "height": 720,
+    "scrollWidth": 1280,
+    "scrollHeight": 720,
+    "brokenImages": 0
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "scrollWidth": 1366,
+    "scrollHeight": 768,
+    "brokenImages": 0
+  }
+]

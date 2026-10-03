@@ -178,7 +178,10 @@ after(() => {
 
 test("分类只改变当前栏目查询，搜索保留栏目及分类并重置分页", async () => {
   const router = mount("/channels/guides?category=11&page=2");
-  await screen.findByRole("heading", { name: "使用指南", level: 1 });
+  await screen.findByRole("heading", {
+    name: "从这里，开始高效使用",
+    level: 1,
+  });
   fireEvent.click(
     screen.getByRole("button", { name: "业务帮助", exact: true }),
   );
@@ -252,7 +255,10 @@ test("后台关闭访客切换后，已存偏好不能覆盖网站统一浅色�
   allowThemeToggle = false;
   localStorage.setItem("mayday.portal.mode.v1", "dark");
   mount("/channels/guides");
-  await screen.findByRole("heading", { name: "使用指南", level: 1 });
+  await screen.findByRole("heading", {
+    name: "从这里，开始高效使用",
+    level: 1,
+  });
   assert.equal(
     document.querySelector(".theme-scope").getAttribute("data-theme"),
     "light",
