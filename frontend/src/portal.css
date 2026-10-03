@@ -118,6 +118,7 @@
 }
 .site-search .ant-input-affix-wrapper {
   border-radius: 5px 0 0 5px;
+  min-width: 0;
 }
 .site-search .ant-btn {
   border-radius: 0 5px 5px 0;
@@ -859,6 +860,9 @@
 .site-empty a {
   color: var(--app-primary-text);
 }
+.site-empty > .ant-btn {
+  margin-top: 16px;
+}
 /* 阅读页直接显示文章，不重复插入“首页/正文/返回浏览结果”。目录与关联内容保持独立。 */
 .site-article-container {
   padding-top: 28px;
@@ -1140,14 +1144,28 @@
     column-gap: 8px;
   }
   .site-search {
-    width: 145px;
+    flex: 1;
+    min-width: 0;
+    max-width: 200px;
+    width: auto;
   }
   .site-search .ant-input,
   .site-search .ant-btn {
     font-size: 12px;
   }
   .site-contact-link {
-    display: none;
+    /* 小屏保留可发现的支持入口，用主题图标节省空间，名称仍提供给辅助技术。 */
+    display: inline-flex;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 32px;
+    min-height: 36px;
+    padding: 0;
+    border: 0;
+  }
+  .site-mode-toggle {
+    width: 32px;
+    padding-inline: 0;
   }
   .site-header nav {
     gap: 20px;

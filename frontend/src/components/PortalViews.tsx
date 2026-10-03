@@ -50,10 +50,13 @@ export function PortalArticleLink({
   article,
   children,
   className,
+  ariaLabel,
 }: {
   article: Article;
   children?: React.ReactNode;
   className?: string;
+  /** 纯封面链接需要明确阅读目标；普通标题和按钮仍使用可见文字作为名称。 */
+  ariaLabel?: string;
 }) {
   const location = useLocation();
   return (
@@ -61,6 +64,7 @@ export function PortalArticleLink({
       to={`/articles/${article.id}`}
       state={{ from: location.pathname + location.search }}
       className={className}
+      aria-label={ariaLabel}
     >
       {children ?? article.title}
     </Link>
@@ -195,7 +199,11 @@ export function PortalArticleCard({
 }) {
   return (
     <article className="portal-content-card">
-      <PortalArticleLink article={article} className="portal-card-image">
+      <PortalArticleLink
+        article={article}
+        className="portal-card-image"
+        ariaLabel={`阅读：${article.title}`}
+      >
         <ArticleCover article={article} featured={!showCategory} />
       </PortalArticleLink>
       <div className="portal-card-copy">

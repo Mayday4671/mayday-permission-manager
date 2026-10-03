@@ -164,9 +164,12 @@ export function ArticlePage() {
                   {item.summary && (
                     <p className="site-article-summary">{item.summary}</p>
                   )}
-                  <div className="site-article-cover">
-                    <ArticleCover article={item} />
-                  </div>
+                  {/* 正文只展示运营配置的实际封面，列表缺省摄影不插入文章冒充内容。 */}
+                  {item.coverUrl && (
+                    <div className="site-article-cover">
+                      <ArticleCover article={item} />
+                    </div>
+                  )}
                   <div
                     className="site-reading-body rich-text-content"
                     dangerouslySetInnerHTML={{ __html: document.html }}

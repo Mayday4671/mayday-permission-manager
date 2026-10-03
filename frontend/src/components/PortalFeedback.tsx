@@ -115,6 +115,18 @@ export function PortalFeedback() {
         >
           {receipt}
         </Typography.Paragraph>
+        <Button
+          type="primary"
+          onClick={() => {
+            // 只在本次页面会话中传递查询码，不写入网址、浏览器存储或公开日志。
+            trackForm.resetFields();
+            trackForm.setFieldValue("receipt", receipt);
+            setReceipt(null);
+            setTracking(true);
+          }}
+        >
+          查看处理进度
+        </Button>
       </DetailsModal>
       <FormModal
         title="查询反馈"
@@ -132,12 +144,18 @@ export function PortalFeedback() {
         <Form.Item
           name="receipt"
           label="查询码"
+          // 复制时附带空格、换行或大写十六进制不改变查询凭据；仍严格校验完整 48 位。
+          normalize={(value: string) => value.trim().toLowerCase()}
           rules={[
             { required: true },
             { pattern: /^[a-f0-9]{48}$/, message: "请输入完整查询码" },
           ]}
         >
-          <Input autoComplete="off" maxLength={48} />
+          <Input
+            autoComplete="off"
+            maxLength={120}
+            placeholder="粘贴提交反馈时获得的查询码"
+          />
         </Form.Item>
       </FormModal>
       <DetailsModal

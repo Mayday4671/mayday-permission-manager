@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Empty, Pagination } from "antd";
+import { Button, Empty, Pagination } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ChevronRight, Pin } from "lucide-react";
 import { PortalState, SiteFrame, ArticleCover } from "../components/Portal";
@@ -169,6 +169,7 @@ function StoryContent({ items }: { items: Article[] }) {
               <PortalArticleLink
                 article={article}
                 className="portal-story-image"
+                ariaLabel={`阅读：${article.title}`}
               >
                 <ArticleCover article={article} />
               </PortalArticleLink>
@@ -270,6 +271,15 @@ export function PortalChannelPage({
     STORY: StoryContent,
   };
   const Template = channel ? templates[channel.template] : null;
+  // 栏目已由主视觉提供一级标题；全站检索才使用独立一级标题，避免重复阅读入口。
+  const SearchHeading = searchOnly ? "h1" : "h2";
+  const searchTitle = keyword ? "搜索结果" : tagId ? "标签内容" : "全部内容";
+  const clearKeyword = () => {
+    const next = new URLSearchParams(params);
+    next.delete("q");
+    next.delete("page");
+    setParams(next);
+  };
   return (
     <SiteFrame activeChannelCode={channel?.code}>
       <main
@@ -316,10 +326,14 @@ export function PortalChannelPage({
               )}
               {(searchOnly || keyword) && (
                 <div className="portal-section-heading">
-                  <h1>搜索结果</h1>
-                  <p>
+                  <SearchHeading>{searchTitle}</SearchHeading>
+                  <p role="status" aria-live="polite">
                     {keyword ? `“${keyword}” · ` : ""}
-                    {result.data?.total ?? 0} 篇内容
+                    {result.isPending
+                      ? "正在查找内容"
+                      : result.isError
+                        ? "暂时无法读取结果"
+                        : `${result.data?.total ?? 0} 篇内容`}
                   </p>
                 </div>
               )}
@@ -345,9 +359,14 @@ export function PortalChannelPage({
                       description={
                         keyword
                           ? "未找到匹配内容，请尝试其他标题关键词"
-                          : "该分类暂时没有已发布内容"
+                          : categoryId
+                            ? "该分类暂时没有已发布内容"
+                            : "暂时没有已发布内容"
                       }
                     />
+                    {keyword && (
+                      <Button onClick={clearKeyword}>清空关键词</Button>
+                    )}
                   </div>
                 )}
               </PortalState>

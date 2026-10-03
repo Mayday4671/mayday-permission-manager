@@ -32,6 +32,9 @@ for (const key of [
     value: dom.window[key],
   });
 globalThis.getComputedStyle = (element) => dom.window.getComputedStyle(element);
+// 表单错误定位读取视口，JSDOM 的 Node 全局需要显式映射这些浏览器属性。
+globalThis.innerWidth = dom.window.innerWidth;
+globalThis.innerHeight = dom.window.innerHeight;
 globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
 globalThis.cancelAnimationFrame = clearTimeout;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -68,12 +71,19 @@ const { QueryClient, QueryClientProvider } =
 const { ModulesProvider } = await import("../src/lib/modules");
 const { AppearanceProvider } = await import("../src/lib/theme");
 const { PortalChannelPage } = await import("../src/pages/PortalChannelPage");
+const { PortalArticleCard } = await import("../src/components/PortalViews");
+const { PortalFeedback } = await import("../src/components/PortalFeedback");
 const { PORTAL_APPEARANCE, ADMIN_APPEARANCE } =
   await import("../src/lib/theme-model");
 const clients = [];
 const routers = [];
 let requests = [];
 let allowThemeToggle = true;
+let feedbackEnabled = false;
+let noSearchResults = false;
+let feedbackRequests = [];
+// 固定凭据只用于内存接口回归，不写入真实数据库或浏览器持久存储。
+const testReceipt = "a".repeat(48);
 const channel = {
   id: 1,
   code: "guides",
@@ -87,7 +97,7 @@ const channel = {
     { id: 12, name: "业务帮助", enabled: true },
   ],
 };
-globalThis.fetch = async (path) => {
+globalThis.fetch = async (path, options) => {
   const url = new URL(
     path instanceof Request ? path.url : String(path),
     "http://localhost",
@@ -95,7 +105,7 @@ globalThis.fetch = async (path) => {
   const envelope = (data) => Response.json({ success: true, data });
   if (url.pathname === "/api/platform/features")
     return envelope({
-      modules: { portal: true, content: true, feedback: false },
+      modules: { portal: true, content: true, feedback: feedbackEnabled },
     });
   if (url.pathname === "/api/public/site")
     return envelope({
@@ -108,25 +118,44 @@ globalThis.fetch = async (path) => {
   if (url.pathname === "/api/public/articles") {
     requests.push(url);
     return envelope({
-      items: [
-        {
-          id: 1,
-          title: "指南正文",
-          summary: "操作步骤",
-          categoryId: 11,
-          category: "账号帮助",
-          channelCode: "guides",
-          channelTemplate: "GUIDE",
-          tags: [],
-          createdAt: "2026-10-03T10:00:00",
-        },
-      ],
-      total: 1,
+      items:
+        noSearchResults && url.searchParams.get("keyword")
+          ? []
+          : [
+              {
+                id: 1,
+                title: "指南正文",
+                summary: "操作步骤",
+                categoryId: 11,
+                category: "账号帮助",
+                channelCode: "guides",
+                channelTemplate: "GUIDE",
+                tags: [],
+                createdAt: "2026-10-03T10:00:00",
+              },
+            ],
+      total: noSearchResults && url.searchParams.get("keyword") ? 0 : 1,
+    });
+  }
+  if (url.pathname.startsWith("/api/public/feedback")) {
+    const body =
+      path instanceof Request
+        ? await path.clone().json()
+        : JSON.parse(options?.body ?? "{}");
+    feedbackRequests.push({ path: url.pathname, body });
+    if (url.pathname === "/api/public/feedback")
+      return envelope({ receipt: testReceipt });
+    assert.equal(body.receipt, testReceipt);
+    return envelope({
+      title: "搜索体验问题",
+      status: "OPEN",
+      createdAt: "2026-10-03T10:00:00",
+      history: [],
     });
   }
   throw new Error("未预期请求：" + url.pathname);
 };
-function mount(path) {
+function mount(path, extraRoutes = null) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 30000 } },
   });
@@ -144,6 +173,7 @@ function mount(path) {
                   element={<PortalChannelPage />}
                 />
                 <Route path="/admin" element={<span>后台页</span>} />
+                {extraRoutes}
               </Routes>
             </AppearanceProvider>
           </ModulesProvider>
@@ -166,6 +196,9 @@ afterEach(() => {
   routers.splice(0).forEach((r) => r.dispose());
   requests = [];
   allowThemeToggle = true;
+  feedbackEnabled = false;
+  noSearchResults = false;
+  feedbackRequests = [];
   localStorage.clear();
 });
 after(() => {
@@ -264,4 +297,82 @@ test("后台关闭访客切换后，已存偏好不能覆盖网站统一浅色�
     "light",
   );
   assert.equal(screen.queryByRole("button", { name: /切换.*模式/ }), null);
+});
+
+test("空搜索结果可直接清空关键词，保留栏目分类且只有一个一级标题", async () => {
+  noSearchResults = true;
+  const router = mount("/channels/guides?category=11&q=不存在&page=2");
+  await screen.findByText("未找到匹配内容，请尝试其他标题关键词");
+  assert.equal(screen.getAllByRole("heading", { level: 1 }).length, 1);
+  assert(screen.getByRole("heading", { name: "搜索结果", level: 2 }));
+  fireEvent.click(await screen.findByRole("button", { name: "清空关键词" }));
+  await screen.findByRole("link", { name: "阅读指南" });
+  const params = new URLSearchParams(router.state.location.search);
+  assert.equal(router.state.location.pathname, "/channels/guides");
+  assert.equal(params.get("category"), "11");
+  assert(!params.has("q"));
+  assert(!params.has("page"));
+});
+
+test("纯图片入口有文章名称，并保留正文链接和来源上下文", async () => {
+  const article = {
+    id: 7,
+    title: "账户使用指南",
+    categoryId: 11,
+    category: "账号帮助",
+    channelCode: "guides",
+    channelTemplate: "GUIDE",
+    createdAt: "2026-10-03T10:00:00",
+  };
+  mount(
+    "/card?category=11",
+    <Route path="/card" element={<PortalArticleCard article={article} />} />,
+  );
+  const cover = await screen.findByRole("link", { name: "阅读：账户使用指南" });
+  assert.equal(cover.getAttribute("href"), "/articles/7");
+  assert.equal(
+    screen
+      .getByRole("link", { name: "账户使用指南", exact: true })
+      .getAttribute("href"),
+    "/articles/7",
+  );
+});
+
+test("反馈提交后可以直达查询，粘贴空格和大写查询码仍可读取真实进度", async () => {
+  feedbackEnabled = true;
+  mount("/feedback", <Route path="/feedback" element={<PortalFeedback />} />);
+  fireEvent.click(await screen.findByRole("button", { name: "反馈问题" }));
+  const submit = await screen.findByRole("dialog", { name: "提交反馈" });
+  fireEvent.change(within(submit).getByLabelText("标题"), {
+    target: { value: "搜索体验问题" },
+  });
+  fireEvent.change(within(submit).getByLabelText("详细说明"), {
+    target: { value: "空结果需要明确恢复入口。" },
+  });
+  fireEvent.click(within(submit).getByRole("button", { name: /^提\s*交$/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "查看处理进度" }));
+  const tracking = await screen.findByRole("dialog", { name: "查询反馈" });
+  fireEvent.change(within(tracking).getByLabelText("查询码"), {
+    target: { value: " \n" + testReceipt.toUpperCase() + "\n " },
+  });
+  assert.equal(within(tracking).getByLabelText("查询码").value, testReceipt);
+  fireEvent.click(within(tracking).getByRole("button", { name: /^查\s*询$/ }));
+  const progress = await screen.findByRole("dialog", { name: "反馈处理进度" });
+  assert(within(progress).getByText("搜索体验问题"));
+  assert(within(progress).getByText("反馈已收到，等待处理。"));
+  assert.equal(feedbackRequests.length, 2);
+  assert.equal(feedbackRequests[1].body.receipt, testReceipt);
+});
+
+test("不完整的查询码只提示校验，不向服务端提交", async () => {
+  feedbackEnabled = true;
+  mount("/feedback", <Route path="/feedback" element={<PortalFeedback />} />);
+  fireEvent.click(await screen.findByRole("button", { name: "查询反馈" }));
+  const tracking = await screen.findByRole("dialog", { name: "查询反馈" });
+  fireEvent.change(within(tracking).getByLabelText("查询码"), {
+    target: { value: "abc" },
+  });
+  fireEvent.click(within(tracking).getByRole("button", { name: /^查\s*询$/ }));
+  await screen.findByText("请输入完整查询码");
+  assert.equal(feedbackRequests.length, 0);
 });
