@@ -457,6 +457,371 @@
 .node-field-permissions > .ant-space {
   margin-bottom: 12px;
 }
+
+/* 业务流程编辑器独立于运行轨迹图：画布占满可用区域，长流程只在画布内滚动。
+   所有连接、聚焦和按钮均消费主题变量，节点卡片不依赖固定亮色背景。 */
+.oa-workflow-canvas {
+  --oa-line: color-mix(
+    in srgb,
+    var(--app-primary-text) 30%,
+    var(--app-border-strong)
+  );
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+  background: var(--app-fill);
+  overflow: hidden;
+  min-width: 0;
+}
+.oa-canvas-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+}
+.oa-canvas-tools > .ant-space:last-child {
+  margin-left: auto;
+}
+.oa-flow-scroll {
+  height: max(340px, calc(100dvh - 350px));
+  overflow: auto;
+  position: relative;
+  outline: none;
+  background-image: radial-gradient(
+    var(--app-border-strong) 1px,
+    transparent 1px
+  );
+  background-size: 18px 18px;
+}
+.oa-flow-scroll:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--app-primary-bg);
+}
+.oa-flow-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100%;
+  width: max-content;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.oa-flow-stage button {
+  font: inherit;
+}
+.oa-flow-stage button:focus-visible {
+  outline: 2px solid var(--app-primary-text);
+  outline-offset: 3px;
+}
+.oa-flow-applicant,
+.oa-flow-card,
+.oa-branch-rule {
+  width: 240px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  border-radius: 6px;
+  color: var(--app-text);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--app-text) 5%, transparent);
+}
+.oa-flow-applicant {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  text-align: left;
+  cursor: pointer;
+  border-top: 3px solid var(--app-primary-text);
+}
+.oa-flow-applicant > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--app-primary-text);
+  font-size: 13px;
+}
+.oa-flow-applicant b {
+  font-size: 14px;
+  font-weight: 500;
+}
+.oa-flow-applicant:disabled,
+.oa-node-settings:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.oa-flow-card {
+  position: relative;
+  overflow: visible;
+}
+.oa-node-settings {
+  display: grid;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.oa-node-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 38px 8px 14px;
+  border-radius: 5px 5px 0 0;
+  background: var(--app-primary-bg);
+  color: var(--app-primary-text);
+  font-size: 13px;
+}
+.oa-node-heading b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oa-flow-card.copy .oa-node-heading {
+  background: var(--app-info-bg);
+  color: var(--app-info);
+}
+.oa-node-people {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px 6px;
+  line-height: 1.5;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.oa-node-people svg {
+  flex-shrink: 0;
+  color: var(--app-text-secondary);
+}
+.oa-node-mode {
+  padding: 0 14px 8px;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+.oa-node-delete.ant-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  color: var(--app-text-secondary);
+}
+.oa-node-delete.ant-btn:hover {
+  color: var(--app-error);
+  background: var(--app-error-bg);
+}
+.oa-flow-card:has(.oa-node-settings:not(:disabled):hover),
+.oa-flow-applicant:not(:disabled):hover,
+.oa-branch-rule:has(button:not(:disabled):hover) {
+  border-color: var(--app-primary-text);
+}
+.oa-flow-stage .unconfigured {
+  color: var(--app-warning);
+}
+/* 插入按钮属于具体出口，竖线穿过按钮中心；末端箭头明确表示执行方向。 */
+.oa-flow-connector {
+  position: relative;
+  height: 42px;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.oa-flow-connector::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: var(--oa-line);
+}
+.oa-flow-connector > .ant-btn {
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  box-shadow: 0 0 0 4px var(--app-fill);
+}
+.oa-flow-arrow {
+  position: absolute;
+  bottom: -3px;
+  color: var(--oa-line);
+}
+.oa-insert-options {
+  display: grid;
+  gap: 4px;
+  min-width: 135px;
+}
+.oa-insert-options .ant-btn {
+  justify-content: flex-start;
+  height: 40px;
+}
+.oa-insert-options .ant-btn-icon {
+  color: var(--app-primary-text);
+}
+.oa-flow-end {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: var(--app-text-secondary);
+  font-size: 12px;
+}
+.oa-flow-end > span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--oa-line);
+  border: 3px solid var(--app-surface);
+  box-shadow: 0 0 0 1px var(--oa-line);
+}
+.oa-condition-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+}
+.oa-condition-toolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 32px;
+  margin: 0 0 14px;
+}
+.oa-condition-toolbar::after {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 14px;
+  bottom: -14px;
+  left: calc(50% - 1px);
+  background: var(--oa-line);
+}
+.oa-condition-toolbar > button:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--app-text-secondary);
+  padding: 4px;
+  cursor: pointer;
+}
+.oa-flow-branches {
+  display: flex;
+  align-items: stretch;
+}
+.oa-flow-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+  min-width: 280px;
+  position: relative;
+}
+.oa-branch-rail {
+  width: calc(100% + 40px);
+  height: 24px;
+  position: relative;
+  flex-shrink: 0;
+}
+.oa-branch-rail::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--oa-line);
+}
+.oa-branch-rail.top::before {
+  top: 0;
+}
+.oa-branch-rail.bottom::before {
+  bottom: 0;
+}
+.oa-branch-rail::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: var(--oa-line);
+}
+.oa-flow-branch:first-child > .oa-branch-rail::before {
+  left: 50%;
+}
+.oa-flow-branch:last-child > .oa-branch-rail::before {
+  right: 50%;
+}
+.oa-branch-tail {
+  flex: 1;
+  min-height: 0;
+  width: 2px;
+  background: var(--oa-line);
+}
+.oa-branch-rule {
+  border-top: 3px solid var(--app-warning);
+  padding: 8px 12px 12px;
+  flex-shrink: 0;
+}
+.oa-branch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 25px;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+.oa-branch-rule > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--app-text);
+  padding: 12px 0 0;
+  min-height: 40px;
+  text-align: left;
+  line-height: 1.5;
+  font-size: 13px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.oa-branch-rule > button:disabled {
+  cursor: default;
+  color: var(--app-text-secondary);
+}
+.oa-flow-stage .ant-alert {
+  max-width: 240px;
+}
+.oa-compact-path {
+  max-width: 240px;
+  padding: 12px;
+  color: var(--app-text-secondary);
+  font-size: 12px;
+}
+.oa-workflow-canvas > .ant-alert {
+  border-radius: 0;
+  border-width: 1px 0 0;
+}
+@media (max-width: 600px) {
+  .oa-canvas-tools {
+    padding: 8px;
+  }
+  .oa-flow-scroll {
+    height: max(380px, calc(100dvh - 410px));
+  }
+  .oa-flow-stage {
+    padding: 24px 16px;
+  }
+}
 @media (max-width: 700px) {
   .form-designer-workspace {
     grid-template-columns: minmax(0, 1fr);

@@ -1,0 +1,51 @@
+{
+  "checkedAt": "2026-10-03T01:44:36.975Z",
+  "status": "passed",
+  "scope": "frontend-only",
+  "http": [
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/admin/workflow-designer",
+      "status": 200
+    },
+    {
+      "path": "/login",
+      "status": 200
+    },
+    {
+      "asset": "index-Dlvk7h9T.css",
+      "status": 200,
+      "sha256": "c547518ed071f6ec0b4a1e08fcdf031b1b93aa7cb8574b9b2b57e7b5dba6ef44"
+    },
+    {
+      "asset": "WorkflowDesignerPage-ezt7UNoW.js",
+      "status": 200,
+      "sha256": "40c8724d7a71166b11bfcc231305a9bb0ea435cb7260657fd2f1661c67330ddb"
+    }
+  ],
+  "containers": [
+    {
+      "name": "mayday-frontend-1",
+      "image": "sha256:7cc99b78a750fa2a4093e36ff0ecb1832b9d96a44997ac5c45dcdfd99d9b9b3e",
+      "status": "running",
+      "startedAt": "2026-10-03T01:43:19.251862653Z"
+    },
+    {
+      "name": "mayday-backend-1",
+      "image": "sha256:a1e6dbfe39c4c6278f8fcd6d3eed76400dce6cca5b6cb63d54a7a4782a225eca",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-10-02T14:29:07.441729227Z"
+    },
+    {
+      "name": "mayday-mysql-1",
+      "image": "sha256:7c07d11b694dcc7e2ef3de845075eca1a8b39868f85f519f938b54c432edc1cb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-10-02T03:24:27.780905462Z"
+    }
+  ]
+}
