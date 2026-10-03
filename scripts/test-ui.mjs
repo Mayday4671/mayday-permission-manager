@@ -11,7 +11,8 @@ const files = readdirSync(resolve(frontend, "tests"))
   .map((name) => "tests/" + name);
 const result = spawnSync(
   process.execPath,
-  ["--import", "tsx", "--test", ...files],
+  // 与完整工程检查保持相同并发预算，仍逐文件隔离并执行全部断言。
+  ["--import", "tsx", "--test", "--test-concurrency=2", ...files],
   {
     cwd: frontend,
     stdio: "inherit",

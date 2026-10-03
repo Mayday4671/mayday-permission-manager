@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -136,6 +137,8 @@ public class WorkflowDefinitions {
     if (definition.getPublishedVersionId() != null
         && !definition.getBusinessType().equals(input.businessType()))
       throw new BusinessException("已发布流程不能更换业务类型，请新建流程");
+    // 草稿仍允许未配人员或连线，但不能通过保存接口静默删除已被单选条件使用的值。
+    WorkflowSchema.validateDraft(input.schema());
     String schema =
         json.write(
             input.schema() == null
@@ -238,9 +241,30 @@ public class WorkflowDefinitions {
     };
   }
 
-  /** 所有节点人员在提交时冻结；角色和负责人后续变动不替换已有申请，但每次处理仍检查账号权限。 */
+  /** 客户端模拟模型始终使用最新严格契约，不能借人员解析绕过发布及字段引用校验。 */
   public Map<String, List<Long>> resolve(Spec schema, SysUser applicant) {
     WorkflowSchema.validate(schema);
+    return resolvePeople(schema, applicant);
+  }
+
+  /**
+   * 正式提交与退回重提从已存实例读取冻结模型，调用方只能提供实例 ID，不能提交任意 schema 或选择宽松验证。实例快照在创建时复制不可变发布版本，编辑申请接口不接受
+   * 模型字段；旧快照只保留旧单选比较语义，其他模型约束及当前人员权限仍重新校验。
+   */
+  public Map<String, List<Long>> resolveStoredSnapshot(Long requestId, SysUser applicant) {
+    var request = requests.findById(requestId).orElseThrow(() -> new BusinessException("申请快照不存在"));
+    if (!Objects.equals(request.getApplicantId(), applicant.getId()))
+      throw new AccessDeniedException("只能解析本人申请的冻结快照");
+    Spec schema =
+        request.getSchemaSnapshot() == null
+            ? legacy(request.getApproverIds())
+            : json.spec(request.getSchemaSnapshot());
+    WorkflowSchema.validateRuntimeSnapshot(schema);
+    return resolvePeople(schema, applicant);
+  }
+
+  /** 所有节点人员在提交时冻结；角色和负责人后续变动不替换已有申请，但每次处理仍检查账号权限。 */
+  private Map<String, List<Long>> resolvePeople(Spec schema, SysUser applicant) {
     if (!canStart(schema, applicant)) throw new AccessDeniedException("当前账号不在流程发起范围");
     Map<String, List<Long>> result = new LinkedHashMap<>();
     for (Node node : schema.nodes())

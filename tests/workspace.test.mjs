@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   normalizeTabs,
+  adminRouteTarget,
+  normalizeTabTargets,
   closeTabs,
 } from "../frontend/src/lib/workspace-model.ts";
 
@@ -59,4 +61,60 @@ test("关闭全部后回到固定首页", () => {
     paths: [home],
     active: home,
   });
+});
+
+test("后台返回地址只保留流程设计的安全实体 ID，未知参数和不可信地址无法恢复", () => {
+  const designer = "/admin/workflow-designer";
+  assert.equal(adminRouteTarget(`${designer}?id=23`), `${designer}?id=23`);
+  assert.equal(
+    adminRouteTarget(
+      `${designer}/?id=0023&token=secret&redirect=https://example.com`,
+    ),
+    `${designer}?id=23`,
+  );
+  assert.equal(adminRouteTarget(`${users}?token=secret`), users);
+  assert.equal(
+    adminRouteTarget("/admin/tasks?record=17&token=secret"),
+    "/admin/tasks?record=17",
+  );
+  for (const id of [
+    "",
+    "0",
+    "-1",
+    "1.5",
+    "1e3",
+    "9007199254740992",
+    "23&id=24",
+    "%2F%2Fevil.example",
+  ])
+    assert.equal(adminRouteTarget(`${designer}?id=${id}`), designer);
+  for (const target of [
+    null,
+    {},
+    42,
+    "https://example.com/admin/users",
+    "//example.com/admin/users",
+    "/admin/unknown",
+    "/admin/users#secret",
+    "/admin/../login",
+    "/admin\\users",
+    "/admin/users\n",
+  ])
+    assert.equal(adminRouteTarget(target), undefined);
+});
+
+test("页签实体目标恢复依旧按开放路径过滤，且不能恢复表单、外链或其他页面", () => {
+  const designer = "/admin/workflow-designer";
+  const saved = {
+    [designer]: `${designer}?id=23&schema=secret`,
+    [users]: "https://example.com/admin/users",
+    [roles]: `${designer}?id=24`,
+    "/admin/profile": "/admin/profile?draft=secret",
+  };
+  assert.deepEqual(normalizeTabTargets(saved, [home, users, roles, designer]), {
+    [designer]: `${designer}?id=23`,
+  });
+  assert.deepEqual(normalizeTabTargets(saved, [home, users]), {});
+  assert.deepEqual(normalizeTabTargets(null, [designer]), {});
+  assert.deepEqual(normalizeTabTargets([`${designer}?id=23`], [designer]), {});
 });

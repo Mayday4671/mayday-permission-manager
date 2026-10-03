@@ -18,7 +18,9 @@ import { useModules } from "./modules";
 import { pageEnabled } from "./module-model";
 import {
   adminPages,
+  adminRouteTarget,
   closeTabs,
+  normalizeTabTargets,
   normalizeTabs,
   type CloseMode,
 } from "./workspace-model";
@@ -32,6 +34,7 @@ interface WorkspaceValue {
   cache: PageCache;
   close: (target: string, mode: CloseMode) => void;
   refresh: (path: string) => void;
+  destinationOf: (path: string) => string;
   registerLeaveGuard: (guard: LeaveGuard) => () => void;
   confirmLeave: () => Promise<boolean>;
 }
@@ -39,7 +42,8 @@ const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 
 /**
  * 页签壳层只保存路由清单和非敏感的列表筛选状态，表单和密码不进入缓存。
- * 路由清单按账号隔离并保存在 sessionStorage；筛选状态仅保留于本次后台挂载期间。
+ * 路由清单和必要实体 ID 按账号隔离保存在 sessionStorage；表单及试填值不持久化。
+ * 筛选状态仅保留于本次后台挂载期间；恢复目标不等于获得实体访问权限。
  * 页面仍通过原有路由 Guard 检查权限，页签可见性不替代接口及路由授权。
  */
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
@@ -75,6 +79,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       !initial.includes(active)
       ? [...initial, active]
       : initial;
+  });
+  const [targets, setTargets] = useState<Record<string, string>>(() => {
+    let saved: unknown;
+    try {
+      saved = JSON.parse(
+        sessionStorage.getItem(`${storageKey}.targets`) ?? "{}",
+      );
+    } catch {
+      /* 损坏的目标参数不影响合法页签恢复。 */
+    }
+    const initial = normalizeTabTargets(saved, paths);
+    const current = adminRouteTarget(active + location.search);
+    if (
+      allowed.includes(active as (typeof allowed)[number]) &&
+      current !== active &&
+      current
+    )
+      initial[active] = current;
+    else delete initial[active];
+    return initial;
   });
   const [versions, setVersions] = useState<Record<string, number>>({});
   const cache = useRef<PageCache>(new Map()).current;
@@ -138,12 +162,45 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [active, allowed, pinned, cache]);
 
   useEffect(() => {
+    setTargets((previous) => {
+      const open = normalizeTabs(paths, allowed, pinned);
+      if (
+        allowed.includes(active as (typeof allowed)[number]) &&
+        !open.includes(active)
+      )
+        open.push(active);
+      const next = normalizeTabTargets(previous, open);
+      const current = adminRouteTarget(active + location.search);
+      if (open.includes(active) && current && current !== active)
+        next[active] = current;
+      else delete next[active];
+      return JSON.stringify(next) === JSON.stringify(previous)
+        ? previous
+        : next;
+    });
+  }, [active, location.search, allowed, paths, pinned]);
+
+  useEffect(() => {
     try {
       sessionStorage.setItem(storageKey, JSON.stringify(paths));
     } catch {
       /* 浏览器禁用存储不影响导航。 */
     }
   }, [paths, storageKey]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`${storageKey}.targets`, JSON.stringify(targets));
+    } catch {
+      /* 参数存储不可用时，本次挂载仍保留内存中的导航目标。 */
+    }
+  }, [targets, storageKey]);
+
+  // 页签标识仍为路径，实体参数只影响导航目标，不改变标题、权限或页面缓存的作用域。
+  const destinationOf = (path: string) =>
+    path === active
+      ? (adminRouteTarget(path + location.search) ?? path)
+      : (targets[path] ?? path);
 
   const close = async (target: string, mode: CloseMode) => {
     const result = closeTabs(paths, target, active, pinned, mode);
@@ -152,9 +209,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     for (const path of paths)
       if (!result.paths.includes(path)) cache.delete(path);
     setPaths(result.paths);
+    setTargets((previous) => normalizeTabTargets(previous, result.paths));
     if (result.active !== active) {
       skipNextRoute.current = true;
-      navigate(result.active);
+      navigate(destinationOf(result.active));
     }
   };
   const refresh = async (path: string) => {
@@ -167,7 +225,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }));
     if (path !== active) {
       skipNextRoute.current = true;
-      navigate(path);
+      navigate(destinationOf(path));
     }
   };
   return (
@@ -180,6 +238,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         cache,
         close,
         refresh,
+        destinationOf,
         registerLeaveGuard,
         confirmLeave,
       }}

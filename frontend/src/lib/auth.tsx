@@ -35,36 +35,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const requestedToken = tokenStore.get();
     const revision = ++identityRevision.current;
-    const updated = unwrapContract(await contractClient.GET("/api/auth/me"));
-    // 并发刷新只接纳最新响应；退出或切换账号后到达的旧响应不能恢复旧身份。
-    if (
-      revision === identityRevision.current &&
-      requestedToken === tokenStore.get()
-    )
-      setSession(updated);
+    try {
+      const updated = unwrapContract(await contractClient.GET("/api/auth/me"));
+      // 并发刷新只接纳最新响应；退出或切换账号后到达的旧响应不能恢复旧身份。
+      if (
+        revision === identityRevision.current &&
+        requestedToken === tokenStore.get()
+      )
+        setSession(updated);
+    } finally {
+      // 身份与加载状态属于同一次请求：StrictMode 的旧响应不能提前放行路由守卫。
+      // 焦点刷新若取代初始请求，也由最新请求结束等待，避免永久停留在加载页。
+      if (
+        revision === identityRevision.current &&
+        requestedToken === tokenStore.get()
+      )
+        setLoading(false);
+    }
   }, []);
   useEffect(() => {
+    let active = true;
     const initialToken = tokenStore.get();
     if (initialToken) {
       const initialRefresh = refresh();
       const initialRevision = identityRevision.current;
-      initialRefresh
-        .catch((error) => {
-          if (
-            initialToken !== tokenStore.get() ||
-            initialRevision !== identityRevision.current
-          )
-            return;
-          // 短暂断网或后端重启不撤销仍有效的令牌；只有明确的 401 才清理认证。
-          if (error instanceof ApiError && error.status === 401)
-            tokenStore.clear();
-          setSession(null);
-        })
-        .finally(() => setLoading(false));
+      initialRefresh.catch((error) => {
+        if (
+          !active ||
+          initialToken !== tokenStore.get() ||
+          initialRevision !== identityRevision.current
+        )
+          return;
+        // 短暂断网或后端重启不撤销仍有效的令牌；只有明确的 401 才清理认证。
+        if (error instanceof ApiError && error.status === 401)
+          tokenStore.clear();
+        setSession(null);
+      });
     } else setLoading(false);
     const expired = () => {
       identityRevision.current++;
       setSession(null);
+      setLoading(false);
       client.clear();
     };
     window.addEventListener("mayday:unauthorized", expired);
@@ -78,6 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState === "visible") focus();
     }, 30000);
     return () => {
+      active = false;
+      // 销毁或 StrictMode 重新挂载时，使尚未完成的身份请求失效。
+      identityRevision.current++;
       window.clearInterval(timer);
       window.removeEventListener("mayday:unauthorized", expired);
       window.removeEventListener("focus", focus);
@@ -103,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         identityRevision.current++;
         tokenStore.clear();
         setSession(null);
+        setLoading(false);
       }
       throw error;
     }
@@ -117,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         identityRevision.current++;
         tokenStore.clear();
         setSession(null);
+        setLoading(false);
         client.clear();
       }
     }

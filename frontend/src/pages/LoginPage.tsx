@@ -5,6 +5,7 @@ import { Brand } from "../components/shared";
 import { SlideCaptcha } from "../components/SlideCaptcha";
 import { useAuth } from "../lib/auth";
 import { useModules } from "../lib/modules";
+import { adminRouteTarget } from "../lib/workspace-model";
 
 /** 登录凭证仅保存在当前表单和一次验证回调的内存中，不写入 URL 或浏览器持久存储。 */
 interface LoginCredentials {
@@ -23,10 +24,8 @@ export function LoginPage() {
   const requestedPath =
     navigationState &&
     typeof navigationState === "object" &&
-    "from" in navigationState &&
-    typeof navigationState.from === "string" &&
-    /^\/admin(?:\/|$)/.test(navigationState.from)
-      ? navigationState.from
+    "from" in navigationState
+      ? adminRouteTarget(navigationState.from)
       : undefined;
   const destination = requestedPath
     ? requestedPath

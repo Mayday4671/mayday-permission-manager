@@ -53,6 +53,8 @@ run(
     "--import",
     "tsx",
     "--test",
+    // Ant/jsdom 套件开销较高，限制文件并发，避免按宿主机核心数同时渲染导致等待断言失真。
+    "--test-concurrency=2",
     ...readdirSync(join(frontend, "tests"))
       .filter((file) => /\.test\.tsx?$/.test(file))
       .map((file) => join("tests", file)),

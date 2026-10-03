@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-10-03T04:46:22.217Z",
+  "origin": "http://127.0.0.1:15174",
+  "flowId": 23,
+  "publishedVersion": 1,
+  "uiChain": [
+    "create expense template",
+    "edit label and drag date range",
+    "save draft",
+    "configure assignee and field permissions",
+    "publish version",
+    "submit with date range and detail row",
+    "return to applicant with reason",
+    "confirm original values restored",
+    "modify and resubmit round 2",
+    "approve and verify two-round history",
+    "verify 4 notification deliveries"
+  ],
+  "safeNavigation": [
+    "direct URL retains id",
+    "reload retains id",
+    "tab return retains id"
+  ],
+  "reducedMotion": [
+    "approval detail opens with opacity 1 and closes",
+    "theme drawer opens with opacity 1 and closes",
+    "mobile field properties 374x780 opens and closes"
+  ],
+  "pageErrors": [],
+  "propertyLabelRoundTrip": {
+    "route": "mobile properties dialog → close → desktop properties",
+    "duplicateIds": 0,
+    "labelClickFocusesVisibleInput": true,
+    "pageErrors": []
+  }
+}

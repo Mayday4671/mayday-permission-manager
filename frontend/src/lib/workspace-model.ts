@@ -281,6 +281,45 @@ export const adminPages = [
   },
 ] as const;
 
+/**
+ * 后台返回地址只接受已实现的本机页面；流程设计 ID 和审批详情 record 允许正整数。
+ * 查询串不能恢复令牌、跳转地址、表单草稿或任意参数；路由和后端仍独立检查访问权限。
+ */
+export function adminRouteTarget(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const match = /^([/a-z-]+)(?:\?([^#]*))?$/.exec(value);
+  if (!match) return undefined;
+  const path = match[1].replace(/\/$/, "");
+  if (!adminPages.some((page) => page.path === path)) return undefined;
+  const key =
+    path === "/admin/workflow-designer"
+      ? "id"
+      : path === "/admin/requests" || path === "/admin/tasks"
+        ? "record"
+        : undefined;
+  if (!key) return path;
+  const ids = new URLSearchParams(match[2] ?? "").getAll(key);
+  const id = ids.length === 1 && /^\d+$/.test(ids[0]) ? Number(ids[0]) : NaN;
+  return Number.isSafeInteger(id) && id > 0 ? `${path}?${key}=${id}` : path;
+}
+
+/** 持久化目标仅包含开放页签的安全路由参数，账号隔离和权限过滤由工作区统一执行。 */
+export function normalizeTabTargets(
+  saved: unknown,
+  paths: readonly string[],
+): Record<string, string> {
+  if (saved === null || typeof saved !== "object" || Array.isArray(saved))
+    return {};
+  const targets: Record<string, string> = {};
+  for (const path of paths) {
+    if (!Object.prototype.hasOwnProperty.call(saved, path)) continue;
+    const target = adminRouteTarget((saved as Record<string, unknown>)[path]);
+    if (target?.split("?")[0] === path && target !== path)
+      targets[path] = target;
+  }
+  return targets;
+}
+
 /** 去重、权限过滤并固定首页。损坏的存储数据也只能恢复为合法页签。 */
 export function normalizeTabs(
   saved: unknown,

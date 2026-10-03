@@ -1,0 +1,136 @@
+{
+  "environment": "15174 independent Edge, real component with synthetic form, no authentication or data writes",
+  "measurements": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "page": {
+        "width": 1440,
+        "scrollWidth": 1440,
+        "height": 1000,
+        "scrollHeight": 1000
+      },
+      "narrow": false,
+      "panels": [
+        {
+          "className": "workflow-form-palette",
+          "width": 215,
+          "scrollWidth": 215,
+          "height": 631,
+          "scrollHeight": 631
+        },
+        {
+          "className": "workflow-form-stage",
+          "width": 886,
+          "scrollWidth": 886,
+          "height": 631,
+          "scrollHeight": 891
+        },
+        {
+          "className": "workflow-form-properties",
+          "width": 303,
+          "scrollWidth": 303,
+          "height": 631,
+          "scrollHeight": 631
+        }
+      ]
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "page": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 720,
+        "scrollHeight": 720
+      },
+      "narrow": false,
+      "panels": [
+        {
+          "className": "workflow-form-palette",
+          "width": 215,
+          "scrollWidth": 215,
+          "height": 351,
+          "scrollHeight": 524
+        },
+        {
+          "className": "workflow-form-stage",
+          "width": 726,
+          "scrollWidth": 726,
+          "height": 351,
+          "scrollHeight": 891
+        },
+        {
+          "className": "workflow-form-properties",
+          "width": 303,
+          "scrollWidth": 303,
+          "height": 351,
+          "scrollHeight": 565
+        }
+      ]
+    },
+    {
+      "viewport": {
+        "width": 2560,
+        "height": 1389
+      },
+      "page": {
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1389,
+        "scrollHeight": 1389
+      },
+      "narrow": false,
+      "panels": [
+        {
+          "className": "workflow-form-palette",
+          "width": 215,
+          "scrollWidth": 215,
+          "height": 1020,
+          "scrollHeight": 1020
+        },
+        {
+          "className": "workflow-form-stage",
+          "width": 2006,
+          "scrollWidth": 2006,
+          "height": 1020,
+          "scrollHeight": 1020
+        },
+        {
+          "className": "workflow-form-properties",
+          "width": 303,
+          "scrollWidth": 303,
+          "height": 1020,
+          "scrollHeight": 1020
+        }
+      ]
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "page": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 844,
+        "scrollHeight": 844
+      },
+      "narrow": true,
+      "panels": [
+        {
+          "className": "workflow-form-stage",
+          "width": 356,
+          "scrollWidth": 356,
+          "height": 419,
+          "scrollHeight": 1038
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

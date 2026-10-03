@@ -1,0 +1,391 @@
+{
+  "checkedAt": "2026-10-03T04:51:55.351Z",
+  "status": "passed",
+  "scope": "backend-and-frontend; existing database and file volumes retained; no migrations in this batch",
+  "http": [
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/admin/workflow-designer",
+      "status": 200
+    },
+    {
+      "path": "/login",
+      "status": 200
+    },
+    {
+      "asset": "app-CYYU4SQ4.js",
+      "status": 200,
+      "sha256": "91073f174cd47f3e56e2cbcc01738a9d0911b712b601b47c223139770049199a"
+    },
+    {
+      "asset": "ApprovalDetailModal-HD_47jMS.js",
+      "status": 200,
+      "sha256": "846fa2101da8d3dee14a0759df00e9203e090cc0805f90613387c4051c799f3f"
+    },
+    {
+      "asset": "ApprovalSubmitModal-CYSgzHbX.js",
+      "status": 200,
+      "sha256": "e08fa0cc5dfb347a3d82db67a69aa2a735d896291ecfe01b305a3bba9f8b1814"
+    },
+    {
+      "asset": "AttachmentList-CkCQdeRm.js",
+      "status": 200,
+      "sha256": "5984b7b6dc2ee26d99aeaeb52c8c4d795544b25fde6f57364b8a9cf32914068c"
+    },
+    {
+      "asset": "AttachmentUpload-CN_36rzQ.js",
+      "status": 200,
+      "sha256": "355df86a61fe25855797b9124645a34eecf3b85fe5340ad562af3dd185761511"
+    },
+    {
+      "asset": "CartesianChart-CJ10-y6d.js",
+      "status": 200,
+      "sha256": "492700d88c08a623a640e3d9b461809cf525ce2ba845f3569e57db9c18959e80"
+    },
+    {
+      "asset": "ChangesPage-B1Fhvs0K.js",
+      "status": 200,
+      "sha256": "6fb5b3427a2237d1a2af8f9304d472cb85c6303e182715175ad83807e3c697dd"
+    },
+    {
+      "asset": "CrawlConfigPage-_4QGXKv0.js",
+      "status": 200,
+      "sha256": "9425deca6560840a354f08801f8881b15d50bde7d904537014dd4f5a3e8ae94c"
+    },
+    {
+      "asset": "CrawlDataPage-DaOnLrUn.js",
+      "status": 200,
+      "sha256": "e7dba4b269c09a57a0a4a936aeb091a3b9eff65c9445499a534f180b2910e889"
+    },
+    {
+      "asset": "DashboardPage-Cl5chTYv.js",
+      "status": 200,
+      "sha256": "79191938c04583321e0c3280beb548a6fb223f5dd7cd1a6da0b0b1c88b96791f"
+    },
+    {
+      "asset": "DataTable-Yr5cSz3O.js",
+      "status": 200,
+      "sha256": "6cf3e835ac9932887e04460a1a667d7ed602ba339ca0231cf4d3713b3bf12833"
+    },
+    {
+      "asset": "DepartmentSelect-DXg69jCP.js",
+      "status": 200,
+      "sha256": "5360de9586c58b0ac141bf5b1f98ad29105f50a10998ea4cdf3d7686fb817e5f"
+    },
+    {
+      "asset": "descriptions-D6KaWLd0.js",
+      "status": 200,
+      "sha256": "523e9c1168772cfe9b242a44ecf58654d67500431d587533dc8ed84b36f505a9"
+    },
+    {
+      "asset": "DictionariesPage-Dx6wEvs-.js",
+      "status": 200,
+      "sha256": "2f0c4b10dad2c6df55b471cdb28f263c49c1bdfe7662095c0c3aa227adcbac03"
+    },
+    {
+      "asset": "download-tGDOB5tC.js",
+      "status": 200,
+      "sha256": "f543a56b7e062d9859c1af56d0438e6f50197a53f04fa7cf8994e93fc343c7ff"
+    },
+    {
+      "asset": "EllipsisOutlined-B5v7WZLu.js",
+      "status": 200,
+      "sha256": "d1867b52469c9019e79f4eff5a35fd8d47ec23c64da33f4ece28ea1e5054f0ff"
+    },
+    {
+      "asset": "EntriesPage-DLQtdGdT.js",
+      "status": 200,
+      "sha256": "3da2ca72629352d4b0142ebc72dcbcd9afe18d1a623cbd95999beda868467763"
+    },
+    {
+      "asset": "FeedbackPage-xB-0hwJn.js",
+      "status": 200,
+      "sha256": "b8c9629c4a704c0dfc54bc043c9c11a9b7fc6a9988c017403989a01c3b51b49f"
+    },
+    {
+      "asset": "FilesPage-C1n6cUmL.css",
+      "status": 200,
+      "sha256": "b9ed0136aca2c33dc79c37abf5574ea4c1dab22ad3ecc1b5307e8010b05918c5"
+    },
+    {
+      "asset": "FilesPage-Zvgqi5EQ.js",
+      "status": 200,
+      "sha256": "2998fea21bc4411ffe94089a11674c1c51c51bcd681f6b07d3f645c99c40f9e7"
+    },
+    {
+      "asset": "FormModal-obFgeAsT.js",
+      "status": 200,
+      "sha256": "15c800a46442a1aeb5b719c3cd39f51dfb09ef09022fe971fe7012b0bf8afb59"
+    },
+    {
+      "asset": "grid-pagination-CEl3BSOg.js",
+      "status": 200,
+      "sha256": "804528de26a1f68e5ea9890a9f34bac6b677a9387f3671c3cf9222a8441500c9"
+    },
+    {
+      "asset": "index-BF0DTM2x.js",
+      "status": 200,
+      "sha256": "c04fd3a9a1de9788554d715ef17a2b1a26ff1371c3c50fc7750b5941567b1fb5"
+    },
+    {
+      "asset": "index-CDxk-JDL.css",
+      "status": 200,
+      "sha256": "ff5f048e93592749e07901a5ff3fd85322f35a870e7180edfd84d627811b907f"
+    },
+    {
+      "asset": "Input-CqMoDHgg.js",
+      "status": 200,
+      "sha256": "c942f1733666e33893c3d044bf7fa0e3cdb75b27d412c972e80be461c0d6eff9"
+    },
+    {
+      "asset": "input-number-CyhrCw8_.js",
+      "status": 200,
+      "sha256": "29be9fb64b376b28067114c520bac5566c1fd68ec13747fa9ae1927209614ee5"
+    },
+    {
+      "asset": "LineChart-CWpqoMm0.js",
+      "status": 200,
+      "sha256": "a3ca122a7db135b2d5c59c3e204b321840e1bdf9353148d2ccb27641b6a877f6"
+    },
+    {
+      "asset": "LogsPage-CF7-uwzs.js",
+      "status": 200,
+      "sha256": "5b5548da43cc1b9811afe17df4544bba3b811df974ec078139c5fabc010cc5b8"
+    },
+    {
+      "asset": "LookupSelect-oHo9Gyl3.js",
+      "status": 200,
+      "sha256": "776f5daf0cb249a7625f58b869e96d47faa6bf1d9f683877b51c9fc4f6418fd5"
+    },
+    {
+      "asset": "MessageDetailModal-Cxkc51pV.js",
+      "status": 200,
+      "sha256": "8e67e8dabc35087d84d9ad345dcf52bb426f983b27b890cb1fed546fd7063ec8"
+    },
+    {
+      "asset": "MessagesPage-CxS4uBp0.js",
+      "status": 200,
+      "sha256": "e68cd74c3f07f10330a6c9cc556bc46192bf8693adfa4c044e4c4c91a2023138"
+    },
+    {
+      "asset": "MonitorPage-3xMj1_yk.js",
+      "status": 200,
+      "sha256": "ccc8f7cdeeb3497dbd8a87a3c3d68336cab0dcfc8456caddde87d7270d562a60"
+    },
+    {
+      "asset": "MonitorPage-D7fCleUk.css",
+      "status": 200,
+      "sha256": "840323d2358d89258e1f7eaafc6573e762e4f1c80d0146742b7de07bb9f21963"
+    },
+    {
+      "asset": "NoticesPage-Cje1UNiz.js",
+      "status": 200,
+      "sha256": "d9ae78ca19ab7bc98ff49f2f6fdd7dedd8a6f0b816d4f37e0915ab7fc4c4d8f5"
+    },
+    {
+      "asset": "notifications-BTjsgFe7.js",
+      "status": 200,
+      "sha256": "9bda1588690a8fb06daf05f7f4a75cc2d6ca1b22845bf3054923818c5e1f3844"
+    },
+    {
+      "asset": "NotificationsPage-fAxJldcw.js",
+      "status": 200,
+      "sha256": "321c3e7ee1ec416c72d33edfdab9c045e2aa930b14922bad7fb3fa004c355341"
+    },
+    {
+      "asset": "pagination-C8nHlAaC.js",
+      "status": 200,
+      "sha256": "cc0db3e6550d9788b658eeb5ac851bcb60ef7010a417b0a6998aa4cbfa2aaee0"
+    },
+    {
+      "asset": "PlusOutlined-CJaKmdIK.js",
+      "status": 200,
+      "sha256": "3b8d7b0061c76d7f046d175ed69339cdb3a0faa366282435a00d1dc46d08d3fb"
+    },
+    {
+      "asset": "popconfirm-DIBMtdWG.js",
+      "status": 200,
+      "sha256": "a7632b7fcd46b454dd27dcb172fdf7f9c82e7712a195c72a9656ae44e9e6afe7"
+    },
+    {
+      "asset": "ProfilePage-BOKd1jng.js",
+      "status": 200,
+      "sha256": "99e3e13bd871e5c0756b68e00029af4be8e09890513575d7f15cf109c5730fe8"
+    },
+    {
+      "asset": "RequestsPage-DRcH8esT.js",
+      "status": 200,
+      "sha256": "2a2a89fb63f88dfd314e0c8ecd03b20928a7278e2c628fdcb631c4e6863b9cde"
+    },
+    {
+      "asset": "ResourcePage-Dl3uu55M.js",
+      "status": 200,
+      "sha256": "1addb82caeaefd42c6ceacc3283fd233cf68bf9acd8fbf39589f87a63219a199"
+    },
+    {
+      "asset": "RichTextEditor-00oTUXH7.js",
+      "status": 200,
+      "sha256": "962fb9e7f1a80c15833e7bd3299859f6ae3082fc70a0d0fbcfe821c3ccd8aa75"
+    },
+    {
+      "asset": "RolesPage-zvUgy0AM.js",
+      "status": 200,
+      "sha256": "4cfa570d0511ec54af5aa3cec58749fa5c174ffacea8e4df730fb2113e66ede3"
+    },
+    {
+      "asset": "rolldown-runtime-hePW80VL.js",
+      "status": 200,
+      "sha256": "580ad8c58061a4dde99bde0a56905e382f0568516ee2f5b84dbfb52085709021"
+    },
+    {
+      "asset": "SchedulerPage-CCQDu1zi.js",
+      "status": 200,
+      "sha256": "c96c6aaf1cf2aed1cc856a04f48a2cabb0d4d74c97dff736813851a4d9634bc4"
+    },
+    {
+      "asset": "select-DGM5o2tz.js",
+      "status": 200,
+      "sha256": "228002aa63c5a91520b38023fe079185915d7a924df08cdae0742f83261ba95a"
+    },
+    {
+      "asset": "send-xVAvNpzC.js",
+      "status": 200,
+      "sha256": "0f4e502a6a32a43afe226bbccc1ad5a8d0616007b69b889d83c96f11cb39b303"
+    },
+    {
+      "asset": "SettingsPage-Ck4f94Gu.js",
+      "status": 200,
+      "sha256": "fb757faa63996622ccb64cdc54a7cf5845d90e98efb77327036e085d1d08fc61"
+    },
+    {
+      "asset": "shared-irnZZXX7.js",
+      "status": 200,
+      "sha256": "172d5e884620b017a6a7844c4a9a2413748b2a0c015f8b1db245db96c41aba66"
+    },
+    {
+      "asset": "SiteSettingsPage-DR0QJbj_.js",
+      "status": 200,
+      "sha256": "a6b4348c43ff57b297429e38440c493c6e0f09f27db4a9549eb0873c769ee783"
+    },
+    {
+      "asset": "statistic-BxAoWfns.js",
+      "status": 200,
+      "sha256": "e443abecb26b5936fc39dfde521544fe0b707df34cbbbf8e29dfaacb60a36fdd"
+    },
+    {
+      "asset": "SystemPages-DUzE3Zci.js",
+      "status": 200,
+      "sha256": "61363382e850858511d015b1373eee5c36080cec4ccd403aeaff9c8f3bf3f0fa"
+    },
+    {
+      "asset": "tabs-DHkdd7Xx.js",
+      "status": 200,
+      "sha256": "71e52e9b7b582493f3752bd53c531ecdd2511f2547be072fa3e35e2ed8a1e3a4"
+    },
+    {
+      "asset": "trash-2-BZ8hCKY1.js",
+      "status": 200,
+      "sha256": "4b804e1ac2959b4621a0acfb02c18f7e265bc2a3499404ddd16c9ec93f82c27c"
+    },
+    {
+      "asset": "UdpRelayPage-DgXRgZxy.js",
+      "status": 200,
+      "sha256": "7749da01a1222cc4ed4800c03a0c416cf88428cca5b23b42f07601b4197ba749"
+    },
+    {
+      "asset": "undo-2-BgQdZk2Q.js",
+      "status": 200,
+      "sha256": "f6754d529e192fd0582a4fdda70bb1b4f2de0ee7fa897e9c2c3aeb66ee2fd46e"
+    },
+    {
+      "asset": "useModalTablePagination-Ce_cSSjC.js",
+      "status": 200,
+      "sha256": "08b4b04dbc8449a4f21ae89affaeebd32d1cb933efce8097d2b66b635938a22f"
+    },
+    {
+      "asset": "UsersPage-CfbHIYvX.js",
+      "status": 200,
+      "sha256": "ad41a49169ad874e0aa57004594e9ff82d62016aaf12c25f8492892aafca9425"
+    },
+    {
+      "asset": "UserStatisticsPage-C1z3LJgP.js",
+      "status": 200,
+      "sha256": "31572e11d68c29b05837ec339dccc3e15aaf0adfb9c822ce3aa057c748992f5c"
+    },
+    {
+      "asset": "useUnsavedChanges-uFyhY0_Y.js",
+      "status": 200,
+      "sha256": "1870162fa2e3d069a563e04caec8f7cbd77ccaa4da377520416af26ca225a925"
+    },
+    {
+      "asset": "value-SIcts_1p.js",
+      "status": 200,
+      "sha256": "376c116bdc36ecc270de347d91537b50a9ad75af01ffed1d29613534bc3f757b"
+    },
+    {
+      "asset": "with-selector-C60wiYMZ.js",
+      "status": 200,
+      "sha256": "27fe0eeb9b2abda14c912c7751c26084c75c725abbf8031b8efd7e512d179bc9"
+    },
+    {
+      "asset": "workflow-BPs9Cnvx.js",
+      "status": 200,
+      "sha256": "c294bd993a25866681e57a9d7bdd999c27d521e22e665a0dc511b55e98b1c5f4"
+    },
+    {
+      "asset": "WorkflowDesignerPage-Ce3BtfMx.js",
+      "status": 200,
+      "sha256": "5d75bfb74c1a13d17e2cd8bd797abbdffb16526e2081686fc05973fef65dbcec"
+    },
+    {
+      "asset": "WorkflowDiagram-Bf2CFWUq.js",
+      "status": 200,
+      "sha256": "971f34f7f9f95fe44e3d785c1efac666d3d9f223d12e145bd9648d82fe713f7d"
+    },
+    {
+      "asset": "WorkflowDiagram-DLioOiRN.css",
+      "status": 200,
+      "sha256": "b0cb7bd6fec5951c9c8f5808821438206604b1629a912c96009ac427f38e7d69"
+    },
+    {
+      "asset": "WorkflowsPage-Sgz0B38U.js",
+      "status": 200,
+      "sha256": "f2bce43c26884b7fb67509b548cb24240710b3f952292c4eaf69d001411f3b88"
+    },
+    {
+      "asset": "WorkOrderPage-krk1AbKc.js",
+      "status": 200,
+      "sha256": "159e742014ef2e7862cdbbfc9614caa22b4e81d2242b4212491be3ebfddd03f3"
+    },
+    {
+      "asset": "workspace-BC4GsxUR.js",
+      "status": 200,
+      "sha256": "57917c9296192479d4f3ecc667a05abee78be30ce2903fe78a4648e663c26430"
+    }
+  ],
+  "containers": [
+    {
+      "name": "mayday-frontend-1",
+      "image": "sha256:e450fd0ec310969d188a1a4719e080566b660cd71bbc8d23ff3a3ec30d3c94fc",
+      "status": "running",
+      "startedAt": "2026-10-03T04:51:53.378589076Z"
+    },
+    {
+      "name": "mayday-backend-1",
+      "image": "sha256:3a5b2485fdf5f9ced2a22c6df0078c1dc4ce93b3029cc5fac38f0e7f08e185e7",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-10-03T04:35:38.006162154Z"
+    },
+    {
+      "name": "mayday-mysql-1",
+      "image": "sha256:7c07d11b694dcc7e2ef3de845075eca1a8b39868f85f519f938b54c432edc1cb",
+      "status": "running",
+      "health": "healthy",
+      "startedAt": "2026-10-02T03:24:27.780905462Z"
+    }
+  ]
+}

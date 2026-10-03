@@ -375,50 +375,366 @@
 .workflow-diagram .react-flow__attribution a {
   color: var(--app-text-secondary);
 }
-/* 控件库、预览、明细均使用可缩列网格；明细不要求横向滚动来填写。 */
-.form-designer-workspace {
-  display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
-  gap: 20px;
+/* 表单编辑三栏共用运行主题。高度由视口剩余空间决定，内容溢出仅发生在对应面板内。
+   属性栏不另套业务抽屉；窄屏由组件切换为弹窗，避免强行保留三栏导致全页横向滚动。 */
+.designer-form-body {
+  padding: 0;
 }
-.form-designer-palette {
+.workflow-form-builder {
+  min-width: 0;
+  height: max(380px, calc(100dvh - 312px));
+  display: flex;
+  flex-direction: column;
+}
+.workflow-form-tools {
+  flex: 0 0 auto;
+  min-height: 52px;
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--app-border);
+}
+.workflow-form-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.workflow-form-error-count {
+  color: var(--app-error);
+  font-size: 12px;
+}
+.workflow-form-layout {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
   display: grid;
-  /* 13 类控件按两列排列，避免少量表单字段时仅控件库就撑出页面滚动条。 */
+  grid-template-columns: 216px minmax(0, 1fr) 304px;
+}
+.workflow-form-layout.is-preview,
+.workflow-form-layout.is-narrow {
+  grid-template-columns: minmax(0, 1fr);
+}
+.workflow-form-palette,
+.workflow-form-properties {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--app-surface);
+}
+.workflow-form-palette {
+  border-right: 1px solid var(--app-border);
+}
+.workflow-form-properties {
+  border-left: 1px solid var(--app-border);
+}
+.workflow-form-palette > header,
+.workflow-form-properties > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 16px;
+}
+.workflow-form-palette > header span,
+.workflow-form-properties > header span {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+.workflow-form-palette-content {
+  padding: 0 14px 16px;
+}
+.workflow-form-palette-content h4 {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  font-weight: 500;
+  margin: 18px 0 10px;
+}
+.workflow-form-control-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  align-content: start;
 }
-.form-designer-palette .ant-btn {
+.workflow-form-control-grid .ant-btn {
   justify-content: flex-start;
+  padding: 0 8px;
+  font-size: 12px;
+  height: 36px;
+  border-color: var(--app-border);
 }
-.form-designer-canvas {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  align-content: start;
+.workflow-form-control-grid .ant-btn:not(:disabled) {
+  cursor: grab;
 }
-.form-designer-field {
-  grid-column: span 2;
+.workflow-form-control-grid .ant-btn svg {
+  color: var(--app-primary-text);
+  flex-shrink: 0;
+}
+.workflow-form-stage {
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--app-border-strong);
+  min-height: 0;
+  padding: 20px;
+  overflow: auto;
+  background: var(--app-layout);
+}
+.workflow-form-sheet {
+  margin: 0 auto;
+  max-width: 840px;
+  min-width: 0;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
 }
-.form-designer-field.half-field {
+.workflow-form-sheet.is-mobile {
+  width: 360px;
+  max-width: 100%;
+}
+.workflow-form-sheet-title {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--app-border);
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.workflow-form-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 12px;
+  align-content: start;
+}
+.workflow-form-field {
+  grid-column: span 2;
+  min-width: 0;
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius);
+  padding: 12px 12px 28px;
+  cursor: pointer;
+  outline: none;
+}
+.workflow-form-field.is-half {
   grid-column: span 1;
 }
-.field-design-control {
-  margin: 16px 0 8px;
+.workflow-form-field:hover {
+  background: var(--app-fill);
 }
-.field-design-control .ant-form-item-label {
-  display: none;
+.workflow-form-field.is-selected,
+.workflow-form-field:focus-visible {
+  border-color: var(--app-primary-border);
+  background: var(--app-primary-bg);
 }
-.field-design-control .ant-form-item {
-  margin-bottom: 12px;
+.workflow-form-field.is-drop-target::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -3px;
+  height: 3px;
+  background: var(--app-primary);
+  border-radius: 2px;
 }
-.form-designer-field .field-card-footer {
-  justify-content: flex-end;
+.workflow-form-field-header {
   display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 9px;
+  font-size: 13px;
+}
+.workflow-form-field-header b {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.workflow-form-drag-handle {
+  flex-shrink: 0;
+  color: var(--app-text-secondary);
+  cursor: grab;
+}
+.workflow-form-type-name {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--app-text-secondary);
+}
+.workflow-form-design-control {
+  min-width: 0;
+  pointer-events: none;
+}
+.workflow-form-design-control > .ant-select {
+  width: 100%;
+}
+.workflow-form-design-control textarea.ant-input {
+  resize: none;
+}
+.workflow-form-design-control .ant-input-data-count {
+  font-size: 11px;
+}
+.workflow-form-field-help {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  overflow-wrap: anywhere;
+}
+.workflow-form-field-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--app-error);
+  overflow-wrap: anywhere;
+}
+.workflow-form-field-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 2px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+}
+.workflow-form-field:hover .workflow-form-field-actions,
+.workflow-form-field:focus-within .workflow-form-field-actions,
+.workflow-form-field.is-selected .workflow-form-field-actions {
+  opacity: 1;
+}
+.workflow-form-detail-sample {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  padding: 12px;
+}
+.workflow-form-detail-sample > .ant-btn {
+  justify-self: start;
+}
+.workflow-form-drop-end {
+  grid-column: span 2;
+  border: 1px dashed var(--app-border);
+  color: var(--app-text-secondary);
+  border-radius: var(--app-radius);
+  padding: 18px 8px;
+  margin-top: 4px;
+  text-align: center;
+  font-size: 12px;
+}
+.workflow-form-drop-end.is-drop-target {
+  border-color: var(--app-primary);
+  background: var(--app-primary-bg);
+  color: var(--app-primary-text);
+}
+.workflow-form-live-preview {
+  padding: 20px 24px;
+}
+.workflow-form-preview-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 12px;
+}
+.workflow-form-sheet.is-mobile .workflow-form-field.is-half,
+.workflow-form-sheet.is-mobile .workflow-fields > .half-field {
+  grid-column: span 2;
+}
+.workflow-field-properties {
+  padding: 0 16px 16px;
+  min-width: 0;
+}
+.workflow-field-properties .ant-form-item {
+  margin-bottom: 16px;
+}
+.workflow-field-properties .ant-input-number {
+  width: 100%;
+}
+.workflow-field-properties .ant-form-item-label {
+  padding-bottom: 5px;
+}
+.workflow-field-properties .ant-collapse {
+  background: transparent;
+}
+.workflow-field-options,
+.workflow-detail-columns {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.workflow-field-option-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.workflow-field-option-row > .ant-input {
+  min-width: 0;
+  flex: 1;
+}
+.workflow-field-option-row .ant-btn {
+  padding: 3px;
+  flex-shrink: 0;
+}
+.workflow-detail-column-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  padding: 6px;
+}
+.workflow-detail-column-row.is-selected {
+  border-color: var(--app-primary-border);
+  background: var(--app-primary-bg);
+}
+.workflow-detail-column-row > .ant-btn:first-child {
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+.workflow-detail-column-row .ant-btn {
+  padding-inline: 3px;
+}
+.workflow-column-properties {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+}
+.workflow-form-mobile-dialog .ant-modal-body {
+  max-height: calc(100dvh - 180px);
+  overflow: auto;
+}
+.workflow-form-mobile-dialog .workflow-form-palette-content {
+  padding: 0;
+}
+.workflow-form-mobile-dialog .workflow-field-properties {
+  padding: 0;
+}
+@media (max-width: 600px) {
+  .workflow-form-builder {
+    height: max(400px, calc(100dvh - 322px));
+  }
+  .workflow-form-tools {
+    padding: 10px;
+  }
+  .workflow-form-stage {
+    padding: 12px;
+  }
+  .workflow-form-field-grid {
+    padding: 6px;
+  }
+  .workflow-form-field.is-half {
+    grid-column: span 2;
+  }
+  .workflow-form-type-name {
+    font-size: 10px;
+  }
+  .workflow-form-sheet-title {
+    padding: 16px;
+  }
+  .workflow-form-live-preview {
+    padding: 16px;
+  }
 }
 .workflow-date-range {
   display: grid;
@@ -823,20 +1139,24 @@
   }
 }
 @media (max-width: 700px) {
-  .form-designer-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .form-designer-palette {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .form-designer-canvas {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .form-designer-field,
-  .form-designer-field.half-field {
-    grid-column: span 1;
-  }
   .workflow-diagram {
     height: 340px;
   }
+}
+
+/* 属性标题只出现一次，明细列长名称只截断展示、不改变其保存值。 */
+.workflow-form-properties > .workflow-field-properties {
+  padding-top: 16px;
+}
+.workflow-field-properties-heading {
+  margin-bottom: 16px;
+}
+.workflow-form-device-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.workflow-detail-column-row > .ant-btn:first-child .ant-btn-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

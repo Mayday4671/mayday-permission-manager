@@ -154,6 +154,52 @@ public final class WorkflowSchema {
 
   /** 发布与模拟使用同一验证器。先校验字段，再遍历图中的每一条边，而不是仅检查当前预览路径。 */
   public static void validate(Spec s) {
+    validate(s, true);
+  }
+
+  /**
+   * 草稿可以缺少人员、起点和连线，但已经放入表单的字段必须符合填写契约。 先检查字段结构，避免引用检查读取非法字段 ID；再阻止已存在单选项的分支引用失效。
+   * 不校验尚未完成的节点图，也不读取或修改历史发布版本。
+   */
+  public static void validateDraft(Spec s) {
+    if (s == null) return;
+    validateFields(s.fields());
+    validateChoiceReferences(s);
+  }
+
+  /** 保存草稿也保护已有单选值引用；人员未配置、连线尚未完成等草稿状态仍可保存。 未引用到已知单选字段的临时规则留给完整发布校验，不把本检查当作整图有效性证明。 */
+  public static void validateChoiceReferences(Spec s) {
+    if (s == null) return;
+    for (Node node : s.nodes())
+      if (node != null && "CONDITION".equals(node.type()))
+        for (Condition condition : node.conditions()) {
+          if (condition == null) continue;
+          s.fields().stream()
+              .filter(
+                  field ->
+                      field != null && field.id() != null && field.id().equals(condition.field()))
+              .findFirst()
+              .ifPresent(field -> validateChoiceReference(node, field, condition));
+        }
+  }
+
+  private static void validateChoiceReference(Node node, Field field, Condition condition) {
+    if ("SINGLE".equals(field.type())
+        && Set.of("EQ", "NE").contains(Objects.toString(condition.operator(), "")))
+      require(
+          field.options() != null && field.options().contains(condition.value()),
+          "条件节点“" + node.name() + "”使用的字段“" + field.label() + "”选项已不存在，请重新配置分支条件");
+  }
+
+  /**
+   * 仅服务内部对已冻结、不能由请求体改写的实例快照使用。旧发布契约曾允许单选规则引用 已不存在的值；历史实例沿用当时的比较语义，重提不能被新设计约束改写或截断。
+   * 这里只豁免该新增成员检查，字段、图、权限、人员来源等原有结构约束仍完整执行。
+   */
+  static void validateRuntimeSnapshot(Spec s) {
+    validate(s, false);
+  }
+
+  private static void validate(Spec s, boolean requireChoiceMembership) {
     require(s != null, "请先配置流程");
     require(s.fields().size() <= 40, "表单最多 40 个字段");
     require(!s.nodes().isEmpty() && s.nodes().size() <= 40, "流程需要 1 至 40 个节点");
@@ -274,6 +320,9 @@ public final class WorkflowSchema {
               !Set.of("FILES", "MULTI", "USER", "DEPARTMENT", "DATE_RANGE", "DETAILS")
                   .contains(f.type()),
               "条件暂不支持附件或对象字段");
+          // 单选项本身就是分支比较值；改名或删除后必须显式修复条件，不能静默走默认分支。
+          // 同时校验直接接口提交，前端提示不替代服务端发布和模拟的安全边界。
+          if (requireChoiceMembership) validateChoiceReference(n, f, c);
           if (Set.of("GT", "GE", "LT", "LE").contains(c.operator()))
             require(Set.of("NUMBER", "MONEY").contains(f.type()), "大小比较只适用于数值字段");
           if (Set.of("NUMBER", "MONEY").contains(f.type()) && !"CONTAINS".equals(c.operator())) {

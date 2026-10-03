@@ -431,7 +431,8 @@ public class WorkflowEngine implements FileUsage {
         && (input.businessId() != null || input.businessRevisionId() != null))
       throw new BusinessException("通用审批不能冒用业务关联");
     if (!draft) {
-      request.setResolvedAssignees(json.write(definitions.resolve(spec, access.current())));
+      request.setResolvedAssignees(
+          json.write(definitions.resolveStoredSnapshot(request.getId(), access.current())));
       record(request, "SUBMIT", null, "发起申请", null);
       advance(request, spec.startNodeId());
     }
@@ -469,7 +470,8 @@ public class WorkflowEngine implements FileUsage {
               versions.findById(definition.getPublishedVersionId()).orElseThrow().getSchemaJson());
       if (!definitions.canStart(current, access.current()))
         throw new AccessDeniedException("当前发起范围已撤销");
-      request.setResolvedAssignees(json.write(definitions.resolve(spec, access.current())));
+      request.setResolvedAssignees(
+          json.write(definitions.resolveStoredSnapshot(request.getId(), access.current())));
       request.setRunNumber(request.getRunNumber() + 1);
       request.setActivePath(null);
       request.setCompletedAt(null);

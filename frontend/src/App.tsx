@@ -12,7 +12,7 @@ import { useAuth } from "./lib/auth";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { PortalPage, ArticlePage } from "./pages/PortalPage";
-import { adminPages } from "./lib/workspace-model";
+import { adminPages, adminRouteTarget } from "./lib/workspace-model";
 import { useModules } from "./lib/modules";
 import { pageEnabled } from "./lib/module-model";
 import "./workflow.css";
@@ -147,7 +147,8 @@ const ChangesPage = lazy(() =>
   })),
 );
 
-function Protected() {
+/** 会话确认完成前不跳转；登录返回地址只保留白名单页面和必要实体 ID。 */
+export function Protected() {
   const { session, loading } = useAuth();
   const location = useLocation();
   if (loading)
@@ -159,7 +160,11 @@ function Protected() {
   return session ? (
     <Outlet />
   ) : (
-    <Navigate to="/login" replace state={{ from: location.pathname }} />
+    <Navigate
+      to="/login"
+      replace
+      state={{ from: adminRouteTarget(location.pathname + location.search) }}
+    />
   );
 }
 function Guard({

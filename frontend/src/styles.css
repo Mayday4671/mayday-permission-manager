@@ -3475,8 +3475,12 @@ code {
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;
-    transition: none !important;
-    animation: none !important;
+    /* 保留结束事件，避免 Ant 弹窗停在透明的入场状态；极短时长仍消除可感知动效。 */
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 /* 可读性校准：低饱和背景保留轻盈感，正文与可操作文本保持足够对比度。 */

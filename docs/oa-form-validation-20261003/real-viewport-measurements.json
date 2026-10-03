@@ -1,0 +1,86 @@
+{
+  "source": "authenticated isolated backend /admin/workflow-designer?id=23",
+  "errors": [],
+  "measurements": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "url": "http://127.0.0.1:15174/admin/workflow-designer?id=23",
+      "page": {
+        "width": 1440,
+        "scrollWidth": 1440,
+        "height": 1000,
+        "scrollHeight": 1000
+      },
+      "builder": {
+        "top": 227,
+        "bottom": 928,
+        "width": 1194,
+        "height": 701,
+        "narrow": false
+      }
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "url": "http://127.0.0.1:15174/admin/workflow-designer?id=23",
+      "page": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "height": 720,
+        "scrollHeight": 720
+      },
+      "builder": {
+        "top": 227,
+        "bottom": 648,
+        "width": 1034,
+        "height": 421,
+        "narrow": false
+      }
+    },
+    {
+      "viewport": {
+        "width": 2560,
+        "height": 1389
+      },
+      "url": "http://127.0.0.1:15174/admin/workflow-designer?id=23",
+      "page": {
+        "width": 2560,
+        "scrollWidth": 2560,
+        "height": 1389,
+        "scrollHeight": 1389
+      },
+      "builder": {
+        "top": 227,
+        "bottom": 1317,
+        "width": 2314,
+        "height": 1090,
+        "narrow": false
+      }
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "http://127.0.0.1:15174/admin/workflow-designer?id=23",
+      "page": {
+        "width": 390,
+        "scrollWidth": 390,
+        "height": 844,
+        "scrollHeight": 844
+      },
+      "builder": {
+        "top": 301,
+        "bottom": 772,
+        "width": 364,
+        "height": 471,
+        "narrow": true
+      }
+    }
+  ]
+}

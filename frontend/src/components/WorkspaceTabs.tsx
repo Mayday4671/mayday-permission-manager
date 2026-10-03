@@ -11,7 +11,7 @@ const popupContainer = () => document.body;
 /** 共用多页签栏：路由即标识。原生横向滚动承载任意宽度，菜单承载批量操作。 */
 export function WorkspaceTabs({ titles }: { titles: Record<string, string> }) {
   const workspace = useWorkspace();
-  const { paths, active, pinned, close, refresh } = workspace;
+  const { paths, active, pinned, close, refresh, destinationOf } = workspace;
   const navigate = useNavigate();
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   useEffect(() => {
@@ -52,7 +52,7 @@ export function WorkspaceTabs({ titles }: { titles: Record<string, string> }) {
               : -1;
     if (nextIndex >= 0) {
       event.preventDefault();
-      navigate(paths[nextIndex]);
+      navigate(destinationOf(paths[nextIndex]));
       buttons.current.get(paths[nextIndex])?.focus({ preventScroll: true });
     } else if (event.key === "Delete" && path !== pinned) {
       event.preventDefault();
@@ -109,7 +109,7 @@ export function WorkspaceTabs({ titles }: { titles: Record<string, string> }) {
                   if (node) buttons.current.set(path, node);
                   else buttons.current.delete(path);
                 }}
-                onClick={() => navigate(path)}
+                onClick={() => navigate(destinationOf(path))}
                 onKeyDown={(event) => onKeyDown(event, path)}
               >
                 {titleOf(path)}
@@ -135,7 +135,7 @@ export function WorkspaceTabs({ titles }: { titles: Record<string, string> }) {
           menu={{
             items: paths.map((path) => ({ key: path, label: titleOf(path) })),
             selectedKeys: [active],
-            onClick: ({ key }) => navigate(key),
+            onClick: ({ key }) => navigate(destinationOf(key)),
           }}
         >
           <Button type="text" aria-label="所有页签" icon={<List size={16} />} />
