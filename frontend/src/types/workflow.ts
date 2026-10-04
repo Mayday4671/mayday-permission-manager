@@ -118,6 +118,10 @@ export interface WorkflowTask extends BaseRecord {
   nodeName: string;
   assigneeId: number;
   assigneeName: string;
+  originalAssigneeId?: number | null;
+  originalAssigneeName?: string | null;
+  delegationId?: number | null;
+  assignmentNote?: string | null;
   status: string;
   mandatory: boolean;
   decidedAt: string | null;
@@ -173,6 +177,8 @@ export interface ApprovalDetail extends ApprovalRecord {
   canRemind: boolean;
   canEdit: boolean;
   canTerminate: boolean;
+  canHandover?: boolean;
+  handoverSources?: { value: number; label: string }[];
   returnTargets: { id: string; name: string }[];
   unreadCopies: number;
   diagram: {
@@ -221,6 +227,8 @@ export const actionNames: Record<string, string> = {
   TRANSFER: "转交",
   ADD_SIGN: "加签",
   REMIND: "催办",
+  DELEGATE: "委托",
+  HANDOVER: "人员交接",
 };
 export const fieldNames: Record<FieldType, string> = {
   TEXT: "单行文字",

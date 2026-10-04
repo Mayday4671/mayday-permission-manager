@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { ResourcePage } from "../../components/ResourcePage";
 import { ApprovalSubmitModal } from "../../components/ApprovalSubmitModal";
 import { ApprovalDetailModal } from "../../components/ApprovalDetailModal";
+import { WorkflowDelegationModal } from "../../components/WorkflowDelegationModal";
 import { formatTime } from "../../components/shared";
 import { useAuth } from "../../lib/auth";
 import { usePageState } from "../../lib/workspace";
@@ -15,6 +16,7 @@ function Approvals({ tasks = false }: { tasks?: boolean }) {
   const [params, setParams] = useSearchParams();
   const [selected, setSelected] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [delegating, setDelegating] = useState(false);
   const [status, setStatus] = usePageState<string | undefined>(
     "applicationStatus",
     undefined,
@@ -120,16 +122,20 @@ function Approvals({ tasks = false }: { tasks?: boolean }) {
           </Space>
         }
         extraToolbar={
-          !tasks &&
-          can("requests:create") && (
-            <Button
-              type="primary"
-              icon={<Plus size={16} />}
-              onClick={() => setCreating(true)}
-            >
-              发起审批
-            </Button>
-          )
+          <Space wrap>
+            {tasks && can("requests:delegate") && (
+              <Button onClick={() => setDelegating(true)}>审批委托</Button>
+            )}
+            {!tasks && can("requests:create") && (
+              <Button
+                type="primary"
+                icon={<Plus size={16} />}
+                onClick={() => setCreating(true)}
+              >
+                发起审批
+              </Button>
+            )}
+          </Space>
         }
         columns={[
           { title: "申请标题", dataIndex: "title", width: 260 },
@@ -184,6 +190,12 @@ function Approvals({ tasks = false }: { tasks?: boolean }) {
         onSuccess={(record) => setSelected(record.id)}
       />
       <ApprovalDetailModal id={selected} onClose={close} />
+      {can("requests:delegate") && (
+        <WorkflowDelegationModal
+          open={delegating}
+          onClose={() => setDelegating(false)}
+        />
+      )}
     </>
   );
 }

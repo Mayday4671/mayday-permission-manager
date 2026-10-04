@@ -24,6 +24,7 @@ const made = {
   requests: [],
   notices: [],
   files: [],
+  delegations: [],
 };
 async function call(path, token, method = "GET", data, status = 200) {
   const response = await fetch(base + path, {
@@ -155,11 +156,13 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
       "requests:approve",
       "messages:view",
       "users:view",
+      "requests:delegate",
     ];
     const a = await user("a", reviewPermissions),
       b = await user("b", reviewPermissions),
       c = await user("c", reviewPermissions),
-      outsider = await user("out", ["requests:view", "requests:create"]);
+      outsider = await user("out", ["requests:view", "requests:create"]),
+      replacement = await user("replacement", reviewPermissions);
     const cat = (await call("/system/entries/approvalcategories", admin))
       .items[0];
     const create = async (spec, businessType = "GENERAL") => {
@@ -210,6 +213,337 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
         status,
       );
     };
+
+    const localTime = (offsetMinutes) =>
+      new Date(Date.now() + offsetMinutes * 60000)
+        .toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" })
+        .replace(" ", "T");
+    const delegation = async (
+      who,
+      target,
+      definitionIds = [],
+      status = 200,
+      extra = {},
+    ) => {
+      const saved = await call(
+        "/operations/delegations",
+        who.token,
+        "POST",
+        {
+          targetId: target.id,
+          startsAt: localTime(0),
+          endsAt: localTime(120),
+          definitionIds,
+          reason: "临时请假安排",
+          ...extra,
+        },
+        status,
+      );
+      if (status === 200) made.delegations.push(saved.id);
+      return saved;
+    };
+    const revoke = async (who, record, status = 200) =>
+      call(
+        `/operations/delegations/${record.id}/revoke`,
+        who.token,
+        "POST",
+        { version: record.version },
+        status,
+      );
+    const handover = async (r, from, target, token = admin, status = 200) =>
+      call(
+        `/operations/requests/${r.id}/handover`,
+        token,
+        "POST",
+        {
+          version: r.version,
+          fromUserId: from.id,
+          targetUserId: target.id,
+          reason: "人员离职交接",
+        },
+        status,
+      );
+    const setEnabled = async (who, enabled) => {
+      const fresh = (
+        await call(
+          `/system/users?keyword=${encodeURIComponent(who.username)}`,
+          admin,
+        )
+      ).items.find((u) => u.id === who.id);
+      assert(fresh, "隔离账号须仍在SQL授权分页结果中");
+      await call("/system/users/status", admin, "PUT", {
+        rows: [{ id: fresh.id, version: fresh.version }],
+        enabled,
+      });
+    };
+    await t.test(
+      "使用未支持的用户读取方法返回405，不能误报服务器故障",
+      async () => {
+        await call(`/system/users/${a.id}`, admin, "GET", undefined, 405);
+      },
+    );
+    await t.test(
+      "限时委托按流程生效且不扩大审批字段，撤销只影响后续任务",
+      async () => {
+        const d = await create(schema([node([a.id])])),
+          other = await create(schema([node([a.id])]));
+        const arrangement = await delegation(a, c, [d.id]);
+        await call(
+          "/operations/delegations",
+          outsider.token,
+          "GET",
+          undefined,
+          403,
+        );
+        await delegation(outsider, c, [d.id], 403);
+        await revoke(c, arrangement, 403);
+        const normal = await submit(other);
+        assert.equal((await detail(normal.id, a.token)).myTaskId > 0, true);
+        await detail(normal.id, c.token).then(
+          () => assert.fail("其他流程不能委托"),
+          (error) => assert.match(error.message, /403/),
+        );
+        const r = await submit(d),
+          assigned = await detail(r.id, c.token);
+        const active = assigned.tasks.find((task) => task.status === "PENDING");
+        assert.equal(active.assigneeId, c.id);
+        assert.equal(active.originalAssigneeId, a.id);
+        assert.equal(active.delegationId, arrangement.id);
+        assert.deepEqual(Object.keys(assigned.values), ["memo"]);
+        await decide(r.id, a, "APPROVE", { taskId: active.id }, 403);
+        const received = await call(
+          "/operations/delegations?box=received",
+          c.token,
+        );
+        assert(received.items.some((row) => row.id === arrangement.id));
+        await revoke(a, arrangement);
+        await revoke(a, arrangement, 409);
+        assert.equal((await decide(r.id, c, "APPROVE")).status, "APPROVED");
+        const fresh = await submit(d);
+        assert((await detail(fresh.id, a.token)).myTaskId);
+        assert(
+          (await detail(r.id)).history.some(
+            (row) =>
+              row.action === "DELEGATE" && row.targetUserName === c.nickname,
+          ),
+        );
+      },
+    );
+    await t.test(
+      "委托拒绝重叠、循环和转委托，并发创建只有一个成功",
+      async () => {
+        await delegation(a, a, [], 400);
+        await delegation(a, outsider, [], 400);
+        await delegation(a, c, [], 400, { endsAt: localTime(91 * 24 * 60) });
+        const responses = await Promise.allSettled([
+          delegation(a, b),
+          delegation(a, c),
+        ]);
+        const success = responses.filter((r) => r.status === "fulfilled");
+        assert.equal(success.length, 1);
+        const arranged = success[0].value;
+        const receiver = arranged.targetId === b.id ? b : c;
+        await delegation(receiver, replacement, [], 400);
+        await delegation(replacement, a, [], 400);
+        await revoke(a, arranged);
+        const planned = await delegation(a, c, [], 200, {
+          startsAt: localTime(60),
+          endsAt: localTime(120),
+        });
+        const d = await create(schema([node([a.id])]));
+        const r = await submit(d);
+        assert((await detail(r.id, a.token)).myTaskId);
+        await revoke(a, planned);
+        const expired = await delegation(a, c);
+        sql(
+          `UPDATE ops_flow_delegation SET starts_at=DATE_SUB(NOW(),INTERVAL 2 HOUR),ends_at=DATE_SUB(NOW(),INTERVAL 1 HOUR) WHERE id=${expired.id} AND owner_id=${a.id};`,
+        );
+        const after = await submit(d);
+        assert((await detail(after.id, a.token)).myTaskId);
+        assert.equal(
+          (await call("/operations/delegations", a.token)).items.find(
+            (row) => row.id === expired.id,
+          ).status,
+          "EXPIRED",
+        );
+      },
+    );
+    await t.test(
+      "委托不能制造路径重复或同节点双任务，不适用时由原审批人办理",
+      async () => {
+        const first = node([a.id], { next: "second" }),
+          second = node([b.id], { id: "second" });
+        const d = await create(schema([first, second]));
+        const arranged = await delegation(a, b, [d.id]);
+        const r = await submit(d),
+          actual = await detail(r.id, a.token);
+        assert.equal(
+          actual.tasks.find((t) => t.status === "PENDING").assigneeId,
+          a.id,
+        );
+        assert.match(actual.tasks[0].assignmentNote, /委托未应用/);
+        await decide(r.id, a, "APPROVE");
+        await decide(r.id, b, "APPROVE");
+        await revoke(a, arranged);
+        const together = await create(schema([node([a.id, b.id])]));
+        const duplicate = await delegation(a, b, [together.id]);
+        const group = await submit(together),
+          all = await detail(group.id);
+        assert.deepEqual(
+          all.tasks.map((task) => task.assigneeId),
+          [a.id, b.id],
+        );
+        await revoke(a, duplicate);
+      },
+    );
+    await t.test(
+      "停用的后续人员可管理员交接，旧版本和无交接授权均拒绝",
+      async () => {
+        const d = await create(
+          schema([
+            node([a.id], { next: "second" }),
+            node([b.id], { id: "second" }),
+          ]),
+        );
+        const r = await submit(d);
+        await setEnabled(b, false);
+        const current = await detail(r.id, a.token);
+        await decide(r.id, a, "APPROVE", {}, 400);
+        assert.equal((await detail(r.id, a.token)).version, current.version);
+        await handover(r, b, c, a.token, 403);
+        await handover(r, b, a, admin, 400);
+        const repaired = await handover(r, b, c);
+        assert(repaired.version > r.version);
+        await handover(r, b, c, admin, 409);
+        await call(
+          `/operations/requests/${r.id}`,
+          c.token,
+          "GET",
+          undefined,
+          403,
+        );
+        await decide(r.id, a, "APPROVE");
+        assert((await detail(r.id, c.token)).myTaskId);
+        assert.equal((await decide(r.id, c, "APPROVE")).status, "APPROVED");
+        await setEnabled(b, true);
+        b.token = await login(b.username);
+      },
+    );
+    await t.test("当前待办交接保留期限与历史，原处理人不能再办理", async () => {
+      const d = await create(schema([node([a.id], { timeoutMinutes: 30 })]));
+      const r = await submit(d),
+        before = await detail(r.id, a.token),
+        old = before.tasks[0];
+      await handover(r, a, applicant, admin, 400);
+      await setEnabled(a, false);
+      const repaired = await handover(r, a, c);
+      const active = repaired.tasks.find((task) => task.status === "PENDING");
+      assert.equal(active.dueAt, old.dueAt);
+      assert.equal(active.originalAssigneeId, a.id);
+      assert.equal(
+        repaired.tasks.find((task) => task.id === old.id).status,
+        "TRANSFERRED",
+      );
+      await setEnabled(a, true);
+      a.token = await login(a.username);
+      await decide(r.id, a, "APPROVE", { taskId: old.id }, 403);
+      const assigned = await detail(r.id, c.token);
+      assert.equal(assigned.myTaskId, active.id);
+      assert(assigned.history.some((row) => row.action === "HANDOVER"));
+      assert.equal((await decide(r.id, c, "APPROVE")).status, "APPROVED");
+      await handover(await detail(r.id, admin), c, replacement, admin, 400);
+    });
+    await t.test(
+      "顺签未激活人员交接保留位置，不提前授权或跳过处理人",
+      async () => {
+        const d = await create(
+          schema([node([a.id, b.id, c.id], { mode: "SERIAL" })]),
+        );
+        const r = await submit(d),
+          before = await detail(r.id),
+          old = before.tasks.find((t) => t.assigneeId === b.id);
+        await setEnabled(b, false);
+        await handover(r, b, replacement);
+        const changed = await detail(r.id);
+        assert.equal(
+          changed.tasks.find((t) => t.id === old.id).assigneeId,
+          replacement.id,
+        );
+        await call(
+          `/operations/requests/${r.id}`,
+          replacement.token,
+          "GET",
+          undefined,
+          403,
+        );
+        await decide(r.id, a, "APPROVE");
+        assert((await detail(r.id, replacement.token)).myTaskId);
+        assert.equal(
+          (await decide(r.id, replacement, "APPROVE")).status,
+          "PENDING",
+        );
+        assert.equal((await decide(r.id, c, "APPROVE")).status, "APPROVED");
+        await setEnabled(b, true);
+        b.token = await login(b.username);
+      },
+    );
+    await t.test(
+      "人员交接跨退回重提保留，发布版本中的离职人员不会重新接收",
+      async () => {
+        const d = await create(
+          schema([node([a.id], { actions: ["APPROVE", "REJECT", "RETURN"] })]),
+        );
+        const r = await submit(d);
+        await setEnabled(a, false);
+        await handover(r, a, c);
+        await decide(r.id, c, "RETURN", { comment: "补充材料" });
+        const returned = await detail(r.id);
+        assert.equal(returned.status, "RETURNED");
+        const reentered = await call(
+          `/operations/requests/${r.id}/submit`,
+          applicant.token,
+          "POST",
+          {
+            version: returned.version,
+            title: returned.title,
+            values: returned.values,
+          },
+        );
+        assert.equal(reentered.runNumber, 2);
+        assert((await detail(r.id, c.token)).myTaskId);
+        assert.equal((await decide(r.id, c, "APPROVE")).status, "APPROVED");
+        const published = (
+          await call(`/operations/workflows/${d.id}/versions`, admin)
+        )[0];
+        assert.deepEqual(published.schema.nodes[0].assigneeIds, [a.id]);
+        await setEnabled(a, true);
+        a.token = await login(a.username);
+      },
+    );
+    await t.test(
+      "受托人恰为申请人时不允许自审，不把委托误当作永久授权",
+      async () => {
+        const starter = await user("reviewer_app", [
+          ...reviewPermissions,
+          "requests:create",
+        ]);
+        const d = await create(schema([node([a.id])]));
+        const arranged = await delegation(a, starter, [d.id]);
+        const r = await submit(d, {}, starter.token),
+          actual = await detail(r.id, a.token);
+        assert.equal(actual.tasks[0].assigneeId, a.id);
+        assert.match(actual.tasks[0].assignmentNote, /自审/);
+        await decide(
+          r.id,
+          starter,
+          "APPROVE",
+          { taskId: actual.tasks[0].id },
+          403,
+        );
+        await revoke(a, arranged);
+        await decide(r.id, a, "APPROVE");
+      },
+    );
     await t.test(
       "计算字段、组合分支及审批修改/退回重提保持可信结果和字段隔离",
       async () => {
@@ -1672,6 +2006,10 @@ DELIMITER ;`,
       },
     );
   } finally {
+    if (made.delegations.length)
+      sql(
+        `DELETE FROM ops_flow_delegation WHERE id IN (${ids(made.delegations)}) AND owner_id IN (${ids(made.users)});`,
+      );
     // 明确锁定本次事件，再删除它们生成的站内投递；不会借助永久删除接口放宽业务审计规则。
     const req = ids(made.requests),
       defs = ids(made.definitions);

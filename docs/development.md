@@ -6,7 +6,7 @@
 
 `ContentService` 负责草稿、修订、排期和发布，`NotificationService` 负责接收范围与投递，`WorkflowDefinitions` 负责模型发布和人员解析，`WorkflowEngine` 负责申请及节点流转。控制器只做协议转换、分页和调用。`WorkflowBusiness` 是审批与其他业务之间的契约，`ContentApprovalBinding` 在 application 层实现它，避免内容模块与审批模块循环依赖。
 
-Spring Data JPA 负责数据访问，Hibernate 使用 `ddl-auto=validate`，不会自动改动已有结构。空库可由 Flyway 初始化，或一次导入 `database/mayday.sql`（内含 V21 基线）；已有库升级统一由 Flyway 执行。新增字段须创建下一份迁移文件，不能改写任何已执行迁移（当前 V1–V21，下一个未占用版本是 V22）。V12 补齐原有业务表/字段中文注释，V13–V15 建立采集队列、图文数据及配置归档；V16–V17 增加 UDP 配置与网卡/传输模式；V18 增加工单示例；V19 增加文件存储/目录/回收站、批量任务、反馈、监控采样/策略、审批催办/到期及关键字段审计。V20 增加 OA 草稿、退回重办、提交轮次、顺签及抄送阅读状态，保留全部旧申请。V21 增加独立门户栏目、栏目分类归属、首页编排与访客明暗策略，修订冻结栏目 ID，保留既有正文、发布和审批历史。新增表或字段须同步更新单文件初始化 SQL 的结构、基础资料及基线版本，通过 `node scripts/database-docs.mjs --check` 检查注释完整性。
+Spring Data JPA 负责数据访问，Hibernate 使用 `ddl-auto=validate`，不会自动改动已有结构。空库可由 Flyway 初始化，或一次导入 `database/mayday.sql`（内含 V24 基线）；已有库升级统一由 Flyway 执行。新增字段须创建下一份迁移文件，不能改写任何已执行迁移（当前 V1–V24，下一个未占用版本是 V25）。V12 补齐原有业务表/字段中文注释，V13–V15 建立采集队列、图文数据及配置归档；V16–V17 增加 UDP 配置与网卡/传输模式；V18 增加工单示例；V19 增加文件存储/目录/回收站、批量任务、反馈、监控采样/策略、审批催办/到期及关键字段审计。V20 增加 OA 草稿、退回重办、提交轮次、顺签及抄送阅读状态，保留全部旧申请。V21 增加独立门户栏目、栏目分类归属、首页编排与访客明暗策略，修订冻结栏目 ID，保留既有正文、发布和审批历史。新增表或字段须同步更新单文件初始化 SQL 的结构、基础资料及基线版本，通过 `node scripts/database-docs.mjs --check` 检查注释完整性。
 
 `mayday-netty` 使用独立 POM，仅依赖 Netty，不进入 JPA 链路；管理端适配位于应用模块 `com.mayday.relay`。
 

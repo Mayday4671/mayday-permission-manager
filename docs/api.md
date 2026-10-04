@@ -205,6 +205,17 @@ V15 起，DELETE `/crawler/tasks/{id}` 对已经产生文章的配置采用归�
 
 关键词按字面量匹配，`%`、`_` 不解释为通配符。客户端不得以角色名称推断权限；校验以实际 DTO、PermissionCatalog 和服务层为准。版本过期应重新取得最新记录并让用户核对，不能自动覆盖重试。
 
+## 审批连续性
+
+- `GET /operations/delegations?box=mine|received&page=1&size=6`：仅本人创建或收到的安排，SQL 分页，不接受任意账号查询。需要 `requests:delegate/approve/view`。
+- `GET /operations/delegations/scopes`：已发布启用流程名称候选，不返回模型、表单或人员。
+- `POST /operations/delegations`：`targetId/startsAt/endsAt/definitionIds/reason`；空范围表示全部。身份取自会话，最长 90 天，时段采用北京时间且左闭右开；接收人检查启用、审批/查看权及用户数据范围。
+- `POST /operations/delegations/{id}/revoke`：`{version}`，只有本人可撤销；到期/撤销不自动收回已经激活的任务。
+- `POST /operations/requests/{id}/handover`：`{version,fromUserId,targetUserId,reason}`，需 `requests:manage/reassign` 与 `users:view` 数据范围。当前及未来审批人员的实例级交接，保留顺签顺序、原任务历史和期限；退回重提保留覆盖，发布版本不变。
+- 详情 `canHandover/handoverSources` 由服务端授权裁剪；普通参与者不返回未来人员修复目录。任务增加 `originalAssigneeId/originalAssigneeName/delegationId/assignmentNote`，历史增加 DELEGATE/HANDOVER；不允许客户端修改这些来源字段。
+
+所有动作继续检查版本和当前权限。接收人不能自审或制造同一路径重复审批；委托条件不适用时回到原人办理，不自动通过。用户权限撤销在接口立即生效。
+
 ## 门户栏目与首页
 
 - `GET /portal-management/channels`、`GET /portal-management/category-options`、`GET /portal-management/home`：要求 `portal:view`，分别返回管理栏目、有序分类候选、首页编排与原版本。

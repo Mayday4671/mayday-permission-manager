@@ -260,18 +260,26 @@ public class WorkflowDefinitions {
             ? legacy(request.getApproverIds())
             : json.spec(request.getSchemaSnapshot());
     WorkflowSchema.validateRuntimeSnapshot(schema);
-    return resolvePeople(schema, applicant);
+    return resolvePeople(schema, applicant, json.assignees(request.getAssignmentOverrides()));
   }
 
   /** 所有节点人员在提交时冻结；角色和负责人后续变动不替换已有申请，但每次处理仍检查账号权限。 */
   private Map<String, List<Long>> resolvePeople(Spec schema, SysUser applicant) {
+    return resolvePeople(schema, applicant, Map.of());
+  }
+
+  /** 只有服务端交接接口能写实例覆盖；重提重新校验接收人和人员规则，覆盖不改变节点字段或动作。 */
+  private Map<String, List<Long>> resolvePeople(
+      Spec schema, SysUser applicant, Map<String, List<Long>> overrides) {
     if (!canStart(schema, applicant)) throw new AccessDeniedException("当前账号不在流程发起范围");
     Map<String, List<Long>> result = new LinkedHashMap<>();
     for (Node node : schema.nodes())
       if (Set.of("APPROVAL", "COPY").contains(node.type())) {
         boolean approval = "APPROVAL".equals(node.type());
         List<SysUser> candidates;
-        if ("USERS".equals(node.source()))
+        if (approval && overrides.containsKey(node.id()))
+          candidates = overrides.get(node.id()).stream().map(id -> validUser(id, true)).toList();
+        else if ("USERS".equals(node.source()))
           candidates = node.assigneeIds().stream().map(id -> validUser(id, approval)).toList();
         else if ("DEPARTMENT_LEADER".equals(node.source())) {
           var department =
@@ -302,7 +310,7 @@ public class WorkflowDefinitions {
           throw new BusinessException(node.name() + "没有有效审批人或超过 100 人");
         // 指定人员顺序决定顺签顺序；角色成员没有人工顺序，按稳定账号编号排序。
         List<Long> ids =
-            "USERS".equals(node.source())
+            overrides.containsKey(node.id()) || "USERS".equals(node.source())
                 ? candidates.stream().map(SysUser::getId).distinct().toList()
                 : candidates.stream().map(SysUser::getId).distinct().sorted().toList();
         if (approval
@@ -332,6 +340,13 @@ public class WorkflowDefinitions {
     node.conditions().forEach(condition -> exits.add(condition.next()));
     return exits.stream()
         .anyMatch(id -> target.equals(id) || reachable(spec, spec.node(id), target, visited));
+  }
+
+  /** 人员替换只对可共同经过的审批节点限制重复；互斥分支的相同人员不会误判。 */
+  public boolean shareApprovalPath(Spec spec, String first, String second) {
+    return first.equals(second)
+        || reachable(spec, spec.node(first), second, new HashSet<>())
+        || reachable(spec, spec.node(second), first, new HashSet<>());
   }
 
   /** 申请入口只返回已发布版本的表单，避免使用未发布的设计草稿作为提交契约。 */

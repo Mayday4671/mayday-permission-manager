@@ -38,6 +38,7 @@ import {
 } from "../types/workflow";
 import { ApprovalEditModal } from "./ApprovalEditModal";
 import { WorkflowDiagram } from "./workflow/WorkflowDiagram";
+import { WorkflowHandoverModal } from "./WorkflowHandoverModal";
 interface EventState {
   id: number;
   status: string;
@@ -58,6 +59,7 @@ export function ApprovalDetailModal({
     client = useQueryClient();
   const [action, setAction] = useState<WorkflowAction | null>(null);
   const [editing, setEditing] = useState<ApprovalDetail | null>(null);
+  const [handover, setHandover] = useState<ApprovalDetail | null>(null);
   const [form] = Form.useForm();
   const query = useQuery({
     queryKey: ["approvals", "detail", id],
@@ -85,6 +87,7 @@ export function ApprovalDetailModal({
   useEffect(() => {
     setAction(null);
     setEditing(null);
+    setHandover(null);
   }, [id]);
   return (
     <>
@@ -230,7 +233,20 @@ export function ApprovalDetailModal({
                         columns={[
                           { title: "轮次", dataIndex: "runNumber", width: 70 },
                           { title: "节点", dataIndex: "nodeName" },
-                          { title: "审批人", dataIndex: "assigneeName" },
+                          {
+                            title: "审批人",
+                            dataIndex: "assigneeName",
+                            render: (value, row) => (
+                              <span title={row.assignmentNote ?? undefined}>
+                                {value}
+                                {row.originalAssigneeName && (
+                                  <small style={{ display: "block" }}>
+                                    原指定：{row.originalAssigneeName}
+                                  </small>
+                                )}
+                              </span>
+                            ),
+                          },
                           {
                             title: "状态",
                             dataIndex: "status",
@@ -450,6 +466,9 @@ export function ApprovalDetailModal({
                       {d.status === "DRAFT" ? "继续填写" : "修改并重新提交"}
                     </Button>
                   )}
+                  {d.canHandover && (
+                    <Button onClick={() => setHandover(d)}>人员交接</Button>
+                  )}
                   {d.canTerminate && (
                     <Button danger onClick={() => start("TERMINATE")}>
                       终止申请
@@ -544,6 +563,16 @@ export function ApprovalDetailModal({
           )}
         </QueryState>
       </DetailsModal>
+      <WorkflowHandoverModal
+        record={handover}
+        onClose={() => setHandover(null)}
+        onSuccess={async () => {
+          await query.refetch();
+          await client.invalidateQueries({
+            queryKey: ["resource", "requests"],
+          });
+        }}
+      />
       <FormModal
         zIndex={1100}
         title={action ? actionNames[action] + "审批" : ""}

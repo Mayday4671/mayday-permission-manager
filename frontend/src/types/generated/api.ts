@@ -624,6 +624,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/operations/delegations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["WorkflowContinuityController_list"];
+    put?: never;
+    post: operations["WorkflowContinuityController_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/delegations/{id}/revoke": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["WorkflowContinuityController_revoke"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/delegations/scopes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["WorkflowContinuityController_scopes"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/operations/feedback": {
     parameters: {
       query?: never;
@@ -1258,6 +1306,22 @@ export interface paths {
     get: operations["WorkflowFileController_download"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/requests/{id}/handover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["WorkflowContinuityController_handover"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2690,6 +2754,16 @@ export interface components {
       /** Format: int32 */
       maxImages?: number;
     };
+    Create: {
+      definitionIds?: number[];
+      /** Format: date-time */
+      endsAt: string;
+      reason: string;
+      /** Format: date-time */
+      startsAt: string;
+      /** Format: int64 */
+      targetId: number;
+    };
     DepartmentGrant: {
       /** Format: int64 */
       departmentId: number;
@@ -2876,6 +2950,15 @@ export interface components {
       operation?: string;
       /** Format: int32 */
       scale?: number;
+    };
+    Handover: {
+      /** Format: int64 */
+      fromUserId: number;
+      reason: string;
+      /** Format: int64 */
+      targetUserId: number;
+      /** Format: int64 */
+      version: number;
     };
     HomeDraft: {
       allowThemeToggle?: boolean;
@@ -4602,6 +4685,100 @@ export interface operations {
       };
     };
   };
+  WorkflowContinuityController_list: {
+    parameters: {
+      query?: {
+        box?: string;
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  WorkflowContinuityController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Create"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  WorkflowContinuityController_revoke: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["WorkflowVersionRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  WorkflowContinuityController_scopes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
   FeedbackController_list: {
     parameters: {
       query?: {
@@ -5781,6 +5958,32 @@ export interface operations {
         };
         content: {
           "application/json": string;
+        };
+      };
+    };
+  };
+  WorkflowContinuityController_handover: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Handover"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
         };
       };
     };

@@ -27,6 +27,18 @@ public class FlowTask extends BaseEntity {
   @Column(length = 64)
   private String assigneeName;
 
+  /** 临时委托或管理员交接前的原指定人；为空表示任务没有发生归属替换。 */
+  private Long originalAssigneeId;
+
+  @Column(length = 64)
+  private String originalAssigneeName;
+
+  /** 已激活的任务保存委托来源；委托撤销或到期不追溯改变该任务。 */
+  private Long delegationId;
+
+  @Column(length = 500)
+  private String assignmentNote;
+
   @Column(length = 20)
   private String status = "PENDING";
 

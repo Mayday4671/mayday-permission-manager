@@ -434,7 +434,12 @@ test(
           if (!nativeRoot) assert(/^[a-f0-9]{12,64}$/.test(container));
           if (nativeRoot) {
             const allowed = realpathSync(
-              resolve(".local", "full-functions-files"),
+              resolve(
+                ".local",
+                database === "fresh-db"
+                  ? "full-functions-fresh-files"
+                  : "full-functions-files",
+              ),
             );
             assert.equal(
               realpathSync(nativeRoot),

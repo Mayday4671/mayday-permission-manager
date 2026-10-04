@@ -70,6 +70,13 @@ public class ApiExceptionHandler {
     return response(413, "上传内容超过服务器限制，请减小文件后重试");
   }
 
+  /** 已注册路径使用不支持的方法应返回405，不把客户端调用错误记成服务器故障。 */
+  @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+  ResponseEntity<?> methodNotAllowed(
+      org.springframework.web.HttpRequestMethodNotSupportedException exception) {
+    return response(405, "此资源不支持该请求方法");
+  }
+
   /** 未预期故障仅在服务端保存异常栈，对外固定错误提示以隔离内部实现细节。 */
   @ExceptionHandler(Exception.class)
   ResponseEntity<?> internal(Exception exception) {

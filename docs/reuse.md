@@ -11,7 +11,7 @@
 1. 复制源码目录中的 `backend`、`frontend`、`scripts`、`tests`、`tools`、`contracts`、`database`、`docs`、`.github`、Compose 文件、README 和工程配置文件（含 `.env.example`、`.editorconfig`、`.gitattributes`、`.gitignore`）。保留 Maven Wrapper（包括 `backend/.mvn`）及前端 lockfile。
 2. **不要复制**日常 `.env`、`.local`、真实数据库备份/卷、构建输出、`node_modules`、缓存和日志。当前源码已提交到 [GitHub 仓库](https://github.com/Mayday4671/mayday-permission-manager)，可克隆后为新业务另建仓库或分支；数据库备份与代码版本管理分别保留。
 3. 将 `.env.example` 复制为新项目 `.env`；替换管理员和数据库口令，保持 `SEED_DEMO_DATA=false`。Compose 顶部项目名、数据库名、端口按新项目调整，使用独立目录和独立数据卷，不能指向旧业务库。
-4. 执行 `docker compose up -d --build`，Flyway 会从空库迁移到 V22。需要手动建库时，先把 `database/mayday.sql` 一次导入独立空库，再启动应用；文件已包含 V22 基线，无需关闭迁移或放宽校验。两种安装方式均由应用创建管理员和必要基础资料，没有演示成员、部门或文章。UDP 转发默认停止；仅需独立转发时可直接复制 `backend/mayday-netty`，不需要整个后台。
+4. 执行 `docker compose up -d --build`，Flyway 会从空库迁移到 V24。需要手动建库时，先把 `database/mayday.sql` 一次导入独立空库，再启动应用；文件已包含 V24 基线，无需关闭迁移或放宽校验。两种安装方式均由应用创建管理员和必要基础资料，没有演示成员、部门或文章。UDP 转发默认停止；仅需独立转发时可直接复制 `backend/mayday-netty`，不需要整个后台。
 5. 登录后配置站点名称、联系信息、前台主题、门户栏目及分类归属和实际组织；创建普通角色，按最小权限授权。账号、角色、组织、业务配置在数据库内，重启不重置。
 6. 在增加业务前运行前端构建与隔离基线验证，保留结果。默认端口均绑定本机；正式部署按 [生产指南](production.md) 配置启动门禁、会话期限、分离数据库账号、探针、域名/HTTPS 和同恢复点的数据库及文件备份。
 
@@ -23,7 +23,7 @@ UDP 是可选业务能力，普通后台安装不要求预先提高内核 socket
 
 可先使用 [模块生成器与工程规范](engineering.md) 生成基础代码，已提供默认关闭的工单示例。以“工单”为例，先明确数据所有者和所属部门，决定工单转派时权限如何变化；跨组织或客户隔离不能直接拿部门字段冒充租户字段。
 
-1. 新增实体、Repository、请求/响应 DTO、服务；使用独立业务表，不把复杂业务塞进 `sys_entry.value`。当前已到 V22，新增迁移从下一个未占用版本（现为 V23）开始，写完整表/列 COMMENT，再同步 `database/mayday.sql` 中的当前结构、基础资料和基线版本。
+1. 新增实体、Repository、请求/响应 DTO、服务；使用独立业务表，不把复杂业务塞进 `sys_entry.value`。当前已到 V24，新增迁移从下一个未占用版本（现为 V25）开始，写完整表/列 COMMENT，再同步 `database/mayday.sql` 中的当前结构、基础资料和基线版本。
 2. 在 `PermissionCatalog.GROUPS` 注册 `tickets` 及 view/create/update/delete/export 等实际支持动作；需要行级范围则设置 `scoped=true`。角色编辑页面、后端范围白名单及会话摘要现在统一从该目录派生。
 3. **操作授权**：Controller 使用 `@PreAuthorize("@access.has('tickets:view')")` 或 Service 入口 `access.require(...)`；认证通过不等于拥有模块权限。
 4. **列表范围**：`access.filter("tickets", "ownerId")` 与业务条件组合；当前通用策略约定实体的部门属性名为 `departmentId`。分页、总数、导出、搜索选项和图表都复用同一过滤，不先全量查再在前端过滤。

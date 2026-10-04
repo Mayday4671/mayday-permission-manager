@@ -59,6 +59,10 @@ public class FlowRequest extends BaseEntity {
   @Column(columnDefinition = "longtext")
   private String resolvedAssignees;
 
+  /** 管理员交接的实例级人员修复；退回重提沿用，不回退到已经离职的原发布人员。 */
+  @Column(columnDefinition = "longtext")
+  private String assignmentOverrides;
+
   @Column(length = 40)
   private String currentNodeId;
 

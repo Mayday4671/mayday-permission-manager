@@ -1,6 +1,6 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V22）
--- 唯一对外交付 SQL：51 张业务表、506 个业务字段、索引/外键及必要基础资料。
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V24）
+-- 唯一对外交付 SQL：52 张业务表、524 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
 -- 【使用方法】
@@ -12,7 +12,7 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V22 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V23+。
+-- 4. 本文件已包含 V24 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V25+。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
@@ -292,10 +292,11 @@ CREATE TABLE `ops_flow_request` (
   `completed_at` datetime(6) DEFAULT NULL COMMENT '结束时间；通过、驳回或撤回时写入，审批中为 NULL',
   `submitted_form_data` longtext COMMENT '发起时的原始表单 JSON，不随节点修改变化；字段读取仍须应用可见性过滤',
   `last_reminded_at` datetime(6) DEFAULT NULL COMMENT '申请人最近一次手动催办时间；每30分钟最多一次，不改变审批状态和节点授权',
-  `run_number` INT NOT NULL DEFAULT 1 COMMENT '提交轮次：未提交草稿为0；首次提交为1；修改重提递增',
-  `node_visit` INT NOT NULL DEFAULT 0 COMMENT '节点办理批次：每次进入审批或抄送递增，用于隔离退回后的旧决定',
-  `active_path` TEXT DEFAULT NULL COMMENT '当前轮实际审批路径JSON，nodes为稳定节点ID数组；退回时裁剪，重提时清空',
-  `submitted_at` DATETIME(6) DEFAULT NULL COMMENT '最近一次正式提交时间；未提交草稿为空，不使用草稿创建时间冒充',
+  `run_number` int NOT NULL DEFAULT '1' COMMENT '提交轮次：未提交草稿为0；首次提交为1；修改重提递增',
+  `node_visit` int NOT NULL DEFAULT '0' COMMENT '节点办理批次：每次进入审批或抄送递增，用于隔离退回后的旧决定',
+  `active_path` text COMMENT '当前轮实际审批路径JSON，nodes为稳定节点ID数组；退回时裁剪，重提时清空',
+  `submitted_at` datetime(6) DEFAULT NULL COMMENT '最近一次正式提交时间；未提交草稿为空，不使用草稿创建时间冒充',
+  `assignment_overrides` longtext COMMENT '管理员人员交接形成的实例级节点人员覆盖JSON；退回重提保留，发布模型不改变，未交接时NULL',
   PRIMARY KEY (`id`),
   KEY `idx_request_applicant` (`applicant_id`),
   KEY `idx_request_approver` (`current_approver_id`,`status`)
@@ -326,12 +327,17 @@ CREATE TABLE `ops_flow_task` (
   `decided_at` datetime(6) DEFAULT NULL COMMENT '任务已处理时间；尚未处理时为 NULL',
   `due_at` datetime(6) DEFAULT NULL COMMENT '审批任务到期时间，由已发布流程版本的节点超时分钟数计算；NULL表示未设置超时',
   `timeout_notified_at` datetime(6) DEFAULT NULL COMMENT '已发送本任务一次超时提醒的时间；NULL表示尚未提醒，任务行锁保证并发幂等',
-  `run_number` INT NOT NULL DEFAULT 1 COMMENT '所属提交轮次，与申请重提轮次对应；旧任务只作为历史',
-  `node_visit` INT NOT NULL DEFAULT 0 COMMENT '所属节点办理批次；同一节点退回重办不得混用以前的会签结果',
-  `kind` VARCHAR(16) NOT NULL DEFAULT 'APPROVAL' COMMENT '任务种类：APPROVAL审批/COPY抄送，抄送不具备决定权限',
-  `read_at` DATETIME(6) DEFAULT NULL COMMENT '抄送接收者首次已读时间，空表示未读；审批任务不用此字段',
+  `run_number` int NOT NULL DEFAULT '1' COMMENT '所属提交轮次，与申请重提轮次对应；旧任务只作为历史',
+  `node_visit` int NOT NULL DEFAULT '0' COMMENT '所属节点办理批次；同一节点退回重办不得混用以前的会签结果',
+  `kind` varchar(16) NOT NULL DEFAULT 'APPROVAL' COMMENT '任务种类：APPROVAL审批/COPY抄送，抄送不具备决定权限',
+  `read_at` datetime(6) DEFAULT NULL COMMENT '抄送接收者首次已读时间，空表示未读；审批任务不用此字段',
+  `original_assignee_id` bigint DEFAULT NULL COMMENT '委托或交接前原指定账号ID；逻辑关联sys_user，历史不追溯更改',
+  `original_assignee_name` varchar(64) DEFAULT NULL COMMENT '原指定审批人名称快照；没有替换任务归属时为空',
+  `delegation_id` bigint DEFAULT NULL COMMENT '临时委托记录ID；任务激活时绑定，之后到期或撤销不自动收回此任务',
+  `assignment_note` varchar(500) DEFAULT NULL COMMENT '任务归属说明：委托来源、交接理由或委托不适用原因；不包含隐藏表单字段',
   PRIMARY KEY (`id`),
   KEY `idx_task_pending` (`assignee_id`,`status`,`request_id`),
+  KEY `idx_flow_task_timeout` (`status`,`due_at`,`timeout_notified_at`),
   KEY `idx_flow_task_round_visit` (`request_id`,`run_number`,`node_visit`),
   KEY `idx_flow_task_copy_reader` (`assignee_id`,`kind`,`read_at`),
   CONSTRAINT `ops_flow_task_ibfk_1` FOREIGN KEY (`request_id`) REFERENCES `ops_flow_request` (`id`)
@@ -997,7 +1003,6 @@ CREATE TABLE `ops_monitor_policy` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='监控阈值与单人站内提醒策略；独立配置权限、版本保护和数据库告警冷却';
 
 ALTER TABLE ops_file ADD KEY idx_file_owner_directory (owner_id,directory_id,deleted_at);
-ALTER TABLE ops_flow_task ADD KEY idx_flow_task_timeout (status,due_at,timeout_notified_at);
 ALTER TABLE ops_file ADD CONSTRAINT fk_file_directory FOREIGN KEY (directory_id) REFERENCES ops_file_directory(id);
 
 INSERT INTO ops_monitor_policy(id,created_at,updated_at,version,enabled,heap_threshold_percent,database_threshold_ms) VALUES(1,NOW(6),NOW(6),0,0,85,500);
@@ -1041,12 +1046,33 @@ INSERT INTO sys_entry(kind,name,code,path,permission,sort_order,enabled,created_
  WHERE NOT EXISTS(SELECT 1 FROM sys_entry WHERE kind='menus' AND code='portal');
 
 
+CREATE TABLE `ops_flow_delegation` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '临时委托主键，数据库生成；不是审批任务编号',
+  `created_at` datetime(6) NOT NULL COMMENT '委托创建时间，服务端业务本地时间 Asia/Shanghai',
+  `updated_at` datetime(6) NOT NULL COMMENT '委托最近变更时间；仅撤销可更新现有记录',
+  `version` bigint NOT NULL COMMENT 'JPA乐观锁版本；撤销须携带读取版本，不能客户端赋值',
+  `owner_id` bigint NOT NULL COMMENT '委托创建账号，由当前会话决定；不能由请求指定他人',
+  `owner_name` varchar(64) NOT NULL COMMENT '创建时原审批人名称快照，不随用户改名重写',
+  `target_id` bigint NOT NULL COMMENT '受托审批账号；创建和任务激活时重新检查有效权限',
+  `target_name` varchar(64) NOT NULL COMMENT '创建时受托人名称快照，供安排历史展示',
+  `starts_at` datetime(6) NOT NULL COMMENT '委托开始时间，包含此时刻；单条时段最长90天',
+  `ends_at` datetime(6) NOT NULL COMMENT '委托结束时间，不包含此时刻；结束不改写已激活任务',
+  `definition_ids_json` text NOT NULL COMMENT '受限结构JSON对象 ids数组；空数组表示全部流程，否则为发布定义ID集合',
+  `reason` varchar(500) NOT NULL COMMENT '创建时填写的委托原因，历史保留，不允许事后改写',
+  `revoked_at` datetime(6) DEFAULT NULL COMMENT '本人撤销时间；非空不再产生新委托任务，已激活任务需显式交接',
+  PRIMARY KEY (`id`),
+  KEY `idx_delegation_owner_time` (`owner_id`,`revoked_at`,`starts_at`,`ends_at`),
+  KEY `idx_delegation_target_time` (`target_id`,`revoked_at`,`starts_at`,`ends_at`),
+  CONSTRAINT `fk_delegation_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_delegation_target` FOREIGN KEY (`target_id`) REFERENCES `sys_user` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='不可改写的限时审批委托安排；撤销保留历史，拒绝同一时段双重安排和委托链';
+
 -- 全部建表及基础资料成功后才登记基线；如前面报错，必须停止，不能跳过失败语句。
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '22', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '24', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
--- 安装完成自检：应得到 51 张业务表、506 个业务字段，缺少注释数均为 0。
+-- 安装完成自检：应得到 52 张业务表、524 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。
 SELECT COUNT(*) AS business_tables, SUM(table_comment = '') AS missing_table_comments
 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history';
