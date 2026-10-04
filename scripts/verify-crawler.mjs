@@ -1,5 +1,5 @@
 /**
- * 图片采集隔离验收：随机命名的临时 MySQL、随机本机端口，导入唯一交付 SQL 后运行真实事务测试。
+ * 采集与调度事务隔离验收：随机命名的临时 MySQL、随机本机端口，导入唯一交付 SQL 后运行真实事务测试。
  * 外站响应由测试代码提供确定性夹具；不增加生产测试接口、不放开内网采集限制。
  */
 import { spawnSync } from "node:child_process";
@@ -109,7 +109,7 @@ try {
     "-pl",
     "mayday-application",
     "-am",
-    "-Dtest=CrawlerIntegrationTest",
+    "-Dtest=CrawlerIntegrationTest,JobTransactionIntegrationTest",
     "-Dsurefire.failIfNoSpecifiedTests=false",
     "test",
   ];
@@ -134,7 +134,9 @@ try {
     0,
     "集成测试失败，详见 " + join(out, "integration.log"),
   );
-  mark("真实 MySQL 双层分页、去重、停止恢复、失效租约、重试与权限回归");
+  mark(
+    "真实 MySQL 采集分页、重试与权限，以及调度失败回滚、持久历史和并发领取回归",
+  );
   assert.equal(sql("SELECT COUNT(*) FROM crawl_task;").trim(), "0");
   assert.equal(sql("SELECT COUNT(*) FROM ops_file;").trim(), "0");
   mark("测试任务与图片完整清理");

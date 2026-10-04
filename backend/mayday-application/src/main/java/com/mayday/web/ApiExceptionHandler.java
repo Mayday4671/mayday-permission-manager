@@ -9,11 +9,13 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 /** 统一异常边界：把业务错误变为可读提示，内部细节仅保留在服务端日志。 */
 @RestControllerAdvice
@@ -70,9 +72,23 @@ public class ApiExceptionHandler {
     return response(413, "上传内容超过服务器限制，请减小文件后重试");
   }
 
-  /** 未预期故障仅在服务端保存异常栈，对外固定错误提示以隔离内部实现细节。 */
+  /** 框架请求错误保留客户端状态；未预期故障仅在服务端保存异常栈，对外固定提示。 */
   @ExceptionHandler(Exception.class)
   ResponseEntity<?> internal(Exception exception) {
+    // 框架请求异常保留其状态和 Allow/Accept 协议头，不回传可能包含内部细节的 detail。
+    if (exception instanceof ErrorResponse error && error.getStatusCode().is4xxClientError()) {
+      String message =
+          switch (error.getStatusCode().value()) {
+            case 405 -> "请求方法不支持";
+            case 406 -> "不支持请求的响应格式";
+            case 415 -> "请求内容类型不支持";
+            default -> "请求格式不正确";
+          };
+      return ResponseEntity.status(error.getStatusCode())
+          .headers(error.getHeaders())
+          .body(ApiResponse.error(message));
+    }
+    if (exception instanceof MultipartException) return response(400, "上传请求格式不正确");
     LOG.error("请求处理失败", exception);
     return response(500, "服务暂时不可用，请稍后重试");
   }

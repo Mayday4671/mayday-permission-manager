@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -114,7 +115,7 @@ public class FileController {
   }
 
   /** 接收受限文件流并写入部署指定的存储，数据库失败时补偿已写入对象。 */
-  @PostMapping
+  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ApiResponse<StoredFile> upload(
       @RequestPart("file") MultipartFile upload, @RequestParam(required = false) Long directoryId)
       throws IOException {

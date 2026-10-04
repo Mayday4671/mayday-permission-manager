@@ -97,6 +97,7 @@ let requests = [];
 let clients = [];
 let routers = [];
 const crawlerPayloads = [];
+const settingPayloads = [];
 let serverRows = [
   { id: 1, name: "Alpha", enabled: true, version: 1 },
   { id: 2, name: "Beta", enabled: false, version: 1 },
@@ -133,6 +134,9 @@ globalThis.fetch = async (path, options) => {
           "users:create",
           "users:update",
           "roles:view",
+          "settings:view",
+          "settings:create",
+          "settings:update",
           "crawler:view",
           "crawler:create",
           "crawler:run",
@@ -155,6 +159,16 @@ globalThis.fetch = async (path, options) => {
       success: true,
       data: { items: [], total: 0, page: 1, size: 10 },
     });
+  }
+  if (
+    url.pathname.startsWith("/api/system/entries/settings") &&
+    ["POST", "PUT"].includes(options?.method)
+  ) {
+    settingPayloads.push({
+      method: options.method,
+      ...JSON.parse(options.body),
+    });
+    return Response.json({ success: true, data: { id: 1 } });
   }
   requests.push(url.searchParams);
   const rows = serverRows.filter(
@@ -1865,4 +1879,39 @@ test("明细列属性编辑保留模板约束，并允许修改金额上限", as
   assert.equal(saved.columns[0].maxLength, 200);
   assert.equal(saved.columns[1].min, 0);
   assert.equal(saved.columns[1].max, 500);
+});
+
+test("参数真实表单新增提交默认排序，编辑保留已有排序与版本", async () => {
+  const { SettingsPage } = await import("../src/pages/SettingsPage");
+  const user = userEvent.setup();
+  settingPayloads.length = 0;
+  serverRows = [
+    {
+      id: 1,
+      name: "已有参数",
+      code: "test.existing",
+      groupName: "通用",
+      valueType: "TEXT",
+      value: "old",
+      sortOrder: 23,
+      enabled: true,
+      version: 7,
+    },
+  ];
+  mount(<SettingsPage />);
+  await user.click(await screen.findByRole("button", { name: "新增参数" }));
+  let dialog = await screen.findByRole("dialog", { name: "新增参数" });
+  await user.type(within(dialog).getByLabelText("参数名称"), "测试参数");
+  await user.type(within(dialog).getByLabelText("参数编码"), "test.new");
+  await user.click(within(dialog).getByRole("button", { name: /保\s*存/ }));
+  await waitFor(() => assert.equal(settingPayloads.length, 1));
+  assert.equal(settingPayloads[0].sortOrder, 0);
+  await waitFor(() => assert.equal(screen.queryByRole("dialog"), null));
+  await user.click(await screen.findByRole("button", { name: /编\s*辑/ }));
+  dialog = await screen.findByRole("dialog", { name: "编辑参数" });
+  await user.click(within(dialog).getByRole("button", { name: /保\s*存/ }));
+  await waitFor(() => assert.equal(settingPayloads.length, 2));
+  assert.equal(settingPayloads[1].sortOrder, 23);
+  assert.equal(settingPayloads[1].version, 7);
+  assert.equal(settingPayloads[1].method, "PUT");
 });

@@ -42,6 +42,8 @@ jobs:
           docker compose up -d --build --wait --wait-timeout 180 mysql backend
       - name: Fresh install, preserved upgrade, permission and module regression
         run: node scripts/verify-baseline.mjs
+      - name: Crawler and scheduler transaction regression
+        run: node scripts/verify-crawler.mjs
       - name: Stop CI services
         if: always()
         run: docker compose down --volumes --remove-orphans

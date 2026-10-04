@@ -6036,7 +6036,7 @@
         ],
         "requestBody": {
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
                 "properties": {
                   "file": {

@@ -118,6 +118,10 @@ export function SettingsPage() {
       ]}
       fields={(record, form) => (
         <>
+          {/* 注册隐藏排序字段，确保新增默认值和编辑原值进入提交 DTO。 */}
+          <Form.Item name="sortOrder" hidden>
+            <Input type="number" />
+          </Form.Item>
           <div className="form-two-columns">
             <Form.Item
               label="参数名称"
