@@ -10,7 +10,9 @@ Content-Type: application/json
 ```
 
 成功：`{ "success": true, "data": ..., "message": "操作成功" }`。
-失败：`{ "success": false, "data": null, "message": "可读错误信息" }`，同时返回真实 HTTP 状态：400 校验、401 认证、403 授权、404 资源不存在或模块关闭、409 冲突、429 限流、500 内部失败。
+失败：`{ "success": false, "data": null, "message": "可读错误信息" }`，同时返回真实 HTTP 状态：400 校验、401 认证、403 授权、404 资源不存在或模块关闭、409 冲突、413 请求过大、429 限流、500 内部失败。
+
+应用为每次请求生成 `X-Request-ID` 并关联日志，忽略客户端同名头；前端服务错误显示有效的定位号，不能用它作为身份或授权依据。代理自身拒绝的请求可能没有此头。匿名健康端点仅公开 `/actuator/health`、`/actuator/health/liveness` 和 `/actuator/health/readiness`，就绪探针包含数据库连通且不公开组件详情。
 
 列表 `data` 包含 `items`、`total`、`page`、`size`。页码从 1 开始，每页最多 100 条。默认按 ID 倒序；列表接受 `keyword/page/size`，用户和基础资料额外接受 `enabled`，内容接受 `published`，日志接受 `success`。用户还支持 `departmentId`。
 

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V21）
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V22）
 -- 唯一对外交付 SQL：51 张业务表、506 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
@@ -12,7 +12,7 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V21 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V22+。
+-- 4. 本文件已包含 V22 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V23+。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
@@ -573,10 +573,10 @@ CREATE TABLE `sys_role_scope_department` (
 CREATE TABLE `sys_session` (
   `token_hash` varchar(64) NOT NULL COMMENT '令牌 SHA-256 小写十六进制摘要，64 字符主键；不通过会话列表公开',
   `user_id` bigint NOT NULL COMMENT '会话账号 ID，外键 sys_user.id；鉴权时重新加载账号状态和角色',
-  `expires_at` timestamp(6) NOT NULL COMMENT '绝对过期时刻，TIMESTAMP 存储时间点；签发后 12 小时，不因活跃时间更新而延长',
+  `expires_at` timestamp(6) NOT NULL COMMENT '签发时的固定截止时间，TIMESTAMP 时间点；按会话配置写入，默认 720 分钟，不随认证活动延长',
   `session_id` varchar(36) DEFAULT NULL COMMENT '随机 UUID 公开会话标识，唯一；用于列表及撤销接口，不能作为登录令牌使用',
-  `created_at` timestamp(6) NULL DEFAULT NULL COMMENT '会话签发时刻，TIMESTAMP 时间点；V3 前历史会话迁移时回填',
-  `last_active_at` timestamp(6) NULL DEFAULT NULL COMMENT '最近活跃时刻，TIMESTAMP；为减少写入至多约每分钟更新一次',
+  `created_at` timestamp(6) NULL DEFAULT NULL COMMENT '会话签发时间点；固定期限亦按当前策略从此时刻计算，缺少可信签发时间的记录不能恢复认证',
+  `last_active_at` timestamp(6) NULL DEFAULT NULL COMMENT '最近认证请求时间点，最多每分钟更新一次；无请求超时默认 30 分钟，轮询属于活动；NULL 回退签发时间',
   `ip` varchar(64) DEFAULT NULL COMMENT '登录请求来源地址；默认取连接对端，可信代理部署需要另行配置',
   `device` varchar(255) DEFAULT NULL COMMENT '登录请求 User-Agent 截断至 255 字符；客户端声明信息，不能用于鉴权',
   PRIMARY KEY (`token_hash`),
@@ -1044,7 +1044,7 @@ INSERT INTO sys_entry(kind,name,code,path,permission,sort_order,enabled,created_
 -- 全部建表及基础资料成功后才登记基线；如前面报错，必须停止，不能跳过失败语句。
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '21', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '22', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
 -- 安装完成自检：应得到 51 张业务表、506 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。

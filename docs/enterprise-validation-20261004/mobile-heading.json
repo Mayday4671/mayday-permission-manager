@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "url": "http://127.0.0.1:15173/channels/guides?q=%E4%B8%8D%E5%AD%98%E5%9C%A8%E7%9A%84%E9%AA%8C%E6%94%B6%E5%85%B3%E9%94%AE%E8%AF%8D",
+  "screenshot": "21-daily-mobile-search-heading.png",
+  "headingHeight": 29.84375,
+  "lineHeight": 29.8571,
+  "viewport": [
+    320,
+    844
+  ],
+  "scroll": [
+    320,
+    1063
+  ],
+  "descriptionLayout": "column"
+}

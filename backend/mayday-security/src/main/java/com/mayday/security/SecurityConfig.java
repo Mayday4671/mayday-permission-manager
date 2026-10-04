@@ -70,6 +70,8 @@ public class SecurityConfig {
                         "/api/platform/features",
                         "/api/public/**",
                         "/actuator/health",
+                        "/actuator/health/liveness",
+                        "/actuator/health/readiness",
                         "/error")
                     .permitAll()
                     .requestMatchers("/api/platform/openapi", "/api/platform/openapi/**")

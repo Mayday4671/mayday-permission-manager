@@ -10,6 +10,11 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import {
+  deploymentFingerprint,
+  assertVerifiedInputs,
+} from "./deployment-inputs.mjs";
+import { fileManifest } from "./file-backup.mjs";
+import {
   snapshotFields,
   readCrawlerMenu,
   verifyCrawlerMenuRename,
@@ -32,6 +37,8 @@ const passed = readdirSync(baseline)
   })
   .find((r) => r?.status === "passed");
 assert(passed, "请先完成 scripts/verify-baseline.mjs 隔离验收");
+const sourceFingerprint = deploymentFingerprint(root);
+assertVerifiedInputs(passed.sourceFingerprint, sourceFingerprint);
 const id = new Date().toISOString().replace(/[^0-9]/g, "");
 const out = join(root, ".local", "upgrades", id);
 mkdirSync(out, { recursive: true });
@@ -47,6 +54,7 @@ const result = {
   verification: passed.path,
   status: "running",
   checks: [],
+  sourceFingerprint,
 };
 const hash = (s) => createHash("sha256").update(s).digest("hex");
 function command(args, { input, log = "commands.log" } = {}) {
@@ -128,6 +136,7 @@ try {
     result.oldImages[service] = { image, tag };
   }
   dc(["build", "backend", "frontend"], { log: "build.log" });
+  assertVerifiedInputs(sourceFingerprint, deploymentFingerprint(root));
   mark("前后端镜像构建及旧镜像保留");
   dc(["stop", "backend", "frontend"], { log: "stop.log" });
   stopped = true;
@@ -157,6 +166,26 @@ try {
     bytes: Buffer.byteLength(dump),
   };
   mark("停写后的完整数据库备份");
+  const backend = dc(["ps", "-a", "-q", "backend"]).trim();
+  assert(/^[a-f0-9]{12,64}$/.test(backend), "文件备份容器标识无效");
+  const filePath = join(out, "files");
+  mkdirSync(filePath);
+  // docker cp 可读取已停止容器中的持久卷；先停写，再和数据库组成同一恢复点。
+  command(["cp", `${backend}:/app/data/files/.`, filePath], {
+    log: "file-backup.log",
+  });
+  const manifest = fileManifest(filePath);
+  writeFileSync(
+    join(out, "files-manifest.json"),
+    JSON.stringify(manifest, null, 2) + "\n",
+  );
+  result.fileBackup = {
+    path: filePath,
+    manifest: join(out, "files-manifest.json"),
+    files: manifest.files.length,
+    bytes: manifest.bytes,
+  };
+  mark("停写后的 LOCAL 文件正文备份与逐文件 SHA-256");
   dc(
     [
       "up",

@@ -302,10 +302,19 @@ test("后台关闭访客切换后，已存偏好不能覆盖网站统一浅色�
 test("空搜索结果可直接清空关键词，保留栏目分类且只有一个一级标题", async () => {
   noSearchResults = true;
   const router = mount("/channels/guides?category=11&q=不存在&page=2");
-  await screen.findByText("未找到匹配内容，请尝试其他标题关键词");
+  // 零结果会先将第2页规范化为第1页；等路由和新查询稳定再操作，避免点击已经卸载的旧按钮。
+  await act(async () => {
+    await waitFor(() =>
+      assert(!new URLSearchParams(router.state.location.search).has("page")),
+    );
+  });
+  await screen.findByRole("button", { name: "清空关键词" });
+  assert(screen.getByText("未找到匹配内容，请尝试其他标题关键词"));
   assert.equal(screen.getAllByRole("heading", { level: 1 }).length, 1);
   assert(screen.getByRole("heading", { name: "搜索结果", level: 2 }));
-  fireEvent.click(await screen.findByRole("button", { name: "清空关键词" }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "清空关键词" }));
+  });
   await screen.findByRole("link", { name: "阅读指南" });
   const params = new URLSearchParams(router.state.location.search);
   assert.equal(router.state.location.pathname, "/channels/guides");

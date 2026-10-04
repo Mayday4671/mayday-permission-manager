@@ -1,0 +1,174 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "08-home-upgraded",
+      "url": "/",
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        720
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "09-guides-upgraded",
+      "url": "/channels/guides",
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        720
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "10-notices-upgraded",
+      "url": "/channels/notices",
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        720
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "11-updates-upgraded",
+      "url": "/channels/updates",
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        948
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "12-stories-upgraded",
+      "url": "/channels/stories",
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        911
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "13-home-dark-upgraded",
+      "url": "/",
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        720
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "14-mobile-home-dark",
+      "url": "/",
+      "viewport": [
+        390,
+        844
+      ],
+      "scroll": [
+        390,
+        2038
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "15-mobile-home-light",
+      "url": "/",
+      "viewport": [
+        390,
+        844
+      ],
+      "scroll": [
+        390,
+        2038
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "16-small-mobile-home",
+      "url": "/",
+      "viewport": [
+        320,
+        844
+      ],
+      "scroll": [
+        320,
+        2081
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "17-small-mobile-empty-search",
+      "url": "/channels/guides?q=%E4%B8%8D%E5%AD%98%E5%9C%A8%E7%9A%84%E9%AA%8C%E6%94%B6%E5%85%B3%E9%94%AE%E8%AF%8D",
+      "viewport": [
+        320,
+        844
+      ],
+      "scroll": [
+        320,
+        1065
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "18-desktop-empty-search",
+      "url": "/channels/guides?q=%E4%B8%8D%E5%AD%98%E5%9C%A8%E7%9A%84%E9%AA%8C%E6%94%B6%E5%85%B3%E9%94%AE%E8%AF%8D",
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        720
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    },
+    {
+      "name": "19-desktop-search-recovered",
+      "url": "/channels/guides",
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        720
+      ],
+      "brokenImages": 0,
+      "adminLinks": 0
+    }
+  ],
+  "pageErrors": []
+}

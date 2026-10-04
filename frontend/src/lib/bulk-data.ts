@@ -1,5 +1,5 @@
 import type { components } from "../types/generated/api";
-import { ApiError } from "./api";
+import { ApiError, responseError } from "./api";
 import { contractClient, unwrapContract } from "./contract-client";
 
 /** 导入预览只复用服务端公开的安全字段；文件中的初始密码不会进入业务状态模型。 */
@@ -83,7 +83,7 @@ async function saveBulkDownload(
       typeof failure.message === "string"
         ? failure.message
         : "下载失败，请检查当前权限";
-    throw new ApiError(reason, result.response.status);
+    throw responseError(result.response, reason);
   }
   if (
     !/^text\/csv(?:;|$)/i.test(

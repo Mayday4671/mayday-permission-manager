@@ -16,7 +16,7 @@ public record PageResult<T>(List<T> items, long total, int page, int size) {
   /** 规范化不可信分页参数并按主键倒序稳定排序；调用方仍需添加资源权限和行级范围条件。 */
   public static PageRequest request(int page, int size) {
     return PageRequest.of(
-        Math.max(0, page - 1),
+        Math.max(1, page) - 1,
         Math.min(100, Math.max(1, size)),
         Sort.by(Sort.Direction.DESC, "id"));
   }

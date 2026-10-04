@@ -566,6 +566,10 @@
 
 /* 720px 高度的笔记本进一步压缩主视觉与装饰留白，分页或长正文仍允许真实内容滚动。 */
 @media (min-width: 851px) and (max-height: 760px) {
+  /* 空搜索没有正文需要滚动，只压缩上下装饰留白，保留恢复按钮与页脚。 */
+  .portal-channel-page .site-empty {
+    padding-block: 20px;
+  }
   .portal-home {
     --portal-home-hero-height: 175px;
   }
@@ -1134,6 +1138,16 @@
   }
 }
 @media (max-width: 600px) {
+  /* 栏目检索说明独占一行，避免长关键词在窄屏把“搜索结果”标题挤成逐字换行。 */
+  .portal-channel-page .portal-section-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .portal-channel-page .portal-section-heading p {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
   .site-container {
     width: calc(100% - 32px);
   }

@@ -14,8 +14,8 @@ export function SessionsPage() {
     <ResourcePage<SessionRecord>
       resource="sessions"
       endpoint="/operations/sessions"
-      title="在线用户"
-      singular="用户"
+      title="在线会话"
+      singular="会话"
       readOnly
       fields={() => null}
       columns={[
@@ -49,7 +49,7 @@ export function SessionsPage() {
           width: 180,
         },
         {
-          title: "失效时间",
+          title: "预计失效",
           dataIndex: "expiresAt",
           render: formatTime,
           width: 180,

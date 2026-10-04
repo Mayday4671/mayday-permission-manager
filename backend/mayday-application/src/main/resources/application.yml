@@ -1,8 +1,11 @@
 server:
   port: 8080
+  shutdown: graceful
   error:
     include-message: never
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   servlet:
     multipart:
       max-file-size: ${MAYDAY_STORAGE_MAX_MB:10}MB
@@ -14,12 +17,15 @@ spring:
     url: ${DB_URL:jdbc:mysql://127.0.0.1:13306/mayday?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
     username: ${DB_USERNAME:mayday}
     password: ${DB_PASSWORD}
+    hikari:
+      connection-timeout: 5000
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
   flyway:
-    enabled: true
+    # 分离DDL/DML账号时，先用部署迁移任务升级，再关闭业务进程的自动DDL。
+    enabled: ${DB_MIGRATIONS_ENABLED:true}
   jackson:
     time-zone: Asia/Shanghai
 management:
@@ -30,7 +36,23 @@ management:
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        # 本平台核心功能依赖MySQL；数据库故障停止接流量，但不通过存活探针反复重启。
+        readiness:
+          include: readinessState,db
 mayday:
+  deployment:
+    production: ${MAYDAY_PRODUCTION:false}
+    public-origin: ${MAYDAY_PUBLIC_ORIGIN:}
+  security:
+    sessions:
+      absolute-minutes: ${MAYDAY_SESSION_ABSOLUTE_MINUTES:720}
+      idle-minutes: ${MAYDAY_SESSION_IDLE_MINUTES:30}
+      max-per-user: ${MAYDAY_SESSION_MAX_PER_USER:5}
   admin-password: ${ADMIN_PASSWORD}
   # 仅首次空库初始化读取；正式新项目默认不创建演示人员、部门与文章。
   seed-demo-data: ${SEED_DEMO_DATA:false}
@@ -56,3 +78,8 @@ springdoc:
   paths-to-match: /api/**
   writer-with-order-by-keys: true
   default-produces-media-type: application/json
+
+# 故障定位只关联随机请求标识，不把请求正文、令牌或查询参数放进关联字段。
+logging:
+  pattern:
+    level: "%5p [requestId:%X{requestId}]"

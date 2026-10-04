@@ -12,6 +12,9 @@ import { spawnSync } from "node:child_process";
 import { deflateSync } from "node:zlib";
 import { loginWithCaptcha } from "./support/captcha.mjs";
 import { purgeTestFiles } from "./support/files-cleanup.mjs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { fileManifest, assertRestoredFiles } from "../scripts/file-backup.mjs";
 
 const base = process.env.API_BASE;
 const project = process.env.API_TEST_COMPOSE_PROJECT;
@@ -375,6 +378,134 @@ test(
           400,
         );
       });
+      await t.test(
+        "LOCAL 备份恢复后正文、缩略图和原数据库文件引用仍可读取",
+        async () => {
+          assert(isolated, "恢复检查只允许隔离环境");
+          const service =
+            database === "upgrade-db" ? "backend-upgrade" : "backend-fresh";
+          const compose = [
+            "compose",
+            "-p",
+            project,
+            "-f",
+            "compose.verify.yaml",
+          ];
+          const docker = (args) => {
+            const result = spawnSync("docker", args, {
+              encoding: "utf8",
+              windowsHide: true,
+              timeout: 180000,
+            });
+            assert.equal(result.status, 0, "隔离文件恢复命令未完成");
+            assert(!result.error, "隔离文件恢复命令异常");
+            return result.stdout.trim();
+          };
+          const container = docker([...compose, "ps", "-q", service]);
+          assert(/^[a-f0-9]{12,64}$/.test(container));
+          // SQL取出的键仍必须属于刚上传的测试账号和严格UUID路径，不能用请求参数拼接任意文件路径。
+          const key = sql(
+            `SELECT storage_key FROM ops_file WHERE id=${image.id} AND owner_id=${first.user.id};`,
+          );
+          assert(/^[a-f0-9]{2}\/[a-f0-9-]{36}$/.test(key));
+          const output = resolve(
+            ".local",
+            "file-recovery",
+            project,
+            database,
+            prefix,
+          );
+          const saved = join(output, "files");
+          const restored = join(output, "restored");
+          mkdirSync(saved, { recursive: true });
+          mkdirSync(restored);
+          let stopped = false;
+          let backup;
+          try {
+            docker([...compose, "stop", service]);
+            stopped = true;
+            docker(["cp", `${container}:/app/data/files/.`, saved]);
+            backup = fileManifest(saved);
+            writeFileSync(
+              join(output, "manifest.json"),
+              JSON.stringify(backup, null, 2) + "\n",
+            );
+            docker([
+              ...compose,
+              "up",
+              "-d",
+              "--no-build",
+              "--wait",
+              "--wait-timeout",
+              "180",
+              service,
+            ]);
+            stopped = false;
+            // 只移除已登记测试图片的对象；元信息保留，模拟正文丢失。绝不清空整卷。
+            docker([
+              "exec",
+              "--user",
+              "0",
+              container,
+              "rm",
+              "--",
+              `/app/data/files/${key}`,
+            ]);
+            await binary(image.id, first.token, "download", 400);
+            docker([...compose, "stop", service]);
+            stopped = true;
+            docker(["cp", saved + "/.", `${container}:/app/data/files`]);
+            docker(["cp", `${container}:/app/data/files/.`, restored]);
+            assertRestoredFiles(backup, fileManifest(restored));
+          } finally {
+            if (stopped) {
+              // cp在宿主机备份后不保证Linux属主；启动后用固定存储目录恢复应用用户写权限。
+              docker([
+                ...compose,
+                "up",
+                "-d",
+                "--no-build",
+                "--wait",
+                "--wait-timeout",
+                "180",
+                service,
+              ]);
+              docker([
+                "exec",
+                "--user",
+                "0",
+                container,
+                "chown",
+                "-R",
+                "mayday:mayday",
+                "/app/data/files",
+              ]);
+            }
+          }
+          assert.deepEqual((await binary(image.id, first.token)).bytes, png());
+          const thumbnail = await binary(image.id, first.token, "thumbnail");
+          assert.equal(thumbnail.bytes.readUInt32BE(16), 320);
+          assert.equal(thumbnail.bytes.readUInt32BE(20), 160);
+          assert.equal(
+            (await metadata(image.id, first.token)).directoryId,
+            child.id,
+          );
+          writeFileSync(
+            join(output, "result.json"),
+            JSON.stringify(
+              {
+                status: "passed",
+                files: backup.files.length,
+                bytes: backup.bytes,
+                imageId: image.id,
+                databaseReferenceRetained: true,
+              },
+              null,
+              2,
+            ) + "\n",
+          );
+        },
+      );
       await t.test(
         "跨用户猜测文件和目录被拒绝，查看权限不等于下载或编辑权限",
         async () => {

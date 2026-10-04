@@ -5,7 +5,11 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loginWithCaptcha } from "./support/captcha.mjs";
+import {
+  loginWithCaptcha,
+  captchaToken,
+  captchaRequest,
+} from "./support/captcha.mjs";
 import { spawnSync } from "node:child_process";
 
 const isolated =
@@ -585,6 +589,146 @@ test("隔离数据库权限专项回归", { skip: !isolated }, async (t) => {
         assert.equal(after.user.username, operator.username);
         assert.equal(after.user.departmentId, before.user.departmentId);
         assert.deepEqual(after.permissions, before.permissions);
+      },
+    );
+
+    await t.test("并发登录不突破每账号五会话配额，最早登录被撤销", async () => {
+      const user = await person("login_quota", dept.id, selfRole);
+      const oldest = await login(user.username);
+      // 同账号换图会废弃旧挑战，不能并发创建七道题；先逐次取得独立一次性凭证，再并发真实密码登录。
+      const proofs = [];
+      for (let i = 0; i < 7; i++)
+        proofs.push(await captchaToken(base, user.username));
+      const tokens = await Promise.all(
+        proofs.map(
+          async (proof) =>
+            (
+              await captchaRequest(base, "/auth/login", {
+                username: user.username,
+                password,
+                captchaToken: proof,
+              })
+            ).token,
+        ),
+      );
+      await api("/auth/me", oldest, "GET", undefined, 401);
+      const responses = await Promise.all(
+        tokens.map((token) =>
+          fetch(`${base}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ),
+      );
+      assert.equal(
+        responses.filter((response) => response.status === 200).length,
+        5,
+      );
+      assert.equal(
+        responses.filter((response) => response.status === 401).length,
+        2,
+      );
+      const list = await sessions(admin, user.username);
+      assert.equal(list.total, 5);
+      assert(
+        list.items.every(
+          (item) => !("tokenHash" in item) && !("token" in item),
+        ),
+      );
+      const page1 = await api(
+        `/operations/sessions?size=2&page=1&keyword=${encodeURIComponent(user.username)}`,
+        admin,
+      );
+      const page2 = await api(
+        `/operations/sessions?size=2&page=2&keyword=${encodeURIComponent(user.username)}`,
+        admin,
+      );
+      const page3 = await api(
+        `/operations/sessions?size=2&page=3&keyword=${encodeURIComponent(user.username)}`,
+        admin,
+      );
+      assert.deepEqual(
+        [page1.items.length, page2.items.length, page3.items.length],
+        [2, 2, 1],
+      );
+      assert.equal(
+        new Set(
+          [...page1.items, ...page2.items, ...page3.items].map(
+            (item) => item.id,
+          ),
+        ).size,
+        5,
+      );
+      const negative = await api(
+        "/operations/sessions?page=-2147483648&size=2",
+        admin,
+      );
+      assert.equal(negative.page, 1);
+    });
+
+    await t.test(
+      "服务端无请求/固定超时不会因首次访问被重新激活，在线计数同步排除",
+      async () => {
+        const user = await person("timeout_probe", dept.id, selfRole);
+        // 只改本测试账号的时间，模拟超时而无需让验收阻塞30分钟；禁止指向日常库。
+        const age = (column) => {
+          assert(Number.isSafeInteger(user.id));
+          assert(["last_active_at", "created_at"].includes(column));
+          const minutes = column === "created_at" ? 721 : 31;
+          const result = spawnSync(
+            "docker",
+            [
+              "compose",
+              "-p",
+              process.env.API_TEST_COMPOSE_PROJECT,
+              "-f",
+              "compose.verify.yaml",
+              "exec",
+              "-T",
+              process.env.API_TEST_DATABASE,
+              "sh",
+              "-c",
+              'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE"',
+            ],
+            {
+              // 从真实签发时间相对回拨，避免MySQL会话显示时区与Java UTC存储规则影响超时夹具。
+              input: `UPDATE sys_session SET ${column}=${column}-INTERVAL ${minutes} MINUTE WHERE user_id=${user.id}; SELECT ROW_COUNT();`,
+              encoding: "utf8",
+              windowsHide: true,
+            },
+          );
+          assert.equal(result.status, 0, "隔离会话时间夹具建立失败");
+          assert.match(
+            result.stdout,
+            /\b1\s*$/,
+            "时间回拨必须恰好影响本测试的一条会话",
+          );
+        };
+        const idle = await login(user.username);
+        age("last_active_at");
+        await api("/auth/me", idle, "GET", undefined, 401);
+        assert.equal((await sessions(admin, user.username)).total, 0);
+        const absolute = await login(user.username);
+        age("created_at");
+        await api("/auth/me", absolute, "GET", undefined, 401);
+        assert.equal((await sessions(admin, user.username)).total, 0);
+      },
+    );
+
+    await t.test(
+      "认证拒绝和业务响应具有随机定位号，客户端不能指定服务端日志关联",
+      async () => {
+        const response = await fetch(`${base}/system/users`, {
+          headers: { "X-Request-ID": "client-controlled" },
+        });
+        assert.equal(response.status, 401);
+        const id = response.headers.get("X-Request-ID");
+        assert.match(id, /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i);
+        assert.notEqual(id, "client-controlled");
+        const next = await fetch(`${base}/system/users`, {
+          headers: { Authorization: `Bearer ${admin}` },
+        });
+        assert.equal(next.status, 200);
+        assert.notEqual(next.headers.get("X-Request-ID"), id);
       },
     );
   } finally {

@@ -11,6 +11,10 @@ import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import {
+  deploymentFingerprint,
+  assertVerifiedInputs,
+} from "./deployment-inputs.mjs";
+import {
   readDatabaseMetadata,
   readDatabaseConstraints,
   verifyDatabaseComments,
@@ -75,6 +79,7 @@ const result = {
   startedAt: new Date().toISOString(),
   status: "running",
   checks: [],
+  sourceFingerprint: deploymentFingerprint(root),
 };
 
 function execute(
@@ -563,6 +568,11 @@ try {
     log: "module-switches.log",
   });
   mark("裁剪模块的接口、导航、权限候选与依赖联动通过");
+  execute(process.execPath, ["scripts/verify-production.mjs"], {
+    env: { ...environment, API_TEST_COMPOSE_PROJECT: project },
+    log: "production-startup.log",
+  });
+  mark("生产启动拒绝、探针与数据库迁移/运行权限分离通过");
   assert.deepEqual(
     verificationSnapshot("upgrade-db"),
     beforeUpgradeTests,
@@ -601,6 +611,8 @@ try {
   assert.equal(migrations(sourceCompose, "mysql"), sourceVersions);
   assert.deepEqual(snapshot(sourceCompose, "mysql", entryLimit), before);
   mark("日常运行数据库未被本次验证更改");
+  assertVerifiedInputs(result.sourceFingerprint, deploymentFingerprint(root));
+  mark("验收期间构建与检查输入未变化");
   result.status = "passed";
 } catch (error) {
   result.status = "failed";

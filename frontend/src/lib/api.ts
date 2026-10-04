@@ -13,9 +13,33 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public requestId?: string,
   ) {
     super(message);
   }
+}
+/** 同源请求与生成契约共享错误展示；只信任随机UUID定位号，代理413也能显示明确上传提示。 */
+export function responseError(
+  response: Response,
+  explanation?: string,
+): ApiError {
+  const header = response.headers.get("X-Request-ID");
+  const requestId =
+    header && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(header)
+      ? header
+      : undefined;
+  const message =
+    explanation ||
+    (response.status === 413
+      ? "上传内容超过服务器限制，请减小文件后重试"
+      : "服务响应异常，请稍后重试");
+  return new ApiError(
+    response.status >= 500 && requestId
+      ? `${message}（故障编号：${requestId}）`
+      : message,
+    response.status,
+    requestId,
+  );
 }
 /** 同源标准信封请求；合并取消和超时信号，仅同一令牌的 401 可以触发退出。 */
 export async function api<T>(
@@ -60,8 +84,8 @@ export async function api<T>(
       typeof envelope.message === "string" &&
       envelope.message
         ? envelope.message
-        : "服务响应异常，请检查后端是否已启动";
-    throw new ApiError(explanation, response.status);
+        : undefined;
+    throw responseError(response, explanation);
   }
   return envelope.data as T;
 }

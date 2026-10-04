@@ -20,7 +20,7 @@ public class LoginSession {
 
   private Instant createdAt;
 
-  /** 认证服务每分钟最多更新一次，反映最近活动；它不延长 expiresAt 的固定到期时间。 */
+  /** 认证服务每分钟最多更新一次；按服务端无请求期限判断失效，不延长 expiresAt 的固定到期时间。 */
   private Instant lastActiveAt;
 
   @Column(length = 64)

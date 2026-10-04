@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /** 统一异常边界：把业务错误变为可读提示，内部细节仅保留在服务端日志。 */
 @RestControllerAdvice
@@ -61,6 +62,12 @@ public class ApiExceptionHandler {
   @ExceptionHandler(OptimisticLockingFailureException.class)
   ResponseEntity<?> stale(Exception exception) {
     return response(409, "数据已被其他人修改，请刷新后重试");
+  }
+
+  /** 框架拒绝超大请求时返回413，不能被兜底处理误报为500或回显文件/表单内容。 */
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  ResponseEntity<?> uploadTooLarge(MaxUploadSizeExceededException exception) {
+    return response(413, "上传内容超过服务器限制，请减小文件后重试");
   }
 
   /** 未预期故障仅在服务端保存异常栈，对外固定错误提示以隔离内部实现细节。 */

@@ -1,0 +1,14 @@
+{
+  "backend": {
+    "bytes": 11534336,
+    "status": 413,
+    "correlationHeader": true,
+    "friendlyMessage": true,
+    "createdFiles": 0
+  },
+  "proxy": {
+    "bytes": 106954752,
+    "status": 413
+  },
+  "passed": true
+}

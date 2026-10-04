@@ -1,6 +1,6 @@
 import createClient from "openapi-fetch";
 import type { paths } from "../types/generated/api";
-import { ApiError, tokenStore } from "./api";
+import { responseError, tokenStore } from "./api";
 
 /** 类型来自真实控制器契约；路径、动作、查询参数与请求字段由编译器检查。 */
 export const contractClient = createClient<paths>({
@@ -51,8 +51,8 @@ export function unwrapContract<
       "message" in error &&
       typeof error.message === "string"
         ? error.message
-        : (result.data?.message ?? "服务响应异常，请稍后重试");
-    throw new ApiError(message, result.response.status);
+        : result.data?.message;
+    throw responseError(result.response, message);
   }
   return result.data.data as Exclude<T["data"], undefined>;
 }

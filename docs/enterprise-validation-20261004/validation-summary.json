@@ -1,0 +1,206 @@
+{
+  "status": "partially-accepted",
+  "checkedAt": "2026-10-04T06:00:00.569Z",
+  "scope": "单组织后台与客户内容门户；不扩展 UDP",
+  "sourceFingerprint": {
+    "version": 1,
+    "sha256": "6bf668d100ce95c46a81646cbc023feb8bb664e40f1464d745d6816145e22ae6",
+    "files": 510
+  },
+  "project": {
+    "javaConventionFiles": 229,
+    "handwrittenFrontendConventionFiles": 121,
+    "contractPaths": 145,
+    "rootChecks": {
+      "tests": 37,
+      "pass": 37,
+      "fail": 0,
+      "skipped": 0
+    },
+    "frontendChecks": {
+      "tests": 163,
+      "pass": 161,
+      "fail": 0,
+      "skipped": 2
+    },
+    "javaChecks": {
+      "tests": 115,
+      "pass": 103,
+      "fail": 0,
+      "skipped": 12
+    }
+  },
+  "baseline": {
+    "id": "20261004054128241-6858fb",
+    "status": "passed",
+    "startedAt": "2026-10-04T05:41:28.245Z",
+    "finishedAt": "2026-10-04T05:56:18.370Z",
+    "checks": [
+      {
+        "name": "原数据库一致性快照与 SQL 备份",
+        "status": "passed"
+      },
+      {
+        "name": "备份已在独立数据库成功恢复",
+        "status": "passed"
+      },
+      {
+        "name": "唯一 SQL 成功导入空库，后端正常启动并保留基线标记",
+        "status": "passed"
+      },
+      {
+        "name": "升级与空库安装迁移一致，原业务记录与角色授权不变",
+        "status": "passed"
+      },
+      {
+        "name": "空库、升级库与统一 SQL 的索引及外键约束一致",
+        "status": "passed",
+        "detail": {
+          "indexes": 128,
+          "foreignKeys": 48,
+          "sha256": "16954525af3bf95fe912a174e904fb5565ec3899c1a5706bf310073492f5d25f"
+        }
+      },
+      {
+        "name": "所有业务表和字段的中文 COMMENT 完整且一致，原有字段定义保持不变",
+        "status": "passed",
+        "detail": {
+          "tables": 51,
+          "columns": 506
+        }
+      },
+      {
+        "name": "纯净初始化仅创建管理员及必要基础资料，不创建演示组织、人员或文章",
+        "status": "passed"
+      },
+      {
+        "name": "真实控制器契约与前端生成类型一致",
+        "status": "passed"
+      },
+      {
+        "name": "upgrade：真实 MySQL 接口回归",
+        "status": "passed"
+      },
+      {
+        "name": "fresh：真实 MySQL 接口回归",
+        "status": "passed"
+      },
+      {
+        "name": "裁剪模块的接口、导航、权限候选与依赖联动通过",
+        "status": "passed"
+      },
+      {
+        "name": "生产启动拒绝、探针与数据库迁移/运行权限分离通过",
+        "status": "passed"
+      },
+      {
+        "name": "接口回归结束后，原业务快照完全一致",
+        "status": "passed"
+      },
+      {
+        "name": "重启未重复初始化或改变迁移、原业务数据",
+        "status": "passed"
+      },
+      {
+        "name": "日常运行数据库未被本次验证更改",
+        "status": "passed"
+      },
+      {
+        "name": "验收期间构建与检查输入未变化",
+        "status": "passed"
+      }
+    ],
+    "cleanup": "passed",
+    "upgradeApi": {
+      "tests": 151,
+      "pass": 151,
+      "fail": 0,
+      "skipped": 0
+    },
+    "freshApi": {
+      "tests": 151,
+      "pass": 151,
+      "fail": 0,
+      "skipped": 0
+    },
+    "database": {
+      "tables": 51,
+      "columns": 506,
+      "indexes": 128,
+      "foreignKeys": 48,
+      "sha256": "16954525af3bf95fe912a174e904fb5565ec3899c1a5706bf310073492f5d25f"
+    }
+  },
+  "dailyUpgrade": {
+    "id": "20261004055637400",
+    "status": "passed",
+    "startedAt": "2026-10-04T05:56:37.400Z",
+    "finishedAt": "2026-10-04T05:57:14.216Z",
+    "checks": [
+      "前后端镜像构建及旧镜像保留",
+      "停写后的完整数据库备份",
+      "停写后的 LOCAL 文件正文备份与逐文件 SHA-256",
+      "实际迁移与已通过验收一致",
+      "原有账号、权限、组织和内容字段保持一致",
+      "内置采集菜单按预期改名，自定义名称保留",
+      "前后端与数据库服务已启动"
+    ],
+    "sourceFingerprint": {
+      "version": 1,
+      "sha256": "6bf668d100ce95c46a81646cbc023feb8bb664e40f1464d745d6816145e22ae6",
+      "files": 510
+    },
+    "backup": {
+      "sha256": "77cfbf5525c5d552faadb2d688553536b4571521375dca9095e04bee233c81dd",
+      "bytes": 43712705
+    },
+    "localFileBackup": {
+      "files": 0,
+      "bytes": 0
+    }
+  },
+  "actualScreens": {
+    "desktop": {
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        720
+      ],
+      "brokenImages": 0,
+      "screenshot": "22-daily-home-final-dark.png"
+    },
+    "mobile": {
+      "passed": true,
+      "url": "http://127.0.0.1:15173/channels/guides?q=%E4%B8%8D%E5%AD%98%E5%9C%A8%E7%9A%84%E9%AA%8C%E6%94%B6%E5%85%B3%E9%94%AE%E8%AF%8D",
+      "screenshot": "21-daily-mobile-search-heading.png",
+      "headingHeight": 29.84375,
+      "lineHeight": 29.8571,
+      "viewport": [
+        320,
+        844
+      ],
+      "scroll": [
+        320,
+        1063
+      ],
+      "descriptionLayout": "column"
+    },
+    "publicJourneys": "public-layout.json",
+    "uploadBoundaries": "upload-boundary.json"
+  },
+  "remaining": [
+    "正常浏览器登录后验证门户栏目弹窗、排序和分类归属保存",
+    "正常浏览器验证栏目/分类联动、草稿保存及内容发布",
+    "正常浏览器验证首页手动编排和前台主题抽屉保存",
+    "当前隔离副本 127.0.0.1:15175 的滑块仍待用户本次确认"
+  ],
+  "limits": [
+    "未验收多实例共享限流/验证码",
+    "未验收外部 S3 容灾",
+    "未进行真实生产容量测试",
+    "未声明完整身份平台或全量无障碍认证"
+  ]
+}
