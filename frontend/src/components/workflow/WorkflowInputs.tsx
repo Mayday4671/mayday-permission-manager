@@ -18,6 +18,15 @@ export function WorkflowInput({
     "aria-label": label ?? field.label,
     placeholder: field.placeholder,
   };
+  if (field.type === "CALCULATED")
+    return (
+      <Input
+        {...props}
+        readOnly
+        value={value == null ? "" : String(value)}
+        placeholder="自动计算"
+      />
+    );
   if (field.type === "NUMBER" || field.type === "MONEY")
     return (
       <InputNumber

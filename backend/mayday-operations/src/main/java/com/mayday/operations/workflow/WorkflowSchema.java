@@ -33,7 +33,40 @@ public final class WorkflowSchema {
       String placeholder,
       String helpText,
       List<Field> columns,
-      Integer maxRows) {
+      Integer maxRows,
+      WorkflowCalculations.Formula formula) {
+    /** 保留已交付的完整构造签名；旧表单不增加计算规则，也不改写历史输入值。 */
+    public Field(
+        String id,
+        String label,
+        String type,
+        Boolean required,
+        Integer width,
+        BigDecimal min,
+        BigDecimal max,
+        Integer maxLength,
+        List<String> options,
+        String placeholder,
+        String helpText,
+        List<Field> columns,
+        Integer maxRows) {
+      this(
+          id,
+          label,
+          type,
+          required,
+          width,
+          min,
+          max,
+          maxLength,
+          options,
+          placeholder,
+          helpText,
+          columns,
+          maxRows,
+          null);
+    }
+
     /** 已有发布版本及业务扩展保持原构造签名；新增属性缺失时使用运行端默认值。 */
     public Field(
         String id,
@@ -50,7 +83,13 @@ public final class WorkflowSchema {
   }
 
   /** 条件按列表顺序匹配，next 是稳定节点 ID；全部不命中时使用节点默认出口。 */
-  public record Condition(String field, String operator, String value, String next) {}
+  public record Condition(
+      String field, String operator, String value, String next, WorkflowConditions.Rule predicate) {
+    /** 已发布的单条件继续按原值运行，不将旧规则隐式改写成组合判断。 */
+    public Condition(String field, String operator, String value, String next) {
+      this(field, operator, value, next, null);
+    }
+  }
 
   /** 节点保存人员来源、会签规则、字段和动作授权；timeoutMinutes 为空表示不自动提醒。 */
   public record Node(
@@ -134,6 +173,7 @@ public final class WorkflowSchema {
           "TEXTAREA",
           "NUMBER",
           "MONEY",
+          "CALCULATED",
           "DATE",
           "DATETIME",
           "DATE_RANGE",
@@ -174,12 +214,19 @@ public final class WorkflowSchema {
       if (node != null && "CONDITION".equals(node.type()))
         for (Condition condition : node.conditions()) {
           if (condition == null) continue;
-          s.fields().stream()
-              .filter(
-                  field ->
-                      field != null && field.id() != null && field.id().equals(condition.field()))
-              .findFirst()
-              .ifPresent(field -> validateChoiceReference(node, field, condition));
+          for (var rule : WorkflowConditions.leaves(condition)) {
+            s.fields().stream()
+                .filter(
+                    field -> field != null && field.id() != null && field.id().equals(rule.field()))
+                .findFirst()
+                .ifPresent(
+                    field ->
+                        validateChoiceReference(
+                            node,
+                            field,
+                            new Condition(
+                                rule.field(), rule.operator(), rule.value(), condition.next())));
+          }
         }
   }
 
@@ -258,6 +305,7 @@ public final class WorkflowSchema {
                 && f.options().stream().allMatch(v -> text(v, 100)),
             "选择项应为 1 至 50 个不重复值");
     }
+    WorkflowCalculations.validate(s.fields());
     Map<String, Node> nodes = new LinkedHashMap<>();
     for (Node n : s.nodes()) {
       require(
@@ -274,6 +322,10 @@ public final class WorkflowSchema {
       require(
           fields.containsAll(n.readable()) && n.readable().containsAll(n.writable()),
           "可写字段必须同时可读，且字段必须存在");
+      require(
+          s.fields().stream()
+              .noneMatch(f -> "CALCULATED".equals(f.type()) && n.writable().contains(f.id())),
+          "计算字段由服务器生成，不能设为可编辑");
       if (Set.of("APPROVAL", "COPY").contains(n.type())) {
         require(
             n.timeoutMinutes() == null || (n.timeoutMinutes() >= 1 && n.timeoutMinutes() <= 43200),
@@ -305,31 +357,36 @@ public final class WorkflowSchema {
       require("APPROVAL".equals(n.type()) || n.timeoutMinutes() == null, "只有审批节点可以配置超时提醒");
       if ("CONDITION".equals(n.type())) {
         require(!n.conditions().isEmpty() && n.conditions().size() <= 10, "条件节点需要 1 至 10 条规则及默认出口");
-        for (Condition c : n.conditions()) {
-          require(
-              c != null
-                  && fields.contains(c.field())
-                  && Set.of("EQ", "NE", "GT", "GE", "LT", "LE", "CONTAINS")
-                      .contains(Objects.toString(c.operator(), ""))
-                  && c.value() != null
-                  && c.value().length() <= 1000,
-              "分支条件引用或比较值无效");
-          Field f =
-              s.fields().stream().filter(v -> v.id().equals(c.field())).findFirst().orElseThrow();
-          require(
-              !Set.of("FILES", "MULTI", "USER", "DEPARTMENT", "DATE_RANGE", "DETAILS")
-                  .contains(f.type()),
-              "条件暂不支持附件或对象字段");
-          // 单选项本身就是分支比较值；改名或删除后必须显式修复条件，不能静默走默认分支。
-          // 同时校验直接接口提交，前端提示不替代服务端发布和模拟的安全边界。
-          if (requireChoiceMembership) validateChoiceReference(n, f, c);
-          if (Set.of("GT", "GE", "LT", "LE").contains(c.operator()))
-            require(Set.of("NUMBER", "MONEY").contains(f.type()), "大小比较只适用于数值字段");
-          if (Set.of("NUMBER", "MONEY").contains(f.type()) && !"CONTAINS".equals(c.operator())) {
-            try {
-              new BigDecimal(c.value());
-            } catch (Exception e) {
-              throw new BusinessException("条件数值无效");
+        for (Condition branch : n.conditions()) {
+          require(branch != null, "分支条件不能为空");
+          for (var rule : WorkflowConditions.leaves(branch)) {
+            Condition c = new Condition(rule.field(), rule.operator(), rule.value(), branch.next());
+            require(
+                c != null
+                    && fields.contains(c.field())
+                    && Set.of("EQ", "NE", "GT", "GE", "LT", "LE", "CONTAINS")
+                        .contains(Objects.toString(c.operator(), ""))
+                    && c.value() != null
+                    && c.value().length() <= 1000,
+                "分支条件引用或比较值无效");
+            Field f =
+                s.fields().stream().filter(v -> v.id().equals(c.field())).findFirst().orElseThrow();
+            require(
+                !Set.of("FILES", "MULTI", "USER", "DEPARTMENT", "DATE_RANGE", "DETAILS")
+                    .contains(f.type()),
+                "条件暂不支持附件或对象字段");
+            // 单选项本身就是分支比较值；改名或删除后必须显式修复条件，不能静默走默认分支。
+            // 同时校验直接接口提交，前端提示不替代服务端发布和模拟的安全边界。
+            if (requireChoiceMembership) validateChoiceReference(n, f, c);
+            if (Set.of("GT", "GE", "LT", "LE").contains(c.operator()))
+              require(Set.of("NUMBER", "MONEY", "CALCULATED").contains(f.type()), "大小比较只适用于数值字段");
+            if (Set.of("NUMBER", "MONEY", "CALCULATED").contains(f.type())
+                && !"CONTAINS".equals(c.operator())) {
+              try {
+                new BigDecimal(c.value());
+              } catch (Exception e) {
+                throw new BusinessException("条件数值无效");
+              }
             }
           }
         }
@@ -384,6 +441,8 @@ public final class WorkflowSchema {
     Map<String, Object> result = new LinkedHashMap<>();
     require(s.fields().stream().map(Field::id).toList().containsAll(values.keySet()), "表单含未登记字段");
     for (Field f : s.fields()) {
+      // 即便请求伪造计算结果，也只以规范化后的原始输入重算；草稿允许输入暂缺。
+      if ("CALCULATED".equals(f.type())) continue;
       Object value = values.get(f.id());
       boolean empty =
           value == null
@@ -486,7 +545,7 @@ public final class WorkflowSchema {
       }
       result.put(f.id(), value);
     }
-    return result;
+    return WorkflowCalculations.calculate(s.fields(), result, required);
   }
 
   /** 明细列复用主表字段校验，不绕过稳定 ID、选项和数值规则；没有可执行的子流程。 */
@@ -526,30 +585,7 @@ public final class WorkflowSchema {
   public static String next(Node n, Map<String, Object> values) {
     if ("CONDITION".equals(n.type()))
       for (Condition c : n.conditions()) {
-        Object value = values.get(c.field());
-        if (value == null) continue;
-        boolean match =
-            switch (c.operator()) {
-              case "EQ" ->
-                  value instanceof Number
-                      ? new BigDecimal(value.toString()).compareTo(new BigDecimal(c.value())) == 0
-                      : value.toString().equals(c.value());
-              case "NE" ->
-                  value instanceof Number
-                      ? new BigDecimal(value.toString()).compareTo(new BigDecimal(c.value())) != 0
-                      : !value.toString().equals(c.value());
-              case "CONTAINS" -> value.toString().contains(c.value());
-              default -> {
-                int compare = new BigDecimal(value.toString()).compareTo(new BigDecimal(c.value()));
-                yield switch (c.operator()) {
-                  case "GT" -> compare > 0;
-                  case "GE" -> compare >= 0;
-                  case "LT" -> compare < 0;
-                  default -> compare <= 0;
-                };
-              }
-            };
-        if (match) return c.next();
+        if (WorkflowConditions.matches(c, values)) return c.next();
       }
     return n.next();
   }

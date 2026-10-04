@@ -5,6 +5,8 @@ import { FormModal } from "../FormModal";
 import { UserSelect } from "../LookupSelect";
 import { api } from "../../lib/api";
 import { NodeFieldPermissions } from "./NodeFieldPermissions";
+import { ConditionGroupEditor } from "./ConditionGroupEditor";
+import { conditionIssues, conditionLeaves } from "../../lib/workflowConditions";
 import {
   actionNames,
   type WorkflowNode,
@@ -109,6 +111,7 @@ export function NodeEditor({
         "TEXTAREA",
         "NUMBER",
         "MONEY",
+        "CALCULATED",
         "DATE",
         "DATETIME",
         "SINGLE",
@@ -132,8 +135,55 @@ export function NodeEditor({
   /** 每条条件只编辑比较规则；分支出口由画布连接关系决定，隐藏注册可避免保存丢失。 */
   const renderCondition = (row: { name: number; key: number }) => {
     const rule = conditions[row.name];
+    if (rule?.predicate)
+      return (
+        <div key={row.key}>
+          <Form.Item
+            name={[row.name, "predicate"]}
+            label="组合条件"
+            rules={[
+              {
+                validator: async (_, predicate) => {
+                  const issues = conditionIssues(
+                    { next: rule.next, predicate },
+                    fields,
+                  );
+                  if (issues.length) throw new Error(issues[0]);
+                },
+              },
+            ]}
+          >
+            <ConditionGroupEditor fields={fields} />
+          </Form.Item>
+          <Form.Item
+            name={[row.name, "next"]}
+            hidden={structured}
+            label="满足时前往"
+            rules={[{ required: true }]}
+          >
+            {structured ? <Input /> : <Select options={exits} />}
+          </Form.Item>
+          <Button
+            disabled={conditionLeaves(rule).length !== 1}
+            onClick={() => {
+              const first = conditionLeaves(rule)[0];
+              form.setFieldValue(["conditions", row.name], {
+                field: first.field ?? "",
+                operator: first.operator ?? "EQ",
+                value: first.value ?? "",
+                next: rule.next,
+              });
+            }}
+          >
+            改为单条件
+          </Button>
+        </div>
+      );
     const field = fields.find((candidate) => candidate.id === rule?.field);
-    const numeric = field?.type === "NUMBER" || field?.type === "MONEY";
+    const numeric =
+      field?.type === "NUMBER" ||
+      field?.type === "MONEY" ||
+      field?.type === "CALCULATED";
     const operators = [
       { value: "EQ", label: "等于" },
       { value: "NE", label: "不等于" },
@@ -149,6 +199,25 @@ export function NodeEditor({
     ];
     return (
       <div key={row.key} className="condition-rule">
+        <Button
+          onClick={() =>
+            form.setFieldValue(["conditions", row.name], {
+              next: rule?.next,
+              predicate: {
+                logic: "AND",
+                children: [
+                  {
+                    field: rule?.field ?? "",
+                    operator: rule?.operator ?? "EQ",
+                    value: rule?.value ?? "",
+                  },
+                ],
+              },
+            })
+          }
+        >
+          增加组合判断
+        </Button>
         <Form.Item
           name={[row.name, "field"]}
           label="表单字段"
@@ -175,7 +244,9 @@ export function NodeEditor({
                 (candidate) => candidate.id === fieldId,
               );
               const supportsNumeric =
-                selected?.type === "NUMBER" || selected?.type === "MONEY";
+                selected?.type === "NUMBER" ||
+                selected?.type === "MONEY" ||
+                selected?.type === "CALCULATED";
               if (
                 !supportsNumeric &&
                 ["GT", "GE", "LT", "LE"].includes(rule?.operator ?? "")

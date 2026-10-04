@@ -4,6 +4,11 @@ import {
   type WorkflowField,
   type WorkflowSpec,
 } from "../types/workflow";
+import {
+  calculationIssues,
+  calculateWorkflowValues,
+} from "./workflowCalculations";
+import { conditionLeaves } from "./workflowConditions";
 
 /** 与 Java WorkflowSchema 共用的字段数量边界；画布布局和预览值不进入发布模型。 */
 export const MAX_WORKFLOW_FIELDS = 40;
@@ -77,6 +82,9 @@ export function createWorkflowField(
   };
   if (type === "TEXT" || type === "TEXTAREA") field.maxLength = 2000;
   if (type === "MONEY") field.min = 0;
+  if (type === "CALCULATED") {
+    field.formula = { operation: "SUM", operands: [], scale: 2 };
+  }
   if (type === "SINGLE" || type === "MULTI") field.options = ["选项1", "选项2"];
   if (type === "DETAILS") {
     field.maxRows = 20;
@@ -159,8 +167,17 @@ export function removeWorkflowField(
   fieldId: string,
 ): WorkflowSpec {
   const index = fieldIndex(spec, fieldId);
+  const formulas = spec.fields.filter((field) =>
+    field.formula?.operands.includes(fieldId),
+  );
+  if (formulas.length)
+    throw new Error(
+      `字段被计算字段“${formulas.map((field) => field.label).join("、")}”引用，请先修改计算规则`,
+    );
   const referenced = spec.nodes.filter((node) =>
-    node.conditions?.some((condition) => condition.field === fieldId),
+    node.conditions?.some((condition) =>
+      conditionLeaves(condition).some((rule) => rule.field === fieldId),
+    ),
   );
   if (referenced.length)
     throw new Error(
@@ -287,6 +304,7 @@ export function validateWorkflowFields(
   }
 
   inspectFields(fields);
+  issues.push(...calculationIssues(fields));
   return issues;
 }
 
@@ -301,16 +319,25 @@ export function validateWorkflowFormReferences(
   for (const node of spec.nodes) {
     if (node.type !== "CONDITION") continue;
     for (const condition of node.conditions ?? []) {
-      const field = spec.fields.find((item) => item.id === condition.field);
-      if (
-        field?.type === "SINGLE" &&
-        (condition.operator === "EQ" || condition.operator === "NE") &&
-        !field.options?.includes(condition.value)
-      )
-        issues.push({
-          fieldId: field.id,
-          message: `条件节点“${node.name}”使用的字段“${field.label}”选项已不存在，请重新配置分支条件`,
-        });
+      let rules;
+      try {
+        rules = conditionLeaves(condition);
+      } catch (error) {
+        issues.push({ fieldId: "", message: (error as Error).message });
+        continue;
+      }
+      for (const rule of rules) {
+        const field = spec.fields.find((item) => item.id === rule.field);
+        if (
+          field?.type === "SINGLE" &&
+          (rule.operator === "EQ" || rule.operator === "NE") &&
+          !field.options?.includes(rule.value ?? "")
+        )
+          issues.push({
+            fieldId: field.id,
+            message: `条件节点“${node.name}”使用的字段“${field.label}”选项已不存在，请重新配置分支条件`,
+          });
+      }
     }
   }
   return issues;
@@ -502,7 +529,11 @@ export function validateWorkflowFormValues(
         const reversed = from.findIndex((part, index) => part !== to[index]);
         if (reversed >= 0 && from[reversed] > to[reversed])
           issue("结束日期不能早于开始日期");
-      } else if (field.type === "NUMBER" || field.type === "MONEY") {
+      } else if (
+        field.type === "NUMBER" ||
+        field.type === "MONEY" ||
+        field.type === "CALCULATED"
+      ) {
         const number = decimalParts(value);
         if (!number) {
           issue("必须是数值");
@@ -561,6 +592,8 @@ export function validateWorkflowFormValues(
     }
   }
 
-  inspectValues(fields, values);
+  const calculated = calculateWorkflowValues(fields, values);
+  inspectValues(fields, { ...values, ...calculated.values });
+  issues.push(...calculated.issues);
   return issues;
 }

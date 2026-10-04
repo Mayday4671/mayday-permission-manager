@@ -11,6 +11,8 @@ import {
   WorkflowDetailRows,
 } from "./workflow/WorkflowInputs";
 import { DataTable } from "./DataTable";
+import { useEffect } from "react";
+import { calculateWorkflowValues } from "../lib/workflowCalculations";
 
 /** 申请、审批补充、设计器预览共用渲染器。可写字段由服务端给出，不用前端模型推断权限。 */
 export function WorkflowFields({
@@ -20,6 +22,15 @@ export function WorkflowFields({
   fields: WorkflowField[];
   preview?: boolean;
 }) {
+  const form = Form.useFormInstance();
+  const values = Form.useWatch("values", { form, preserve: true });
+  // 只有完整填写表单才重算本地预览。审批只编辑服务器给出的 writable 字段，隐藏来源不取回。
+  useEffect(() => {
+    const calculated = calculateWorkflowValues(fields, values ?? {});
+    for (const [id, value] of Object.entries(calculated.values))
+      if (form.getFieldValue(["values", id]) !== value)
+        form.setFieldValue(["values", id], value);
+  }, [fields, values, form]);
   return (
     <div className="workflow-fields">
       {fields.map((field) => (
@@ -61,6 +72,7 @@ export function encodeWorkflowValues(
 ) {
   const result: Record<string, unknown> = {};
   for (const field of fields) {
+    if (field.type === "CALCULATED") continue;
     const value = values[field.id];
     result[field.id] =
       field.type === "FILES"

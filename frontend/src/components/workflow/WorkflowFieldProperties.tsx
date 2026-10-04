@@ -18,6 +18,7 @@ import {
   type FieldType,
   type WorkflowField,
 } from "../../types/workflow";
+import { calculationNames } from "../../lib/workflowCalculations";
 
 const detailColumnTypes: FieldType[] = [
   "TEXT",
@@ -314,7 +315,9 @@ function FieldSettings({
           />
         </Form.Item>
       )}
-      {(field.type === "NUMBER" || field.type === "MONEY") && (
+      {(field.type === "NUMBER" ||
+        field.type === "MONEY" ||
+        field.type === "CALCULATED") && (
         <>
           <div className="form-two-columns">
             <Form.Item
@@ -561,10 +564,12 @@ function DetailColumns({ field, editable, onChange }: FieldSettingsProps) {
  */
 export function WorkflowFieldProperties({
   field,
+  fields = [],
   editable,
   onChange,
 }: {
   field: WorkflowField | null;
+  fields?: WorkflowField[];
   editable: boolean;
   onChange: (field: WorkflowField) => void;
 }) {
@@ -590,6 +595,14 @@ export function WorkflowFieldProperties({
           if (editable) onChange(value);
         }}
       />
+      {field.type === "CALCULATED" && (
+        <CalculationSettings
+          field={field}
+          fields={fields}
+          editable={editable}
+          onChange={onChange}
+        />
+      )}
       {field.type === "DETAILS" && (
         <DetailColumns
           key={field.id}
@@ -601,5 +614,114 @@ export function WorkflowFieldProperties({
         />
       )}
     </section>
+  );
+}
+
+/** 用来源字段选择器代替表达式代码；依赖排序由引擎处理，失效引用保留并明确提示。 */
+function CalculationSettings({
+  field,
+  fields,
+  editable,
+  onChange,
+}: FieldSettingsProps & { fields: WorkflowField[] }) {
+  const formula = field.formula ?? { operation: "SUM", operands: [], scale: 2 };
+  const candidates = fields.filter(
+    (source) =>
+      source.id !== field.id &&
+      (formula.operation === "DETAIL_SUM"
+        ? source.type === "DETAILS"
+        : formula.operation === "DATE_DAYS"
+          ? source.type === "DATE_RANGE"
+          : ["NUMBER", "MONEY", "CALCULATED"].includes(source.type)),
+  );
+  const source = fields.find((item) => item.id === formula.operands[0]);
+  function update(patch: Partial<NonNullable<WorkflowField["formula"]>>) {
+    if (editable) onChange({ ...field, formula: { ...formula, ...patch } });
+  }
+  const oneSource =
+    formula.operation === "DETAIL_SUM" || formula.operation === "DATE_DAYS";
+  return (
+    <Form component="div" layout="vertical" disabled={!editable}>
+      <Form.Item label="计算方式">
+        <Select
+          aria-label="计算方式"
+          value={formula.operation}
+          options={Object.entries(calculationNames).map(([value, label]) => ({
+            value,
+            label,
+          }))}
+          onChange={(operation) =>
+            update({
+              operation,
+              operands: [],
+              column: undefined,
+              scale: operation === "DATE_DAYS" ? 0 : formula.scale,
+            })
+          }
+        />
+      </Form.Item>
+      <Form.Item
+        label="来源字段"
+        extra={
+          ["SUBTRACT", "DIVIDE"].includes(formula.operation)
+            ? "按选择顺序计算：第一个字段减去或除以第二个字段"
+            : undefined
+        }
+      >
+        <Select
+          aria-label="计算来源字段"
+          mode={oneSource ? undefined : "multiple"}
+          value={oneSource ? formula.operands[0] : formula.operands}
+          options={candidates.map((item) => ({
+            value: item.id,
+            label: item.label,
+          }))}
+          maxCount={
+            oneSource
+              ? undefined
+              : ["SUBTRACT", "DIVIDE"].includes(formula.operation)
+                ? 2
+                : 10
+          }
+          onChange={(value: string | string[]) =>
+            update({
+              operands: Array.isArray(value) ? value : [value],
+              column: undefined,
+            })
+          }
+        />
+      </Form.Item>
+      {formula.operation === "DETAIL_SUM" && (
+        <Form.Item label="汇总列">
+          <Select
+            aria-label="汇总列"
+            value={formula.column}
+            options={source?.columns
+              ?.filter((item) => ["NUMBER", "MONEY"].includes(item.type))
+              .map((item) => ({ value: item.id, label: item.label }))}
+            onChange={(column) => update({ column })}
+          />
+        </Form.Item>
+      )}
+      <Form.Item
+        label="小数位数"
+        extra={
+          formula.operation === "DATE_DAYS"
+            ? "包含起止两天，按自然日计算"
+            : "四舍五入，结果由服务器重新计算"
+        }
+      >
+        <Select
+          aria-label="计算小数位数"
+          disabled={!editable || formula.operation === "DATE_DAYS"}
+          value={formula.scale}
+          options={Array.from({ length: 7 }, (_, value) => ({
+            value,
+            label: `${value} 位`,
+          }))}
+          onChange={(scale) => update({ scale })}
+        />
+      </Form.Item>
+    </Form>
   );
 }

@@ -8,6 +8,7 @@ export type FieldType =
   | "TEXTAREA"
   | "NUMBER"
   | "MONEY"
+  | "CALCULATED"
   | "DATE"
   | "DATETIME"
   | "DATE_RANGE"
@@ -31,12 +32,30 @@ export interface WorkflowField {
   helpText?: string;
   columns?: WorkflowField[];
   maxRows?: number;
+  formula?: WorkflowFormula | null;
+}
+/** 结构化计算规则对应 Java 的白名单运算，顺序影响减法和除法；结果始终由服务器重算。 */
+export interface WorkflowFormula {
+  operation:
+    "SUM" | "SUBTRACT" | "MULTIPLY" | "DIVIDE" | "DETAIL_SUM" | "DATE_DAYS";
+  operands: string[];
+  column?: string;
+  scale: number;
 }
 export interface WorkflowCondition {
-  field: string;
-  operator: "EQ" | "NE" | "GT" | "GE" | "LT" | "LE" | "CONTAINS";
-  value: string;
+  field?: string;
+  operator?: WorkflowConditionRule["operator"];
+  value?: string;
   next: string;
+  predicate?: WorkflowConditionRule | null;
+}
+/** 分组只配置 logic/children；叶子只配置字段/比较/值，最多 3 层、20 条判断。 */
+export interface WorkflowConditionRule {
+  field?: string;
+  operator?: "EQ" | "NE" | "GT" | "GE" | "LT" | "LE" | "CONTAINS";
+  value?: string;
+  logic?: "AND" | "OR";
+  children?: WorkflowConditionRule[];
 }
 export type WorkflowAction =
   | "APPROVE"
@@ -208,6 +227,7 @@ export const fieldNames: Record<FieldType, string> = {
   TEXTAREA: "多行文字",
   NUMBER: "数字",
   MONEY: "金额",
+  CALCULATED: "计算字段",
   DATE: "日期",
   DATETIME: "日期时间",
   DATE_RANGE: "日期区间",

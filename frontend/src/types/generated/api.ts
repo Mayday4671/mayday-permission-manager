@@ -2628,6 +2628,7 @@ export interface components {
       field?: string;
       next?: string;
       operator?: string;
+      predicate?: components["schemas"]["Rule"];
       value?: string;
     };
     ContentDraft: {
@@ -2836,6 +2837,7 @@ export interface components {
     };
     Field: {
       columns?: components["schemas"]["Field"][];
+      formula?: components["schemas"]["Formula"];
       helpText?: string;
       id?: string;
       label?: string;
@@ -2867,6 +2869,13 @@ export interface components {
       updatedAt?: string;
       /** Format: int64 */
       version?: number;
+    };
+    Formula: {
+      column?: string;
+      operands?: string[];
+      operation?: string;
+      /** Format: int32 */
+      scale?: number;
     };
     HomeDraft: {
       allowThemeToggle?: boolean;
@@ -3187,6 +3196,13 @@ export interface components {
       scopeDepartments?: components["schemas"]["DepartmentGrant"][];
       /** Format: int64 */
       version?: number;
+    };
+    Rule: {
+      children?: components["schemas"]["Rule"][];
+      field?: string;
+      logic?: string;
+      operator?: string;
+      value?: string;
     };
     ScheduledJob: {
       /** Format: int64 */

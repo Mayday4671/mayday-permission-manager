@@ -31,6 +31,7 @@ import {
   Users,
   Wallet,
   Building2,
+  Calculator,
 } from "lucide-react";
 import { WorkflowFields } from "../WorkflowFields";
 import { WorkflowInput, WorkflowDateRange } from "./WorkflowInputs";
@@ -66,13 +67,14 @@ const controlGroups: { title: string; types: FieldType[] }[] = [
     ],
   },
   { title: "选择控件", types: ["SINGLE", "MULTI", "USER", "DEPARTMENT"] },
-  { title: "其他控件", types: ["DETAILS", "FILES"] },
+  { title: "其他控件", types: ["DETAILS", "CALCULATED", "FILES"] },
 ];
 const controlIcons = {
   TEXT: TextCursorInput,
   TEXTAREA: AlignLeft,
   NUMBER: Hash,
   MONEY: Wallet,
+  CALCULATED: Calculator,
   DATE: CalendarDays,
   DATETIME: CalendarDays,
   DATE_RANGE: CalendarDays,
@@ -378,6 +380,7 @@ export function WorkflowFormDesigner({
   );
   const properties = (
     <WorkflowFieldProperties
+      fields={spec.fields}
       field={selected}
       editable={editable}
       onChange={edit}

@@ -79,7 +79,9 @@ export function NodeFieldPermissions({
                   options={[
                     { value: "hidden", label: "隐藏" },
                     { value: "read", label: "只读" },
-                    ...(!copy ? [{ value: "write", label: "可编辑" }] : []),
+                    ...(!copy && field.type !== "CALCULATED"
+                      ? [{ value: "write", label: "可编辑" }]
+                      : []),
                   ]}
                 />
               ),

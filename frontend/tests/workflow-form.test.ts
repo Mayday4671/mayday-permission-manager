@@ -36,7 +36,7 @@ function fieldIds(spec: WorkflowSpec): string[] {
   return spec.fields.map((field) => field.id);
 }
 
-test("13 种控件创建完整有效默认值，稳定 ID 使用首个空闲编号", () => {
+test("基础控件创建完整有效默认值，计算控件明确要求配置来源，稳定 ID 使用首个空闲编号", () => {
   const existing = [text("field_1"), text("field_3"), text("business_code")];
   const original = structuredClone(existing);
   for (const type of Object.keys(fieldNames) as FieldType[]) {
@@ -45,7 +45,9 @@ test("13 种控件创建完整有效默认值，稳定 ID 使用首个空闲编�
     assert.equal(field.type, type);
     assert.equal(field.label, fieldNames[type]);
     assert.equal(field.required, false);
-    assert.deepEqual(validateWorkflowFields([field]), []);
+    if (type === "CALCULATED") {
+      assert.match(validateWorkflowFields([field])[0].message, /来源字段/);
+    } else assert.deepEqual(validateWorkflowFields([field]), []);
     if (type === "SINGLE" || type === "MULTI")
       assert.deepEqual(field.options, ["选项1", "选项2"]);
     if (type === "DETAILS") {
@@ -510,6 +512,7 @@ test("全部控件预览值通过，检查不转换日期、数字文本或关�
     TEXTAREA: "第一行\n第二行",
     NUMBER: "42.123456",
     MONEY: "001.20",
+    CALCULATED: "8888",
     DATE: "2026-10-03",
     DATETIME: "2026-10-03T10:30:00.123456789",
     DATE_RANGE: ["2026-10-01", "2026-10-03"],
@@ -526,6 +529,12 @@ test("全部控件预览值通过，检查不转换日期、数字文本或关�
   for (const type of Object.keys(fieldNames) as FieldType[]) {
     const field = createWorkflowField(type, fields);
     field.required = true;
+    if (type === "CALCULATED")
+      field.formula = {
+        operation: "SUM",
+        operands: [fields.find((source) => source.type === "NUMBER")!.id],
+        scale: 2,
+      };
     fields.push(field);
     values[field.id] = byType[type];
   }
@@ -563,9 +572,14 @@ test("必填、未知键、文字类型和长度均可定位，空的可选值�
   assert.match(issues[0].message, /未登记字段/);
   for (const type of Object.keys(fieldNames) as FieldType[]) {
     const field = createWorkflowField(type, []);
+    const fields = [field];
+    if (type === "CALCULATED") {
+      field.formula = { operation: "SUM", operands: ["source"], scale: 2 };
+      fields.push({ id: "source", label: "来源", type: "NUMBER" });
+    }
     for (const value of [undefined, null, " ", []])
       assert.deepEqual(
-        validateWorkflowFormValues([field], { [field.id]: value }),
+        validateWorkflowFormValues(fields, { [field.id]: value }),
         [],
       );
   }

@@ -1160,3 +1160,36 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.workflow-condition-group {
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius);
+  padding: 12px;
+  min-width: 0;
+}
+.workflow-condition-row {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0;
+  align-items: flex-start;
+}
+.workflow-condition-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.workflow-condition-leaf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(85px, 0.7fr);
+  gap: 8px;
+}
+.workflow-condition-leaf > :last-child {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+@media (max-width: 600px) {
+  .workflow-condition-group {
+    padding: 8px;
+  }
+  .workflow-condition-leaf {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

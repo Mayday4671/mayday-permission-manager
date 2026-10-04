@@ -210,6 +210,143 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
         status,
       );
     };
+    await t.test(
+      "计算字段、组合分支及审批修改/退回重提保持可信结果和字段隔离",
+      async () => {
+        const fields = [
+          field,
+          { id: "price", label: "单价", type: "MONEY", required: true },
+          { id: "quantity", label: "数量", type: "NUMBER", required: true },
+          {
+            id: "kind",
+            label: "类型",
+            type: "SINGLE",
+            required: true,
+            options: ["采购", "差旅", "其他"],
+          },
+          {
+            id: "total",
+            label: "总额",
+            type: "CALCULATED",
+            required: true,
+            formula: {
+              operation: "MULTIPLY",
+              operands: ["price", "quantity"],
+              scale: 2,
+            },
+          },
+        ];
+        const first = node([a.id], {
+          next: "choice",
+          readable: fields.map((field) => field.id),
+          writable: ["price"],
+          actions: ["APPROVE", "REJECT", "RETURN"],
+        });
+        const choice = {
+          id: "choice",
+          name: "金额和类型判断",
+          type: "CONDITION",
+          next: "end",
+          conditions: [
+            {
+              next: "special",
+              predicate: {
+                logic: "AND",
+                children: [
+                  { field: "total", operator: "GT", value: "1000" },
+                  {
+                    logic: "OR",
+                    children: [
+                      { field: "kind", operator: "EQ", value: "采购" },
+                      { field: "kind", operator: "EQ", value: "差旅" },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        };
+        const special = {
+          ...node([b.id]),
+          id: "special",
+          name: "加审",
+          readable: ["total"],
+        };
+        const spec = { ...schema([first, choice, special]), fields };
+        const definition = await create(spec);
+        const values = {
+          memo: "计算验收",
+          price: "100.00",
+          quantity: 5,
+          kind: "采购",
+          total: 999999,
+        };
+        const request = await submit(definition, { values });
+        assert.equal(request.values.total, 500);
+        await decide(request.id, a, "APPROVE", { values: { total: 1 } }, 403);
+        const modified = await decide(request.id, a, "APPROVE", {
+          values: { price: "250.00" },
+        });
+        assert.equal(modified.values.total, 1250);
+        assert.equal(modified.currentNodeId, "special");
+        const bDetail = await detail(request.id, b.token);
+        assert.deepEqual(Object.keys(bDetail.values), ["total"]);
+        assert.equal(bDetail.values.total, 1250);
+        assert.equal(bDetail.history.at(-1).changes.total.after, 1250);
+        await decide(request.id, b, "APPROVE");
+        const second = await submit(definition, {
+          values: { ...values, kind: "其他", price: "500.00" },
+        });
+        const returned = await decide(second.id, a, "RETURN", {
+          comment: "补充金额",
+        });
+        assert.equal(returned.status, "RETURNED");
+        const latest = await detail(second.id);
+        await call(
+          `/operations/requests/${second.id}/submit`,
+          applicant.token,
+          "POST",
+          {
+            version: latest.version,
+            title: latest.title,
+            values: { ...values, price: "0.10", quantity: 3 },
+          },
+        );
+        assert.equal((await detail(second.id)).values.total, 0.3);
+        assert.equal(
+          (await decide(second.id, a, "APPROVE")).status,
+          "APPROVED",
+        );
+        const unchanged = await submit(definition, { values });
+        const unchangedResult = await decide(unchanged.id, a, "APPROVE", {
+          values: { price: "100.00" },
+        });
+        assert.equal(
+          Object.keys(unchangedResult.history.at(-1).changes ?? {}).length,
+          0,
+        );
+        const draft = await call(
+          `/operations/workflows/${definition.id}`,
+          admin,
+        );
+        const bad = structuredClone(spec);
+        bad.nodes[0].writable = ["total"];
+        const saved = await call(
+          `/operations/workflows/${definition.id}`,
+          admin,
+          "PUT",
+          { ...draft, schema: bad },
+        );
+        await call(
+          `/operations/workflows/${definition.id}/publish`,
+          admin,
+          "POST",
+          { version: saved.version },
+          400,
+        );
+        assert.equal((await detail(request.id)).values.total, 1250);
+      },
+    );
     // OA 生命周期验收使用独立库、真实行锁和权限，不用模拟状态代替业务执行。
     const editApplication = async (
       id,

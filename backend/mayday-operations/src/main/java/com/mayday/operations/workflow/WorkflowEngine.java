@@ -28,6 +28,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -893,8 +894,13 @@ public class WorkflowEngine implements FileUsage {
         var candidate = new LinkedHashMap<>(old);
         candidate.putAll(input.values());
         var form = WorkflowSchema.form(spec, candidate);
-        for (String key : input.values().keySet())
-          if (!Objects.equals(old.get(key), form.get(key))) {
+        // 计算结果和源字段一起记入历史；展示历史时仍按查看人的可读范围裁剪。
+        for (String key : form.keySet())
+          if ((input.values().containsKey(key)
+                  || spec.fields().stream()
+                      .anyMatch(
+                          field -> field.id().equals(key) && "CALCULATED".equals(field.type())))
+              && !sameFormValue(old.get(key), form.get(key))) {
             var change = new LinkedHashMap<String, Object>();
             change.put("before", old.get(key));
             change.put("after", form.get(key));
@@ -1041,6 +1047,13 @@ public class WorkflowEngine implements FileUsage {
     requests.flush();
     refreshParticipants(request);
     return detail(id);
+  }
+
+  /** JSON 重读可能把 BigDecimal 变成整数/浮点表示；数值相同不制造假的表单变更记录。 */
+  private boolean sameFormValue(Object before, Object after) {
+    if (before instanceof Number && after instanceof Number)
+      return new BigDecimal(before.toString()).compareTo(new BigDecimal(after.toString())) == 0;
+    return Objects.equals(before, after);
   }
 
   /** 更新申请参与者的列表和工作台，未来节点未实际进入实例的人员不提前收到事件。 */

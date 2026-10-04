@@ -17,6 +17,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { WorkflowNode, WorkflowSpec } from "../../types/workflow";
+import { conditionSummary as groupedConditionSummary } from "../../lib/workflowConditions";
 import {
   addWorkflowBranch,
   deleteWorkflowBranch,
@@ -230,8 +231,16 @@ export function WorkflowCanvas({
     });
   const conditionSummary = (node: WorkflowNode, index: number) => {
     const rule = node.conditions?.[index];
+    if (rule?.predicate) return groupedConditionSummary(rule);
     const field = spec.fields.find((field) => field.id === rule?.field);
-    if (!rule || !field || rule.value === "") return "请设置条件";
+    if (
+      !rule ||
+      !field ||
+      !rule.operator ||
+      rule.value == null ||
+      rule.value === ""
+    )
+      return "请设置条件";
     return `${field.label} ${operatorNames[rule.operator]} ${rule.value}`;
   };
   const peopleSummary = (node: WorkflowNode) => {

@@ -71,17 +71,26 @@ const { useState } = React;
 const { render, screen, within, cleanup, fireEvent } =
   await import("@testing-library/react");
 const userEvent = (await import("@testing-library/user-event")).default;
-const { ConfigProvider } = await import("antd");
+const { ConfigProvider, Form } = await import("antd");
 const { WorkflowFieldProperties } =
   await import("../src/components/workflow/WorkflowFieldProperties");
+const { WorkflowFields, encodeWorkflowValues } =
+  await import("../src/components/WorkflowFields");
+const { ConditionGroupEditor } =
+  await import("../src/components/workflow/ConditionGroupEditor");
 
 /** 父级每次回调立即重渲染，贴近真实设计器，能发现按输入值重建组件造成的失焦。 */
-function mountField(initial: WorkflowField | null, editable = true) {
+function mountField(
+  initial: WorkflowField | null,
+  editable = true,
+  fields: WorkflowField[] = [],
+) {
   const changes: WorkflowField[] = [];
   function Harness() {
     const [field, setField] = useState(initial);
     return (
       <WorkflowFieldProperties
+        fields={fields}
         field={field}
         editable={editable}
         onChange={(value) => {
@@ -516,4 +525,109 @@ test("没有选中控件时仅提示选择，不显示空属性或业务操作",
   assert.equal(screen.queryByLabelText("字段标题"), null);
   assert.equal(screen.queryByRole("button"), null);
   assert.deepEqual(changes, []);
+});
+
+test("计算属性用字段选择配置精度和顺序，切换方式清理不适用来源", async () => {
+  const user = userEvent.setup();
+  const initial: WorkflowField = {
+    id: "total",
+    label: "总额",
+    type: "CALCULATED",
+    formula: { operation: "SUM", operands: ["price"], scale: 2 },
+  };
+  const changes = mountField(initial, true, [
+    { id: "price", label: "单价", type: "MONEY" },
+    { id: "quantity", label: "数量", type: "NUMBER" },
+    initial,
+  ]);
+  await user.click(screen.getByLabelText("计算方式"));
+  await user.click(screen.getByText("相乘"));
+  assert.deepEqual(changes.at(-1).formula.operands, []);
+  await user.click(screen.getByLabelText("计算来源字段"));
+  await user.click(screen.getByText("单价"));
+  await user.click(screen.getByText("数量"));
+  assert.deepEqual(changes.at(-1).formula.operands, ["price", "quantity"]);
+  assert.equal(changes.at(-1).formula.scale, 2);
+  assert.equal(changes.at(-1).id, "total");
+});
+
+test("填写金额即时重算只读结果，提交不发送预览结果", async () => {
+  const user = userEvent.setup();
+  const fields: WorkflowField[] = [
+    { id: "price", label: "单价", type: "MONEY" },
+    { id: "quantity", label: "数量", type: "NUMBER" },
+    {
+      id: "total",
+      label: "总额",
+      type: "CALCULATED",
+      formula: {
+        operation: "MULTIPLY",
+        operands: ["price", "quantity"],
+        scale: 2,
+      },
+    },
+  ];
+  let current;
+  function Harness() {
+    const [form] = Form.useForm();
+    current = form;
+    return (
+      <Form form={form} initialValues={{ values: { price: 0.1, quantity: 3 } }}>
+        <WorkflowFields fields={fields} />
+      </Form>
+    );
+  }
+  render(
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <Harness />
+    </ConfigProvider>,
+  );
+  const total = screen.getByLabelText("总额");
+  assert.equal(total.readOnly, true);
+  await screen.findByDisplayValue("0.30");
+  const quantity = screen.getByLabelText("数量");
+  await user.clear(quantity);
+  await user.type(quantity, "7");
+  await screen.findByDisplayValue("0.70");
+  assert.deepEqual(
+    encodeWorkflowValues(fields, current.getFieldValue("values")),
+    { price: 0.1, quantity: 7 },
+  );
+});
+
+test("组合条件真实控件支持分组、增加和删除，关系保留在父级模型", async () => {
+  const user = userEvent.setup();
+  let current;
+  function Harness() {
+    const [value, setValue] = useState({
+      logic: "AND" as const,
+      children: [{ field: "amount", operator: "GT" as const, value: "1000" }],
+    });
+    return (
+      <ConditionGroupEditor
+        fields={[{ id: "amount", label: "金额", type: "MONEY" }]}
+        value={value}
+        onChange={(next) => {
+          current = next;
+          setValue(next);
+        }}
+      />
+    );
+  }
+  render(
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <Harness />
+    </ConfigProvider>,
+  );
+  await user.click(screen.getByRole("button", { name: "添加分组" }));
+  assert.equal(current.children.length, 2);
+  const group = screen.getByRole("region", { name: "条件组1.2" });
+  await user.click(within(group).getByLabelText("条件组1.2关系"));
+  await user.click(screen.getByText("以下条件任一满足"));
+  assert.equal(current.children[1].logic, "OR");
+  await user.click(within(group).getByRole("button", { name: "添加判断" }));
+  assert.equal(current.children[1].children.length, 2);
+  await user.click(screen.getByRole("button", { name: "删除判断1.2.2" }));
+  assert.equal(current.children[1].children.length, 1);
+  assert.equal(current.children[0].value, "1000");
 });

@@ -1103,6 +1103,9 @@
           "operator": {
             "type": "string"
           },
+          "predicate": {
+            "$ref": "#/components/schemas/Rule"
+          },
           "value": {
             "type": "string"
           }
@@ -1807,6 +1810,9 @@
             },
             "type": "array"
           },
+          "formula": {
+            "$ref": "#/components/schemas/Formula"
+          },
           "helpText": {
             "type": "string"
           },
@@ -1882,6 +1888,27 @@
           },
           "version": {
             "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "Formula": {
+        "properties": {
+          "column": {
+            "type": "string"
+          },
+          "operands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "scale": {
+            "format": "int32",
             "type": "integer"
           }
         },
@@ -2883,6 +2910,29 @@
           "name",
           "permissions"
         ],
+        "type": "object"
+      },
+      "Rule": {
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            },
+            "type": "array"
+          },
+          "field": {
+            "type": "string"
+          },
+          "logic": {
+            "type": "string"
+          },
+          "operator": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "ScheduledJob": {

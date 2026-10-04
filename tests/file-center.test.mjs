@@ -12,8 +12,15 @@ import { spawnSync } from "node:child_process";
 import { deflateSync } from "node:zlib";
 import { loginWithCaptcha } from "./support/captcha.mjs";
 import { purgeTestFiles } from "./support/files-cleanup.mjs";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import {
+  cpSync,
+  copyFileSync,
+  mkdirSync,
+  realpathSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { join, resolve, relative, isAbsolute } from "node:path";
 import { fileManifest, assertRestoredFiles } from "../scripts/file-backup.mjs";
 
 const base = process.env.API_BASE;
@@ -401,8 +408,6 @@ test(
             assert(!result.error, "隔离文件恢复命令异常");
             return result.stdout.trim();
           };
-          const container = docker([...compose, "ps", "-q", service]);
-          assert(/^[a-f0-9]{12,64}$/.test(container));
           // SQL取出的键仍必须属于刚上传的测试账号和严格UUID路径，不能用请求参数拼接任意文件路径。
           const key = sql(
             `SELECT storage_key FROM ops_file WHERE id=${image.id} AND owner_id=${first.user.id};`,
@@ -421,45 +426,51 @@ test(
           mkdirSync(restored);
           let stopped = false;
           let backup;
-          try {
-            docker([...compose, "stop", service]);
-            stopped = true;
-            docker(["cp", `${container}:/app/data/files/.`, saved]);
-            backup = fileManifest(saved);
+          // 本机验收同样执行正文丢失与恢复。只接受明确标识的本次隔离目录，禁止指向日常存储。
+          const nativeRoot = process.env.API_TEST_NATIVE_FILES;
+          const container = nativeRoot
+            ? null
+            : docker([...compose, "ps", "-q", service]);
+          if (!nativeRoot) assert(/^[a-f0-9]{12,64}$/.test(container));
+          if (nativeRoot) {
+            const allowed = realpathSync(
+              resolve(".local", "full-functions-files"),
+            );
+            assert.equal(
+              realpathSync(nativeRoot),
+              allowed,
+              "本机恢复只能操作本次独立验收目录",
+            );
+            const target = resolve(allowed, key);
+            const inside = relative(allowed, realpathSync(target));
+            assert(inside && !inside.startsWith("..") && !isAbsolute(inside));
+            // 此子测试无并发写入；删除前先校验全目录无符号链接，并保存每个对象的摘要。
+            backup = fileManifest(allowed);
+            cpSync(allowed, saved, { recursive: true });
+            assertRestoredFiles(backup, fileManifest(saved));
+            try {
+              unlinkSync(target);
+              await binary(image.id, first.token, "download", 400);
+            } finally {
+              // 无论接口断言是否成功，都恢复刚登记的测试对象，不覆盖其他对象或数据库元信息。
+              copyFileSync(resolve(saved, key), target);
+            }
+            cpSync(allowed, restored, { recursive: true });
+            assertRestoredFiles(backup, fileManifest(restored));
             writeFileSync(
               join(output, "manifest.json"),
               JSON.stringify(backup, null, 2) + "\n",
             );
-            docker([
-              ...compose,
-              "up",
-              "-d",
-              "--no-build",
-              "--wait",
-              "--wait-timeout",
-              "180",
-              service,
-            ]);
-            stopped = false;
-            // 只移除已登记测试图片的对象；元信息保留，模拟正文丢失。绝不清空整卷。
-            docker([
-              "exec",
-              "--user",
-              "0",
-              container,
-              "rm",
-              "--",
-              `/app/data/files/${key}`,
-            ]);
-            await binary(image.id, first.token, "download", 400);
-            docker([...compose, "stop", service]);
-            stopped = true;
-            docker(["cp", saved + "/.", `${container}:/app/data/files`]);
-            docker(["cp", `${container}:/app/data/files/.`, restored]);
-            assertRestoredFiles(backup, fileManifest(restored));
-          } finally {
-            if (stopped) {
-              // cp在宿主机备份后不保证Linux属主；启动后用固定存储目录恢复应用用户写权限。
+          } else {
+            try {
+              docker([...compose, "stop", service]);
+              stopped = true;
+              docker(["cp", `${container}:/app/data/files/.`, saved]);
+              backup = fileManifest(saved);
+              writeFileSync(
+                join(output, "manifest.json"),
+                JSON.stringify(backup, null, 2) + "\n",
+              );
               docker([
                 ...compose,
                 "up",
@@ -470,16 +481,47 @@ test(
                 "180",
                 service,
               ]);
+              stopped = false;
+              // 只移除已登记测试图片的对象；元信息保留，模拟正文丢失。绝不清空整卷。
               docker([
                 "exec",
                 "--user",
                 "0",
                 container,
-                "chown",
-                "-R",
-                "mayday:mayday",
-                "/app/data/files",
+                "rm",
+                "--",
+                `/app/data/files/${key}`,
               ]);
+              await binary(image.id, first.token, "download", 400);
+              docker([...compose, "stop", service]);
+              stopped = true;
+              docker(["cp", saved + "/.", `${container}:/app/data/files`]);
+              docker(["cp", `${container}:/app/data/files/.`, restored]);
+              assertRestoredFiles(backup, fileManifest(restored));
+            } finally {
+              if (stopped) {
+                // cp在宿主机备份后不保证Linux属主；启动后用固定存储目录恢复应用用户写权限。
+                docker([
+                  ...compose,
+                  "up",
+                  "-d",
+                  "--no-build",
+                  "--wait",
+                  "--wait-timeout",
+                  "180",
+                  service,
+                ]);
+                docker([
+                  "exec",
+                  "--user",
+                  "0",
+                  container,
+                  "chown",
+                  "-R",
+                  "mayday:mayday",
+                  "/app/data/files",
+                ]);
+              }
             }
           }
           assert.deepEqual((await binary(image.id, first.token)).bytes, png());
