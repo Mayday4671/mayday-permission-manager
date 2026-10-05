@@ -653,6 +653,7 @@ const staticTables = [
   "ops_file_directory",
   "sys_bulk_job",
   "sys_bulk_result",
+  "sys_durable_task",
   "sys_external_identity",
   "sys_mfa_credential",
   "sys_mfa_recovery",

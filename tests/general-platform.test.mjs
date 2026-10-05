@@ -571,8 +571,13 @@ test("客户反馈、监控、调度与脱敏变更审计", { skip: !isolated },
       DELETE FROM ops_feedback WHERE id IN (${feedbackIds});
       DELETE FROM ops_job_execution WHERE job_id IN (${jobIds});
       COMMIT;`);
-    for (const id of made.jobs.reverse())
+    for (const id of made.jobs.reverse()) {
+      // 持久任务队列没有依赖配置表的级联删除；只清理由本轮执行记录生成的业务键。
+      isolatedSql(
+        `DELETE FROM sys_durable_task WHERE task_type='SCHEDULER' AND business_key LIKE '${id}:%';`,
+      );
       await api(`/operations/scheduler/${id}`, admin, "DELETE");
+    }
     for (const id of made.users.reverse())
       await api(`/system/users/${id}`, admin, "DELETE");
     for (const id of made.roles.reverse())

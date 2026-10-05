@@ -195,6 +195,7 @@ function verificationSnapshot(service) {
     sys_dictionary_item: "id",
     sys_role_scope_department: "role_id,resource,department_id",
     sys_user_post: "user_id,post_id",
+    sys_durable_task: "id",
     cms_notice: "id",
     cms_notice_tag: "notice_id,tag",
     cms_revision: "id",
