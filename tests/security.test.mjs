@@ -720,7 +720,7 @@ test("隔离数据库权限专项回归", { skip: !isolated }, async (t) => {
     if (created.jobs.length) {
       assert(created.jobs.every(Number.isSafeInteger));
       isolatedSql(
-        `DELETE FROM ops_job_execution WHERE job_id IN (${created.jobs.join(",")});`,
+        `DELETE FROM sys_durable_task WHERE task_type='SCHEDULER' AND business_key REGEXP '^(${created.jobs.join("|")}):'; DELETE FROM ops_job_execution WHERE job_id IN (${created.jobs.join(",")});`,
       );
       for (const id of created.jobs)
         await api(`/operations/scheduler/${id}`, admin, "DELETE");

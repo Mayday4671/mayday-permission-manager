@@ -387,6 +387,10 @@ test(
           "0",
         75000,
       );
+      // 过期作业及导出正文由产品清理器删除；队列没有级联外键，需按本轮作业编号清理其持久幂等行。
+      sql(
+        `DELETE FROM sys_durable_task WHERE task_type='BULK_EXPORT' AND business_key IN (${jobIds});`,
+      );
       for (const id of [...new Set(made.users)])
         await call(`/system/users/${id}`, admin, "DELETE");
       for (const id of made.roles)

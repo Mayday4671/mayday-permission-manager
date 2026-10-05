@@ -38,10 +38,10 @@ async function api(path, token, method = "GET", body, status = 200) {
   return result.data;
 }
 
-/** SQL 仅供没有业务删除入口的测试历史清理，不接受用户输入、日常项目或任意数据库名称。 */
-function isolatedSql(statement) {
+/** SQL 仅用于本轮隔离验收的精确键读取与历史清理，绝不接受日常库或用户提供的查询。 */
+function isolatedSql(statement, options) {
   assert(isolated, "SQL 仅允许本次独立验收项目");
-  runIsolatedSql(statement);
+  return runIsolatedSql(statement, options);
 }
 
 /** 清理条件只包含服务端返回的正整数主键，空集合使用无匹配哨兵，不能退化为全表删除。 */
@@ -54,7 +54,7 @@ test("客户反馈、监控、调度与脱敏变更审计", { skip: !isolated },
   const admin = (
     await loginWithCaptcha(base, "admin", process.env.ADMIN_PASSWORD)
   ).token;
-  const made = { users: [], roles: [], feedback: [], jobs: [] };
+  const made = { users: [], roles: [], feedback: [], jobs: [], taskKeys: [] };
   const secrets = [admin, password, contact];
   let originalPolicy;
   let originalPolicyFixture;
@@ -445,6 +445,15 @@ test("客户反馈、监控、调度与脱敏变更审计", { skip: !isolated },
         assert.equal(execution.status, "SUCCESS");
         assert.equal(execution.jobId, job.id);
         assert.equal(execution.result, "数据库连接正常");
+        const taskKey = isolatedSql(
+          `SELECT task_key FROM ops_job_execution WHERE id=${execution.id};`,
+          { raw: true },
+        ).trim();
+        assert.match(
+          taskKey,
+          new RegExp(`^${job.id}:manual:[a-zA-Z0-9-]{16,64}$`),
+        );
+        made.taskKeys.push(taskKey);
         const logs = await api(
           `/operations/job-logs?jobId=${job.id}`,
           viewer.token,
@@ -562,20 +571,20 @@ test("客户反馈、监控、调度与脱敏变更审计", { skip: !isolated },
       });
     }
     const feedbackIds = ids(made.feedback),
-      jobIds = ids(made.jobs);
+      jobIds = ids(made.jobs),
+      taskKeys = made.taskKeys.length
+        ? made.taskKeys.map((key) => `'${key}'`).join(",")
+        : "'__no_matching_task_key__'";
     isolatedSql(`START TRANSACTION;
       DELETE delivery FROM ops_delivery delivery JOIN ops_notification notification ON notification.id=delivery.notification_id WHERE notification.target_type='FEEDBACK' AND notification.target_id IN (${feedbackIds});
       DELETE target FROM ops_notification_target target JOIN ops_notification notification ON notification.id=target.notification_id WHERE notification.target_type='FEEDBACK' AND notification.target_id IN (${feedbackIds});
       DELETE FROM ops_notification WHERE target_type='FEEDBACK' AND target_id IN (${feedbackIds});
       DELETE FROM ops_feedback_history WHERE feedback_id IN (${feedbackIds});
       DELETE FROM ops_feedback WHERE id IN (${feedbackIds});
+      DELETE FROM sys_durable_task WHERE task_type='SCHEDULER' AND business_key IN (${taskKeys});
       DELETE FROM ops_job_execution WHERE job_id IN (${jobIds});
       COMMIT;`);
     for (const id of made.jobs.reverse()) {
-      // 持久任务队列没有依赖配置表的级联删除；只清理由本轮执行记录生成的业务键。
-      isolatedSql(
-        `DELETE FROM sys_durable_task WHERE task_type='SCHEDULER' AND business_key LIKE '${id}:%';`,
-      );
       await api(`/operations/scheduler/${id}`, admin, "DELETE");
     }
     for (const id of made.users.reverse())
