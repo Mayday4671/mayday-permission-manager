@@ -56,9 +56,11 @@ jobs:
           name: verification-summaries
           path: |
             .local/baseline/**/result.json
+            .local/baseline/**/api-*-failure.json
             .local/cluster/**/report.json
           if-no-files-found: ignore
-          # Do not upload private configuration, SQL backups, raw API logs or fixture files.
+          # Only allowlisted failure JSON: static test names, source locations, error enums and counts.
+          # Do not upload private configuration, SQL backups, raw TAP/API logs, responses or fixture files.
       - name: Stop CI services
         if: always()
         run: docker compose down --volumes --remove-orphans

@@ -138,7 +138,7 @@ public class JobController {
     return ApiResponse.ok(null);
   }
 
-  /** 手动执行需独立execute权限，可验证未启用配置；返回真实成功或失败记录，失败日志不随业务回滚消失。 */
+  /** 执行权限下按幂等键提交持久任务，返回当前执行记录；排队或运行状态需继续查询历史，HTTP成功不代表业务执行完成。 */
   @PostMapping("/scheduler/{id}/run")
   public ApiResponse<JobExecution> run(
       @PathVariable Long id,

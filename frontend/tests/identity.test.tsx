@@ -1,8 +1,24 @@
 import { JSDOM } from "jsdom";
+import * as nodeModule from "node:module";
 import test, { after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
 // 使用真实 Ant 表单交互验证认证边界，合成请求不会接触实际身份提供商或日常数据库。
+/** 真实 Protected 引用应用入口；Node 只忽略 CSS，不替换路由守卫或产品组件。 */
+const styles = nodeModule.registerHooks?.({
+  load(url, context, nextLoad) {
+    if (url.endsWith(".css"))
+      return { format: "module", source: "", shortCircuit: true };
+    return nextLoad(url, context);
+  },
+});
+if (!styles)
+  nodeModule.register(
+    `data:text/javascript,${encodeURIComponent(
+      'export async function load(url, context, nextLoad) { if (url.endsWith(".css")) return { format: "module", source: "", shortCircuit: true }; return nextLoad(url, context); }',
+    )}`,
+    import.meta.url,
+  );
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost/",
   pretendToBeVisual: true,
@@ -75,7 +91,8 @@ const userEvent = (await import("@testing-library/user-event")).default;
 const { App, ConfigProvider } = await import("antd");
 const { QueryClient, QueryClientProvider } =
   await import("@tanstack/react-query");
-const { MemoryRouter } = await import("react-router-dom");
+const { MemoryRouter, Route, Routes, useLocation } =
+  await import("react-router-dom");
 const { AuthProvider, useAuth } = await import("../src/lib/auth");
 const { IdentityMfaVerify } =
   await import("../src/components/IdentityMfaVerify");
@@ -83,21 +100,34 @@ const { IdentitySecurityPanel } =
   await import("../src/components/IdentitySecurityPanel");
 const { IdentityResetMfa } = await import("../src/components/IdentityResetMfa");
 const { OidcCallbackPage } = await import("../src/pages/OidcCallbackPage");
+const { IdentityRecoveryCodesProvider } =
+  await import("../src/components/IdentityRecoveryCodesProvider");
+const { ProfilePage } = await import("../src/pages/ProfilePage");
+const { LoginPage } = await import("../src/pages/LoginPage");
+const { Protected } = await import("../src/App");
+const { ModulesProvider } = await import("../src/lib/modules");
+const { api, ApiError } = await import("../src/lib/api");
 type IdentityProvider = import("../src/lib/identity").IdentityProvider;
 type IdentityBinding = import("../src/lib/identity").IdentityBinding;
 const originalFetch = globalThis.fetch;
 const calls: { path: string; body?: Record<string, unknown> }[] = [];
 const clients: InstanceType<typeof QueryClient>[] = [];
 let enabled = false,
-  rejectVerification = false;
+  rejectVerification = false,
+  revokeOnRecovery = false,
+  sessionRevoked = false,
+  deferNextIdentity = false;
+let pendingIdentity: ((response: Response) => void) | undefined;
 let identityProviders: IdentityProvider[] = [
   { id: "company", name: "公司身份" },
 ];
 let identityBindings: IdentityBinding[] = [];
-const recoveryCodes = [
-  "11111111-22222222-33333333-44444444",
-  "55555555-66666666-77777777-88888888",
-];
+/** 与真实接口一样返回 10 个不同的恢复码，避免只验证一个样例文本。 */
+const recoveryCodes = Array.from(
+  { length: 10 },
+  (_, index) =>
+    `11111111-22222222-33333333-${(index + 1).toString(16).padStart(8, "0")}`,
+);
 const enrollment = {
   challengeId: "enrollment-challenge",
   secret: "JBSWY3DPEHPK3PXP",
@@ -118,22 +148,48 @@ globalThis.fetch = async (input, options) => {
   const body = raw ? JSON.parse(raw) : undefined;
   calls.push({ path: url.pathname, body });
   let data: unknown;
-  if (url.pathname === "/api/auth/me")
+  if (url.pathname === "/api/auth/me") {
+    if (deferNextIdentity) {
+      deferNextIdentity = false;
+      return new Promise<Response>((resolve) => {
+        pendingIdentity = resolve;
+      });
+    }
+    if (sessionRevoked)
+      return Response.json(
+        { success: false, message: "登录会话已撤销" },
+        { status: 401 },
+      );
     data = {
-      user: { id: 101, nickname: "测试成员" },
+      user: {
+        id: 101,
+        username: "synthetic",
+        nickname: "测试成员",
+        email: null,
+        phone: null,
+        departmentName: "测试部门",
+        roleNames: [],
+      },
       permissions: [],
       dataScopes: {},
       scopeDepartments: {},
     };
+  } else if (url.pathname === "/api/platform/features")
+    data = { modules: { portal: false }, overrides: {} };
   else if (url.pathname === "/api/auth/login")
     data = { token: null, mfaRequired: true, challengeId: "primary-challenge" };
-  else if (url.pathname === "/api/auth/identity/mfa")
+  else if (url.pathname === "/api/auth/identity/mfa") {
+    if (sessionRevoked)
+      return Response.json(
+        { success: false, message: "登录会话已撤销" },
+        { status: 401 },
+      );
     data = {
       available: true,
       enabled,
       recoveryCodesRemaining: enabled ? 10 : 0,
     };
-  else if (url.pathname === "/api/auth/identity/providers")
+  } else if (url.pathname === "/api/auth/identity/providers")
     data = identityProviders;
   else if (url.pathname === "/api/auth/identity/bindings")
     data = identityBindings;
@@ -150,9 +206,11 @@ globalThis.fetch = async (input, options) => {
   else if (
     url.pathname === "/api/auth/identity/mfa/confirm" ||
     url.pathname === "/api/auth/identity/mfa/recovery"
-  )
+  ) {
+    // 模拟真实后端：恢复码成功返回时旧会话已经撤销，后续受保护请求必须返回 401。
+    if (revokeOnRecovery) sessionRevoked = true;
     data = recoveryCodes;
-  else if (url.pathname === "/api/auth/identity/mfa/verify") {
+  } else if (url.pathname === "/api/auth/identity/mfa/verify") {
     if (rejectVerification)
       return Response.json(
         { success: false, message: "验证码错误或已使用" },
@@ -168,7 +226,12 @@ globalThis.fetch = async (input, options) => {
   else throw new Error("未登记的身份组件请求：" + url.pathname);
   return Response.json({ success: true, data });
 };
-function mount(children: React.ReactNode, session = false) {
+function mount(
+  children: React.ReactNode,
+  session = false,
+  initialEntry = "/",
+  withModules = false,
+) {
   if (session)
     sessionStorage.setItem("mayday.session", "synthetic-current-session");
   const client = new QueryClient({
@@ -178,13 +241,22 @@ function mount(children: React.ReactNode, session = false) {
     },
   });
   clients.push(client);
+  const identity = (
+    <AuthProvider>
+      <IdentityRecoveryCodesProvider>{children}</IdentityRecoveryCodesProvider>
+    </AuthProvider>
+  );
+  // 路由回归沿用产品 Modules → Auth → 恢复码 Provider 的归属，缓存清理也不能销毁明文弹窗。
+  const content = withModules ? (
+    <ModulesProvider>{identity}</ModulesProvider>
+  ) : (
+    identity
+  );
   return render(
     <QueryClientProvider client={client}>
       <ConfigProvider theme={{ token: { motion: false } }}>
         <App>
-          <MemoryRouter>
-            <AuthProvider>{children}</AuthProvider>
-          </MemoryRouter>
+          <MemoryRouter initialEntries={[initialEntry]}>{content}</MemoryRouter>
         </App>
       </ConfigProvider>
     </QueryClientProvider>,
@@ -200,6 +272,10 @@ afterEach(async () => {
   calls.length = 0;
   enabled = false;
   rejectVerification = false;
+  revokeOnRecovery = false;
+  sessionRevoked = false;
+  deferNextIdentity = false;
+  pendingIdentity = undefined;
   identityProviders = [{ id: "company", name: "公司身份" }];
   identityBindings = [];
   window.history.replaceState(null, "", "/");
@@ -312,6 +388,7 @@ for (const change of ["提供方停用", "其他会话完成绑定"] as const)
   });
 after(async () => {
   globalThis.fetch = originalFetch;
+  styles?.deregister();
   dom.window.close();
   channels.forEach(({ port1, port2 }) => {
     port1.close();
@@ -398,7 +475,7 @@ test("二次验证提交挑战与因素，错误保留输入且不触发登录�
   assert.equal(cancelled, 1);
 });
 
-test("认证器开通分两阶段，恢复码仅在当前弹窗显示，确认保管后清除旧会话", async () => {
+test("认证器开通分两阶段，成功即清除旧会话，恢复码保留到确认保存", async () => {
   const user = userEvent.setup();
   mount(<IdentitySecurityPanel />, true);
   await user.click(
@@ -431,17 +508,177 @@ test("认证器开通分两阶段，恢复码仅在当前弹窗显示，确认�
       recoveryCodes[0],
     ),
   );
-  assert.equal(
-    sessionStorage.getItem("mayday.session"),
-    "synthetic-current-session",
-  );
-  await user.click(
-    within(saved).getByRole("button", { name: "已安全保存，重新登录" }),
-  );
+  assert.equal(sessionStorage.getItem("mayday.session"), null);
+  await user.click(within(saved).getByRole("button", { name: "已安全保存" }));
   await waitFor(() =>
-    assert.equal(sessionStorage.getItem("mayday.session"), null),
+    assert.equal(
+      screen.queryByRole("dialog", { name: "保存一次性恢复码" }),
+      null,
+    ),
   );
+  assert.equal(sessionStorage.getItem("mayday.session"), null);
 });
+
+/**
+ * 容器只精简不相关业务路由：个人中心、登录页、认证上下文和 Protected 都使用真实产品实现。
+ * 路由位置与真实个人页 DOM 同时断言，防止把 Modal 遮挡页面误认为个人中心已经卸载。
+ */
+function RecoveryRoutes() {
+  const location = useLocation();
+  return (
+    <>
+      <output aria-label="当前页面">
+        {location.pathname + location.search + location.hash}
+      </output>
+      <Routes>
+        <Route element={<Protected />}>
+          <Route path="/admin/profile" element={<ProfilePage />} />
+        </Route>
+        <Route path="/login" element={<LoginPage />} />
+      </Routes>
+    </>
+  );
+}
+
+for (const action of ["enroll", "recovery"] as const)
+  test(`真实路由中${action === "enroll" ? "开通" : "轮换"}后的恢复码跨退出、迟到401及身份刷新保留到确认`, async (context) => {
+    enabled = action === "recovery";
+    revokeOnRecovery = true;
+    const refreshIntervals: (() => void)[] = [];
+    const scheduleInterval = window.setInterval.bind(window);
+    context.mock.method(
+      window,
+      "setInterval",
+      (handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+        if (delay === 30000 && typeof handler === "function")
+          refreshIntervals.push(() => handler(...args));
+        // 仍注册真实计时器供 AuthProvider 正常清理；测试只提前驱动它实际注册的 30 秒回调。
+        return scheduleInterval(handler, delay, ...args);
+      },
+    );
+    const user = userEvent.setup();
+    mount(<RecoveryRoutes />, true, "/admin/profile", true);
+    const profileSave = await screen.findByRole("button", { name: "保存资料" });
+    await screen.findByRole("button", {
+      name: action === "enroll" ? "开通认证器验证" : /重新生成恢复码/,
+    });
+    assert.equal(refreshIntervals.length, 1);
+    const identityReads = () =>
+      calls.filter((call) => call.path === "/api/auth/me").length;
+    const beforeRefresh = identityReads();
+    await act(async () => refreshIntervals[0]());
+    await waitFor(() => assert.equal(identityReads(), beforeRefresh + 1));
+
+    // 在有效会话下启动真实焦点刷新，暂存响应；恢复码成功后再返回真实 401，覆盖在途请求。
+    deferNextIdentity = true;
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await waitFor(() => assert(pendingIdentity));
+    const completePendingIdentity = pendingIdentity!;
+    await user.click(
+      screen.getByRole("button", {
+        name: action === "enroll" ? "开通认证器验证" : /重新生成恢复码/,
+      }),
+    );
+    const proof = await screen.findByRole("dialog", {
+      name: action === "enroll" ? "开通多因素认证" : "重新生成恢复码",
+    });
+    await user.type(
+      within(proof).getByLabelText("当前本地密码"),
+      "SyntheticPassword_2026!",
+    );
+    if (action === "recovery")
+      await user.type(
+        within(proof).getByLabelText("认证器验证码或恢复码"),
+        "123456",
+      );
+    await user.click(within(proof).getByRole("button", { name: /确\s*认/ }));
+    if (action === "enroll") {
+      const scan = await screen.findByRole("dialog", {
+        name: "扫描并确认开通",
+      });
+      await user.type(within(scan).getByLabelText("6 位动态验证码"), "123456");
+      await user.click(within(scan).getByRole("button", { name: "确认开通" }));
+    }
+    const saved = await screen.findByRole("dialog", {
+      name: "保存一次性恢复码",
+    });
+    assert(sessionRevoked);
+    assert.equal(sessionStorage.getItem("mayday.session"), null);
+    await waitFor(() => {
+      assert.equal(screen.getByLabelText("当前页面").textContent, "/login");
+      assert.equal(document.body.contains(profileSave), false);
+    });
+    recoveryCodes.forEach((code) => assert(saved.textContent?.includes(code)));
+
+    await act(async () => {
+      completePendingIdentity(
+        Response.json(
+          { success: false, message: "登录会话已撤销" },
+          { status: 401 },
+        ),
+      );
+      pendingIdentity = undefined;
+      await Promise.resolve();
+    });
+    // 再走统一 API 的真实 401 路径，触发 unauthorized 和缓存清理；弹窗仍属于路由上层。
+    await act(async () => {
+      await assert.rejects(
+        api("/auth/identity/mfa"),
+        (error) => error instanceof ApiError && error.status === 401,
+      );
+    });
+    const afterSignOut = identityReads();
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      refreshIntervals[0]();
+      await Promise.resolve();
+    });
+    assert.equal(identityReads(), afterSignOut);
+    const retained = screen.getByRole("dialog", { name: "保存一次性恢复码" });
+    recoveryCodes.forEach((code) =>
+      assert(retained.textContent?.includes(code)),
+    );
+    assert.equal(sessionStorage.getItem("mayday.session"), null);
+
+    const client = clients.at(-1)!;
+    const stored = JSON.stringify({
+      session: { ...sessionStorage },
+      local: { ...localStorage },
+      queries: client
+        .getQueryCache()
+        .getAll()
+        .map((query) => query.state.data),
+      route: screen.getByLabelText("当前页面").textContent,
+    });
+    recoveryCodes.forEach((code) => assert(!stored.includes(code)));
+    assert(!stored.includes(enrollment.secret));
+    await user.keyboard("{Escape}");
+    assert(screen.getByRole("dialog", { name: "保存一次性恢复码" }));
+    await user.click(
+      within(retained).getByRole("button", { name: "已安全保存" }),
+    );
+    await waitFor(() => {
+      assert.equal(
+        screen.queryByRole("dialog", { name: "保存一次性恢复码" }),
+        null,
+      );
+      recoveryCodes.forEach((code) =>
+        assert(!document.body.textContent?.includes(code)),
+      );
+    });
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      refreshIntervals[0]();
+    });
+    assert.equal(sessionStorage.getItem("mayday.session"), null);
+    assert.equal(identityReads(), afterSignOut);
+    assert.equal(
+      screen.queryByRole("dialog", { name: "保存一次性恢复码" }),
+      null,
+    );
+  });
 
 test("管理员恢复使用管理者自己的 MFA 证明和理由，目标账号由路径指定", async () => {
   enabled = true;

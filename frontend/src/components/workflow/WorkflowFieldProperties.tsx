@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import {
+  App,
   Button,
   Empty,
   Form,
@@ -19,7 +20,11 @@ import {
   type WorkflowField,
 } from "../../types/workflow";
 import { calculationNames } from "../../lib/workflowCalculations";
-import { compareWorkflowDecimals } from "../../lib/workflowForm";
+import {
+  compareWorkflowDecimals,
+  nextWorkflowDetailColumnId,
+  requireWorkflowFieldChange,
+} from "../../lib/workflowForm";
 
 const detailColumnTypes: FieldType[] = [
   "TEXT",
@@ -371,13 +376,23 @@ function FieldSettings({
 
 /**
  * 明细列与流程引用一样使用稳定标识：排序、改标题均不生成新 ID。
- * 新列取未占用的 column_N，保留旧列属性；只允许 Java 已支持的七类简单控件。
+ * 新列避开现有、计算引用及本次面板曾用标识；只允许 Java 已支持的七类简单控件。
  */
-function DetailColumns({ field, editable, onChange }: FieldSettingsProps) {
+function DetailColumns({
+  field,
+  fields,
+  editable,
+  onChange,
+}: FieldSettingsProps & { fields: WorkflowField[] }) {
   const rowsId = `workflow-detail-rows-${useId()}`;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addingType, setAddingType] = useState<FieldType>("TEXT");
   const columns = field.columns ?? [];
+  // 面板卸载后不持久化内部编号；当前公式的引用仍由公共生成器独立保留。
+  const usedColumnIds = useRef(new Set(columns.map((column) => column.id)));
+  useEffect(() => {
+    columns.forEach((column) => usedColumnIds.current.add(column.id));
+  }, [columns]);
   const duplicateColumnIds = new Set(
     columns
       .filter((column, index) =>
@@ -512,12 +527,15 @@ function DetailColumns({ field, editable, onChange }: FieldSettingsProps) {
           disabled={!canEditColumns || columns.length >= 6}
           onClick={() => {
             if (!canEditColumns || columns.length >= 6) return;
-            let number = 1;
-            while (columns.some((column) => column.id === `column_${number}`))
-              number++;
+            const id = nextWorkflowDetailColumnId(
+              fields,
+              field,
+              usedColumnIds.current,
+            );
+            usedColumnIds.current.add(id);
             const column: WorkflowField = {
-              id: `column_${number}`,
-              label: `明细项${number}`,
+              id,
+              label: `明细项${id.slice(7)}`,
               type: addingType,
               required: false,
               ...(addingType === "SINGLE"
@@ -578,6 +596,17 @@ export function WorkflowFieldProperties({
   editable: boolean;
   onChange: (field: WorkflowField) => void;
 }) {
+  const { message } = App.useApp();
+  // 所有属性和明细结构写入共用守卫，不能只保护删除按钮而漏掉旧来源替换。
+  function change(next: WorkflowField) {
+    if (!field || !editable) return;
+    try {
+      requireWorkflowFieldChange(fields, field, next);
+      onChange(next);
+    } catch (error) {
+      message.error((error as Error).message);
+    }
+  }
   if (!field)
     return (
       <section className="workflow-field-properties" aria-label="字段属性">
@@ -593,29 +622,22 @@ export function WorkflowFieldProperties({
         <Typography.Text strong>控件属性</Typography.Text>
         <Tag>{fieldNames[field.type]}</Tag>
       </Space>
-      <FieldSettings
-        field={field}
-        editable={editable}
-        onChange={(value) => {
-          if (editable) onChange(value);
-        }}
-      />
+      <FieldSettings field={field} editable={editable} onChange={change} />
       {field.type === "CALCULATED" && (
         <CalculationSettings
           field={field}
           fields={fields}
           editable={editable}
-          onChange={onChange}
+          onChange={change}
         />
       )}
       {field.type === "DETAILS" && (
         <DetailColumns
           key={field.id}
           field={field}
+          fields={fields}
           editable={editable}
-          onChange={(value) => {
-            if (editable) onChange(value);
-          }}
+          onChange={change}
         />
       )}
     </section>

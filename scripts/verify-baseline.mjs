@@ -7,7 +7,7 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes, createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { resolve, dirname, join } from "node:path";
+import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import {
@@ -25,6 +25,11 @@ import {
   readCrawlerMenu,
   verifyCrawlerMenuRename,
 } from "./migration-snapshot.mjs";
+import { runVerificationProcess } from "./verification-process.mjs";
+import {
+  apiDiagnosticReporterOptions,
+  publicApiFailureDiagnostic,
+} from "../tests/support/api-test-diagnostics.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const runId =
@@ -243,34 +248,40 @@ function verificationSnapshot(service) {
     ]),
   );
 }
-function apiSuite(label, port) {
-  // TAP 保留子进程退出码及完整断言位置，避免终端精简报告只留下 test failed 而无法定位。
-  const checked = execute(
+async function apiSuite(label, port) {
+  const files = [
+    "tests/api.test.mjs",
+    "tests/workflow.test.mjs",
+    "tests/workflow-decimal.test.mjs",
+    "tests/security.test.mjs",
+    "tests/theme.test.mjs",
+    "tests/captcha.test.mjs",
+    "tests/crawler.test.mjs",
+    "tests/business-module.test.mjs",
+    "tests/realtime-workflow.test.mjs",
+    "tests/file-center.test.mjs",
+    "tests/bulk-data.test.mjs",
+    "tests/general-platform.test.mjs",
+    "tests/portal.test.mjs",
+    "tests/workflow-orchestration.test.mjs",
+    "tests/workflow-field-activation.test.mjs",
+    "tests/shared-execution.test.mjs",
+  ];
+  const reportPath = join(output, `api-${label}-reporter.json`);
+  const diagnosticOptions = apiDiagnosticReporterOptions({
+    phase: label,
+    testFiles: files,
+    reportPath,
+  });
+  // 长 API 套件异步等待退出；保留 600 秒上限、私有 TAP 和原始失败，不重试或阻塞父进程。
+  const checked = await runVerificationProcess(
     process.execPath,
-    [
-      "--test",
-      "--test-reporter=tap",
-      "--test-concurrency=1",
-      "tests/api.test.mjs",
-      "tests/workflow.test.mjs",
-      "tests/workflow-decimal.test.mjs",
-      "tests/security.test.mjs",
-      "tests/theme.test.mjs",
-      "tests/captcha.test.mjs",
-      "tests/crawler.test.mjs",
-      "tests/business-module.test.mjs",
-      "tests/realtime-workflow.test.mjs",
-      "tests/file-center.test.mjs",
-      "tests/bulk-data.test.mjs",
-      "tests/general-platform.test.mjs",
-      "tests/portal.test.mjs",
-      "tests/workflow-orchestration.test.mjs",
-      "tests/workflow-field-activation.test.mjs",
-      "tests/shared-execution.test.mjs",
-    ],
+    ["--test", ...diagnosticOptions.args, "--test-concurrency=1", ...files],
     {
+      cwd: root,
       env: {
         ...environment,
+        ...diagnosticOptions.env,
         API_BASE: `http://127.0.0.1:${port}/api`,
         ADMIN_PASSWORD: settings.ADMIN_PASSWORD,
         API_TEST_COMPOSE_PROJECT: project,
@@ -279,7 +290,8 @@ function apiSuite(label, port) {
         API_TEST_NATIVE_FILES: "",
         MAYDAY_TEST_COMPOSE_ARGS: JSON.stringify(checkCompose),
       },
-      log: `api-${label}.log`,
+      logPath: join(output, `api-${label}.log`),
+      timeoutMs: 600_000,
     },
   );
   const counts = Object.fromEntries(
@@ -289,13 +301,35 @@ function apiSuite(label, port) {
       ),
     ].map((match) => [match[1], Number(match[2])]),
   );
-  assert(
-    counts.tests > 0 && counts.pass === counts.tests,
-    "容器接口回归必须执行全部检查，不以缺失环境条件或跳过替代通过",
-  );
-  assert.equal(counts.skipped, 0, "容器接口条件跳过不得计为通过");
-  assert.equal(counts.fail, 0);
-  assert.equal(counts.cancelled, 0);
+  try {
+    assert(!checked.error && checked.status === 0, "容器 API 子进程失败");
+    assert(
+      counts.tests > 0 && counts.pass === counts.tests,
+      "容器接口回归必须执行全部检查，不以缺失环境条件或跳过替代通过",
+    );
+    assert.equal(counts.skipped, 0, "容器接口条件跳过不得计为通过");
+    assert.equal(counts.fail, 0);
+    assert.equal(counts.cancelled, 0);
+  } catch {
+    const diagnostic = publicApiFailureDiagnostic({
+      phase: label,
+      root,
+      testFiles: files,
+      response: checked,
+      reportPath,
+    });
+    const failurePath = join(output, `api-${label}-failure.json`);
+    writeFileSync(failurePath, JSON.stringify(diagnostic, null, 2) + "\n", {
+      mode: 0o600,
+    });
+    result.apiFailure = {
+      phase: label,
+      diagnostic: relative(root, failurePath),
+    };
+    // 仅安全对象进入 CI 终端；原 TAP、响应、错误消息及堆栈继续只在私有日志中。
+    console.error("API 回归脱敏失败摘要：" + JSON.stringify(diagnostic));
+    throw new Error(`${label}：API 回归未通过，脱敏诊断见 ${failurePath}`);
+  }
   mark(`${label}：真实 MySQL 接口回归`, counts);
 }
 
@@ -582,8 +616,8 @@ try {
   mark("真实控制器契约与前端生成类型一致");
   const beforeUpgradeTests = verificationSnapshot("upgrade-db");
   const beforeFreshTests = verificationSnapshot("fresh-db");
-  apiSuite("upgrade", upgradePort);
-  apiSuite("fresh", freshPort);
+  await apiSuite("upgrade", upgradePort);
+  await apiSuite("fresh", freshPort);
   execute(process.execPath, ["scripts/verify-module-switches.mjs"], {
     env: { ...environment, API_TEST_COMPOSE_PROJECT: project },
     log: "module-switches.log",

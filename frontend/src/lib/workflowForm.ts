@@ -158,6 +158,75 @@ export function copyWorkflowField(
   return result;
 }
 
+/** 同一来源的主字段与明细列共用计算引用查询，不按列名或位置推断关联。 */
+function calculationReferences(
+  fields: WorkflowField[],
+  sourceId: string,
+  columnId?: string,
+): WorkflowField[] {
+  return fields.filter(
+    (field) =>
+      field.formula?.operands.includes(sourceId) &&
+      (columnId === undefined ||
+        (field.formula.operation === "DETAIL_SUM" &&
+          field.formula.column === columnId)),
+  );
+}
+
+/**
+ * 属性修改保留计算来源的身份与类型。标题、排序和约束仍可编辑；删除来源、
+ * 替换明细列或在 NUMBER/MONEY 之间改类型前，必须先显式修改引用计算规则。
+ * 返回前只读核验，不能自动清空公式或把旧引用重绑定到同名新字段。
+ */
+export function requireWorkflowFieldChange(
+  fields: WorkflowField[],
+  previous: WorkflowField,
+  next: WorkflowField,
+): void {
+  const references = calculationReferences(fields, previous.id);
+  if (
+    references.length &&
+    (previous.id !== next.id || previous.type !== next.type)
+  )
+    throw new Error(
+      `字段被计算字段“${references.map((field) => field.label).join("、")}”引用，请先修改计算规则后再改变来源字段标识或类型`,
+    );
+  if (previous.type !== "DETAILS") return;
+  for (const column of previous.columns ?? []) {
+    const calculations = calculationReferences(fields, previous.id, column.id);
+    const replacement = next.columns?.find((item) => item.id === column.id);
+    if (
+      calculations.length &&
+      (!replacement || replacement.type !== column.type)
+    )
+      throw new Error(
+        `明细列“${column.label}”被计算字段“${calculations.map((field) => field.label).join("、")}”引用，请先修改计算规则后再删除或改变来源列标识、类型`,
+      );
+  }
+}
+
+/**
+ * 新列避开已有列、未修复的汇总引用和本次面板曾用标识。即使旧草稿有悬空
+ * DETAIL_SUM 引用，也不能通过添加 column_N 静默把原计算绑定到另一项业务。
+ */
+export function nextWorkflowDetailColumnId(
+  fields: WorkflowField[],
+  source: WorkflowField,
+  usedIds: ReadonlySet<string> = new Set(),
+): string {
+  const reserved = new Set([
+    ...usedIds,
+    ...(source.columns ?? []).map((column) => column.id),
+    ...calculationReferences(fields, source.id)
+      .filter((field) => field.formula?.operation === "DETAIL_SUM")
+      .map((field) => field.formula?.column)
+      .filter((id): id is string => typeof id === "string"),
+  ]);
+  let number = 1;
+  while (reserved.has(`column_${number}`)) number++;
+  return `column_${number}`;
+}
+
 /**
  * 条件仍使用该字段时先阻止删除并指出节点，避免暗改业务路由；普通字段删除只
  * 清理对应读写引用，保留节点、连线、其他字段和历史属性，不修改输入模型。
@@ -167,9 +236,7 @@ export function removeWorkflowField(
   fieldId: string,
 ): WorkflowSpec {
   const index = fieldIndex(spec, fieldId);
-  const formulas = spec.fields.filter((field) =>
-    field.formula?.operands.includes(fieldId),
-  );
+  const formulas = calculationReferences(spec.fields, fieldId);
   if (formulas.length)
     throw new Error(
       `字段被计算字段“${formulas.map((field) => field.label).join("、")}”引用，请先修改计算规则`,

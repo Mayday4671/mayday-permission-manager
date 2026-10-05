@@ -50,6 +50,7 @@ run(process.execPath, [
   "tests/development-configuration.test.mjs",
   "tests/isolated-compose.test.mjs",
   "tests/cluster-release-gate.test.mjs",
+  "tests/verification-diagnostics.test.mjs",
 ]);
 run(
   process.execPath,

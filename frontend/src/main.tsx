@@ -9,6 +9,7 @@ import { AuthProvider } from "./lib/auth";
 import { ModulesProvider } from "./lib/modules";
 import { ApiError } from "./lib/api";
 import { AppearanceProvider } from "./lib/theme";
+import { IdentityRecoveryCodesProvider } from "./components/IdentityRecoveryCodesProvider";
 import Application, { ErrorBoundary } from "./App";
 import "./styles.css";
 import "./admin.css";
@@ -35,7 +36,9 @@ const router = createBrowserRouter([
         <ModulesProvider>
           <AuthProvider>
             <AppearanceProvider>
-              <Application />
+              <IdentityRecoveryCodesProvider>
+                <Application />
+              </IdentityRecoveryCodesProvider>
             </AppearanceProvider>
           </AuthProvider>
         </ModulesProvider>

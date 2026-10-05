@@ -73,7 +73,7 @@ export async function verifyIdentityRestart({
   const failures = [];
   const rememberFailure = (failure) => {
     const detail = lastCall
-      ? `；${lastCall.method} ${lastCall.route}，预期 ${lastCall.expectedStatus}，实际 ${lastCall.actualStatus ?? "无响应"}，类型 ${lastCall.kind}`
+      ? `；${lastCall.method} ${lastCall.route}，预期 ${lastCall.expectedStatus}，实际 ${lastCall.actualStatus ?? "无响应"}，类型 ${lastCall.kind}${lastCall.networkCode ? "，网络错误码 " + lastCall.networkCode : ""}`
       : "；类型 " +
         (failure?.name === "AssertionError" ? "assertion" : "runtime");
     const recorded = new Error("持久 MFA 检查失败阶段：" + stage + detail);
@@ -89,15 +89,36 @@ export async function verifyIdentityRestart({
       actualStatus: null,
       kind: "network",
     };
-    const response = await fetch(base + path, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: "Bearer " + token } : {}),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(20000),
-    });
+    let response;
+    try {
+      response = await fetch(base + path, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: "Bearer " + token } : {}),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch (failure) {
+      // 仅公开标准网络错误码，保留连接重置与超时的区别；不输出原异常、请求或认证参数，也不重试有副作用的认证操作。
+      const code = failure?.cause?.code ?? failure?.code;
+      lastCall.networkCode = [
+        "ECONNREFUSED",
+        "ECONNRESET",
+        "ETIMEDOUT",
+        "EPIPE",
+        "UND_ERR_SOCKET",
+        "UND_ERR_CONNECT_TIMEOUT",
+        "UND_ERR_HEADERS_TIMEOUT",
+        "UND_ERR_BODY_TIMEOUT",
+      ].includes(code)
+        ? code
+        : ["AbortError", "TimeoutError"].includes(failure?.name)
+          ? failure.name
+          : "OTHER_NETWORK_ERROR";
+      throw failure;
+    }
     lastCall.actualStatus = response.status;
     lastCall.kind = "status";
     assert.equal(

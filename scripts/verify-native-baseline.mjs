@@ -45,6 +45,11 @@ import {
 } from "../tests/support/isolated-compose.mjs";
 import { verifyIdentityRestart } from "../tests/support/identity-restart.mjs";
 import { verifyIdentityRace } from "./verify-identity-race.mjs";
+import { runVerificationProcess } from "./verification-process.mjs";
+import {
+  apiDiagnosticReporterOptions,
+  publicApiFailureDiagnostic,
+} from "../tests/support/api-test-diagnostics.mjs";
 import {
   javaRuntimeEnvironment,
   assertLocalDockerEndpoint,
@@ -698,7 +703,7 @@ function apiEnvironment(label) {
   });
 }
 
-function apiSuite(label) {
+async function apiSuite(label) {
   const files = [
     "api",
     "workflow",
@@ -724,14 +729,38 @@ function apiSuite(label) {
     isolatedSql("SELECT DATABASE();", { environment: env }).trim(),
     "mayday_verify",
   );
-  const checked = execute(
+  const reportPath = join(output, `api-${label}-diagnostic.json`);
+  const diagnostic = apiDiagnosticReporterOptions({
+    phase: label,
+    testFiles: files,
+    reportPath,
+  });
+  // 接口套件可能持续数分钟；异步等待保持 HTTP 超时与自有 Java 退出事件可处理，认证失败不自动重试。
+  const checked = await runVerificationProcess(
     process.execPath,
-    ["--test", "--test-reporter=tap", "--test-concurrency=1", ...files],
+    ["--test", ...diagnostic.args, "--test-concurrency=1", ...files],
     {
-      env,
-      log: `api-${label}.log`,
+      cwd: root,
+      env: { ...env, ...diagnostic.env },
+      logPath: join(output, `api-${label}.log`),
     },
   );
+  if (checked.error || checked.status !== 0) {
+    const failure = publicApiFailureDiagnostic({
+      phase: label,
+      root,
+      testFiles: files,
+      response: checked,
+      reportPath,
+    });
+    writeFileSync(
+      join(output, `api-${label}-failure.json`),
+      JSON.stringify(failure, null, 2),
+    );
+    result.apiFailure = failure;
+    console.error("API 回归脱敏失败摘要：" + JSON.stringify(failure));
+    throw new Error(`真实 API 验收失败，见 api-${label}-failure.json`);
+  }
   const counts = Object.fromEntries(
     [
       ...checked.stdout.matchAll(
@@ -974,8 +1003,8 @@ try {
     upgrade: staticSnapshot("upgrade-db"),
     fresh: staticSnapshot("fresh-db"),
   };
-  apiSuite("upgrade");
-  apiSuite("fresh");
+  await apiSuite("upgrade");
+  await apiSuite("fresh");
   const identityRestart = await verifyIdentityRestart({
     apiBase: `http://127.0.0.1:${ports.fresh.api}/api`,
     adminPassword: settings.ADMIN_PASSWORD,

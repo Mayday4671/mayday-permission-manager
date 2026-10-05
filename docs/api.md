@@ -166,10 +166,14 @@ SSE 从共享数据库读取事务提交后的刷新提示，客户端重新调�
 - `GET /operations/monitor/history?minutes=60`：本次进程节点最近 5–60 分钟、最多 120 点；每 30 秒采样，保留 7 天。进程重启开始新曲线。
 - `GET/PUT /operations/monitor/policy`：编辑包含 version/enabled/heapThresholdPercent/databaseThresholdMs/alertUserId，修改另需 `monitor:configure`。`GET .../recipients` 返回有监控查看权的有效接收人候选。启用后超阈值发站内提醒，冷却 30 分钟；数据库离线时不能向同一个故障库承诺持久化采样/提醒。
 - `GET /operations/scheduler/handlers`：实际注册的 JobHandler；`GET .../recipients`：有调度查看权的提醒接收人候选。
-- `GET/POST /operations/scheduler`、`PUT/DELETE .../{id}`：任务配置；编辑为 `{name,handler,cron,description,enabled,alertUserId,version}`，cron 为六段表达式。`POST .../{id}/run` 需独立 `scheduler:execute`。
-- `GET /operations/job-logs`：按 keyword/jobId/page/size 查询真实执行结果；删除配置不删除独立执行历史。失败先回滚业务事务，再保存失败记录；站内失败提醒独立重试最近一天未完成的最早 100 条，已投递项退出队列，不回滚执行结果。未配置或失效接收人明确跳过，恢复权限后不补发这批历史提醒；消息模块关闭时保留待发状态。
+- `GET/POST /operations/scheduler`、`PUT/DELETE .../{id}`：任务配置；编辑为 `{name,handler,cron,description,enabled,alertUserId,version}`，cron 为六段表达式。编辑和删除前检查是否存在排队或运行记录。
+- `POST /operations/scheduler/{id}/run`：无需正文，需 `scheduler:execute`，允许手动执行未启用配置。可选请求头 `Idempotency-Key` 为 16–64 位字母、数字或横线；网络重试沿用原键，同配置、同键和同冻结工作内容复用持久执行记录，内容改变则拒绝。缺省生成新键，每次请求会成为不同执行。接口先登记队列与执行记录，能立即领取时会执行短事务；返回的 `JobExecution.status` 可以是 QUEUED/RUNNING 或已结束状态，HTTP 200 不代表业务执行成功。
+- `GET /operations/job-logs`：需 `scheduler:view`，按 keyword/jobId/page/size 查询执行状态与结果；返回记录含 `id/jobId/jobName/status/result/durationMs/attempts`，状态为 QUEUED/RUNNING/SUCCESS/FAILED/CANCELLED。客户端按返回的执行 ID 在分页结果中核对状态，页面每 10 秒刷新；没有单条 `GET /job-logs/{id}` 接口。删除配置不删除独立执行历史，内部任务键及租约令牌不公开。
+- `POST /operations/job-logs/{id}/cancel`、`/{id}/retry`：均无需正文、需 `scheduler:execute`，id 为执行记录 ID。cancel 只接受排队/运行状态，成功返回 CANCELLED；retry 只接受失败/取消状态，保留原冻结处理器与业务键并返回 QUEUED，随后由工作器领取。缺失记录、旧记录无持久任务键或状态已变化时拒绝，需刷新核对，不能把成功记录重新执行或撤销。
 
-调度只执行注册处理器，不接收任意 SQL、脚本、类名或 URL。默认数据库事务超时 30 秒，适合短维护用例，但不能强制中断任意 CPU 运算或外部调用；长任务应提交专用队列，外部副作用需自身幂等。注册任务的跨节点领取、幂等和故障恢复使用专门验证；本机监控不替代外部生产故障管理平台。
+失败先回滚业务事务，再保存失败记录；站内失败提醒独立重试最近一天未完成的最早 100 条，已投递项退出队列，不回滚执行结果。未配置或失效接收人明确跳过，恢复权限后不补发这批历史提醒；消息模块关闭时保留待发状态。
+
+调度只执行注册处理器，不接收任意 SQL、脚本、类名或 URL。默认数据库事务超时 30 秒，适合短维护用例，但不能强制中断任意 CPU 运算或外部调用；取消可能等待已进入的处理器事务完成，已提交成功结果不能撤销，已发生的外部副作用也不能靠取消回滚。长任务应提交专用队列，外部副作用需自身幂等。注册任务的跨节点领取、幂等和故障恢复使用专门验证；本机监控不替代外部生产故障管理平台。
 
 ## 图片采集
 

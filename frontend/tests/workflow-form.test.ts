@@ -6,7 +6,9 @@ import {
   insertWorkflowField,
   MAX_WORKFLOW_FIELDS,
   moveWorkflowField,
+  nextWorkflowDetailColumnId,
   removeWorkflowField,
+  requireWorkflowFieldChange,
   validateWorkflowFormReferences,
   validateWorkflowFormValues,
   validateWorkflowFields,
@@ -862,4 +864,161 @@ test("与对象原型同名的主字段及明细列只读取自有值，缺省�
     }),
     [],
   );
+});
+
+test("计算引用保护覆盖明细列删除、来源标识及 NUMBER/MONEY 类型改变，错误指出全部计算字段", () => {
+  const source: WorkflowField = {
+    id: "items",
+    label: "费用明细",
+    type: "DETAILS",
+    columns: [
+      { id: "column_1", label: "原金额", type: "MONEY" },
+      text("column_2", "备注"),
+    ],
+  };
+  const calculation: WorkflowField = {
+    id: "total",
+    label: "报销合计",
+    type: "CALCULATED",
+    formula: {
+      operation: "DETAIL_SUM",
+      operands: ["items"],
+      column: "column_1",
+      scale: 2,
+    },
+  };
+  const fields = [
+    source,
+    calculation,
+    { ...calculation, id: "budget", label: "预算合计" },
+  ];
+  const original = structuredClone(fields);
+  for (const next of [
+    { ...source, columns: [source.columns![1]] },
+    {
+      ...source,
+      columns: [
+        { ...source.columns![0], id: "replacement" },
+        source.columns![1],
+      ],
+    },
+    {
+      ...source,
+      columns: [
+        { ...source.columns![0], type: "NUMBER" as const },
+        source.columns![1],
+      ],
+    },
+  ])
+    assert.throws(
+      () => requireWorkflowFieldChange(fields, source, next),
+      /原金额.*报销合计、预算合计.*先修改计算规则/,
+    );
+  for (const next of [
+    { ...source, id: "other_items" },
+    { ...source, type: "NUMBER" as const, columns: undefined },
+  ])
+    assert.throws(
+      () => requireWorkflowFieldChange(fields, source, next),
+      /报销合计、预算合计.*先修改计算规则/,
+    );
+  const numeric = { id: "amount", label: "金额", type: "NUMBER" as const };
+  const sum: WorkflowField = {
+    ...calculation,
+    formula: { operation: "SUM", operands: ["amount"], scale: 2 },
+  };
+  assert.throws(
+    () =>
+      requireWorkflowFieldChange([numeric, sum], numeric, {
+        ...numeric,
+        type: "MONEY",
+      }),
+    /报销合计.*先修改计算规则/,
+  );
+  assert.deepEqual(fields, original);
+});
+
+test("明细改名、排序、约束及其他同名列不受误保护，显式改汇总规则后可删除原列", () => {
+  const first: WorkflowField = {
+    id: "first",
+    label: "原明细",
+    type: "DETAILS",
+    columns: [{ id: "amount", label: "金额", type: "MONEY" }, text("memo")],
+  };
+  const second = { ...structuredClone(first), id: "second" };
+  const total: WorkflowField = {
+    id: "total",
+    label: "汇总",
+    type: "CALCULATED",
+    formula: {
+      operation: "DETAIL_SUM",
+      operands: ["first"],
+      column: "amount",
+      scale: 2,
+    },
+  };
+  const fields = [first, second, total];
+  assert.doesNotThrow(() =>
+    requireWorkflowFieldChange(fields, first, {
+      ...first,
+      label: "改名明细",
+      columns: [
+        first.columns![1],
+        { ...first.columns![0], label: "新标题", min: "0.01" },
+      ],
+    }),
+  );
+  assert.doesNotThrow(() =>
+    requireWorkflowFieldChange(fields, second, {
+      ...second,
+      columns: [second.columns![1]],
+    }),
+  );
+  const adjusted = {
+    ...total,
+    formula: { ...total.formula!, operands: ["second"] },
+  };
+  assert.doesNotThrow(() =>
+    requireWorkflowFieldChange(fields, total, adjusted),
+  );
+  assert.doesNotThrow(() =>
+    requireWorkflowFieldChange([first, second, adjusted], first, {
+      ...first,
+      columns: [first.columns![1]],
+    }),
+  );
+});
+
+test("新增明细列避开悬空汇总引用和曾使用标识，不把旧汇总静默重绑定到新列", () => {
+  const source: WorkflowField = {
+    id: "items",
+    label: "明细",
+    type: "DETAILS",
+    columns: [text("column_2")],
+  };
+  const total: WorkflowField = {
+    id: "total",
+    label: "合计",
+    type: "CALCULATED",
+    formula: {
+      operation: "DETAIL_SUM",
+      operands: ["items"],
+      column: "column_1",
+      scale: 2,
+    },
+  };
+  const fields = [source, total];
+  const original = structuredClone(fields);
+  assert.equal(nextWorkflowDetailColumnId(fields, source), "column_3");
+  assert.equal(
+    nextWorkflowDetailColumnId(fields, source, new Set(["column_3"])),
+    "column_4",
+  );
+  const other = { ...source, id: "other" };
+  assert.equal(nextWorkflowDetailColumnId(fields, other), "column_1");
+  assert.equal(
+    nextWorkflowDetailColumnId([source], source, new Set(["column_1"])),
+    "column_3",
+  );
+  assert.deepEqual(fields, original);
 });

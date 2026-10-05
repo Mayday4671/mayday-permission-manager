@@ -6,7 +6,6 @@ import {
   Form,
   Input,
   Flex,
-  Modal,
   QRCode,
   Select,
   Space,
@@ -16,6 +15,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { FormModal } from "./FormModal";
+import { useIdentityRecoveryCodes } from "./IdentityRecoveryCodesProvider";
 import { QueryState, SectionTitle } from "./shared";
 import { api, jsonBody, tokenStore } from "../lib/api";
 import {
@@ -32,11 +32,11 @@ interface EnrollmentCode {
 }
 type Action = "enroll" | "disable" | "recovery" | "bind" | IdentityBinding;
 
-/** 个人中心的 MFA 与企业身份管理；密码、扫码密钥和恢复码仅保留在当前弹窗，安全变更后明确重新登录。 */
+/** 个人中心管理 MFA 与企业身份；密码和扫码密钥仅留在本次表单，恢复码交给路由上层一次性展示。 */
 export function IdentitySecurityPanel() {
   const [action, setAction] = useState<Action | null>(null);
   const [enrollment, setEnrollment] = useState<MfaEnrollment | null>(null);
-  const [codes, setCodes] = useState<string[] | null>(null);
+  const { present } = useIdentityRecoveryCodes();
   const [proofForm] = Form.useForm<IdentityProof>();
   const [codeForm] = Form.useForm<EnrollmentCode>();
   const navigate = useNavigate();
@@ -83,7 +83,7 @@ export function IdentitySecurityPanel() {
         { name: "providerId", value: undefined, errors: [] },
       ]);
   }, [action, availableProviders, proofForm]);
-  /** 后端已撤销旧会话时同步清除身份，禁止页面拿旧令牌继续操作；恢复码弹窗关闭后再导航。 */
+  /** 无恢复码返回的安全变更也须同步结束已被后端撤销的旧会话，禁止继续操作。 */
   const signOut = () => {
     tokenStore.clear();
     window.dispatchEvent(new Event("mayday:unauthorized"));
@@ -228,8 +228,7 @@ export function IdentitySecurityPanel() {
               method: "POST",
               body: jsonBody(proof),
             });
-            setCodes(result);
-            setAction(null);
+            present(result);
             return;
           }
           const path =
@@ -305,8 +304,7 @@ export function IdentitySecurityPanel() {
               factor: values.factor,
             }),
           });
-          setEnrollment(null);
-          setCodes(result);
+          present(result);
         }}
       >
         {enrollment && (
@@ -339,40 +337,6 @@ export function IdentitySecurityPanel() {
           </>
         )}
       </FormModal>
-      <Modal
-        title="保存一次性恢复码"
-        open={codes !== null}
-        closable={false}
-        mask={{ closable: false }}
-        keyboard={false}
-        centered
-        footer={
-          <Button
-            type="primary"
-            onClick={() => {
-              setCodes(null);
-              signOut();
-            }}
-          >
-            已安全保存，重新登录
-          </Button>
-        }
-      >
-        <Alert
-          type="warning"
-          title="恢复码仅显示这一次。每个恢复码只能使用一次，不能代替登录密码；请存到独立安全位置。"
-        />
-        <Typography.Paragraph
-          copyable={{ text: codes?.join("\n") ?? "" }}
-          style={{
-            marginTop: 16,
-            whiteSpace: "pre-wrap",
-            fontFamily: "monospace",
-          }}
-        >
-          {codes?.join("\n")}
-        </Typography.Paragraph>
-      </Modal>
     </section>
   );
 }

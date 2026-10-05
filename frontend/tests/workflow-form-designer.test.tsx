@@ -789,3 +789,82 @@ test("填写预览校验明细行的必填列，空行不能误报通过且修�
   assert.equal(designer.changes.length, 0);
   assert.equal(requests.length, 0);
 });
+
+test("真实 Ant 删除被汇总引用的明细列被拦截，允许修改列标题而不改变计算来源", async () => {
+  const source = sampleSpec([
+    {
+      id: "items",
+      label: "费用明细",
+      type: "DETAILS",
+      columns: [
+        { id: "column_1", label: "原金额", type: "MONEY" },
+        { id: "column_2", label: "备注", type: "TEXT" },
+      ],
+    },
+    {
+      id: "total",
+      label: "报销合计",
+      type: "CALCULATED",
+      formula: {
+        operation: "DETAIL_SUM",
+        operands: ["items"],
+        column: "column_1",
+        scale: 2,
+      },
+    },
+  ]);
+  const designer = mountDesigner(source);
+  const user = userEvent.setup();
+  await user.click(fieldCard("items"));
+  await user.click(
+    screen.getByRole("button", { name: "删除明细列 1", exact: true }),
+  );
+  assert.ok(await screen.findByText(/原金额.*报销合计.*先修改计算规则/));
+  assert.equal(designer.changes.length, 0);
+  assert.deepEqual(designer.latest, source);
+  const currentColumn = screen.getByRole("region", { name: "当前明细列属性" });
+  const title = within(currentColumn).getByLabelText("列标题");
+  await user.clear(title);
+  await user.type(title, "调整金额标题");
+  assert.equal(designer.latest.fields[0].columns![0].id, "column_1");
+  assert.equal(designer.latest.fields[0].columns![0].label, "调整金额标题");
+  assert.deepEqual(designer.latest.fields[1].formula, source.fields[1].formula);
+});
+
+test("真实 Ant 新增列避开旧悬空引用，删除后再新增也不复用本次曾用标识", async () => {
+  const source = sampleSpec([
+    {
+      id: "items",
+      label: "费用明细",
+      type: "DETAILS",
+      columns: [
+        { id: "column_2", label: "现有备注", type: "TEXT" },
+        { id: "existing", label: "现有项目", type: "TEXT" },
+      ],
+    },
+    {
+      id: "total",
+      label: "原汇总",
+      type: "CALCULATED",
+      formula: {
+        operation: "DETAIL_SUM",
+        operands: ["items"],
+        column: "column_1",
+        scale: 2,
+      },
+    },
+  ]);
+  const designer = mountDesigner(source);
+  const user = userEvent.setup();
+  await user.click(fieldCard("items"));
+  await user.click(screen.getByRole("button", { name: "添加列", exact: true }));
+  assert.equal(designer.latest.fields[0].columns![2].id, "column_3");
+  assert.ok(screen.getAllByText(/请选择明细表及其中的数字或金额列/).length > 0);
+  await user.click(
+    screen.getByRole("button", { name: "删除明细列 3", exact: true }),
+  );
+  await user.click(screen.getByRole("button", { name: "添加列", exact: true }));
+  assert.equal(designer.latest.fields[0].columns![2].id, "column_4");
+  assert.deepEqual(designer.latest.fields[1].formula, source.fields[1].formula);
+  assert.equal(requests.length, 0);
+});

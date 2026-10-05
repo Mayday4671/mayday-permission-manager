@@ -16,6 +16,56 @@ import {
   preservedBusinessColumns,
   snapshotJsonFields,
 } from "../scripts/migration-snapshot.mjs";
+import { verifyIdentityRestart } from "./support/identity-restart.mjs";
+
+test("MFA 重启失败只记录标准网络码，不重试认证操作或泄露异常中的密钥", async (t) => {
+  const privateValue = "private-identity-diagnostic-canary";
+  for (const [code, expected] of [
+    ["ECONNRESET", "ECONNRESET"],
+    ["UND_ERR_CONNECT_TIMEOUT", "UND_ERR_CONNECT_TIMEOUT"],
+    [privateValue, "OTHER_NETWORK_ERROR"],
+  ]) {
+    let calls = 0;
+    const fetchMock = t.mock.method(globalThis, "fetch", async () => {
+      calls++;
+      throw new TypeError(privateValue, {
+        cause: Object.assign(new Error(privateValue), { code }),
+      });
+    });
+    try {
+      await assert.rejects(
+        verifyIdentityRestart({
+          apiBase: "http://127.0.0.1:18001/api",
+          adminPassword: privateValue,
+          project: "mayday-check-20261005000000-abcdef",
+          database: "fresh-db",
+          restart: async () => assert.fail("首请求失败不能重启其他服务"),
+          expectStartupFailure: async () => assert.fail("尚未进入密钥拒启检查"),
+        }),
+        (failure) => {
+          assert(failure instanceof AggregateError);
+          assert.equal(failure.errors.length, 1);
+          assert.equal(failure.errors[0].diagnostic.networkCode, expected);
+          assert.equal(
+            failure.errors[0].diagnostic.route,
+            "/auth/captcha/challenge",
+          );
+          assert.equal(failure.errors[0].diagnostic.actualStatus, null);
+          assert(!failure.message.includes(privateValue));
+          assert(
+            !JSON.stringify(failure.errors[0].diagnostic).includes(
+              privateValue,
+            ),
+          );
+          assert.equal(calls, 1);
+          return true;
+        },
+      );
+    } finally {
+      fetchMock.mock.restore();
+    }
+  }
+});
 
 test("本机数据库验收拒绝远程 Docker 与另一台机器的命名管道", () => {
   assert(
