@@ -703,6 +703,18 @@ function staticSnapshot(service) {
       }),
   );
 }
+
+/** 逐表比较固定业务表快照，失败时只报告环境与表名，不暴露快照摘要或业务内容。 */
+function assertStaticSnapshot(service, expected, actual) {
+  const label = service.replace(/-db$/, "");
+  const tables = new Set([...Object.keys(expected), ...Object.keys(actual)]);
+  for (const table of tables)
+    assert.equal(
+      actual[table],
+      expected[table],
+      `${label} 临时业务数据未清理：${table}`,
+    );
+}
 /**
  * Node/Docker 验收保留宿主 CLI 插件发现环境，Java 仍使用独立的白名单环境。
  * 本轮随机口令及 Compose 完整参数显式覆盖宿主配置，SQL 不会回退日常项目或日常 .env。
@@ -1084,10 +1096,10 @@ try {
   mark("企业身份解绑和 MFA 开通与并发登录的当前读边界", identityRace);
   await workflowRestartCheck(ports);
   for (const label of ["upgrade", "fresh"])
-    assert.deepEqual(
-      staticSnapshot(label + "-db"),
+    assertStaticSnapshot(
+      label + "-db",
       beforeTests[label],
-      label + " 临时业务数据未清理",
+      staticSnapshot(label + "-db"),
     );
   assert.deepEqual(
     originalSnapshot(checkCompose, "upgrade-db", entryLimit),
