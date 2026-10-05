@@ -129,68 +129,71 @@ public class OidcService {
     challenges.consumeBeforeExchange(challenge);
     String subject = client.exchange(provider, code, pending.nonce(), pending.verifier());
     var finalChallenge = challenge;
-    return new TransactionTemplate(transactions)
-        .execute(
-            status -> {
-              String issuerHash = TokenService.hash(provider.getIssuer()),
-                  subjectHash = TokenService.hash(subject);
-              if (binding) {
-                var account =
-                    users
-                        .lockById(finalChallenge.userId())
-                        .filter(com.mayday.system.model.SysUser::isEnabled)
-                        .orElseThrow(OidcService::rejected);
-                if (!TokenService.hash(account.getPasswordHash())
-                        .equals(finalChallenge.credentialHash())
-                    || tokens
-                        .authenticate(bearer)
-                        .filter(user -> user.getId().equals(account.getId()))
-                        .isEmpty()) throw rejected();
-                jdbc.update(
-                    "insert into sys_external_identity(id,user_id,provider_id,issuer_hash,subject_hash,created_at) values(?,?,?,?,?,?)",
-                    UUID.randomUUID().toString(),
-                    account.getId(),
-                    provider.getId(),
-                    issuerHash,
-                    subjectHash,
-                    Timestamp.from(sessionClock.instant()));
-                changeAudit.record(
-                    "用户",
-                    account.getId(),
-                    "绑定企业登录",
-                    Map.of("企业登录", "未绑定"),
-                    Map.of("企业登录", provider.getName()));
-                return new Completion(true, null);
-              }
-              var matches =
-                  jdbc.queryForList(
-                      "select id,user_id from sys_external_identity where provider_id=? and issuer_hash=? and subject_hash=?",
-                      provider.getId(),
-                      issuerHash,
-                      subjectHash);
-              if (matches.isEmpty()) throw new BusinessException("此企业身份尚未绑定本地账号，请先用本地账号登录并在个人中心绑定");
-              Map<String, Object> match = matches.getFirst();
-              var account =
-                  users
-                      .lockById(((Number) match.get("user_id")).longValue())
-                      .filter(com.mayday.system.model.SysUser::isEnabled)
-                      .orElseThrow(OidcService::rejected);
-              // 先锁账号，再用当前读核对映射；RR 下普通读取会继续看到等锁前的旧快照。
-              // 与解绑保持账号 → 映射的锁顺序，不能把首次定位映射改为先取映射锁。
-              if (jdbc.queryForList(
-                          "select id from sys_external_identity where id=? and user_id=? for update",
-                          match.get("id"),
-                          account.getId())
-                      .size()
-                  != 1) throw rejected();
-              var login = mfa.loginAfterPrimary(account, ip, device, (String) match.get("id"));
-              if (!login.mfaRequired())
-                jdbc.update(
-                    "update sys_external_identity set last_login_at=? where id=?",
-                    Timestamp.from(sessionClock.instant()),
-                    match.get("id"));
-              return new Completion(false, login);
-            });
+    // 首次身份定位在账号锁之前；登录配额必须读取等锁后已提交的会话，且不锁其他账号的空范围。
+    var completion = new TransactionTemplate(transactions);
+    completion.setIsolationLevel(
+        org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+    return completion.execute(
+        status -> {
+          String issuerHash = TokenService.hash(provider.getIssuer()),
+              subjectHash = TokenService.hash(subject);
+          if (binding) {
+            var account =
+                users
+                    .lockById(finalChallenge.userId())
+                    .filter(com.mayday.system.model.SysUser::isEnabled)
+                    .orElseThrow(OidcService::rejected);
+            if (!TokenService.hash(account.getPasswordHash())
+                    .equals(finalChallenge.credentialHash())
+                || tokens
+                    .authenticate(bearer)
+                    .filter(user -> user.getId().equals(account.getId()))
+                    .isEmpty()) throw rejected();
+            jdbc.update(
+                "insert into sys_external_identity(id,user_id,provider_id,issuer_hash,subject_hash,created_at) values(?,?,?,?,?,?)",
+                UUID.randomUUID().toString(),
+                account.getId(),
+                provider.getId(),
+                issuerHash,
+                subjectHash,
+                Timestamp.from(sessionClock.instant()));
+            changeAudit.record(
+                "用户",
+                account.getId(),
+                "绑定企业登录",
+                Map.of("企业登录", "未绑定"),
+                Map.of("企业登录", provider.getName()));
+            return new Completion(true, null);
+          }
+          var matches =
+              jdbc.queryForList(
+                  "select id,user_id from sys_external_identity where provider_id=? and issuer_hash=? and subject_hash=?",
+                  provider.getId(),
+                  issuerHash,
+                  subjectHash);
+          if (matches.isEmpty()) throw new BusinessException("此企业身份尚未绑定本地账号，请先用本地账号登录并在个人中心绑定");
+          Map<String, Object> match = matches.getFirst();
+          var account =
+              users
+                  .lockById(((Number) match.get("user_id")).longValue())
+                  .filter(com.mayday.system.model.SysUser::isEnabled)
+                  .orElseThrow(OidcService::rejected);
+          // 先锁账号，再用当前读核对映射；RR 下普通读取会继续看到等锁前的旧快照。
+          // 与解绑保持账号 → 映射的锁顺序，不能把首次定位映射改为先取映射锁。
+          if (jdbc.queryForList(
+                      "select id from sys_external_identity where id=? and user_id=? for update",
+                      match.get("id"),
+                      account.getId())
+                  .size()
+              != 1) throw rejected();
+          var login = mfa.loginAfterPrimary(account, ip, device, (String) match.get("id"));
+          if (!login.mfaRequired())
+            jdbc.update(
+                "update sys_external_identity set last_login_at=? where id=?",
+                Timestamp.from(sessionClock.instant()),
+                match.get("id"));
+          return new Completion(false, login);
+        });
   }
 
   /** 绑定摘要限定为当前用户；禁用/删除提供方也能解除旧绑定，不依赖外部服务在线。 */

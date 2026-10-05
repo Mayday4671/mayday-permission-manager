@@ -17,6 +17,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 256 位随机不透明令牌，无需把权限或个人信息放进浏览器可解码的 JWT。 */
@@ -39,8 +40,11 @@ public class TokenService {
     }
   }
 
-  /** 密码与滑块校验通过后创建配置期限的会话；按账号行锁串行执行并发配额，撤销最早有效登录。 再次检查有效账号及密码摘要，拒绝密码验证后发生的重置/停用；原令牌仅在本次响应返回。 */
-  @Transactional
+  /**
+   * 密码与滑块校验通过后创建配置期限的会话；按账号→会话锁序串行判断配额，撤销最早有效登录。 使用已提交读取，避免其他账号首登时的空范围间隙锁；外层 MFA/OIDC
+   * 登录事务也使用同一隔离级别。 再次检查有效账号及密码摘要，拒绝密码验证后发生的重置/停用；原令牌仅在本次响应返回。
+   */
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public String issue(SysUser user, String ip, String device) {
     SysUser current =
         users.lockById(user.getId()).orElseThrow(() -> new AccessDeniedException("账号已失效，请重新登录"));

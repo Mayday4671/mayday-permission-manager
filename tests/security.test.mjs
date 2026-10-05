@@ -594,75 +594,78 @@ test("隔离数据库权限专项回归", { skip: !isolated }, async (t) => {
 
     await t.test("并发登录不突破每账号五会话配额，最早登录被撤销", async () => {
       const user = await person("login_quota", dept.id, selfRole);
-      const oldest = await login(user.username);
-      // 同账号换图会废弃旧挑战，不能并发创建七道题；先逐次取得独立一次性凭证，再并发真实密码登录。
-      const proofs = [];
-      for (let i = 0; i < 7; i++)
-        proofs.push(await captchaToken(base, user.username));
-      const tokens = await Promise.all(
-        proofs.map(
-          async (proof) =>
-            (
-              await captchaRequest(base, "/auth/login", {
-                username: user.username,
-                password,
-                captchaToken: proof,
-              })
-            ).token,
-        ),
-      );
-      await api("/auth/me", oldest, "GET", undefined, 401);
-      const responses = await Promise.all(
-        tokens.map((token) =>
-          fetch(`${base}/auth/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ),
-      );
-      assert.equal(
-        responses.filter((response) => response.status === 200).length,
-        5,
-      );
-      assert.equal(
-        responses.filter((response) => response.status === 401).length,
-        2,
-      );
-      const list = await sessions(admin, user.username);
-      assert.equal(list.total, 5);
-      assert(
-        list.items.every(
-          (item) => !("tokenHash" in item) && !("token" in item),
-        ),
-      );
-      const page1 = await api(
-        `/operations/sessions?size=2&page=1&keyword=${encodeURIComponent(user.username)}`,
-        admin,
-      );
-      const page2 = await api(
-        `/operations/sessions?size=2&page=2&keyword=${encodeURIComponent(user.username)}`,
-        admin,
-      );
-      const page3 = await api(
-        `/operations/sessions?size=2&page=3&keyword=${encodeURIComponent(user.username)}`,
-        admin,
-      );
-      assert.deepEqual(
-        [page1.items.length, page2.items.length, page3.items.length],
-        [2, 2, 1],
-      );
-      assert.equal(
-        new Set(
-          [...page1.items, ...page2.items, ...page3.items].map(
-            (item) => item.id,
+      // 连续三轮覆盖空配额与已有会话的淘汰；任一轮失败即终止，不重试失败登录或隐藏错误。
+      for (let round = 0; round < 3; round++) {
+        const oldest = await login(user.username);
+        // 同账号换图会废弃旧挑战，不能并发创建七道题；先逐次取得独立一次性凭证，再并发真实密码登录。
+        const proofs = [];
+        for (let i = 0; i < 7; i++)
+          proofs.push(await captchaToken(base, user.username));
+        const tokens = await Promise.all(
+          proofs.map(
+            async (proof) =>
+              (
+                await captchaRequest(base, "/auth/login", {
+                  username: user.username,
+                  password,
+                  captchaToken: proof,
+                })
+              ).token,
           ),
-        ).size,
-        5,
-      );
-      const negative = await api(
-        "/operations/sessions?page=-2147483648&size=2",
-        admin,
-      );
-      assert.equal(negative.page, 1);
+        );
+        await api("/auth/me", oldest, "GET", undefined, 401);
+        const responses = await Promise.all(
+          tokens.map((token) =>
+            fetch(`${base}/auth/me`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ),
+        );
+        assert.equal(
+          responses.filter((response) => response.status === 200).length,
+          5,
+        );
+        assert.equal(
+          responses.filter((response) => response.status === 401).length,
+          2,
+        );
+        const list = await sessions(admin, user.username);
+        assert.equal(list.total, 5);
+        assert(
+          list.items.every(
+            (item) => !("tokenHash" in item) && !("token" in item),
+          ),
+        );
+        const page1 = await api(
+          `/operations/sessions?size=2&page=1&keyword=${encodeURIComponent(user.username)}`,
+          admin,
+        );
+        const page2 = await api(
+          `/operations/sessions?size=2&page=2&keyword=${encodeURIComponent(user.username)}`,
+          admin,
+        );
+        const page3 = await api(
+          `/operations/sessions?size=2&page=3&keyword=${encodeURIComponent(user.username)}`,
+          admin,
+        );
+        assert.deepEqual(
+          [page1.items.length, page2.items.length, page3.items.length],
+          [2, 2, 1],
+        );
+        assert.equal(
+          new Set(
+            [...page1.items, ...page2.items, ...page3.items].map(
+              (item) => item.id,
+            ),
+          ).size,
+          5,
+        );
+        const negative = await api(
+          "/operations/sessions?page=-2147483648&size=2",
+          admin,
+        );
+        assert.equal(negative.page, 1);
+      }
     });
 
     await t.test(

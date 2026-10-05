@@ -71,6 +71,33 @@ code {
   display: grid;
   place-items: center;
 }
+/* 恢复页可在主题上下文失败时独立呈现，正常情况下仍沿用当前主题的语义颜色。 */
+.page-failure {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--app-text, #1f2937);
+  background: var(--app-layout, #f5f7fa);
+}
+.page-failure section {
+  max-width: 480px;
+  text-align: center;
+}
+.page-failure h1 {
+  font-size: 24px;
+}
+.page-failure p {
+  margin: 16px 0 24px;
+  line-height: 1.7;
+}
+.page-failure button {
+  padding: 9px 20px;
+  border: 1px solid var(--app-primary-border, #b4c8eb);
+  border-radius: var(--app-radius, 6px);
+  color: var(--app-primary-text, #245ba6);
+  background: var(--app-surface, #fff);
+}
 .panel {
   background: var(--app-surface);
   border: 1px solid var(--border);

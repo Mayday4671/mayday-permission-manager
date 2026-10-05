@@ -1,16 +1,22 @@
 package com.mayday.system.repository;
 
 import com.mayday.system.model.LoginSession;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 
 /** 修改密码、停用账号时清除此账号所有令牌。 */
 public interface SessionRepository
     extends JpaRepository<LoginSession, String>, JpaSpecificationExecutor<LoginSession> {
-  /** 仅载入目标账号的会话，用于账号行锁内的配额判断，创建时间相同仍按摘要稳定排序。 */
+  /**
+   * 调用方先持有账号行锁，再当前读此账号的会话；不能沿用 MFA/OIDC 早先建立的旧快照判断配额。 登录事务使用
+   * READ_COMMITTED，避免空会话范围的间隙锁阻塞其他账号首登；同时间仍按摘要稳定排序。
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
   List<LoginSession> findByUserIdOrderByCreatedAtAscTokenHashAsc(Long userId);
 
   /** 按公开 UUID 精确查找撤销目标；调用方仍须独立验证动作、范围及账号管理等级。 */

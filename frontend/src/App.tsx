@@ -17,6 +17,7 @@ import { PortalChannelPage } from "./pages/PortalChannelPage";
 import { adminPages, adminRouteTarget } from "./lib/workspace-model";
 import { useModules } from "./lib/modules";
 import { pageEnabled } from "./lib/module-model";
+import { PageFailure } from "./components/PageFailure";
 import "./workflow.css";
 import "./components/table-tools.css";
 
@@ -214,17 +215,7 @@ export class ErrorBoundary extends Component<
     console.error("界面异常", error.message, info.componentStack);
   }
   render() {
-    return this.state.failed ? (
-      <Result
-        status="500"
-        title="页面加载失败"
-        extra={
-          <Button onClick={() => window.location.reload()}>重新加载</Button>
-        }
-      />
-    ) : (
-      this.props.children
-    );
+    return this.state.failed ? <PageFailure /> : this.props.children;
   }
 }
 /** 应用路由总入口：门户使用后台独立主题配置，后台路由同时等待会话和模块状态；权限隐藏不能替代服务器校验。 */

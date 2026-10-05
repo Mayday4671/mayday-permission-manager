@@ -33,7 +33,10 @@ public class JdbcSecurityState implements SecurityState {
         "select cast(unix_timestamp(current_timestamp(3))*1000 as unsigned)", Long.class);
   }
 
-  /** 固定守卫行让配额、换题和容量检查在所有实例间串行，不依靠进程 synchronized。 */
+  /**
+   * 所有安全状态写事务先持有固定守卫，再处理状态/失败窗口行，包括消费和成功清理。 精确主键消费也必须遵守此顺序：过期清理通过到期索引访问同一行，不能与主键删除倒置。
+   * 守卫只保护短数据库事务，不跨绘图、密码比较或外部网络请求，也不依靠进程 synchronized。
+   */
   private long lock() {
     jdbc.queryForObject("select id from sys_security_guard where id=1 for update", Integer.class);
     long now = now();
@@ -86,18 +89,20 @@ public class JdbcSecurityState implements SecurityState {
         expiry);
   }
 
+  /** 一次性消费与过期清理共用守卫；独立事务提交后才返回内容，后续业务失败不返还凭证。 */
   @Override
   public String take(String kind, String token) {
     if (token == null || token.length() > 128) return null;
     return transaction.execute(
         status -> {
+          long now = lock();
           List<String> rows =
               jdbc.query(
                   "select payload from sys_security_state where token_key=? and kind=? and expires_at>? for update",
                   (result, number) -> result.getString(1),
                   hash(token),
                   kind,
-                  now());
+                  now);
           jdbc.update(
               "delete from sys_security_state where token_key=? and kind=?", hash(token), kind);
           return rows.isEmpty() ? null : rows.getFirst();
@@ -144,13 +149,15 @@ public class JdbcSecurityState implements SecurityState {
         expiry);
   }
 
+  /** 成功清理也先持有守卫，避免失败窗口的主键删除与到期索引清理形成反向锁序。 */
   @Override
   public void succeeded(String account) {
     transaction.executeWithoutResult(
-        status ->
-            jdbc.update(
-                "delete from sys_security_rate where rate_key=?",
-                hash("login-account:" + account)));
+        status -> {
+          lock();
+          jdbc.update(
+              "delete from sys_security_rate where rate_key=?", hash("login-account:" + account));
+        });
   }
 
   /** 公开匿名入口复用共享固定窗口；命名空间由业务常量提供，不接受客户端指定限额或时长。 */

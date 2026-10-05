@@ -11,6 +11,7 @@ import { ApiError } from "./lib/api";
 import { AppearanceProvider } from "./lib/theme";
 import { IdentityRecoveryCodesProvider } from "./components/IdentityRecoveryCodesProvider";
 import Application, { ErrorBoundary } from "./App";
+import { PageFailure } from "./components/PageFailure";
 import "./styles.css";
 import "./admin.css";
 import "./theme.css";
@@ -31,6 +32,8 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
   {
     path: "*",
+    // 路由内部会优先捕获异常；必须显式配置，避免默认错误页直接暴露开发堆栈。
+    errorElement: <PageFailure />,
     element: (
       <ErrorBoundary>
         <ModulesProvider>

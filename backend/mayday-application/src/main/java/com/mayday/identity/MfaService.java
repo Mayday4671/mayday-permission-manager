@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 账号行锁串行化开通/关闭/登录；TOTP、恢复码和挑战在同一事务消费，任何失败都不能签发会话。 */
@@ -61,13 +62,13 @@ public class MfaService {
   }
 
   /** 首因素通过后重新持有账号锁；只有没有 MFA 的账号才直接签发会话。 */
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public LoginView loginAfterPrimary(SysUser verified, String ip, String device) {
     return loginAfterPrimary(verified, ip, device, null);
   }
 
   /** 企业首因素建立的挑战同时绑定当前映射；解绑或禁用提供方后旧二次验证不能继续登录。 */
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public LoginView loginAfterPrimary(
       SysUser verified, String ip, String device, String externalBindingId) {
     SysUser account = current(verified.getId());
@@ -90,8 +91,8 @@ public class MfaService {
     return new LoginView(null, true, challenge);
   }
 
-  /** MFA 登录再次核对密码代际、账号状态和 MFA 代际；旧挑战/OTP/恢复码不能产生第二次登录。 */
-  @Transactional
+  /** MFA 登录再次核对密码代际、账号状态和 MFA 代际；旧挑战/OTP/恢复码不能产生第二次登录。 挑战定位先于账号锁，采用已提交读取及会话当前读，等待其他登录后仍使用其已提交配额。 */
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public LoginView completeLogin(String challengeId, String factor, String ip, String device) {
     var challenge = challenges.read(challengeId, "MFA_LOGIN", ip);
     SysUser account = current(challenge.userId());
