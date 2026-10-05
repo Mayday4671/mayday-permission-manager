@@ -298,8 +298,9 @@ try {
         name: "固定子流程",
         type: "SUBPROCESS",
         next: "end",
-        readable: ["memo"],
-        writable: [],
+        // 子调用的输入必须可读，返回 amount 必须同时可读、可写；派生字段仍由服务器重算。
+        readable: ["memo", "amount"],
+        writable: ["amount"],
         actions: [],
         subprocess: {
           versionId: child.publishedVersionId,

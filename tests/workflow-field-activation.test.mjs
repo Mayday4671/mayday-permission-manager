@@ -7,7 +7,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { loginWithCaptcha } from "./support/captcha.mjs";
-import { isolatedSql } from "./support/isolated-compose.mjs";
+import {
+  isolatedSql,
+  assertIsolatedDatabaseBinding,
+} from "./support/isolated-compose.mjs";
 import { purgeTestFiles } from "./support/files-cleanup.mjs";
 
 const base = process.env.API_BASE;
@@ -779,17 +782,10 @@ test("字段权限只由实际激活任务授予", { skip: !isolated }, async (t
             values: changedValues,
           },
         );
-        // 只在已绑定本轮 native 私库中模拟旧布局。先确认库名、迁移列与本次申请归属；
+        // 两种执行方式均只在本轮随机 Compose 的固定私库模拟旧布局。
+        // 先核对实际库名、原生 JDBC 地址（若有）、迁移列及申请归属，不能采用宿主任意库名。
         // 不修改 Flyway 历史，不改其他申请，不允许空 ID 或通配更新。
-        const databaseName = new URL(
-          process.env.DB_URL.replace(/^jdbc:/, ""),
-        ).pathname.slice(1);
-        assert(/^\w+$/.test(databaseName));
-        assert.equal(
-          isolatedSql("SELECT DATABASE();").trim(),
-          databaseName,
-          "旧布局模拟必须绑定当前隔离数据库",
-        );
+        assertIsolatedDatabaseBinding(isolatedSql("SELECT DATABASE();").trim());
         assert.equal(
           isolatedSql(
             "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='ops_flow_request' AND column_name='private_draft';",

@@ -115,6 +115,50 @@ export function isolatedComposeArguments(
 }
 
 /**
+ * SQL 始终由已核验随机 Compose 项目执行，库名来自固定验收配置，不能从宿主 DB_URL 推导。
+ * 容器 API 无需 JDBC 环境；原生 API 提供 JDBC 地址时仍须为本机显式端口与固定隔离库，
+ * 并与容器内 SELECT DATABASE 的结果一致。此函数只核验参数，不连接数据库或执行 SQL。
+ */
+export function assertIsolatedDatabaseBinding(
+  actualDatabase,
+  environment = process.env,
+  root = workspace,
+) {
+  isolatedComposeArguments(environment, root);
+  const expectedDatabase = "mayday_verify";
+  assert.equal(
+    actualDatabase,
+    expectedDatabase,
+    "旧布局模拟必须绑定固定隔离验收数据库",
+  );
+  if (Object.hasOwn(environment, "DB_URL")) {
+    const supplied = environment.DB_URL;
+    assert(
+      typeof supplied === "string" && supplied.startsWith("jdbc:mysql://"),
+      "原生验收数据库地址须为 MySQL JDBC 地址",
+    );
+    let address;
+    try {
+      address = new URL(supplied.slice("jdbc:".length));
+    } catch {
+      throw new Error("原生验收数据库地址格式不合法");
+    }
+    assert(
+      address.protocol === "mysql:" &&
+        ["127.0.0.1", "localhost", "[::1]"].includes(address.hostname) &&
+        Number(address.port) > 0 &&
+        Number(address.port) <= 65535 &&
+        !address.username &&
+        !address.password &&
+        !address.hash &&
+        address.pathname === "/" + expectedDatabase,
+      "原生验收数据库地址须指向本机显式端口和固定隔离库",
+    );
+  }
+  return expectedDatabase;
+}
+
+/**
  * 每个调用环境先核验本机 Docker IPC 上下文，再用容器内已配置凭据执行 SQL。
  * 口令不出现在命令行；失败只报告固定状态，不把输入 SQL、凭据或返回正文写入日志。
  */

@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import {
   isolatedComposeArguments,
   isolatedApiEnvironment,
+  assertIsolatedDatabaseBinding,
 } from "./support/isolated-compose.mjs";
 
 const root = resolve(".local", "compose argument fixture");
@@ -207,5 +208,92 @@ test("JSON 数组不能切换项目、日常文件、其他运行目录或增加
         { ...env, MAYDAY_TEST_COMPOSE_ARGS: JSON.stringify(args) },
         root,
       ),
+    );
+});
+
+test("旧布局模拟在无 JDBC 的容器与有 JDBC 的原生路径核对同一固定隔离库", () => {
+  assert.equal(
+    assertIsolatedDatabaseBinding("mayday_verify", env, root),
+    "mayday_verify",
+  );
+  for (const hostname of ["127.0.0.1", "localhost", "[::1]"])
+    assert.equal(
+      assertIsolatedDatabaseBinding(
+        "mayday_verify",
+        {
+          ...env,
+          DB_URL:
+            "jdbc:mysql://" +
+            hostname +
+            ":49152/mayday_verify?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai",
+        },
+        root,
+      ),
+      "mayday_verify",
+    );
+});
+
+test("固定隔离库不从 JDBC 推导，实际库名与 JDBC 库名污染均拒绝", () => {
+  for (const actual of [
+    "mayday",
+    "other_business",
+    "mayday_verify;DELETE",
+    "",
+    null,
+  ])
+    assert.throws(() => assertIsolatedDatabaseBinding(actual, env, root));
+  for (const supplied of [
+    "jdbc:mysql://127.0.0.1:49152/mayday",
+    "jdbc:mysql://127.0.0.1:49152/other_business",
+    "jdbc:mysql://127.0.0.1:49152/",
+    "jdbc:mysql://127.0.0.1:49152/%6dayday_verify",
+    "jdbc:mysql://127.0.0.1:49152/mayday_verify/extra",
+  ])
+    assert.throws(() =>
+      assertIsolatedDatabaseBinding(
+        "mayday_verify",
+        { ...env, DB_URL: supplied },
+        root,
+      ),
+    );
+});
+
+test("原生 JDBC 拒绝远程主机、默认端口、内嵌凭证、片段及非 MySQL 格式", () => {
+  for (const supplied of [
+    "jdbc:mysql://production.example:3306/mayday_verify",
+    "jdbc:mysql://127.0.0.1/mayday_verify",
+    "jdbc:mysql://127.0.0.1:0/mayday_verify",
+    "jdbc:mysql://user:password@127.0.0.1:49152/mayday_verify",
+    "jdbc:mysql://127.0.0.1:49152/mayday_verify#other",
+    "jdbc:postgresql://127.0.0.1:49152/mayday_verify",
+    "mysql://127.0.0.1:49152/mayday_verify",
+    "",
+    null,
+  ])
+    assert.throws(() =>
+      assertIsolatedDatabaseBinding(
+        "mayday_verify",
+        { ...env, DB_URL: supplied },
+        root,
+      ),
+    );
+});
+
+test("即使库名正确，日常项目、其他服务及跨项目覆盖仍不能模拟旧布局", () => {
+  for (const changed of [
+    { ...env, API_TEST_COMPOSE_PROJECT: "mayday" },
+    { ...env, API_TEST_DATABASE: "mysql" },
+    { ...env, API_TEST_DATABASE: "script-db" },
+    {
+      ...env,
+      MAYDAY_TEST_COMPOSE_ARGS: JSON.stringify([
+        ...expected,
+        "-f",
+        "compose.yaml",
+      ]),
+    },
+  ])
+    assert.throws(() =>
+      assertIsolatedDatabaseBinding("mayday_verify", changed, root),
     );
 });
