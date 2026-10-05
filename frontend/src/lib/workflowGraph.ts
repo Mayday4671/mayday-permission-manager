@@ -15,7 +15,8 @@ export interface WorkflowEdge {
   targetId: string;
 }
 
-export type InsertableWorkflowNode = "APPROVAL" | "COPY" | "CONDITION";
+export type InsertableWorkflowNode =
+  "APPROVAL" | "COPY" | "CONDITION" | "PARALLEL" | "SUBPROCESS";
 
 /** 与服务端 WorkflowSchema 的发布限制一致，编辑器提前阻止超限操作。 */
 export const MAX_WORKFLOW_NODES = 40;
@@ -26,6 +27,7 @@ type NodeMap = Map<string, WorkflowNode>;
 function targets(node: WorkflowNode): string[] {
   // 服务端在 END 立即停止；历史表单可能留有旧 next，不能把它当作真实出口。
   if (node.type === "END") return [];
+  if (node.type === "PARALLEL") return node.branches ?? [];
   return [
     ...(node.next ? [node.next] : []),
     ...(node.type === "CONDITION"
@@ -89,7 +91,7 @@ function requireBranchIndex(node: WorkflowNode, index: number): void {
     throw new Error("条件分支不存在，请刷新流程后再操作");
 }
 
-function newNodeId(spec: WorkflowSpec, type: InsertableWorkflowNode): string {
+function newNodeId(spec: WorkflowSpec, type: WorkflowNode["type"]): string {
   const ids = new Set(spec.nodes.map((node) => node.id));
   const prefix = type.toLowerCase();
   let suffix = 1;
@@ -111,6 +113,17 @@ function newNode(
       next,
       // 显式规则与默认分支各有一条连接；未填完的规则由发布校验拦截。
       conditions: [{ field: "", operator: "EQ", value: "", next }],
+    };
+  if (type === "SUBPROCESS")
+    return {
+      id,
+      name: "子流程",
+      type,
+      next,
+      readable: spec.fields.map((field) => field.id),
+      writable: [],
+      actions: [],
+      subprocess: { versionId: null, inputs: {}, outputs: {} },
     };
   return {
     id,
@@ -146,6 +159,15 @@ function replaceExactEdge(
     if (source.next !== edge.targetId)
       throw new Error("流程连接已变化，请刷新后再添加节点");
     source.next = replacement;
+    return;
+  }
+  if (source.type === "PARALLEL") {
+    if (
+      !source.branches?.[edge.branchIndex] ||
+      source.branches[edge.branchIndex] !== edge.targetId
+    )
+      throw new Error("并行支路已变化，请刷新后再添加节点");
+    source.branches[edge.branchIndex] = replacement;
     return;
   }
   if (source.type !== "CONDITION")
@@ -206,12 +228,16 @@ export function listWorkflowEdges(spec: WorkflowSpec): WorkflowEdge[] {
   ];
   for (const node of spec.nodes) {
     if (node.type === "END") continue;
-    if (node.next)
+    if (node.next && node.type !== "PARALLEL")
       edges.push({ sourceId: node.id, branchIndex: null, targetId: node.next });
     if (node.type === "CONDITION")
       (node.conditions ?? []).forEach((branch, branchIndex) => {
         edges.push({ sourceId: node.id, branchIndex, targetId: branch.next });
       });
+    if (node.type === "PARALLEL")
+      (node.branches ?? []).forEach((targetId, branchIndex) =>
+        edges.push({ sourceId: node.id, branchIndex, targetId }),
+      );
   }
   return edges;
 }
@@ -231,6 +257,36 @@ export function insertWorkflowNode(
   if (!nodes.has(edge.targetId))
     throw new Error("该连接的目标不存在，请刷新流程");
   const updated = structuredClone(spec);
+  if (type === "PARALLEL") {
+    if (spec.nodes.length > MAX_WORKFLOW_NODES - 4)
+      throw new Error("添加并行组需要 4 个节点，请减少节点后重试");
+    const fork: WorkflowNode = {
+      id: newNodeId(updated, "PARALLEL"),
+      name: "并行审批",
+      type: "PARALLEL",
+      next: "",
+      branches: [],
+      actions: [],
+    };
+    updated.nodes.push(fork);
+    const join: WorkflowNode = {
+      id: newNodeId(updated, "JOIN"),
+      name: "并行汇合",
+      type: "JOIN",
+      next: edge.targetId,
+      actions: [],
+    };
+    updated.nodes.push(join);
+    fork.next = join.id;
+    for (let index = 0; index < 2; index++) {
+      const branch = newNode(updated, "APPROVAL", join.id);
+      branch.name = `支路${index + 1}审批`;
+      updated.nodes.push(branch);
+      fork.branches!.push(branch.id);
+    }
+    replaceExactEdge(updated, edge, fork.id);
+    return updated;
+  }
   const inserted = newNode(updated, type, edge.targetId);
   replaceExactEdge(updated, edge, inserted.id);
   // 保留原有节点顺序，新节点放在目标之前，列表视图也能反映插入位置。
@@ -252,6 +308,17 @@ export function insertWorkflowNodeAfterBranches(
   type: InsertableWorkflowNode,
 ): WorkflowSpec {
   const nodes = inspectGraph(spec);
+  const parallel = nodes.get(conditionId);
+  if (parallel?.type === "PARALLEL") {
+    const join = nodes.get(parallel.next ?? "");
+    if (!join || join.type !== "JOIN" || !join.next)
+      throw new Error("并行组缺少有效汇合出口");
+    return insertWorkflowNode(
+      spec,
+      { sourceId: join.id, branchIndex: null, targetId: join.next },
+      type,
+    );
+  }
   const condition = getCondition(nodes, conditionId);
   if (spec.nodes.length >= MAX_WORKFLOW_NODES)
     throw new Error(`流程最多 ${MAX_WORKFLOW_NODES} 个节点`);
@@ -274,19 +341,32 @@ export function insertWorkflowNodeAfterBranches(
     pending.push(...targets(member));
   }
 
-  const updated = structuredClone(spec);
-  const inserted = newNode(updated, type, joinId);
+  // 复用精确入线插入：并行节点必须同时生成专属汇合和两条支路，不能仅创建空壳。
+  const incoming = listWorkflowEdges(spec).filter(
+    (edge) =>
+      edge.sourceId && members.has(edge.sourceId) && edge.targetId === joinId,
+  );
+  if (!incoming.length) throw new Error("条件组没有有效汇合入线，请先修复连接");
+  const updated = insertWorkflowNode(spec, incoming[0], type);
+  const insertedId = listWorkflowEdges(updated).find(
+    (edge) =>
+      edge.sourceId === incoming[0].sourceId &&
+      edge.branchIndex === incoming[0].branchIndex,
+  )!.targetId;
   for (const node of updated.nodes) {
     if (!members.has(node.id)) continue;
-    if (node.next === joinId) node.next = inserted.id;
+    if (node.next === joinId && node.type !== "PARALLEL")
+      node.next = insertedId;
     if (node.type === "CONDITION") {
       for (const branch of node.conditions ?? []) {
-        if (branch.next === joinId) branch.next = inserted.id;
+        if (branch.next === joinId) branch.next = insertedId;
       }
     }
+    if (node.type === "PARALLEL")
+      node.branches = node.branches?.map((id) =>
+        id === joinId ? insertedId : id,
+      );
   }
-  const joinIndex = updated.nodes.findIndex((node) => node.id === joinId);
-  updated.nodes.splice(joinIndex, 0, inserted);
   return updated;
 }
 
@@ -302,6 +382,31 @@ export function removeWorkflowNode(
   const nodes = inspectGraph(spec);
   const removed = nodes.get(nodeId);
   if (!removed) throw new Error("流程节点不存在，请刷新流程");
+  if (removed.type === "JOIN")
+    throw new Error("汇合节点属于并行组，请通过删除并行组一起移除");
+  if (removed.type === "PARALLEL") {
+    const join = nodes.get(removed.next ?? "");
+    if (!join?.next) throw new Error("并行组汇合出口已失效，请先修复连接");
+    const updated = structuredClone(spec);
+    if (updated.startNodeId === removed.id) updated.startNodeId = join.next;
+    for (const item of updated.nodes) {
+      if (item.next === removed.id || item.next === join.id)
+        item.next = join.next;
+      item.conditions?.forEach((rule) => {
+        if (rule.next === removed.id || rule.next === join.id)
+          rule.next = join.next!;
+      });
+      if (item.branches)
+        item.branches = item.branches.map((id) =>
+          id === removed.id || id === join.id ? join.next! : id,
+        );
+    }
+    updated.nodes = updated.nodes.filter(
+      (item) => item.id !== removed.id && item.id !== join.id,
+    );
+    pruneRemovedBranch(nodes, updated, removed.branches ?? []);
+    return updated;
+  }
   if (removed.type === "END") {
     const hasIncoming = spec.nodes.some((node) =>
       targets(node).includes(nodeId),
@@ -324,6 +429,10 @@ export function removeWorkflowNode(
         if (branch.next === nodeId) branch.next = removed.next;
       }
     }
+    if (node.type === "PARALLEL")
+      node.branches = node.branches?.map((id) =>
+        id === nodeId ? removed.next! : id,
+      );
   }
   updated.nodes = updated.nodes.filter((node) => node.id !== nodeId);
   if (removed.type === "CONDITION")
@@ -343,7 +452,23 @@ export function addWorkflowBranch(
   spec: WorkflowSpec,
   conditionId: string,
 ): WorkflowSpec {
-  const node = getCondition(inspectGraph(spec), conditionId);
+  const node = inspectGraph(spec).get(conditionId);
+  if (node?.type === "PARALLEL") {
+    if ((node.branches?.length ?? 0) >= 10)
+      throw new Error("并行最多 10 条支路");
+    if (spec.nodes.length >= MAX_WORKFLOW_NODES || !node.next)
+      throw new Error("节点数已达上限或汇合失效");
+    const updated = structuredClone(spec);
+    const branch = newNode(updated, "APPROVAL", node.next);
+    branch.name = `支路${(node.branches?.length ?? 0) + 1}审批`;
+    updated.nodes.push(branch);
+    updated.nodes
+      .find((item) => item.id === conditionId)!
+      .branches!.push(branch.id);
+    return updated;
+  }
+  if (!node || node.type !== "CONDITION")
+    throw new Error("条件或并行节点不存在");
   if (!node.next) throw new Error("条件节点缺少默认出口，请先修复默认分支");
   if ((node.conditions?.length ?? 0) >= MAX_WORKFLOW_BRANCHES)
     throw new Error(`条件节点最多 ${MAX_WORKFLOW_BRANCHES} 条规则`);
@@ -369,6 +494,19 @@ export function deleteWorkflowBranch(
   branchIndex: number,
 ): WorkflowSpec {
   const nodes = inspectGraph(spec);
+  const parallel = nodes.get(conditionId);
+  if (parallel?.type === "PARALLEL") {
+    if ((parallel.branches?.length ?? 0) <= 2)
+      throw new Error("并行组至少保留两条支路");
+    if (!Number.isInteger(branchIndex) || !parallel.branches?.[branchIndex])
+      throw new Error("并行支路不存在");
+    const updated = structuredClone(spec);
+    const [removed] = updated.nodes
+      .find((item) => item.id === conditionId)!
+      .branches!.splice(branchIndex, 1);
+    pruneRemovedBranch(nodes, updated, [removed]);
+    return updated;
+  }
   const node = getCondition(nodes, conditionId);
   requireBranchIndex(node, branchIndex);
   if (node.conditions!.length <= 1)
@@ -391,7 +529,17 @@ export function moveWorkflowBranch(
   fromIndex: number,
   toIndex: number,
 ): WorkflowSpec {
-  const node = getCondition(inspectGraph(spec), conditionId);
+  const node = inspectGraph(spec).get(conditionId);
+  if (node?.type === "PARALLEL") {
+    if (!node.branches?.[fromIndex] || !node.branches[toIndex])
+      throw new Error("并行支路不存在");
+    const updated = structuredClone(spec),
+      group = updated.nodes.find((item) => item.id === conditionId)!;
+    const [moved] = group.branches!.splice(fromIndex, 1);
+    group.branches!.splice(toIndex, 0, moved);
+    return updated;
+  }
+  if (!node || node.type !== "CONDITION") throw new Error("条件节点不存在");
   requireBranchIndex(node, fromIndex);
   requireBranchIndex(node, toIndex);
   const updated = structuredClone(spec);
@@ -455,6 +603,10 @@ export function findWorkflowConditionJoin(
     return null;
   }
   const condition = nodes.get(conditionId);
+  if (condition?.type === "PARALLEL")
+    return nodes.get(condition.next ?? "")?.type === "JOIN"
+      ? condition.next!
+      : null;
   if (!condition || condition.type !== "CONDITION") return null;
   const roots = [...new Set(targets(condition))];
   if (roots.length === 0) return null;

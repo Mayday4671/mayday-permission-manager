@@ -280,7 +280,7 @@ test("数字范围和文本长度的临时无效值显示提示，清空保留�
   const min = screen.getByLabelText("最小值");
   await user.clear(min);
   await user.type(min, "200");
-  assert.equal(changes.at(-1).min, 200);
+  assert.equal(changes.at(-1).min, "200");
   assert.equal(changes.at(-1).max, 100);
   assert.match(screen.getByRole("alert").textContent, /最小值不能大于最大值/);
   await user.clear(min);
@@ -591,7 +591,7 @@ test("填写金额即时重算只读结果，提交不发送预览结果", async
   await screen.findByDisplayValue("0.70");
   assert.deepEqual(
     encodeWorkflowValues(fields, current.getFieldValue("values")),
-    { price: 0.1, quantity: 7 },
+    { price: 0.1, quantity: "7" },
   );
 });
 

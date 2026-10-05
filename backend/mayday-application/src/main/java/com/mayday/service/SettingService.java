@@ -16,7 +16,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 参数的类型验证、业务读取和公共白名单集中于此。门户不会读取任意 key，也不会返回完整参数表。 缓存只保存不可变字符串快照；事务提交后才失效，避免回滚操作污染缓存或提前读取旧值。 */
+/** 参数的类型验证、业务读取和公共白名单集中于此。门户不会读取任意 key，也不会返回完整参数表。 所有实例读取数据库快照，不保留可能跨节点失效不一致的本机参数缓存。 */
 @Service
 @RequiredArgsConstructor
 public class SettingService {
@@ -47,8 +47,6 @@ public class SettingService {
     SITE_FIELDS.forEach(field -> keys.put(field.key(), field));
     SITE_KEYS = Collections.unmodifiableMap(keys);
   }
-
-  private Map<String, String> cached;
 
   /** 保存前按参数类型验证值；内置键不可换类型，前台主题拒绝任意CSS及未知字段，错误不会写入缓存或数据库。 */
   public void validate(String code, String value, String type) {
@@ -88,16 +86,13 @@ public class SettingService {
     }
   }
 
-  /** 加载启用参数并缓存不可变字符串快照；同步首次加载与失效，防止并发读取得到部分填充的配置。 */
-  public synchronized Map<String, String> values() {
-    if (cached == null) {
-      var loaded = new LinkedHashMap<String, String>();
-      entries.findByKindOrderBySortOrderAscIdAsc("settings").stream()
-          .filter(SystemEntry::isEnabled)
-          .forEach(entry -> loaded.put(entry.getCode(), Objects.toString(entry.getValue(), "")));
-      cached = Collections.unmodifiableMap(loaded);
-    }
-    return cached;
+  /** 每次按已提交数据库状态读取不可变参数快照；不保留跨请求本机缓存，其他实例保存立即生效。 */
+  public Map<String, String> values() {
+    var loaded = new LinkedHashMap<String, String>();
+    entries.findByKindOrderBySortOrderAscIdAsc("settings").stream()
+        .filter(SystemEntry::isEnabled)
+        .forEach(entry -> loaded.put(entry.getCode(), Objects.toString(entry.getValue(), "")));
+    return Collections.unmodifiableMap(loaded);
   }
 
   /** 仅返回SITE_FIELDS登记的公开字段，缺省使用安全默认值；内部审核开关等后台参数不会通过门户泄露。 */
@@ -109,10 +104,8 @@ public class SettingService {
     return visible;
   }
 
-  /** 清除进程内参数快照，下次读取重新加载；多实例部署应在各实例触发失效或接入共享配置广播。 */
-  public synchronized void clearCache() {
-    cached = null;
-  }
+  /** 保留既有刷新接口兼容；读取不再保留本机缓存，刷新后所有实例直接读数据库。 */
+  public void clearCache() {}
 
   /** 读取并规范化门户专属主题，历史无效配置回退默认外观；后台个人主题不会改变这个公开配置。 */
   public PortalThemePolicy.Theme publicTheme() {

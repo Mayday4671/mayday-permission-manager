@@ -115,14 +115,22 @@ export async function schedulerRecipients() {
   );
 }
 
-/** 明确读取选定任务的一页历史，缺失分页字段时报告响应错误，不把异常结果显示成空表。 */
+/** 按可选配置ID与任务名称分页查历史；未选配置时保留已删除配置的执行记录，不将失败当空表。 */
 export async function jobExecutions(
-  jobId: number,
+  jobId: number | undefined,
   page: number,
+  keyword = "",
 ): Promise<PageResult<JobExecution>> {
   const data = unwrapContract(
     await contractClient.GET("/api/operations/job-logs", {
-      params: { query: { jobId, page, size: 5 } },
+      params: {
+        query: {
+          ...(jobId === undefined ? {} : { jobId }),
+          keyword,
+          page,
+          size: 5,
+        },
+      },
     }),
   );
   if (
@@ -142,10 +150,29 @@ export async function jobExecutions(
 }
 
 /** 手动执行和查看独立授权，响应按实际执行状态展示，HTTP 成功不等于处理器成功。 */
-export async function runScheduledJob(id: number) {
+export async function runScheduledJob(
+  id: number,
+  idempotencyKey: string = crypto.randomUUID(),
+) {
   return unwrapContract(
     await contractClient.POST("/api/operations/scheduler/{id}/run", {
       params: { path: { id } },
+      headers: { "Idempotency-Key": idempotencyKey },
     }),
+  );
+}
+
+/** 执行操作权限下取消或明确恢复持久历史，旧执行的租约不会恢复为可提交状态。 */
+export async function controlScheduledExecution(
+  id: number,
+  action: "cancel" | "retry",
+): Promise<JobExecution> {
+  return unwrapContract(
+    await contractClient.POST(
+      action === "cancel"
+        ? "/api/operations/job-logs/{id}/cancel"
+        : "/api/operations/job-logs/{id}/retry",
+      { params: { path: { id } } },
+    ),
   );
 }

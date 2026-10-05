@@ -122,6 +122,9 @@ let permissions: string[] = [];
 let serverRecord: WorkflowDefinition;
 let deferSave = false;
 let completeSave: (() => void) | null = null;
+let simulationFailure = false;
+let deferSimulation = false;
+const pendingSimulations: (() => void)[] = [];
 const originalFetch = globalThis.fetch;
 
 function response(data: unknown) {
@@ -159,6 +162,13 @@ globalThis.fetch = async (input, options) => {
         notifications: true,
       },
     });
+  if (url.pathname === "/api/system/options/users")
+    return response({
+      items: [{ value: 103, label: "另一位合成申请人" }],
+      total: 1,
+      page: 1,
+      size: 30,
+    });
   if (url.pathname === "/api/operations/workflows/21" && method === "GET")
     return response(structuredClone(serverRecord));
   if (url.pathname === "/api/operations/workflows/21" && method === "PUT") {
@@ -192,18 +202,29 @@ globalThis.fetch = async (input, options) => {
   if (
     url.pathname === "/api/operations/workflows/simulate" &&
     method === "POST"
-  )
-    return response({
-      valid: true,
-      path: [
-        {
-          id: "review",
-          name: "主管审批",
-          type: "APPROVAL",
-          approvers: [{ id: 102, name: "合成主管" }],
-        },
-      ],
-    });
+  ) {
+    const result = simulationFailure
+      ? Response.json(
+          { success: false, message: "当前模拟条件不满足，无法解析审批人" },
+          { status: 400 },
+        )
+      : response({
+          valid: true,
+          path: [
+            {
+              id: "review",
+              name: "主管审批",
+              type: "APPROVAL",
+              approvers: [{ id: 102, name: "合成主管" }],
+            },
+          ],
+        });
+    if (deferSimulation)
+      return new Promise<Response>((resolve) => {
+        pendingSimulations.push(() => resolve(result));
+      });
+    return result;
+  }
   return Response.json(
     { success: false, message: "测试没有定义此接口" },
     { status: 404 },
@@ -215,6 +236,9 @@ beforeEach(() => {
   permissions = ["workflows:view", "workflows:update", "workflows:publish"];
   deferSave = false;
   completeSave = null;
+  simulationFailure = false;
+  deferSimulation = false;
+  pendingSimulations.length = 0;
   const schema = initialSpec();
   schema.fields = [
     {
@@ -248,6 +272,10 @@ beforeEach(() => {
 });
 afterEach(async () => {
   if (completeSave) await act(async () => completeSave!());
+  // 延迟响应即使断言提前失败也由当前测试释放，避免跨测试保留等待中的 HTTP 和表单提交锁。
+  await act(async () =>
+    pendingSimulations.splice(0).forEach((finish) => finish()),
+  );
   cleanup();
   routers.splice(0).forEach((router) => router.dispose());
   clients.splice(0).forEach((client) => client.clear());
@@ -314,6 +342,104 @@ function writes(method: string, path = "/api/operations/workflows/21") {
     (request) => request.method === method && request.path === path,
   );
 }
+
+/** 使用真实整页的 Ant 表单打开模拟；不替换模拟组件、表单 watcher 或结果生命周期。 */
+async function openSimulation(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "预览与模拟" }));
+  const dialog = await screen.findByRole("dialog", {
+    name: "表单预览与流程模拟",
+  });
+  const input = within(dialog).getByLabelText("申请说明") as HTMLInputElement;
+  fireEvent.change(input, { target: { value: "第一次模拟的说明" } });
+  return { dialog, input };
+}
+async function simulate(
+  user: ReturnType<typeof userEvent.setup>,
+  dialog: HTMLElement,
+) {
+  await user.click(within(dialog).getByRole("button", { name: "校验并模拟" }));
+}
+
+test("模拟成功后修改输入立即清除旧结果，再次失败保留新输入且不显示旧校验通过", async () => {
+  const user = await mountPage();
+  const { dialog, input } = await openSimulation(user);
+  await simulate(user, dialog);
+  assert.ok(await within(dialog).findByText("模型校验通过"));
+  await waitFor(() => assert.equal(input.disabled, false));
+  assert.ok(within(dialog).getByText("主管审批", { selector: "b" }));
+  await user.clear(input);
+  assert.ok(!within(dialog).queryByText("模型校验通过"));
+  assert.ok(!within(dialog).queryByText("主管审批", { selector: "b" }));
+  await user.type(input, "重新填写后的说明");
+  simulationFailure = true;
+  await simulate(user, dialog);
+  await screen.findByText("当前模拟条件不满足，无法解析审批人");
+  assert.equal(input.value, "重新填写后的说明");
+  assert.ok(!within(dialog).queryByText("模型校验通过"));
+  const simulations = writes("POST", "/api/operations/workflows/simulate");
+  assert.equal(simulations.length, 2);
+  assert.deepEqual(simulations[1].body!.values, {
+    memo: "重新填写后的说明",
+  });
+});
+
+test("重新模拟先清除成功结果，输入变化后再改回原值仍不接纳旧的延迟响应", async () => {
+  const user = await mountPage();
+  const { dialog, input } = await openSimulation(user);
+  await simulate(user, dialog);
+  await within(dialog).findByText("模型校验通过");
+  deferSimulation = true;
+  await simulate(user, dialog);
+  await waitFor(() => assert.equal(pendingSimulations.length, 1));
+  assert.ok(!within(dialog).queryByText("模型校验通过"));
+  assert.equal(input.disabled, true);
+  // 模拟表单在请求中会禁用输入；程序赋值仍可能来自计算/附件等控件，watcher 必须识别 A→B→A。
+  await act(async () =>
+    fireEvent.change(input, { target: { value: "请求后的新输入" } }),
+  );
+  assert.equal(input.value, "请求后的新输入");
+  await act(async () =>
+    fireEvent.change(input, { target: { value: "第一次模拟的说明" } }),
+  );
+  await act(async () => pendingSimulations.shift()!());
+  await waitFor(() => assert.equal(input.disabled, false));
+  assert.ok(!within(dialog).queryByText("模型校验通过"));
+  assert.ok(!within(dialog).queryByText("主管审批", { selector: "b" }));
+  deferSimulation = false;
+  await simulate(user, dialog);
+  assert.ok(await within(dialog).findByText("模型校验通过"));
+  assert.equal(writes("POST", "/api/operations/workflows/simulate").length, 3);
+});
+
+test("更换模拟发起人和修改流程模型都立即使已显示的模拟路径失效", async () => {
+  permissions.push("users:view");
+  const user = await mountPage();
+  const { dialog } = await openSimulation(user);
+  await simulate(user, dialog);
+  await within(dialog).findByText("模型校验通过");
+  await user.click(within(dialog).getByLabelText("模拟发起人"));
+  await user.click(
+    await screen.findByText("另一位合成申请人", {
+      selector: ".ant-select-item-option-content",
+    }),
+  );
+  assert.ok(!within(dialog).queryByText("模型校验通过"));
+  await simulate(user, dialog);
+  await within(dialog).findByText("模型校验通过");
+  assert.equal(
+    writes("POST", "/api/operations/workflows/simulate")[1].body!.applicantId,
+    103,
+  );
+  // 在同一页面保留模拟弹窗时改变真实表单设计模型，旧成功路径不能继续显示。
+  await act(async () =>
+    fireEvent.change(screen.getByLabelText("字段标题"), {
+      target: { value: "模型修改后的申请说明" },
+    }),
+  );
+  assert.ok(!within(dialog).queryByText("模型校验通过"));
+  assert.ok(!within(dialog).queryByText("主管审批", { selector: "b" }));
+  assert.ok(within(dialog).getByLabelText("模型修改后的申请说明"));
+});
 
 test("保存请求未完成时禁止编辑、重复保存和预览入口，响应不覆盖遗漏的新修改", async () => {
   deferSave = true;

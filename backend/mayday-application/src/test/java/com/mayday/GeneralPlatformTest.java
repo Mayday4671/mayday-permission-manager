@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
@@ -110,6 +112,8 @@ class GeneralPlatformTest {
     JobHandler handler = mock(JobHandler.class);
     when(handler.key()).thenReturn("FAIL_TEST");
     when(handler.execute()).thenThrow(new IllegalStateException("password=must-not-leak"));
+    when(handler.execute(any(JobHandler.Context.class)))
+        .thenAnswer(invocation -> handler.execute());
     ScheduledJob job = new ScheduledJob();
     job.setId(1L);
     job.setName("失败边界检查");
@@ -144,7 +148,9 @@ class GeneralPlatformTest {
             transactions,
             List.of(handler),
             access,
-            users);
+            users,
+            durable(transactions),
+            tools.jackson.databind.json.JsonMapper.builder().build());
     JobExecution failed = runner.run(1L, true);
     assertEquals("FAILED", failed.getStatus());
     assertEquals(71L, failed.getId());
@@ -163,7 +169,7 @@ class GeneralPlatformTest {
     verify(executions, never()).save(any(JobExecution.class));
     ArgumentCaptor<TransactionDefinition> definitions =
         ArgumentCaptor.forClass(TransactionDefinition.class);
-    verify(transactions, times(3)).getTransaction(definitions.capture());
+    verify(transactions, times(6)).getTransaction(definitions.capture());
     assertTrue(
         definitions.getAllValues().stream()
             .allMatch(
@@ -181,6 +187,8 @@ class GeneralPlatformTest {
     JobHandler handler = mock(JobHandler.class);
     when(handler.key()).thenReturn("FAIL_TEST");
     when(handler.execute()).thenThrow(new BusinessException("业务处理失败"));
+    when(handler.execute(any(JobHandler.Context.class)))
+        .thenAnswer(invocation -> handler.execute());
     ScheduledJob job = new ScheduledJob();
     job.setId(1L);
     job.setName("外层事务隔离检查");
@@ -194,7 +202,7 @@ class GeneralPlatformTest {
               JobExecution saved = invocation.getArgument(0);
               saved.setId(72L);
               when(executions.lock(72L)).thenReturn(Optional.of(saved));
-              transactions.stageFailure(saved.getId());
+              if ("FAILED".equals(saved.getStatus())) transactions.stageFailure(saved.getId());
               return saved;
             });
     JobRunner runner =
@@ -206,7 +214,9 @@ class GeneralPlatformTest {
             transactions,
             List.of(handler),
             mock(AccessPolicy.class),
-            mock(UserRepository.class));
+            mock(UserRepository.class),
+            durable(transactions),
+            tools.jackson.databind.json.JsonMapper.builder().build());
     assertThrows(
         BusinessException.class,
         () ->
@@ -222,6 +232,9 @@ class GeneralPlatformTest {
     assertEquals(
         List.of(
             TransactionDefinition.PROPAGATION_REQUIRED,
+            TransactionDefinition.PROPAGATION_REQUIRES_NEW,
+            TransactionDefinition.PROPAGATION_REQUIRES_NEW,
+            TransactionDefinition.PROPAGATION_REQUIRES_NEW,
             TransactionDefinition.PROPAGATION_REQUIRES_NEW,
             TransactionDefinition.PROPAGATION_REQUIRES_NEW,
             TransactionDefinition.PROPAGATION_REQUIRES_NEW),
@@ -263,7 +276,9 @@ class GeneralPlatformTest {
             transactions(),
             List.of(),
             access,
-            users);
+            users,
+            durable(transactions()),
+            tools.jackson.databind.json.JsonMapper.builder().build());
     runner.retryFailureNotifications();
     assertNotNull(failure.getFailureNotifiedAt());
     runner.retryFailureNotifications();
@@ -307,7 +322,9 @@ class GeneralPlatformTest {
               transactions,
               List.of(),
               mock(AccessPolicy.class),
-              users)
+              users,
+              durable(transactions),
+              tools.jackson.databind.json.JsonMapper.builder().build())
           .retryFailureNotifications();
       assertNotNull(failure.getFailureNotifiedAt(), recipientState);
       verify(transactions).commit(any(TransactionStatus.class));
@@ -530,5 +547,50 @@ class GeneralPlatformTest {
     when(transactions.getTransaction(any()))
         .thenAnswer(invocation -> new SimpleTransactionStatus());
     return transactions;
+  }
+
+  /** 此替身仅验证业务事务与失败历史隔离；共享领取、故障和旧租约拒绝由真实双实例专项验证。 */
+  private static com.mayday.operations.cluster.DurableTasks durable(
+      PlatformTransactionManager manager) {
+    var tasks = mock(com.mayday.operations.cluster.DurableTasks.class);
+    var payload = new java.util.concurrent.atomic.AtomicReference<String>();
+    when(tasks.enqueue(anyString(), anyString(), anyString(), anyInt()))
+        .thenAnswer(
+            call -> {
+              payload.set(call.getArgument(2));
+              return 1L;
+            });
+    when(tasks.claim(anyString(), anyString()))
+        .thenAnswer(
+            call ->
+                new com.mayday.operations.cluster.DurableTasks.Lease(
+                    1L, call.getArgument(0), call.getArgument(1), payload.get(), "test-lease", 1));
+    var transaction = new TransactionTemplate(manager);
+    transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    when(tasks.inspect(anyString(), anyString(), any()))
+        .thenAnswer(
+            call ->
+                transaction.execute(
+                    status -> ((java.util.function.Supplier<?>) call.getArgument(2)).get()));
+    when(tasks.fenced(any(), any()))
+        .thenAnswer(
+            call ->
+                transaction.execute(
+                    status -> ((java.util.function.Supplier<?>) call.getArgument(1)).get()));
+    when(tasks.finish(any(), any()))
+        .thenAnswer(
+            call ->
+                transaction.execute(
+                    status -> ((java.util.function.Supplier<?>) call.getArgument(1)).get()));
+    org.mockito.Mockito.doAnswer(
+            call -> {
+              transaction.executeWithoutResult(
+                  status ->
+                      ((java.util.function.Consumer<String>) call.getArgument(3)).accept("FAILED"));
+              return null;
+            })
+        .when(tasks)
+        .failed(any(), anyString(), anyBoolean(), any());
+    return tasks;
   }
 }

@@ -14,17 +14,17 @@ import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
 import javax.imageio.ImageIO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
  * 自托管登录拼图：答案只在服务端保存，前端只收到栅格图片，不下发目标坐标或可解码答案。 挑战、通过凭证均一次性，绑定账号和请求来源；先消费再判断，错误尝试不能反复猜同一道题。
- * 这是基础自动化滥用拦截，不代替密码限流、MFA 或专业风控。当前单实例内存存储有 TTL、 来源配额和全局容量上限；多实例部署必须替换为共享存储及原子消费，不能关闭验证绕过。
+ * 这是基础自动化滥用拦截，不代替密码限流、MFA 或专业风控。挑战及凭证保存在 MySQL 共享状态中， 多实例使用同一配额、数据库时间和原子消费；应用重启不会恢复已消费的凭证。
  */
 @Component
 public class SlideCaptchaService {
@@ -39,23 +39,16 @@ public class SlideCaptchaService {
 
   private static final long CHALLENGE_TTL = 120_000;
   private static final long PROOF_TTL = 60_000;
-  private static final int CAPACITY = 2048;
-  private static final int PER_SOURCE_MINUTE = 120;
   private static final String INVALID = "验证未通过或已过期，请重新拖动滑块";
   private final SecureRandom random;
   private final Clock clock;
-  private final Map<String, Challenge> challenges = new HashMap<>();
-  private final Map<String, Proof> proofs = new HashMap<>();
-  private final Map<String, RateWindow> windows = new HashMap<>();
+  private final SecurityState state;
 
-  /** 服务端挑战答案及绑定上下文；目标横坐标只留在进程内，不包含在任何公开响应。 */
+  /** 服务端挑战答案及绑定上下文；目标横坐标只留在服务器数据库，不包含在任何公开响应。 */
   private record Challenge(String username, String source, int x, long issuedAt) {}
 
   /** 通过拼图后的短期一次性凭证；仍绑定用户名与来源，不能代替密码登录或跨账号使用。 */
   private record Proof(String username, String source, long expiresAt) {}
-
-  /** 同来源一分钟挑战配额，到期时整个窗口失效，不延长攻击者持续刷新请求的计数周期。 */
-  private record RateWindow(int count, long expiresAt) {}
 
   /** 仅下发背景、拼图栅格和必要尺寸；纵坐标可公开，目标横坐标与图形矢量描述绝不返回。 */
   public record Puzzle(
@@ -71,22 +64,31 @@ public class SlideCaptchaService {
   /** 登录前仅能消费一次的短期证明；页面应按 expiresIn 秒重新验证，不能持久化为登录会话。 */
   public record Verification(String captchaToken, int expiresIn) {}
 
-  /** 生产构造使用安全随机数和 UTC 时钟；测试不能通过公开 API 设置固定答案或跳过校验。 */
-  public SlideCaptchaService() {
-    this(new SecureRandom(), Clock.systemUTC());
+  /** Spring 只装配数据库共享状态，不存在生产内存回退或关闭验证码的配置入口。 */
+  @Autowired
+  public SlideCaptchaService(JdbcSecurityState state) {
+    this(new SecureRandom(), null, state);
   }
 
-  // 包级注入只用于单元测试时间与随机数，不提供任何 HTTP 测试开关或固定答案。
-  SlideCaptchaService(SecureRandom random, Clock clock) {
+  /** 包级时钟及状态注入只供单元测试，不提供任何 HTTP 固定答案或跳过验证入口。 */
+  SlideCaptchaService(SecureRandom random, Clock clock, SecurityState state) {
     this.random = random;
     this.clock = clock;
+    this.state = state;
   }
 
-  /** 所有入口先清除过期项，容量判断不会把已经失效的挑战或凭证算作仍在使用。 */
-  private void prune(long now) {
-    challenges.values().removeIf(challenge -> now - challenge.issuedAt() >= CHALLENGE_TTL);
-    proofs.values().removeIf(proof -> now >= proof.expiresAt());
-    windows.values().removeIf(window -> now >= window.expiresAt());
+  private long now() {
+    return clock == null ? state.now() : clock.millis();
+  }
+
+  private static String encode(String value) {
+    return Base64.getUrlEncoder()
+        .withoutPadding()
+        .encodeToString(value.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static String decode(String value) {
+    return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
   }
 
   private String nonce() {
@@ -97,29 +99,17 @@ public class SlideCaptchaService {
 
   /** 不查询账号是否存在，避免挑战接口成为用户名探测入口。 */
   public synchronized Puzzle issue(String username, String source) {
-    long now = clock.millis();
-    prune(now);
-    RateWindow previousWindow = windows.get(source);
-    if (challenges.size() >= CAPACITY
-        || proofs.size() >= CAPACITY
-        || windows.size() >= CAPACITY
-        || (previousWindow != null && previousWindow.count() >= PER_SOURCE_MINUTE))
-      throw new BusinessException("验证请求过于频繁，请稍后再试");
-    windows.put(
-        source,
-        new RateWindow(
-            previousWindow == null ? 1 : previousWindow.count() + 1,
-            previousWindow == null ? now + 60_000 : previousWindow.expiresAt()));
-    // 同来源/同账号换图即废弃旧题，控制刷新产生的存量，也避免多个有效答案并存。
-    challenges
-        .values()
-        .removeIf(
-            challenge ->
-                challenge.username().equals(username) && challenge.source().equals(source));
+    state.reserveChallenge(source);
+    long now = now();
     int x = 64 + random.nextInt(WIDTH - SIZE - 80), y = 24 + random.nextInt(HEIGHT - SIZE - 40);
     String id = nonce();
     String[] images = render(x, y);
-    challenges.put(id, new Challenge(username, source, x, now));
+    state.challenge(
+        id,
+        username + "\n" + source,
+        source,
+        encode(username) + ":" + encode(source) + ":" + x + ":" + now,
+        CHALLENGE_TTL);
     return new Puzzle(
         id, images[0], images[1], WIDTH, HEIGHT, SIZE, y, (int) (CHALLENGE_TTL / 1000));
   }
@@ -127,9 +117,17 @@ public class SlideCaptchaService {
   /** 一题仅允许一次验证；时间检查在服务端执行，客户端耗时只作为附加约束。 */
   public synchronized Verification verify(
       String id, String username, String source, int x, long elapsedMs) {
-    long now = clock.millis();
-    prune(now);
-    Challenge challenge = challenges.remove(id);
+    long now = now();
+    String payload = state.take("CHALLENGE", id);
+    String[] values = payload == null ? null : payload.split(":");
+    Challenge challenge =
+        values == null
+            ? null
+            : new Challenge(
+                decode(values[0]),
+                decode(values[1]),
+                Integer.parseInt(values[2]),
+                Long.parseLong(values[3]));
     if (challenge == null
         || !challenge.username().equals(username)
         || !challenge.source().equals(source)
@@ -140,19 +138,27 @@ public class SlideCaptchaService {
         || elapsedMs > CHALLENGE_TTL
         || now - challenge.issuedAt() < elapsedMs - 150
         || now - challenge.issuedAt() < 300) throw new BusinessException(INVALID);
-    if (proofs.size() >= CAPACITY) throw new BusinessException("验证服务繁忙，请稍后再试");
     String token = nonce();
-    proofs.put(token, new Proof(username, source, now + PROOF_TTL));
+    state.proof(
+        token,
+        username + "\n" + source,
+        encode(username) + ":" + encode(source) + ":" + (now + PROOF_TTL),
+        PROOF_TTL);
     return new Verification(token, (int) (PROOF_TTL / 1000));
   }
 
   /** 登录入口必须先消费此凭证再进行密码比较；密码错误也不会返还凭证。 */
   public synchronized void consume(String token, String username, String source) {
-    long now = clock.millis();
-    prune(now);
-    Proof proof = token == null ? null : proofs.remove(token);
-    if (proof == null || !proof.username().equals(username) || !proof.source().equals(source))
-      throw new BusinessException("请先完成滑动验证");
+    String payload = state.take("PROOF", token);
+    String[] values = payload == null ? null : payload.split(":");
+    Proof proof =
+        values == null
+            ? null
+            : new Proof(decode(values[0]), decode(values[1]), Long.parseLong(values[2]));
+    if (proof == null
+        || now() >= proof.expiresAt()
+        || !proof.username().equals(username)
+        || !proof.source().equals(source)) throw new BusinessException("请先完成滑动验证");
   }
 
   /** 无外部图片请求，也不使用字体；每次生成不同几何纹理，并裁出真实拼图块。 */

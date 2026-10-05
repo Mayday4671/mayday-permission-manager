@@ -23,9 +23,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FeedbackService {
   private static final SecureRandom RANDOM = new SecureRandom();
-  private static final Map<String, Window> RATE_WINDOWS = new ConcurrentHashMap<>();
+  private final com.mayday.security.JdbcSecurityState limits;
   private final FeedbackRepository repository;
   private final FeedbackHistoryRepository histories;
   private final UserRepository users;
@@ -111,19 +109,10 @@ public class FeedbackService {
       @Size(max = 2000) String publicReply,
       @Size(max = 2000) String internalNote) {}
 
-  /** 当前进程入口的限频计数窗口，定期清除过期键并限制总键数；它不是处理状态或持久业务数据。 */
-  private record Window(long startedAt, int requests) {}
-
-  /** 同IP每小时至多10次提交；不信任客户端代理头。多实例部署应由网关追加共享限频。 */
-  public static synchronized void limit(String address, boolean submitting) {
-    long now = System.currentTimeMillis();
-    RATE_WINDOWS.entrySet().removeIf(entry -> now - entry.getValue().startedAt() >= 3_600_000L);
-    String key = (submitting ? "submit:" : "query:") + address;
-    Window previous = RATE_WINDOWS.getOrDefault(key, new Window(now, 0));
-    if (previous.requests() >= (submitting ? 10 : 120)) throw new BusinessException("操作过于频繁，请稍后重试");
-    if (RATE_WINDOWS.size() >= 10000 && !RATE_WINDOWS.containsKey(key))
-      throw new BusinessException("服务繁忙，请稍后重试");
-    RATE_WINDOWS.put(key, new Window(previous.startedAt(), previous.requests() + 1));
+  /** 同IP提交每小时十次、凭码查询一百二十次；计数跨实例共享，不信任客户端代理头。 */
+  public void limit(String address, boolean submitting) {
+    limits.reserve(
+        submitting ? "feedback-submit" : "feedback-query", address, submitting ? 10 : 120, 3600000);
   }
 
   /** 创建初始OPEN反馈并生成192位随机查询码，状态、负责人和服务端时间均不可由客户提交；同一事务保存成功后才返回原码。 */

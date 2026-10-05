@@ -1,8 +1,8 @@
 /** 真实数据库主题契约与权限测试。和安全专项一样，只能在独立 Compose 验收项目执行。 */
+import { isolatedSql } from "./support/isolated-compose.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loginWithCaptcha } from "./support/captcha.mjs";
-import { spawnSync } from "node:child_process";
 const isolated =
   /^mayday-check-\d+-[a-f0-9]{6}$/.test(
     process.env.API_TEST_COMPOSE_PROJECT ?? "",
@@ -35,31 +35,8 @@ const fields = [
   "built_in",
 ];
 function sql(statement) {
-  assert(isolated, "只允许隔离验收数据库");
-  const result = spawnSync(
-    "docker",
-    [
-      "compose",
-      "-p",
-      process.env.API_TEST_COMPOSE_PROJECT,
-      "-f",
-      "compose.verify.yaml",
-      "exec",
-      "-T",
-      process.env.API_TEST_DATABASE,
-      "sh",
-      "-c",
-      'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --raw --skip-column-names',
-    ],
-    {
-      input: statement,
-      encoding: "utf8",
-      windowsHide: true,
-      maxBuffer: 1024 * 1024,
-    },
-  );
-  assert.equal(result.status, 0, "隔离主题参数快照/清理失败");
-  return result.stdout.trim();
+  assert(isolated, "SQL 仅允许本次独立验收项目");
+  return isolatedSql(statement, { raw: true, maxBuffer: 1024 * 1024 }).trim();
 }
 const hexValue = (value) => {
   if (value === null) return "NULL";

@@ -36,6 +36,8 @@ class BulkSecurityTest {
     when(access.current()).thenReturn(current);
     BulkResourceAdapter adapter = mock(BulkResourceAdapter.class);
     when(adapter.resource()).thenReturn("users");
+    var spoolManager = mock(BulkSpoolCleanup.class);
+    when(spoolManager.directory()).thenReturn(spool);
     service =
         new BulkService(
             jobs,
@@ -45,7 +47,9 @@ class BulkSecurityTest {
             List.of(adapter),
             mock(PlatformTransactionManager.class),
             JsonMapper.builder().build(),
-            spool.toString());
+            mock(com.mayday.operations.cluster.DurableTasks.class),
+            mock(BulkResultStore.class),
+            spoolManager);
     return service;
   }
 

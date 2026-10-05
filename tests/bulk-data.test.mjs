@@ -2,10 +2,10 @@
  * 批量导入/导出的真实 HTTP 与 MySQL 验收，只在随机隔离 Docker 项目中执行。
  * 对账号、角色和作业登记精确 ID，结束时等待服务端真实过期清理，不清空日常库或文件目录。
  */
+import { isolatedSql } from "./support/isolated-compose.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import { loginWithCaptcha } from "./support/captcha.mjs";
 
 const base = process.env.API_BASE;
@@ -69,26 +69,8 @@ async function download(path, token, expected = 200) {
 
 /** SQL 只进入隔离项目指定数据库，用于精确清理和核对未提交记录，不接受外部 SQL 配置。 */
 function sql(statement) {
-  assert(isolated, "只能操作独立验收数据库");
-  const result = spawnSync(
-    "docker",
-    [
-      "compose",
-      "-p",
-      project,
-      "-f",
-      "compose.verify.yaml",
-      "exec",
-      "-T",
-      database,
-      "sh",
-      "-c",
-      'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --skip-column-names',
-    ],
-    { input: statement, encoding: "utf8", windowsHide: true },
-  );
-  assert.equal(result.status, 0, "隔离验收 SQL 执行失败");
-  return result.stdout.trim();
+  assert(isolated, "SQL 仅允许本次独立验收项目");
+  return isolatedSql(statement).trim();
 }
 
 /** 仅将成功创建并登记的正整数 ID 放进清理语句，不允许宽泛条件删除或全表清理。 */

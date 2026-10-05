@@ -45,6 +45,13 @@ management:
         readiness:
           include: readinessState,db
 mayday:
+  identity:
+    # 默认关闭；启用必须提供独立 32 字节 Base64 加密密钥，并在升级/恢复时保持该密钥。
+    mfa-enabled: ${MAYDAY_MFA_ENABLED:false}
+    encryption-key: ${MAYDAY_IDENTITY_ENCRYPTION_KEY:}
+    issuer-label: ${MAYDAY_IDENTITY_LABEL:Mayday}
+    # providers 支持 Spring indexed 配置；可在部署配置文件或环境变量注册多个固定提供方。
+    providers: []
   deployment:
     production: ${MAYDAY_PRODUCTION:false}
     public-origin: ${MAYDAY_PUBLIC_ORIGIN:}

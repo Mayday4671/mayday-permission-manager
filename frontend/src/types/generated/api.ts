@@ -32,6 +32,214 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/auth/identity/bindings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["IdentityController_bindings"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/bindings/{id}/remove": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_remove"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/mfa": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["IdentityController_status"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/mfa/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_confirm"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/mfa/disable": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_disable"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/mfa/enroll": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_enroll"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/mfa/recovery": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_recovery"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/mfa/verify": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_verify"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/oidc/bind": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_bind"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/oidc/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_complete"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/oidc/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_start"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/providers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["IdentityController_providers"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/identity/users/{id}/mfa/reset": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["IdentityController_reset"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/login": {
     parameters: {
       query?: never;
@@ -208,6 +416,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/bulk/jobs/{id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["BulkController_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/bulk/jobs/{id}/download": {
     parameters: {
       query?: never;
@@ -218,6 +442,22 @@ export interface paths {
     get: operations["BulkController_download"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/bulk/jobs/{id}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["BulkController_retry"];
     delete?: never;
     options?: never;
     head?: never;
@@ -896,6 +1136,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/operations/job-logs/{id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["JobController_cancel"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/job-logs/{id}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["JobController_retry"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/operations/messages": {
     parameters: {
       query?: never;
@@ -1344,6 +1616,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/operations/requests/{id}/recover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["WorkflowController_recover"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/operations/requests/{id}/remind": {
     parameters: {
       query?: never;
@@ -1386,6 +1674,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["WorkflowController_resubmit"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/requests/{id}/subprocess-repair": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["WorkflowController_repairSubprocess"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/requests/{id}/subprocess-repair-options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["WorkflowController_subprocessRepairOptions"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1642,6 +1962,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["WorkflowController_simulate"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/workflows/subprocess-options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["WorkflowController_subprocessOptions"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/operations/workflows/subprocess-versions/{versionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["WorkflowController_subprocessVersion"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2407,6 +2759,11 @@ export interface components {
       /** Format: int64 */
       value: number;
     };
+    ApiResponseAuthorization: {
+      data: components["schemas"]["Authorization"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseBatchResult: {
       data: components["schemas"]["BatchResult"];
       message: string;
@@ -2419,6 +2776,16 @@ export interface components {
     };
     ApiResponseChannelView: {
       data: components["schemas"]["ChannelView"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseCompletion: {
+      data: components["schemas"]["Completion"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseEnrollment: {
+      data: components["schemas"]["Enrollment"];
       message: string;
       success: boolean;
     };
@@ -2477,6 +2844,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseListBinding: {
+      data: components["schemas"]["Binding"][];
+      message: string;
+      success: boolean;
+    };
     ApiResponseListCategoryOption: {
       data: components["schemas"]["CategoryOption"][];
       message: string;
@@ -2504,6 +2876,16 @@ export interface components {
     };
     ApiResponseListMonitorHistoryPoint: {
       data: components["schemas"]["MonitorHistoryPoint"][];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseListProviderView: {
+      data: components["schemas"]["ProviderView"][];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseListString: {
+      data: string[];
       message: string;
       success: boolean;
     };
@@ -2584,6 +2966,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseStatus: {
+      data: components["schemas"]["Status"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseStorageInfo: {
       data: components["schemas"]["StorageInfo"];
       message: string;
@@ -2616,6 +3003,9 @@ export interface components {
       publishedAt?: string;
       title?: string;
     };
+    Authorization: {
+      authorizationUrl?: string;
+    };
     BatchEdit: {
       action: string;
       /** Format: int64 */
@@ -2625,6 +3015,22 @@ export interface components {
     BatchResult: {
       /** Format: int32 */
       count?: number;
+    };
+    Bind: {
+      factor?: string;
+      password: string;
+      providerId: string;
+    };
+    Binding: {
+      createdAt?: string;
+      id?: string;
+      lastLoginAt?: string;
+      providerId?: string;
+      providerName?: string;
+    };
+    Callback: {
+      code: string;
+      state: string;
     };
     CategoryOption: {
       /** Format: int64 */
@@ -2687,6 +3093,10 @@ export interface components {
       /** Format: date */
       before: string;
       loginOnly?: boolean;
+    };
+    Completion: {
+      bound?: boolean;
+      login?: components["schemas"]["LoginView"];
     };
     Condition: {
       field?: string;
@@ -2800,6 +3210,11 @@ export interface components {
       };
       /** Format: int64 */
       version: number;
+    };
+    Enrollment: {
+      challengeId?: string;
+      provisioningUri?: string;
+      secret?: string;
     };
     EntryRequest: {
       code: string;
@@ -2915,12 +3330,14 @@ export interface components {
       helpText?: string;
       id?: string;
       label?: string;
-      max?: number;
+      /** @description 精确十进制上限；兼容旧请求中的 JSON 数字 */
+      max?: string;
       /** Format: int32 */
       maxLength?: number;
       /** Format: int32 */
       maxRows?: number;
-      min?: number;
+      /** @description 精确十进制下限；兼容旧请求中的 JSON 数字 */
+      min?: string;
       options?: string[];
       placeholder?: string;
       required?: boolean;
@@ -3004,6 +3421,8 @@ export interface components {
       };
     };
     JobExecution: {
+      /** Format: int32 */
+      attempts?: number;
       /** Format: date-time */
       createdAt: string;
       /** Format: int64 */
@@ -3036,7 +3455,7 @@ export interface components {
       processedRows: number;
       resource: string;
       /** @enum {string} */
-      status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+      status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
       /** Format: int64 */
       totalRows: number;
     };
@@ -3046,7 +3465,9 @@ export interface components {
       username: string;
     };
     LoginView: {
-      token: string;
+      challengeId?: string;
+      mfaRequired?: boolean;
+      token?: string;
     };
     MonitorHistoryPoint: {
       /** Format: double */
@@ -3114,6 +3535,7 @@ export interface components {
     Node: {
       actions?: string[];
       assigneeIds?: number[];
+      branches?: string[];
       conditions?: components["schemas"]["Condition"][];
       id?: string;
       mode?: string;
@@ -3121,6 +3543,7 @@ export interface components {
       next?: string;
       readable?: string[];
       source?: string;
+      subprocess?: components["schemas"]["Subprocess"];
       /** Format: int32 */
       timeoutMinutes?: number;
       type?: string;
@@ -3225,6 +3648,7 @@ export interface components {
       urlPointer?: string;
     };
     PasswordRequest: {
+      factor?: string;
       newPassword: string;
       oldPassword: string;
     };
@@ -3234,6 +3658,14 @@ export interface components {
       nickname: string;
       phone?: string;
     };
+    Proof: {
+      factor?: string;
+      password: string;
+    };
+    ProviderView: {
+      id?: string;
+      name?: string;
+    };
     Publish: {
       /** Format: date-time */
       offlineAt?: string;
@@ -3241,6 +3673,11 @@ export interface components {
       publishAt?: string;
       /** Format: int64 */
       revisionId: number;
+      /** Format: int64 */
+      version: number;
+    };
+    Recovery: {
+      reason: string;
       /** Format: int64 */
       version: number;
     };
@@ -3261,6 +3698,14 @@ export interface components {
       /** Format: int32 */
       targetPort?: number;
       transportMode?: string;
+      /** Format: int64 */
+      version: number;
+    };
+    Repair: {
+      childNodeId: string;
+      reason: string;
+      targetUserIds: number[];
+      tokenId: string;
       /** Format: int64 */
       version: number;
     };
@@ -3352,6 +3797,12 @@ export interface components {
       /** Format: int64 */
       version: number;
     };
+    Status: {
+      available?: boolean;
+      enabled?: boolean;
+      /** Format: int64 */
+      recoveryCodesRemaining?: number;
+    };
     Stop: {
       runId: string;
     };
@@ -3385,6 +3836,16 @@ export interface components {
       updatedAt?: string;
       /** Format: int64 */
       version?: number;
+    };
+    Subprocess: {
+      inputs?: {
+        [key: string]: string;
+      };
+      outputs?: {
+        [key: string]: string;
+      };
+      /** Format: int64 */
+      versionId?: number;
     };
     TargetVersion: {
       /** Format: int64 */
@@ -3449,6 +3910,10 @@ export interface components {
       value?: string;
       /** Format: int64 */
       version?: number;
+    };
+    Verify: {
+      challengeId: string;
+      factor: string;
     };
     VerifyRequest: {
       challengeId: string;
@@ -3571,6 +4036,312 @@ export interface operations {
       };
     };
   };
+  IdentityController_bindings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseListBinding"];
+        };
+      };
+    };
+  };
+  IdentityController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Proof"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseVoid"];
+        };
+      };
+    };
+  };
+  IdentityController_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseStatus"];
+        };
+      };
+    };
+  };
+  IdentityController_confirm: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Verify"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseListString"];
+        };
+      };
+    };
+  };
+  IdentityController_disable: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Proof"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseVoid"];
+        };
+      };
+    };
+  };
+  IdentityController_enroll: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Proof"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseEnrollment"];
+        };
+      };
+    };
+  };
+  IdentityController_recovery: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Proof"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseListString"];
+        };
+      };
+    };
+  };
+  IdentityController_verify: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Verify"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseLoginView"];
+        };
+      };
+    };
+  };
+  IdentityController_bind: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Bind"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseAuthorization"];
+        };
+      };
+    };
+  };
+  IdentityController_complete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: {
+        "mayday.oidc"?: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Callback"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseCompletion"];
+        };
+      };
+    };
+  };
+  IdentityController_start: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Start"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseAuthorization"];
+        };
+      };
+    };
+  };
+  IdentityController_providers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseListProviderView"];
+        };
+      };
+    };
+  };
+  IdentityController_reset: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Recovery"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseVoid"];
+        };
+      };
+    };
+  };
   AuthController_login: {
     parameters: {
       query?: never;
@@ -3688,7 +4459,9 @@ export interface operations {
   BulkController_export: {
     parameters: {
       query?: never;
-      header?: never;
+      header?: {
+        "Idempotency-Key"?: string;
+      };
       path: {
         resource: string;
       };
@@ -3835,6 +4608,28 @@ export interface operations {
       };
     };
   };
+  BulkController_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseJobView"];
+        };
+      };
+    };
+  };
   BulkController_download: {
     parameters: {
       query?: never;
@@ -3853,6 +4648,28 @@ export interface operations {
         };
         content: {
           "text/csv;charset=UTF-8": string;
+        };
+      };
+    };
+  };
+  BulkController_retry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseJobView"];
         };
       };
     };
@@ -5202,6 +6019,50 @@ export interface operations {
       };
     };
   };
+  JobController_cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseJobExecution"];
+        };
+      };
+    };
+  };
+  JobController_retry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseJobExecution"];
+        };
+      };
+    };
+  };
   MessageController_inbox: {
     parameters: {
       query?: {
@@ -5799,7 +6660,9 @@ export interface operations {
   };
   WorkflowController_request: {
     parameters: {
-      query?: never;
+      query?: {
+        taskId?: number;
+      };
       header?: never;
       path: {
         id: number;
@@ -6010,6 +6873,32 @@ export interface operations {
       };
     };
   };
+  WorkflowController_recover: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Recovery"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
   WorkflowController_remind: {
     parameters: {
       query?: never;
@@ -6072,6 +6961,54 @@ export interface operations {
         "application/json": components["schemas"]["Edit"];
       };
     };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  WorkflowController_repairSubprocess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Repair"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  WorkflowController_subprocessRepairOptions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description OK */
       200: {
@@ -6233,7 +7170,9 @@ export interface operations {
   JobController_run: {
     parameters: {
       query?: never;
-      header?: never;
+      header?: {
+        "Idempotency-Key"?: string;
+      };
       path: {
         id: number;
       };
@@ -6564,6 +7503,52 @@ export interface operations {
         "application/json": components["schemas"]["Simulation"];
       };
     };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  WorkflowController_subprocessOptions: {
+    parameters: {
+      query?: {
+        keyword?: string;
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  WorkflowController_subprocessVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description OK */
       200: {

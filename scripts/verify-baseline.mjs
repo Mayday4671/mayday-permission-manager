@@ -39,7 +39,7 @@ mkdirSync(output, { recursive: true });
 const settings = Object.fromEntries(
   readFileSync(join(root, ".env"), "utf8")
     .split(/\r?\n/)
-    .filter((line) => /^[A-Z_]+=/.test(line))
+    .filter((line) => /^[A-Z][A-Z0-9_]*=/.test(line))
     .map((line) => {
       const split = line.indexOf("=");
       return [
@@ -245,7 +245,7 @@ function verificationSnapshot(service) {
 }
 function apiSuite(label, port) {
   // TAP 保留子进程退出码及完整断言位置，避免终端精简报告只留下 test failed 而无法定位。
-  execute(
+  const checked = execute(
     process.execPath,
     [
       "--test",
@@ -253,6 +253,7 @@ function apiSuite(label, port) {
       "--test-concurrency=1",
       "tests/api.test.mjs",
       "tests/workflow.test.mjs",
+      "tests/workflow-decimal.test.mjs",
       "tests/security.test.mjs",
       "tests/theme.test.mjs",
       "tests/captcha.test.mjs",
@@ -263,6 +264,9 @@ function apiSuite(label, port) {
       "tests/bulk-data.test.mjs",
       "tests/general-platform.test.mjs",
       "tests/portal.test.mjs",
+      "tests/workflow-orchestration.test.mjs",
+      "tests/workflow-field-activation.test.mjs",
+      "tests/shared-execution.test.mjs",
     ],
     {
       env: {
@@ -271,11 +275,28 @@ function apiSuite(label, port) {
         ADMIN_PASSWORD: settings.ADMIN_PASSWORD,
         API_TEST_COMPOSE_PROJECT: project,
         API_TEST_DATABASE: label === "upgrade" ? "upgrade-db" : "fresh-db",
+        // Docker 路径不继承其他原生验收的目录或参数，SQL 明确绑定本轮随机项目。
+        API_TEST_NATIVE_FILES: "",
+        MAYDAY_TEST_COMPOSE_ARGS: JSON.stringify(checkCompose),
       },
       log: `api-${label}.log`,
     },
   );
-  mark(`${label}：真实 MySQL 接口回归`);
+  const counts = Object.fromEntries(
+    [
+      ...checked.stdout.matchAll(
+        /^# (tests|pass|fail|cancelled|skipped) (\d+)$/gm,
+      ),
+    ].map((match) => [match[1], Number(match[2])]),
+  );
+  assert(
+    counts.tests > 0 && counts.pass === counts.tests,
+    "容器接口回归必须执行全部检查，不以缺失环境条件或跳过替代通过",
+  );
+  assert.equal(counts.skipped, 0, "容器接口条件跳过不得计为通过");
+  assert.equal(counts.fail, 0);
+  assert.equal(counts.cancelled, 0);
+  mark(`${label}：真实 MySQL 接口回归`, counts);
 }
 
 let createdEnvironment = false;

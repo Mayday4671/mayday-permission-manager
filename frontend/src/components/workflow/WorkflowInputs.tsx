@@ -29,11 +29,18 @@ export function WorkflowInput({
     );
   if (field.type === "NUMBER" || field.type === "MONEY")
     return (
-      <InputNumber
+      <InputNumber<string>
         {...props}
-        value={typeof value === "number" ? value : null}
-        min={field.min}
-        max={field.max}
+        // 新值保持十进制字符串；旧申请仍可传入 number，回填时只转文字而不再经浮点解析。
+        // 主字段和明细列共用此控件，避免服务端精确值在下一次编辑时丢失有效位。
+        stringMode
+        value={
+          typeof value === "number" || typeof value === "string"
+            ? String(value)
+            : null
+        }
+        min={field.min == null ? undefined : String(field.min)}
+        max={field.max == null ? undefined : String(field.max)}
         precision={field.type === "MONEY" ? 2 : undefined}
         onChange={onChange}
         style={{ width: "100%" }}

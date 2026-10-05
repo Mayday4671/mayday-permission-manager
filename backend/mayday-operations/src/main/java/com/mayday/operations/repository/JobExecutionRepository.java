@@ -13,6 +13,15 @@ import org.springframework.data.jpa.repository.Query;
 /** 执行历史不依赖配置生命周期，失败提醒重试的查询限制数量与时间，避免全表轮询。 */
 public interface JobExecutionRepository
     extends JpaRepository<JobExecution, Long>, JpaSpecificationExecutor<JobExecution> {
+  /** 稳定业务键下只有一份历史，重试更新同一执行而不是伪造多个成功。 */
+  Optional<JobExecution> findByTaskKey(String taskKey);
+
+  /** 有界协调租约耗尽终态与业务显示，避免崩溃恢复超过上限后历史一直显示运行。 */
+  List<JobExecution> findTop100ByStatusInOrderByIdAsc(java.util.Collection<String> states);
+
+  /** 编辑与删除不能改变已领取的处理器和计划快照。 */
+  boolean existsByJobIdAndStatusIn(Long jobId, java.util.Collection<String> states);
+
   /** 每批扫描最早100条尚未完成提醒的近期失败，已投递条目退出队列，避免旧记录永久饥饿。 */
   List<JobExecution> findTop100ByStatusAndFailureNotifiedAtIsNullAndCreatedAtAfterOrderByIdAsc(
       String status, LocalDateTime after);

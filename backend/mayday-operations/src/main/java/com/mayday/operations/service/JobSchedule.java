@@ -21,6 +21,7 @@ public class JobSchedule {
   @Scheduled(fixedDelay = 10000)
   public void tick() {
     if (!modules.isEnabled("scheduler")) return;
+    runner.recover();
     for (var job : jobs.findByEnabledTrueAndNextRunAtLessThanEqual(LocalDateTime.now())) {
       try {
         runner.run(job.getId(), false);

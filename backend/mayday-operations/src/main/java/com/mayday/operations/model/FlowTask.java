@@ -49,6 +49,10 @@ public class FlowTask extends BaseEntity {
 
   private int nodeVisit;
 
+  /** 并行办理只核验本游标的访问批次，不能用申请最后激活的节点排除其他合法支路。 */
+  @Column(length = 40)
+  private String executionTokenId;
+
   /** 抄送没有审批能力；顺签尚未轮到的任务为 WAITING，不计入个人待办。 */
   @Column(nullable = false, length = 16)
   private String kind = "APPROVAL";
@@ -57,6 +61,9 @@ public class FlowTask extends BaseEntity {
   private LocalDateTime readAt;
 
   private LocalDateTime decidedAt;
+
+  /** 实际获得节点办理/抄送资格的时间。顺签排队及其取消记录保持为空，不能仅凭任务状态授予字段读取权； 激活、人员委托、站内事件与业务推进同事务提交，回滚时不会留下虚假的授权凭证。 */
+  private LocalDateTime activatedAt;
 
   /** 从申请冻结的节点超时配置推算；转交和加签继承当前节点期限，不因换人重置。 */
   private LocalDateTime dueAt;

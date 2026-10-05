@@ -6,7 +6,9 @@ import { UserSelect } from "../LookupSelect";
 import { api } from "../../lib/api";
 import { NodeFieldPermissions } from "./NodeFieldPermissions";
 import { ConditionGroupEditor } from "./ConditionGroupEditor";
+import { WorkflowSubprocessEditor } from "./WorkflowSubprocessEditor";
 import { conditionIssues, conditionLeaves } from "../../lib/workflowConditions";
+import { subprocessMappingIssues } from "../../lib/workflowSubprocess";
 import {
   actionNames,
   type WorkflowNode,
@@ -125,9 +127,13 @@ export function NodeEditor({
         ? "审批人设置"
         : node?.type === "COPY"
           ? "抄送设置"
-          : node?.type === "CONDITION"
-            ? "条件分支设置"
-            : "节点设置"
+          : node?.type === "SUBPROCESS"
+            ? "子流程设置"
+            : node?.type === "PARALLEL"
+              ? "并行分支设置"
+              : node?.type === "CONDITION"
+                ? "条件分支设置"
+                : "节点设置"
     : existing
       ? "编辑流程节点"
       : "添加流程节点";
@@ -299,6 +305,7 @@ export function NodeEditor({
                   throw new Error("请输入有效数字。");
                 if (
                   field?.type === "SINGLE" &&
+                  ["EQ", "NE"].includes(rule?.operator ?? "") &&
                   !field.options?.includes(String(value))
                 )
                   throw new Error("请选择此字段的已有选项。");
@@ -306,7 +313,9 @@ export function NodeEditor({
             },
           ]}
         >
-          {field?.type === "SINGLE" ? (
+          {/* 单选包含允许输入选项的任意子串；只有等于/不等于需要保持原选项成员。 */}
+          {field?.type === "SINGLE" &&
+          ["EQ", "NE"].includes(rule?.operator ?? "") ? (
             <Select
               options={field.options?.map((option) => ({
                 value: option,
@@ -378,7 +387,10 @@ export function NodeEditor({
               ? []
               : (values.assigneeIds ?? []),
           readable: values.readable ?? [],
-          writable: values.type === "APPROVAL" ? (values.writable ?? []) : [],
+          writable:
+            values.type === "APPROVAL" || values.type === "SUBPROCESS"
+              ? (values.writable ?? [])
+              : [],
           actions: values.type === "APPROVAL" ? (values.actions ?? []) : [],
           timeoutMinutes:
             values.type === "APPROVAL" ? (values.timeoutMinutes ?? null) : null,
@@ -456,6 +468,8 @@ export function NodeEditor({
                                   { value: "APPROVAL", label: "审批" },
                                   { value: "COPY", label: "抄送" },
                                   { value: "CONDITION", label: "条件分支" },
+                                  { value: "PARALLEL", label: "并行分支" },
+                                  { value: "SUBPROCESS", label: "子流程" },
                                   { value: "END", label: "结束" },
                                 ]}
                               />
@@ -554,7 +568,53 @@ export function NodeEditor({
                     },
                   ]
                 : []),
-              ...(type === "APPROVAL" || type === "COPY"
+              ...(type === "SUBPROCESS"
+                ? [
+                    {
+                      key: "subprocess",
+                      label: "版本与映射",
+                      forceRender: true,
+                      children: (
+                        <Form.Item
+                          name="subprocess"
+                          rules={[
+                            {
+                              validator: async (
+                                _,
+                                binding: WorkflowNode["subprocess"],
+                              ) => {
+                                if (!binding?.versionId)
+                                  throw new Error("请选择子流程发布版本");
+                                const version = await api<{
+                                  fields: WorkflowField[];
+                                }>(
+                                  `/operations/workflows/subprocess-versions/${binding.versionId}`,
+                                );
+                                const issues = subprocessMappingIssues(
+                                  binding,
+                                  fields,
+                                  version.fields,
+                                  form.getFieldValue("readable") ?? [],
+                                  form.getFieldValue("writable") ?? [],
+                                );
+                                if (issues.length) throw new Error(issues[0]);
+                              },
+                            },
+                          ]}
+                        >
+                          <WorkflowSubprocessEditor
+                            fields={fields}
+                            readable={readable}
+                            writable={writable}
+                          />
+                        </Form.Item>
+                      ),
+                    },
+                  ]
+                : []),
+              ...(type === "APPROVAL" ||
+              type === "COPY" ||
+              type === "SUBPROCESS"
                 ? [
                     {
                       key: "fields",

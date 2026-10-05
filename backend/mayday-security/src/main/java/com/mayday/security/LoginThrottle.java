@@ -1,55 +1,41 @@
 package com.mayday.security;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-/** 单实例登录限流：按来源地址固定窗口计数；多实例部署可将此组件替换为 Redis 原子计数器。 */
+/** MySQL 共享的登录失败限流；所有实例读取同一固定窗口，重启或切换节点不会重置失败记录。 */
 @Component
 public class LoginThrottle {
-  /** 固定窗口中的失败次数与到期秒数；到期后整体删除，后续失败开启新窗口。 */
-  private record Attempt(int count, long until) {}
+  private final SecurityState state;
 
-  private final ConcurrentHashMap<String, Attempt> attempts = new ConcurrentHashMap<>();
+  /** 生产只装配共享实现；账号大小写与既有登录规范一致，来源取实际连接地址而非伪造代理头。 */
+  @Autowired
+  public LoginThrottle(JdbcSecurityState state) {
+    this.state = state;
+  }
 
-  private void prune() {
-    long now = Instant.now().getEpochSecond();
-    attempts.entrySet().removeIf(entry -> entry.getValue().until() < now);
+  /** 单元测试可注入受控状态，不提供运行时内存回退开关。 */
+  LoginThrottle(SecurityState state) {
+    this.state = state;
   }
 
   private String account(String ip, String username) {
-    return "account:" + ip + ":" + username.toLowerCase(Locale.ROOT);
+    return ip + "\n" + username.toLowerCase(Locale.ROOT);
   }
 
-  /** 每次登录前同时检查来源和账号窗口；容量达到上限时拒绝继续分配，防止随机账号耗尽内存。 */
-  public synchronized boolean allowed(String ip, String username) {
-    prune();
-    Attempt sourceAttempt = attempts.get("ip:" + ip),
-        accountAttempt = attempts.get(account(ip, username));
-    return attempts.size() < 10000
-        && (sourceAttempt == null || sourceAttempt.count() < 100)
-        && (accountAttempt == null || accountAttempt.count() < 5);
+  /** 每次登录前检查来源与账号窗口；容量达到上限时拒绝新请求。 */
+  public boolean allowed(String ip, String username) {
+    return state.allowed(ip, account(ip, username));
   }
 
-  /** 只统计失败尝试，正常登录不会耗尽整个团队共享出口的配额。 */
-  public synchronized void failed(String ip, String username) {
-    prune();
-    for (String key : List.of("ip:" + ip, account(ip, username))) {
-      Attempt previousAttempt = attempts.get(key);
-      attempts.put(
-          key,
-          new Attempt(
-              previousAttempt == null ? 1 : previousAttempt.count() + 1,
-              previousAttempt == null
-                  ? Instant.now().getEpochSecond() + 900
-                  : previousAttempt.until()));
-    }
+  /** 失败窗口原子递增，成功登录不消耗失败预算；并发正在校验的请求仍可能先于失败提交通过检查。 */
+  public void failed(String ip, String username) {
+    state.failed(ip, account(ip, username));
   }
 
-  /** 成功登录仅清除该来源下的账号失败窗口，保留来源总失败计数，防止成功账号掩护批量猜测。 */
-  public synchronized void succeeded(String ip, String username) {
-    attempts.remove(account(ip, username));
+  /** 只清除当前账号来源组合，保留出口地址总失败计数，防止成功账号掩护批量猜测。 */
+  public void succeeded(String ip, String username) {
+    state.succeeded(account(ip, username));
   }
 }

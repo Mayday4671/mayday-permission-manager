@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class LoginThrottleTest {
   @Test
   void locksAfterFiveFailedAttemptsAndKeepsOtherAccountsUsable() {
-    LoginThrottle limiter = new LoginThrottle();
+    LoginThrottle limiter = new LoginThrottle(new TestSecurityState(java.time.Clock.systemUTC()));
     for (int i = 0; i < 5; i++) {
       assertTrue(limiter.allowed("127.0.0.1", "member"));
       limiter.failed("127.0.0.1", "member");
@@ -21,7 +21,7 @@ class LoginThrottleTest {
 
   @Test
   void repeatedSuccessfulLoginsDoNotConsumeFailureBudget() {
-    LoginThrottle limiter = new LoginThrottle();
+    LoginThrottle limiter = new LoginThrottle(new TestSecurityState(java.time.Clock.systemUTC()));
     for (int i = 0; i < 120; i++) {
       assertTrue(limiter.allowed("127.0.0.1", "admin"));
       limiter.succeeded("127.0.0.1", "admin");
@@ -30,7 +30,7 @@ class LoginThrottleTest {
 
   @Test
   void sourceLimitBlocksRotatingUsernames() {
-    LoginThrottle limiter = new LoginThrottle();
+    LoginThrottle limiter = new LoginThrottle(new TestSecurityState(java.time.Clock.systemUTC()));
     for (int i = 0; i < 100; i++) limiter.failed("127.0.0.1", "user" + i);
     assertFalse(limiter.allowed("127.0.0.1", "next"));
     assertTrue(limiter.allowed("127.0.0.2", "next"));

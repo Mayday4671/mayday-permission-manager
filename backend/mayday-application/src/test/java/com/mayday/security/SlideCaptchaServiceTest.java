@@ -47,7 +47,8 @@ class SlideCaptchaServiceTest {
               return 0;
             }
           },
-          clock);
+          clock,
+          new TestSecurityState(clock));
 
   /** 经正常挑战和校验入口生成一次性证明，不绕过服务端消费与账号/来源绑定。 */
   String proof() {

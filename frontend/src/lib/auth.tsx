@@ -8,9 +8,10 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, ApiError, tokenStore } from "./api";
+import { api, ApiError, jsonBody, tokenStore } from "./api";
 import { contractClient, unwrapContract } from "./contract-client";
 import type { AuthSession } from "../types";
+import type { LoginResult } from "./identity";
 
 interface AuthValue {
   session: AuthSession | null;
@@ -19,7 +20,8 @@ interface AuthValue {
     username: string,
     password: string,
     captchaToken: string,
-  ) => Promise<void>;
+  ) => Promise<LoginResult>;
+  completeLogin: (result: LoginResult) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   can: (permission: string) => boolean;
@@ -97,16 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", focus);
     };
   }, [client, refresh]);
-  const login = async (
-    username: string,
-    password: string,
-    captchaToken: string,
-  ) => {
-    const result = unwrapContract(
-      await contractClient.POST("/api/auth/login", {
-        body: { username, password, captchaToken },
-      }),
-    );
+  /** 只接纳完整证明后签发的本地会话；首因素/MFA挑战没有业务访问权限。 */
+  const completeLogin = async (result: LoginResult) => {
+    if (result.mfaRequired || !result.token)
+      throw new Error("身份验证尚未完成，请继续验证");
     client.clear();
     identityRevision.current++;
     tokenStore.set(result.token);
@@ -121,6 +117,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       throw error;
     }
+  };
+  const login = async (
+    username: string,
+    password: string,
+    captchaToken: string,
+  ): Promise<LoginResult> => {
+    const result = await api<LoginResult>("/auth/login", {
+      method: "POST",
+      body: jsonBody({ username, password, captchaToken }),
+    });
+    if (!result.mfaRequired) await completeLogin(result);
+    return result;
   };
   const logout = async () => {
     const requestedToken = tokenStore.get();
@@ -143,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         login,
+        completeLogin,
         logout,
         refresh,
         can: (permission) => session?.permissions.includes(permission) ?? false,

@@ -168,6 +168,7 @@ public class WorkflowDefinitions {
             ? legacy(definition.getApproverIds())
             : json.spec(definition.getDraftSchema());
     validateReferences(schema);
+    validateSubprocesses(schema, new LinkedHashSet<>(Set.of(id)), 0);
     var published = new FlowVersion();
     published.setDefinitionId(id);
     published.setVersionNumber(
@@ -199,6 +200,89 @@ public class WorkflowDefinitions {
           for (Long id : node.assigneeIds()) validUser(id, "APPROVAL".equals(node.type()));
         if ("ROLES".equals(node.source())) for (Long id : node.assigneeIds()) validRole(id);
       }
+    validateSubprocesses(schema, new LinkedHashSet<>(), 0);
+  }
+
+  /** 固定子版本必须存在且是通用审批；发布时完整验证字段映射和有界调用树，不执行任意业务回调。 */
+  private void validateSubprocesses(Spec parent, Set<Long> ancestors, int depth) {
+    if (depth > 4) throw new BusinessException("子流程最多嵌套 4 层");
+    for (Node node : parent.nodes()) {
+      if (!"SUBPROCESS".equals(node.type())) continue;
+      var version = subprocessVersion(node.subprocess().versionId());
+      if (ancestors.contains(version.getDefinitionId()))
+        throw new BusinessException("子流程不能递归调用同一流程定义");
+      Spec child = json.spec(version.getSchemaJson());
+      WorkflowSchema.validate(child);
+      Map<String, WorkflowSchema.Field> parentFields = new LinkedHashMap<>(),
+          childFields = new LinkedHashMap<>();
+      parent.fields().forEach(field -> parentFields.put(field.id(), field));
+      child.fields().forEach(field -> childFields.put(field.id(), field));
+      for (var input : node.subprocess().inputs().entrySet()) {
+        var source = parentFields.get(input.getValue());
+        var target = childFields.get(input.getKey());
+        if (source == null
+            || target == null
+            || "CALCULATED".equals(target.type())
+            || !compatible(source, target))
+          throw new BusinessException("子流程输入映射字段不存在、类型不一致或指向计算字段");
+      }
+      for (var output : node.subprocess().outputs().entrySet()) {
+        var source = childFields.get(output.getValue());
+        var target = parentFields.get(output.getKey());
+        if (source == null
+            || target == null
+            || "CALCULATED".equals(target.type())
+            || !compatible(source, target))
+          throw new BusinessException("子流程输出映射字段不存在、类型不一致或写入计算字段");
+      }
+      if (child.fields().stream()
+          .anyMatch(
+              field ->
+                  Boolean.TRUE.equals(field.required())
+                      && !"CALCULATED".equals(field.type())
+                      && !node.subprocess().inputs().containsKey(field.id())))
+        throw new BusinessException("子流程必填字段必须配置输入映射");
+      Set<Long> next = new LinkedHashSet<>(ancestors);
+      next.add(version.getDefinitionId());
+      validateSubprocesses(child, next, depth + 1);
+    }
+  }
+
+  private boolean compatible(WorkflowSchema.Field source, WorkflowSchema.Field target) {
+    return source.type().equals(target.type())
+        || (Set.of("NUMBER", "MONEY", "CALCULATED").contains(source.type())
+            && Set.of("NUMBER", "MONEY").contains(target.type()));
+  }
+
+  /** 运行始终读取绑定的版本 ID；停用定义使启动失败并等待恢复，绝不切换成最新版本。 */
+  @Transactional(
+      readOnly = true,
+      noRollbackFor = {BusinessException.class, AccessDeniedException.class})
+  public FlowVersion subprocessVersion(Long versionId) {
+    var version =
+        versions.findById(versionId).orElseThrow(() -> new BusinessException("子流程发布版本不存在"));
+    var definition = find(version.getDefinitionId(), false);
+    if (!definition.isEnabled() || !"GENERAL".equals(definition.getBusinessType()))
+      throw new BusinessException("子流程必须启用且为通用审批流程");
+    return version;
+  }
+
+  /** 父申请内部启动子流程时按原申请人解析；当前办理人不冒充子申请发起人。 */
+  @Transactional(
+      readOnly = true,
+      noRollbackFor = {BusinessException.class, AccessDeniedException.class})
+  public Map<String, List<Long>> resolveSubprocess(Spec spec, SysUser applicant) {
+    return resolveSubprocess(spec, applicant, Map.of());
+  }
+
+  /** 实例修复覆盖由服务端从父申请读取；固定版本、节点权限和人员规则仍全部重新核验。 */
+  @Transactional(
+      readOnly = true,
+      noRollbackFor = {BusinessException.class, AccessDeniedException.class})
+  public Map<String, List<Long>> resolveSubprocess(
+      Spec spec, SysUser applicant, Map<String, List<Long>> overrides) {
+    WorkflowSchema.validateRuntimeSnapshot(spec);
+    return resolvePeople(spec, applicant, overrides);
   }
 
   private SysUser validUser(Long id, boolean approver) {
@@ -277,8 +361,9 @@ public class WorkflowDefinitions {
       if (Set.of("APPROVAL", "COPY").contains(node.type())) {
         boolean approval = "APPROVAL".equals(node.type());
         List<SysUser> candidates;
-        if (approval && overrides.containsKey(node.id()))
-          candidates = overrides.get(node.id()).stream().map(id -> validUser(id, true)).toList();
+        if (overrides.containsKey(node.id()))
+          candidates =
+              overrides.get(node.id()).stream().map(id -> validUser(id, approval)).toList();
         else if ("USERS".equals(node.source()))
           candidates = node.assigneeIds().stream().map(id -> validUser(id, approval)).toList();
         else if ("DEPARTMENT_LEADER".equals(node.source())) {
@@ -324,7 +409,8 @@ public class WorkflowDefinitions {
       for (var first : approvals)
         for (var second : approvals) {
           if (!first.id().equals(second.id())
-              && reachable(schema, first, second.id(), new HashSet<>())
+              && (reachable(schema, first, second.id(), new HashSet<>())
+                  || WorkflowOrchestration.coexecuted(schema, first.id(), second.id()))
               && result.get(first.id()).stream().anyMatch(result.get(second.id())::contains))
             throw new BusinessException("同一路径的多个审批节点包含同一审批人，流程不允许重复审批人");
         }
@@ -335,9 +421,7 @@ public class WorkflowDefinitions {
   /** 互斥分支可由同一人员负责，只有实际可能串行经过的节点才触发重复人员限制。 */
   private boolean reachable(Spec spec, Node node, String target, Set<String> visited) {
     if (!visited.add(node.id()) || "END".equals(node.type())) return false;
-    List<String> exits = new ArrayList<>();
-    exits.add(node.next());
-    node.conditions().forEach(condition -> exits.add(condition.next()));
+    List<String> exits = WorkflowOrchestration.exits(node);
     return exits.stream()
         .anyMatch(id -> target.equals(id) || reachable(spec, spec.node(id), target, visited));
   }
@@ -345,6 +429,7 @@ public class WorkflowDefinitions {
   /** 人员替换只对可共同经过的审批节点限制重复；互斥分支的相同人员不会误判。 */
   public boolean shareApprovalPath(Spec spec, String first, String second) {
     return first.equals(second)
+        || WorkflowOrchestration.coexecuted(spec, first, second)
         || reachable(spec, spec.node(first), second, new HashSet<>())
         || reachable(spec, spec.node(second), first, new HashSet<>());
   }

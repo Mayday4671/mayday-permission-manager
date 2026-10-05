@@ -2,8 +2,11 @@ package com.mayday.config;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.mayday.system.model.SysUser;
@@ -11,6 +14,9 @@ import com.mayday.system.repository.UserRepository;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -83,8 +89,38 @@ class ProductionSafetyTest {
     admin.setPasswordHash("existing-hash");
     when(users.findByUsername("admin")).thenReturn(Optional.of(admin));
     when(encoder.matches("Mayday@2026", "existing-hash")).thenReturn(true);
-    assertThrows(
-        IllegalStateException.class,
-        () -> new ProductionSafety(environment(), users, encoder).run(null));
+    var error =
+        assertThrows(
+            IllegalStateException.class,
+            () -> new ProductionSafety(environment(), users, encoder).afterPropertiesSet());
+    assertFalse(error.getMessage().contains("Mayday@2026"));
+    assertFalse(error.getMessage().contains("existing-hash"));
+  }
+
+  @Test
+  void emptyDatabaseAndRotatedExistingAdministratorCanInitialize() {
+    when(users.findByUsername("admin")).thenReturn(Optional.empty());
+    assertDoesNotThrow(
+        () -> new ProductionSafety(environment(), users, encoder).afterPropertiesSet());
+    var admin = new SysUser();
+    admin.setPasswordHash("rotated-hash");
+    when(users.findByUsername("admin")).thenReturn(Optional.of(admin));
+    when(encoder.matches("Mayday@2026", "rotated-hash")).thenReturn(false);
+    assertDoesNotThrow(
+        () -> new ProductionSafety(environment(), users, encoder).afterPropertiesSet());
+  }
+
+  @Test
+  void developmentDoesNotReadOrRewriteAdministratorCredentials() {
+    assertDoesNotThrow(
+        () -> new ProductionSafety(new MockEnvironment(), users, encoder).afterPropertiesSet());
+    verifyNoInteractions(users, encoder);
+  }
+
+  @Test
+  void databaseGuardRunsBeforeWebLifecycleInsteadOfAfterStartup() {
+    assertNotNull(ProductionSafety.class.getAnnotation(DependsOnDatabaseInitialization.class));
+    assertTrue(InitializingBean.class.isAssignableFrom(ProductionSafety.class));
+    assertFalse(ApplicationRunner.class.isAssignableFrom(ProductionSafety.class));
   }
 }

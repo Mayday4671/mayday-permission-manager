@@ -49,6 +49,17 @@ public class WorkflowDelegations {
     access.require("requests:view");
   }
 
+  /**
+   * 已激活任务的委托来源以不可改写的安排 ownerId 为准，不能把先前管理员交接保存的 originalAssigneeId 当成委托人。撤销或到期不改变历史来源，本方法不授予接口访问权。
+   */
+  boolean ownedBy(Long delegationId, Long userId) {
+    return delegationId != null
+        && delegations
+            .findById(delegationId)
+            .map(item -> item.getOwnerId().equals(userId))
+            .orElse(false);
+  }
+
   /** 委托范围目录只返回已发布启用流程名称，不泄露模型、表单、人员或业务内容。 */
   public List<Map<String, Object>> scopeOptions() {
     requireOwner();

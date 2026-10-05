@@ -47,12 +47,46 @@ import {
 import "../../workflow.css";
 interface Simulation {
   valid: boolean;
-  path: {
-    id: string;
-    name: string;
-    type: string;
-    approvers: { id: number; name: string }[];
-  }[];
+  path: SimulationStep[];
+}
+interface SimulationResult {
+  /** 结果仅属于发起时的输入、发起人、模型与弹窗会话，不能复用到新的上下文。 */
+  generation: number;
+  data: Simulation;
+}
+interface SimulationStep {
+  id: string;
+  name: string;
+  type: string;
+  approvers: { id: number; name: string }[];
+  branch?: string | null;
+  childVersionId?: number;
+  childPath?: SimulationStep[];
+}
+/** 嵌套模拟按真实并行支路与固定子版本展示，不将子流程当作一行空壳节点。 */
+function SimulationPath({ steps }: { steps: SimulationStep[] }) {
+  return (
+    <ol>
+      {steps.map((node, index) => (
+        <li key={`${node.id}:${index}`}>
+          <b>{node.name}</b>
+          {node.branch && <Tag>{node.branch}</Tag>}
+          {!!node.approvers.length && (
+            <span>
+              {" "}
+              · {node.approvers.map((person) => person.name).join("、")}
+            </span>
+          )}
+          {node.childPath && (
+            <>
+              <span> · 固定版本 #{node.childVersionId}</span>
+              <SimulationPath steps={node.childPath} />
+            </>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
 }
 /**
  * 设计器独立页签：线路上选择节点类型即插入，节点弹窗只配置业务属性。
@@ -90,11 +124,36 @@ export function WorkflowDesignerPage() {
   const [node, setNode] = useState<WorkflowNode | null>(null),
     [existing, setExisting] = useState(false);
   const [simulating, setSimulating] = useState(false),
-    [result, setResult] = useState<Simulation | null>(null),
+    [result, setResult] = useState<SimulationResult | null>(null),
     [simulateForm] = Form.useForm<{
       applicantId?: number;
       values: Record<string, unknown>;
     }>();
+  // 观察完整表单，覆盖人员切换、明细/附件和计算控件的程序赋值，不能只依赖文本输入事件。
+  const simulationInputs = Form.useWatch((values) => values, {
+    form: simulateForm,
+    preserve: true,
+  });
+  const simulationFingerprint = JSON.stringify({
+    id,
+    schema: spec,
+    inputs: simulationInputs ?? {},
+    open: simulating,
+  });
+  const simulationContext = useRef({
+    fingerprint: "",
+    generation: 0,
+    request: 0,
+  });
+  // 同步更新异步回调读取的最新上下文；A→B→A 也产生新代际，旧 A 响应不能复活。
+  // 渲染时同时按代际过滤结果，避免 useEffect 清理前的一帧继续显示旧“校验通过”。
+  if (simulationContext.current.fingerprint !== simulationFingerprint)
+    simulationContext.current = {
+      ...simulationContext.current,
+      fingerprint: simulationFingerprint,
+      generation: simulationContext.current.generation + 1,
+    };
+  useEffect(() => setResult(null), [simulationFingerprint]);
   const editable = can("workflows:update") && !saving;
   const savingRef = useRef(false);
   const lastHistoryKey = useRef<string | undefined>(undefined);
@@ -480,11 +539,16 @@ export function WorkflowDesignerPage() {
                   id: item.id,
                   name: item.name,
                   type: item.type,
-                  next: item.type === "END" ? undefined : item.next,
+                  next:
+                    item.type === "END" || item.type === "PARALLEL"
+                      ? undefined
+                      : item.next,
                   branches:
-                    item.type === "CONDITION"
-                      ? item.conditions?.map((rule) => rule.next)
-                      : undefined,
+                    item.type === "PARALLEL"
+                      ? item.branches
+                      : item.type === "CONDITION"
+                        ? item.conditions?.map((rule) => rule.next)
+                        : undefined,
                 }))}
               />
             </Modal>
@@ -535,9 +599,14 @@ export function WorkflowDesignerPage() {
               onCancel={() => setSimulating(false)}
               width={850}
               okText="校验并模拟"
-              onSubmit={async (values) =>
-                setResult(
-                  await api<Simulation>("/operations/workflows/simulate", {
+              onSubmit={async (values) => {
+                const generation = simulationContext.current.generation;
+                const request = ++simulationContext.current.request;
+                // 当前请求失败也必须保持无结果，不能把上一次的成功路径当成本次校验结论。
+                setResult(null);
+                const data = await api<Simulation>(
+                  "/operations/workflows/simulate",
+                  {
                     method: "POST",
                     body: jsonBody({
                       schema: spec,
@@ -547,9 +616,14 @@ export function WorkflowDesignerPage() {
                         values.values ?? {},
                       ),
                     }),
-                  }),
+                  },
+                );
+                if (
+                  simulationContext.current.generation === generation &&
+                  simulationContext.current.request === request
                 )
-              }
+                  setResult({ generation, data });
+              }}
             >
               {simulating && (
                 <>
@@ -563,22 +637,22 @@ export function WorkflowDesignerPage() {
                     </Form.Item>
                   )}
                   <WorkflowFields fields={spec.fields} />
-                  {result && (
+                  <Alert
+                    type="info"
+                    title="模拟按当前填写值展开条件、全部并行支路及固定子流程。正式审批中修改的字段可能改变后续路线，模拟不会预先替审批人作决定。"
+                  />
+                  {result?.generation ===
+                    simulationContext.current.generation && (
                     <div className="simulation-result">
-                      <Alert type="success" title="模型校验通过" />
-                      <ol>
-                        {result.path.map((n) => (
-                          <li key={n.id}>
-                            <b>{n.name}</b>
-                            {n.approvers.length > 0 && (
-                              <span>
-                                {" "}
-                                · {n.approvers.map((a) => a.name).join("、")}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ol>
+                      <Alert
+                        type={result.data.valid ? "success" : "error"}
+                        title={
+                          result.data.valid ? "模型校验通过" : "模型校验未通过"
+                        }
+                      />
+                      {result.data.valid && (
+                        <SimulationPath steps={result.data.path} />
+                      )}
                     </div>
                   )}
                 </>

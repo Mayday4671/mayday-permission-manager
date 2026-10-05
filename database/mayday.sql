@@ -1,6 +1,6 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V24）
--- 唯一对外交付 SQL：52 张业务表、524 个业务字段、索引/外键及必要基础资料。
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V31）
+-- 唯一对外交付 SQL：64 张业务表、597 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
 -- 【使用方法】
@@ -12,7 +12,7 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V24 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V25+。
+-- 4. 本文件已包含 V31 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V32+。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
@@ -297,9 +297,17 @@ CREATE TABLE `ops_flow_request` (
   `active_path` text COMMENT '当前轮实际审批路径JSON，nodes为稳定节点ID数组；退回时裁剪，重提时清空',
   `submitted_at` datetime(6) DEFAULT NULL COMMENT '最近一次正式提交时间；未提交草稿为空，不使用草稿创建时间冒充',
   `assignment_overrides` longtext COMMENT '管理员人员交接形成的实例级节点人员覆盖JSON；退回重提保留，发布模型不改变，未交接时NULL',
+  `execution_state` longtext COMMENT '服务器持久执行游标JSON；保存并行支路、汇合等待、固定子申请和可恢复失败状态；旧单线实例为空',
+  `parent_request_id` bigint DEFAULT NULL COMMENT '父审批申请编号；仅服务器创建子流程时写入，普通提交不接受该字段',
+  `parent_token_id` varchar(40) DEFAULT NULL COMMENT '父申请调用子流程的稳定游标UUID；同一游标只能建立一次子申请',
+  `root_request_id` bigint DEFAULT NULL COMMENT '父子申请树的根申请编号；运行写操作先锁根后锁子，避免反向锁顺序',
+  `private_draft` longtext COMMENT '退回申请人或撤回后尚未重提的私人稿JSON(title、values)；仅原申请人可读；上一提交轮仍保留在title/form_data；正式提交成功后清空',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_flow_child_token` (`parent_request_id`,`parent_token_id`),
   KEY `idx_request_applicant` (`applicant_id`),
-  KEY `idx_request_approver` (`current_approver_id`,`status`)
+  KEY `idx_request_approver` (`current_approver_id`,`status`),
+  KEY `idx_flow_request_root` (`root_request_id`),
+  CONSTRAINT `fk_flow_child_parent` FOREIGN KEY (`parent_request_id`) REFERENCES `ops_flow_request` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='审批实例；冻结模型、原始表单和解析人员，当前任务与历史决定另表记录';
 
 -- V3 顺序流程审批人列表兼容表；新版流程从版本化 JSON 模型解析，保留旧流程导入依据
@@ -335,11 +343,14 @@ CREATE TABLE `ops_flow_task` (
   `original_assignee_name` varchar(64) DEFAULT NULL COMMENT '原指定审批人名称快照；没有替换任务归属时为空',
   `delegation_id` bigint DEFAULT NULL COMMENT '临时委托记录ID；任务激活时绑定，之后到期或撤销不自动收回此任务',
   `assignment_note` varchar(500) DEFAULT NULL COMMENT '任务归属说明：委托来源、交接理由或委托不适用原因；不包含隐藏表单字段',
+  `execution_token_id` varchar(40) DEFAULT NULL COMMENT '所属执行游标UUID；并行支路以游标和办理批次核验待办，旧单线任务为空',
+  `activated_at` datetime(6) DEFAULT NULL COMMENT '此任务实际取得节点办理或抄送资格的时间；未轮到的顺签和未激活取消记录为空；当前值按当前轮、历史按对应轮的激活证据裁剪字段及附件',
   PRIMARY KEY (`id`),
   KEY `idx_task_pending` (`assignee_id`,`status`,`request_id`),
   KEY `idx_flow_task_timeout` (`status`,`due_at`,`timeout_notified_at`),
   KEY `idx_flow_task_round_visit` (`request_id`,`run_number`,`node_visit`),
   KEY `idx_flow_task_copy_reader` (`assignee_id`,`kind`,`read_at`),
+  KEY `idx_flow_task_token` (`request_id`,`execution_token_id`,`node_visit`),
   CONSTRAINT `ops_flow_task_ibfk_1` FOREIGN KEY (`request_id`) REFERENCES `ops_flow_request` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='实例节点对单个审批人的任务；处理时锁定实例并检查任务归属、动作权限和乐观版本';
 
@@ -386,9 +397,12 @@ CREATE TABLE `ops_job_execution` (
   `result` varchar(1000) DEFAULT NULL COMMENT '脱敏的运行结果说明；不得包含密码、令牌或未经授权的业务聚合数据',
   `duration_ms` bigint NOT NULL COMMENT '处理器耗时，单位毫秒',
   `failure_notified_at` datetime(6) DEFAULT NULL COMMENT '失败提醒已投递或无有效接收人跳过的时间；NULL为待重试，成功记录不参与提醒队列',
+  `task_key` varchar(128) DEFAULT NULL COMMENT '持久执行的稳定业务幂等键；故障恢复更新同一日志，旧日志保持为空',
+  `attempts` int NOT NULL DEFAULT '0' COMMENT '本轮领取尝试次数，包括进程故障后的重领',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_job_execution_task` (`task_key`),
   KEY `idx_execution_job` (`job_id`),
-  KEY idx_job_execution_failure (status,failure_notified_at,created_at)
+  KEY `idx_job_execution_failure` (`status`,`failure_notified_at`,`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='受控调度执行记录；只记录必要的运行结果，不返回用户数等超出调度授权的业务信息';
 
 -- V3 旧站内信兼容表；V8 已迁移为通知和投递，当前消息接口不以本表为权威来源
@@ -633,7 +647,7 @@ CREATE TABLE `sys_user_role` (
 
 
 -- Flyway 版本管理表：记录本文件对应的 V15 基线，后续仍按正常增量迁移升级。
--- BASELINE 声明当前结构已处于版本 20；不伪造历史迁移的执行校验和。
+-- BASELINE 声明当前结构已处于版本 31；不伪造历史迁移的执行校验和。
 -- 参考：https://documentation.red-gate.com/flyway/flyway-concepts/baselines
 CREATE TABLE flyway_schema_history (
   installed_rank INT NOT NULL COMMENT '安装记录顺序；由 Flyway 后续维护',
@@ -1067,12 +1081,148 @@ CREATE TABLE `ops_flow_delegation` (
   CONSTRAINT `fk_delegation_target` FOREIGN KEY (`target_id`) REFERENCES `sys_user` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='不可改写的限时审批委托安排；撤销保留历史，拒绝同一时段双重安排和委托链';
 
+CREATE TABLE `sys_bulk_result` (
+  `job_id` bigint NOT NULL COMMENT '批量导出作业编号，一份作业只有一份已提交成功正文',
+  `content` longblob NOT NULL COMMENT '完成的 UTF-8 CSV 正文；受作业本人归属、实时权限指纹和到期校验保护',
+  `created_at` bigint NOT NULL COMMENT '成功结果提交的数据库毫秒时间戳，与成功状态同事务写入',
+  PRIMARY KEY (`job_id`),
+  CONSTRAINT `fk_bulk_result_job` FOREIGN KEY (`job_id`) REFERENCES `sys_bulk_job` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='跨实例共享导出成功正文；局部临时文件不是成功结果的唯一副本';
+
+CREATE TABLE `sys_durable_task` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '内部持久队列主键；不是用户访问授权凭据',
+  `task_type` varchar(64) NOT NULL COMMENT '注册处理器的稳定类型编码，不接受脚本、类名或任意执行地址',
+  `business_key` varchar(128) NOT NULL COMMENT '同类型下唯一业务幂等键；重启与自动重试保留原键',
+  `payload` text NOT NULL COMMENT '注册业务最小执行参数；导出只存作业编号，不存密码或文件正文',
+  `status` varchar(16) NOT NULL COMMENT 'QUEUED/RUNNING/SUCCEEDED/FAILED/CANCELLED；仅服务端状态机修改',
+  `attempts` int NOT NULL DEFAULT '0' COMMENT '本轮实际领取次数；崩溃后重领也计入重试上限',
+  `max_attempts` int NOT NULL COMMENT '允许的最大尝试次数，1 到 10 次；超过后明确失败',
+  `next_attempt_at` bigint NOT NULL COMMENT '下一次允许领取的数据库毫秒时间戳，失败采用有界退避',
+  `lease_owner` char(36) DEFAULT NULL COMMENT '当前进程启动时随机生成的实例编号，仅用于诊断',
+  `lease_token` char(36) DEFAULT NULL COMMENT '每次领取的随机隔离令牌；到期、取消或重领后旧工作器不可写入',
+  `lease_until` bigint DEFAULT NULL COMMENT '租约结束的数据库毫秒时间戳；只有仍有效的原租约可续期',
+  `heartbeat_at` bigint DEFAULT NULL COMMENT '最近成功续期的数据库毫秒时间戳',
+  `last_error` varchar(300) DEFAULT NULL COMMENT '脱敏后的失败说明；不保存网络凭证、SQL 或客户正文',
+  `created_at` bigint NOT NULL COMMENT '首次入队的数据库毫秒时间戳，重试不改变',
+  `updated_at` bigint NOT NULL COMMENT '最近状态或心跳变化的数据库毫秒时间戳',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_durable_task_business` (`task_type`,`business_key`),
+  KEY `idx_durable_task_ready` (`task_type`,`status`,`next_attempt_at`,`lease_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='支持跨实例持久领取、租约心跳、故障恢复与幂等业务提交的队列';
+
+CREATE TABLE `sys_external_identity` (
+  `id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '随机绑定标识；不暴露提供方原始 subject',
+  `user_id` bigint NOT NULL COMMENT '显式绑定的本地用户；权限始终来自本地有效角色',
+  `provider_id` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '部署注册的 OIDC 提供方标识，不能提交任意请求地址',
+  `issuer_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'OIDC 精确 issuer 的 SHA-256 摘要；阻止跨发行方主体碰撞',
+  `subject_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '验签后 subject 的 SHA-256 摘要；不使用可变邮箱标识身份',
+  `created_at` datetime(6) NOT NULL COMMENT '本人近期再认证并完成 OIDC 证明后建立绑定的 UTC 时间',
+  `last_login_at` datetime(6) DEFAULT NULL COMMENT '该绑定最后成功登录的 UTC 时间，失败不更新',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_external_subject` (`provider_id`,`issuer_hash`,`subject_hash`),
+  UNIQUE KEY `uk_external_user_provider` (`user_id`,`provider_id`),
+  CONSTRAINT `fk_external_identity_user` FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='已证明双方身份的企业单点登录绑定；不存访问令牌';
+
+CREATE TABLE `sys_identity_challenge` (
+  `token_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '256 位随机挑战凭证 SHA-256 摘要，原值不入数据库',
+  `purpose` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '封闭用途：MFA_LOGIN、MFA_ENROLL、OIDC_LOGIN、OIDC_BIND',
+  `user_id` bigint DEFAULT NULL COMMENT '本地账号；匿名企业登录在验签并查询显式绑定后才能确定',
+  `source_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '发起请求来源地址摘要，MFA 挑战不可跨来源使用',
+  `browser_hash` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'OIDC HttpOnly 浏览器关联 cookie 摘要，拒绝登录 CSRF',
+  `session_hash` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '绑定操作的原 Bearer 会话摘要；回调要求同一仍有效会话',
+  `credential_hash` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '创建时本地密码摘要的再次散列；改密后挑战失效',
+  `credential_revision` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '创建时 MFA 代际；关闭/重新开通后挑战失效',
+  `payload_cipher` text COLLATE utf8mb4_unicode_ci COMMENT 'AES-GCM 加密 nonce、PKCE 或待确认密钥，不存企业访问令牌',
+  `expires_at` datetime(6) NOT NULL COMMENT '短期 UTC 到期时间；到期边界拒绝，不允许延长',
+  `consumed_at` datetime(6) DEFAULT NULL COMMENT '一次性消费时间；OIDC 交换开始即消费，失败不得重放 code',
+  `failed_attempts` int NOT NULL DEFAULT '0' COMMENT '挑战内失败次数，最多 5 次；事务独立提交保证错误不回滚计数',
+  `created_at` datetime(6) NOT NULL COMMENT '挑战创建 UTC 时间，用于清理和排查，不存来源明文',
+  PRIMARY KEY (`token_hash`),
+  KEY `ix_identity_challenge_expiry` (`expires_at`),
+  KEY `ix_identity_challenge_user` (`user_id`,`purpose`),
+  CONSTRAINT `fk_identity_challenge_user` FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='跨进程共享的身份证明挑战；默认业务会话不使用 cookie';
+
+CREATE TABLE `sys_mfa_credential` (
+  `user_id` bigint NOT NULL COMMENT '每个本地账号最多一份已确认的 TOTP 密钥',
+  `secret_cipher` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '独立部署密钥 AES-256-GCM 加密的 Base32 密钥，带用途认证标签',
+  `revision` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '随机凭据代际；变更后旧登录挑战与恢复码失效',
+  `last_step` bigint NOT NULL COMMENT '最后接受的 30 秒 TOTP 计数；行锁保证跨节点也拒绝重放',
+  `created_at` datetime(6) NOT NULL COMMENT '真实验证码确认开通的 UTC 时间，不把扫码视为开通',
+  PRIMARY KEY (`user_id`),
+  CONSTRAINT `fk_mfa_credential_user` FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='多因素认证已开通密钥；恢复/轮换必须证明本地身份';
+
+CREATE TABLE `sys_mfa_recovery` (
+  `code_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '128 位随机恢复码 SHA-256 摘要，明文仅创建时返回一次',
+  `user_id` bigint NOT NULL COMMENT '恢复码所属本地账号；不能代替密码或企业身份认证',
+  `credential_revision` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '关联当前 MFA 密钥代际，旧代际不得再登录',
+  `used_at` datetime(6) DEFAULT NULL COMMENT '原子消费时间；并发提交只能一个成功，空值表示未使用',
+  PRIMARY KEY (`code_hash`),
+  KEY `ix_mfa_recovery_user` (`user_id`,`used_at`),
+  CONSTRAINT `fk_mfa_recovery_user` FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='一次性 MFA 恢复码；无需存可逆明文';
+
+CREATE TABLE `sys_realtime_connection` (
+  `id` char(36) NOT NULL COMMENT '服务端随机连接编号；不包含令牌、客户端地址或个人资料',
+  `user_id` bigint NOT NULL COMMENT '已认证账号编号，用于全实例每账号四条连接配额',
+  `expires_at` datetime(3) NOT NULL COMMENT '连接保活到期的数据库时间；故障实例不续期，三十秒自然释放',
+  PRIMARY KEY (`id`),
+  KEY `idx_realtime_connection_user` (`user_id`),
+  KEY `idx_realtime_connection_expiry` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='跨实例 SSE 连接配额与故障自动释放记录；原始会话令牌仅留在本机连接内存';
+
+CREATE TABLE `sys_realtime_event` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '递增刷新事件编号；每个应用实例独立维护消费游标',
+  `recipient_id` bigint NOT NULL COMMENT '业务提交结果确定的接收账号编号；发送前仍重新检查当前会话权限',
+  `topics` varchar(64) NOT NULL COMMENT '逗号分隔的白名单资源名 messages/requests，不存业务正文和联系方式',
+  `created_at` datetime(3) NOT NULL COMMENT '业务事务写入提示的数据库时间；回滚业务不会留下提示',
+  PRIMARY KEY (`id`),
+  KEY `idx_realtime_event_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='跨实例已提交刷新提示日志；一天前提示可清理，业务消息独立保留';
+
+CREATE TABLE `sys_realtime_guard` (
+  `id` int NOT NULL COMMENT '固定值 1；刷新日志分配编号与业务提交的顺序守卫',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='刷新提交顺序守卫，防止消费者跳过迟提交的低编号事件';
+
+CREATE TABLE `sys_security_guard` (
+  `id` int NOT NULL COMMENT '固定守卫行编号；1 表示验证码及登录固定窗口的短事务配额锁',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='跨实例验证码容量与失败窗口原子操作守卫';
+
+CREATE TABLE `sys_security_rate` (
+  `rate_key` char(64) NOT NULL COMMENT '限流目的与来源或账号组合的 SHA-256 摘要，避免明文来源标识入库',
+  `attempts` int NOT NULL COMMENT '固定窗口累计次数；数据库原子递增，应用重启不清零',
+  `expires_at` bigint NOT NULL COMMENT '固定窗口结束的数据库毫秒时间戳；后续失败不滑动延长窗口',
+  PRIMARY KEY (`rate_key`),
+  KEY `idx_security_rate_expiry` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='验证码生成及密码失败限流的共享固定窗口';
+
+CREATE TABLE `sys_security_state` (
+  `token_key` char(64) NOT NULL COMMENT '256 位随机令牌的 SHA-256 摘要；数据库和日志不保存原始令牌',
+  `kind` varchar(16) NOT NULL COMMENT '一次性状态类型：CHALLENGE 拼图答案、PROOF 验证通过凭证',
+  `subject_key` char(64) NOT NULL COMMENT '账号与来源绑定组合的摘要；同组合换题原子废弃旧题',
+  `payload` text NOT NULL COMMENT '仅服务端读取的绑定上下文及随机答案；不通过公开接口返回',
+  `expires_at` bigint NOT NULL COMMENT '数据库时间计算的过期毫秒时间戳；所有实例统一校验',
+  PRIMARY KEY (`token_key`),
+  KEY `idx_security_state_subject` (`kind`,`subject_key`),
+  KEY `idx_security_state_expiry` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='跨实例一次性验证码与通过凭证；删除先独立提交，失败不可重放';
+
+-- 原子共享状态守卫行；应用依赖固定主键，不保存账号或令牌。
+INSERT INTO sys_realtime_guard(id) VALUES (1);
+
+-- 原子共享状态守卫行；应用依赖固定主键，不保存账号或令牌。
+INSERT INTO sys_security_guard(id) VALUES (1);
+
 -- 全部建表及基础资料成功后才登记基线；如前面报错，必须停止，不能跳过失败语句。
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '24', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '31', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
--- 安装完成自检：应得到 52 张业务表、524 个业务字段，缺少注释数均为 0。
+-- 安装完成自检：应得到 64 张业务表、597 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。
 SELECT COUNT(*) AS business_tables, SUM(table_comment = '') AS missing_table_comments
 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history';

@@ -88,6 +88,9 @@ public class LegacyWorkflowImport implements CommandLineRunner {
                     case "REJECTED" -> "REJECTED";
                     default -> "CANCELLED";
                   });
+          // 旧申请仅有 currentStep 的可靠实际到达证据；未来取消节点不得因迁移获得字段读取权。
+          if ("APPROVED".equals(request.getStatus()) || index <= request.getCurrentStep())
+            task.setActivatedAt(request.getUpdatedAt());
           tasks.save(task);
           if (!request.getApproverIds().contains(userId)) request.getApproverIds().add(userId);
         }

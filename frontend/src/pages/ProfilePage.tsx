@@ -6,6 +6,9 @@ import { PersonAvatar, SectionTitle } from "../components/shared";
 import { api, jsonBody, tokenStore } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useUnsavedChanges } from "../lib/useUnsavedChanges";
+import { IdentitySecurityPanel } from "../components/IdentitySecurityPanel";
+import { useQuery } from "@tanstack/react-query";
+import type { MfaStatus } from "../lib/identity";
 
 /** 自助资料只允许修改下列字段，角色和部门完全不进入提交对象。 */
 interface ProfileDraft {
@@ -19,11 +22,16 @@ interface PasswordDraft {
   oldPassword: string;
   newPassword: string;
   confirmPassword: string;
+  factor?: string;
 }
 
 /** 自助资料接口独立于用户管理，只提交昵称与联系方式，不能自行修改角色和组织归属。 */
 export function ProfilePage() {
   const { session, refresh } = useAuth();
+  const mfa = useQuery({
+    queryKey: ["identity-mfa"],
+    queryFn: () => api<MfaStatus>("/auth/identity/mfa"),
+  });
   const { message } = App.useApp();
   const [saving, setSaving] = useState(false);
   const [changing, setChanging] = useState(false);
@@ -71,6 +79,7 @@ export function ProfilePage() {
           </div>
         </aside>
         <div className="profile-forms">
+          <IdentitySecurityPanel />
           <section className="panel">
             <SectionTitle title="基本资料" />
             <Form<ProfileDraft>
@@ -153,6 +162,7 @@ export function ProfilePage() {
                     body: jsonBody({
                       oldPassword: values.oldPassword,
                       newPassword: values.newPassword,
+                      factor: values.factor,
                     }),
                   });
                   // 后端已撤销旧会话，当前标签页必须同步清空身份和缓存，禁止继续以旧令牌操作。
@@ -207,6 +217,17 @@ export function ProfilePage() {
                   <Input.Password autoComplete="new-password" />
                 </Form.Item>
               </div>
+              {mfa.data?.enabled && (
+                <Form.Item
+                  name="factor"
+                  label="认证器验证码或恢复码"
+                  rules={[
+                    { required: true, message: "请输入身份验证码或恢复码" },
+                  ]}
+                >
+                  <Input autoComplete="one-time-code" maxLength={64} />
+                </Form.Item>
+              )}
               <Button
                 htmlType="submit"
                 loading={changing}

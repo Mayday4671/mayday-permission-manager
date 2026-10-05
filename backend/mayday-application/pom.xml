@@ -8,6 +8,11 @@
   </parent>
   <artifactId>mayday-application</artifactId>
   <dependencies>
+    <!-- OIDC 只借用成熟 JOSE 验签实现；本地权限与会话不从企业 JWT 直接信任。 -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-oauth2-jose</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.mayday</groupId>
       <artifactId>mayday-workorders</artifactId>

@@ -1,5 +1,5 @@
 import { DataTable } from "./DataTable";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   App,
@@ -39,6 +39,7 @@ import {
 import { ApprovalEditModal } from "./ApprovalEditModal";
 import { WorkflowDiagram } from "./workflow/WorkflowDiagram";
 import { WorkflowHandoverModal } from "./WorkflowHandoverModal";
+import { WorkflowSubprocessRepairModal } from "./WorkflowSubprocessRepairModal";
 interface EventState {
   id: number;
   status: string;
@@ -58,24 +59,85 @@ export function ApprovalDetailModal({
     { message } = App.useApp(),
     client = useQueryClient();
   const [action, setAction] = useState<WorkflowAction | null>(null);
+  const [actionSnapshot, setActionSnapshot] = useState<ApprovalDetail | null>(
+    null,
+  );
   const [editing, setEditing] = useState<ApprovalDetail | null>(null);
   const [handover, setHandover] = useState<ApprovalDetail | null>(null);
+  const [recovering, setRecovering] = useState<ApprovalDetail | null>(null);
+  const [repairing, setRepairing] = useState<ApprovalDetail | null>(null);
+  // 打开确认时固定申请和版本，轮询或切换父子详情不能替用户确认另一批待办。
+  const [reminderSnapshot, setReminderSnapshot] = useState<{
+    id: number;
+    version: number;
+    generation: number;
+  } | null>(null);
+  const [linkedRequest, setLinkedRequest] = useState<{
+    sourceId: number | null;
+    value: number;
+  } | null>(null);
+  const [taskChoice, setTaskChoice] = useState<{
+    requestId: number;
+    taskId: number;
+    revision: number;
+  } | null>(null);
+  // 父子关系在同一个详情弹窗内导航，避免反复打开父/子产生递归弹窗堆栈与重复轮询。
+  const recordId =
+    id !== null && linkedRequest?.sourceId === id ? linkedRequest.value : id;
+  const selectedTaskId =
+    taskChoice?.requestId === recordId ? taskChoice.taskId : null;
+  // 每次切换办理上下文使用新一代查询，A→B→A 也不能被第一次 A 的迟到响应覆盖。
+  const context = useRef({ fingerprint: "", generation: 0 });
+  const fingerprint = JSON.stringify([
+    id,
+    recordId,
+    selectedTaskId,
+    taskChoice?.revision,
+  ]);
+  if (context.current.fingerprint !== fingerprint) {
+    context.current = {
+      fingerprint,
+      generation: context.current.generation + 1,
+    };
+  }
+  const [recoveryForm] = Form.useForm<{ reason: string }>();
   const [form] = Form.useForm();
   const query = useQuery({
-    queryKey: ["approvals", "detail", id],
-    queryFn: () => api<ApprovalDetail>(`/operations/requests/${id}`),
+    queryKey: [
+      "approvals",
+      "detail",
+      recordId,
+      selectedTaskId,
+      context.current.generation,
+    ],
+    queryFn: ({ signal }) =>
+      api<ApprovalDetail>(
+        `/operations/requests/${recordId}${selectedTaskId === null ? "" : `?taskId=${selectedTaskId}`}`,
+        { signal },
+      ),
     enabled: id !== null,
     refetchInterval: id !== null ? PERSONAL_WORK_POLL_MS : false,
   });
   const eventQuery = useQuery({
-    queryKey: ["approvals", "events", id],
-    queryFn: () => api<EventState[]>(`/operations/requests/${id}/events`),
+    queryKey: ["approvals", "events", recordId],
+    queryFn: () => api<EventState[]>(`/operations/requests/${recordId}/events`),
     enabled: id !== null && can("requests:manage"),
     refetchInterval: id !== null ? 10000 : false,
   });
   const d = query.data;
+  const choiceCache = useRef<{
+    id: number | null;
+    items: NonNullable<ApprovalDetail["myTasks"]>;
+  }>({ id: null, items: [] });
+  if (d) choiceCache.current = { id: recordId, items: d.myTasks ?? [] };
+  const myTaskChoices =
+    choiceCache.current.id === recordId ? choiceCache.current.items : [];
   const writable =
     d?.fields.filter((field) => d.writable.includes(field.id)) ?? [];
+  const actionWritable =
+    actionSnapshot?.fields.filter((field) =>
+      actionSnapshot.writable.includes(field.id),
+    ) ?? [];
   const start = (next: WorkflowAction) => {
     form.resetFields();
     if (d)
@@ -83,20 +145,77 @@ export function ApprovalDetailModal({
         values: hydrateWorkflowValues(writable, d.values, d.files),
       });
     setAction(next);
+    // 弹窗打开后后台轮询可以刷新详情，但不能替用户将确认版本/待办编号换成较新的申请。
+    setActionSnapshot(d ? structuredClone(d) : null);
   };
-  useEffect(() => {
+  const clearOperations = () => {
     setAction(null);
+    setActionSnapshot(null);
     setEditing(null);
     setHandover(null);
-  }, [id]);
+    setRecovering(null);
+    setRepairing(null);
+    setReminderSnapshot(null);
+    form.resetFields();
+    recoveryForm.resetFields();
+  };
+  useEffect(() => {
+    clearOperations();
+  }, [fingerprint]);
+  const selectTask = (taskId: number) => {
+    if (recordId === null) return;
+    clearOperations();
+    setTaskChoice((previous) => ({
+      requestId: recordId,
+      taskId,
+      revision: (previous?.revision ?? 0) + 1,
+    }));
+  };
+  const showRequest = (next: number | null) => {
+    clearOperations();
+    setTaskChoice(null);
+    setLinkedRequest(next === null ? null : { sourceId: id, value: next });
+  };
+  const closeDetails = () => {
+    clearOperations();
+    setTaskChoice(null);
+    setLinkedRequest(null);
+    onClose();
+  };
   return (
     <>
       <DetailsModal
         title="审批详情"
         open={id !== null}
-        onClose={onClose}
+        onClose={closeDetails}
         width={980}
       >
+        {myTaskChoices.length > 1 && (
+          <div className="form-message">
+            <label htmlFor="approval-personal-task">办理节点</label>
+            <Select
+              id="approval-personal-task"
+              aria-label="办理节点"
+              style={{ width: "100%", marginTop: 8 }}
+              value={selectedTaskId ?? d?.myTaskId ?? undefined}
+              options={myTaskChoices.map((task) => ({
+                value: task.id,
+                label: task.nodeName,
+              }))}
+              onChange={selectTask}
+            />
+          </div>
+        )}
+        {query.isError && selectedTaskId !== null && (
+          <Button
+            onClick={() => {
+              clearOperations();
+              setTaskChoice(null);
+            }}
+          >
+            重新加载当前待办
+          </Button>
+        )}
         <QueryState
           loading={query.isLoading}
           error={query.error}
@@ -151,6 +270,30 @@ export function ApprovalDetailModal({
                   },
                 ]}
               />
+              {d.hasPrivateDraft && (
+                <Alert
+                  type="info"
+                  className="form-message"
+                  title={
+                    d.canEdit
+                      ? "当前显示你保存的未提交修改，仅你可见。其他参与者查看上一提交轮，重新提交后才进入审批。"
+                      : "当前显示你保留的未提交修改，仅你可见；这些修改没有进入本次审批结果。"
+                  }
+                />
+              )}
+              {recordId !== id && (
+                <Button size="small" onClick={() => showRequest(null)}>
+                  查看原申请
+                </Button>
+              )}
+              {d.canViewParent && d.parentRequestId && (
+                <Button
+                  size="small"
+                  onClick={() => showRequest(d.parentRequestId!)}
+                >
+                  查看父申请
+                </Button>
+              )}
               <Tabs
                 items={[
                   {
@@ -176,6 +319,97 @@ export function ApprovalDetailModal({
                       />
                     ),
                   },
+                  ...(d.execution?.length || d.childRequests?.length
+                    ? [
+                        {
+                          key: "execution",
+                          label: "执行状态",
+                          children: (
+                            <Space
+                              orientation="vertical"
+                              style={{ width: "100%" }}
+                              size="middle"
+                            >
+                              <DataTable
+                                rowKey="tokenId"
+                                size="small"
+                                dataSource={d.execution}
+                                pagination={{ pageSize: 6 }}
+                                columns={[
+                                  {
+                                    title: "节点",
+                                    dataIndex: "nodeId",
+                                    render: (value: string) =>
+                                      d.diagram.nodes.find(
+                                        (item) => item.id === value,
+                                      )?.name ?? value,
+                                  },
+                                  {
+                                    title: "执行状态",
+                                    dataIndex: "status",
+                                    render: (value: string) =>
+                                      ({
+                                        ACTIVE: "推进中",
+                                        APPROVAL: "待办理",
+                                        WAIT_JOIN: "等待全部支路完成",
+                                        WAIT_CHILD: "等待子流程",
+                                        FAILED: "等待恢复",
+                                        DONE: "已完成",
+                                      })[value] ?? value,
+                                  },
+                                  ...(can("requests:manage")
+                                    ? [
+                                        {
+                                          title: "恢复说明",
+                                          dataIndex: "error",
+                                          render: (value: string | null) =>
+                                            value ?? "—",
+                                        },
+                                      ]
+                                    : []),
+                                ]}
+                              />
+                              {!!d.childRequests?.length && (
+                                <DataTable
+                                  rowKey="id"
+                                  size="small"
+                                  dataSource={d.childRequests}
+                                  pagination={{ pageSize: 5 }}
+                                  columns={[
+                                    { title: "子流程", dataIndex: "name" },
+                                    {
+                                      title: "固定版本",
+                                      dataIndex: "versionId",
+                                      render: (value: number) => `#${value}`,
+                                    },
+                                    {
+                                      title: "状态",
+                                      dataIndex: "status",
+                                      render: (value: string) =>
+                                        approvalStates[value] ?? value,
+                                    },
+                                    {
+                                      title: "操作",
+                                      render: (_, row) =>
+                                        row.canView ? (
+                                          <Button
+                                            type="link"
+                                            onClick={() => showRequest(row.id)}
+                                          >
+                                            查看申请
+                                          </Button>
+                                        ) : (
+                                          "无查看权限"
+                                        ),
+                                    },
+                                  ]}
+                                />
+                              )}
+                            </Space>
+                          ),
+                        },
+                      ]
+                    : []),
                   ...(d.business
                     ? [
                         {
@@ -300,10 +534,10 @@ export function ApprovalDetailModal({
                             Object.keys(row.submittedValues ?? {}).length > 0,
                           expandedRowRender: (row) => (
                             <WorkflowValues
-                              fields={d.fields}
+                              fields={row.fields ?? d.fields}
                               values={row.submittedValues ?? {}}
                               labels={d.valueLabels}
-                              files={d.files}
+                              files={row.files ?? d.files}
                               requestId={d.id}
                             />
                           ),
@@ -334,6 +568,20 @@ export function ApprovalDetailModal({
                                   </span>
                                 )}
                                 {value || "—"}
+                                {row.subprocessRepair && (
+                                  <div>
+                                    固定版本 {row.subprocessRepair.versionId} ·{" "}
+                                    {row.subprocessRepair.childNodeName}
+                                    <br />
+                                    {row.subprocessRepair.before
+                                      .map((person) => person.label)
+                                      .join("、") || "暂无人员"}
+                                    {" → "}
+                                    {row.subprocessRepair.after
+                                      .map((person) => person.label)
+                                      .join("、")}
+                                  </div>
+                                )}
                                 {row.targetNodeId && (
                                   <div>
                                     退回至：
@@ -349,8 +597,9 @@ export function ApprovalDetailModal({
                                       key={key}
                                     >
                                       <b>
-                                        {d.fields.find((f) => f.id === key)
-                                          ?.label ?? key}
+                                        {(row.fields ?? d.fields).find(
+                                          (f) => f.id === key,
+                                        )?.label ?? key}
                                       </b>
                                       <span>
                                         {JSON.stringify(change.before) ??
@@ -416,7 +665,7 @@ export function ApprovalDetailModal({
                                   onClick={async () => {
                                     try {
                                       await api(
-                                        `/operations/requests/${id}/retry-notifications`,
+                                        `/operations/requests/${recordId}/retry-notifications`,
                                         { method: "POST" },
                                       );
                                       message.success("已安排重试");
@@ -469,6 +718,21 @@ export function ApprovalDetailModal({
                   {d.canHandover && (
                     <Button onClick={() => setHandover(d)}>人员交接</Button>
                   )}
+                  {d.canRecover && (
+                    <Button
+                      onClick={() => {
+                        recoveryForm.resetFields();
+                        setRecovering(d);
+                      }}
+                    >
+                      恢复执行
+                    </Button>
+                  )}
+                  {d.canRepairSubprocess && (
+                    <Button onClick={() => setRepairing(structuredClone(d))}>
+                      修复子流程人员
+                    </Button>
+                  )}
                   {d.canTerminate && (
                     <Button danger onClick={() => start("TERMINATE")}>
                       终止申请
@@ -519,16 +783,37 @@ export function ApprovalDetailModal({
                         (d.applicantId === session?.user.id ||
                           can("requests:manage")) && (
                           <Popconfirm
-                            title="提醒当前节点审批人？"
+                            title="提醒所有当前审批人？"
                             description="每项申请 30 分钟内只能催办一次。"
                             disabled={!d.canRemind}
+                            open={reminderSnapshot?.id === d.id}
+                            onOpenChange={(open) =>
+                              setReminderSnapshot(
+                                open
+                                  ? {
+                                      id: d.id,
+                                      version: d.version,
+                                      generation: context.current.generation,
+                                    }
+                                  : null,
+                              )
+                            }
                             onConfirm={async () => {
+                              const snapshot = reminderSnapshot;
+                              if (
+                                !snapshot ||
+                                snapshot.generation !==
+                                  context.current.generation
+                              )
+                                return;
                               try {
                                 await api(
-                                  `/operations/requests/${d.id}/remind`,
+                                  `/operations/requests/${snapshot.id}/remind`,
                                   {
                                     method: "POST",
-                                    body: jsonBody({ version: d.version }),
+                                    body: jsonBody({
+                                      version: snapshot.version,
+                                    }),
                                   },
                                 );
                                 void client.invalidateQueries({
@@ -540,6 +825,10 @@ export function ApprovalDetailModal({
                                 message.success("已安排催办通知");
                               } catch (error) {
                                 message.error((error as Error).message);
+                              } finally {
+                                setReminderSnapshot((current) =>
+                                  current === snapshot ? null : current,
+                                );
                               }
                             }}
                           >
@@ -547,7 +836,8 @@ export function ApprovalDetailModal({
                               disabled={!d.canRemind}
                               title={
                                 !d.canRemind
-                                  ? "距离上次催办不足 30 分钟"
+                                  ? (d.remindUnavailableReason ??
+                                    "当前不可催办")
                                   : undefined
                               }
                             >
@@ -573,6 +863,16 @@ export function ApprovalDetailModal({
           });
         }}
       />
+      <WorkflowSubprocessRepairModal
+        record={repairing}
+        onClose={() => setRepairing(null)}
+        onSuccess={async () => {
+          await query.refetch();
+          await client.invalidateQueries({
+            queryKey: ["resource", "requests"],
+          });
+        }}
+      />
       <FormModal
         zIndex={1100}
         title={action ? actionNames[action] + "审批" : ""}
@@ -582,12 +882,12 @@ export function ApprovalDetailModal({
         width={700}
         okText={action ? actionNames[action] : "确定"}
         onSubmit={async (values) => {
-          if (!d || !action) return;
-          await api(`/operations/requests/${id}/decision`, {
+          if (!actionSnapshot || !action) return;
+          await api(`/operations/requests/${actionSnapshot.id}/decision`, {
             method: "POST",
             body: jsonBody({
-              version: d.version,
-              taskId: d.myTaskId,
+              version: actionSnapshot.version,
+              taskId: actionSnapshot.myTaskId,
               action,
               comment: values.comment,
               targetUserId: values.targetUserId,
@@ -596,11 +896,14 @@ export function ApprovalDetailModal({
                   ? undefined
                   : values.targetNodeId,
               values: ["APPROVE", "REJECT"].includes(action)
-                ? encodeWorkflowValues(writable, values.values ?? {})
+                ? encodeWorkflowValues(actionWritable, values.values ?? {})
                 : undefined,
             }),
           });
           setAction(null);
+          setActionSnapshot(null);
+          // 已办理的选定待办不能继续用于详情查询；重新取服务器当前任务，保留其他并行支路。
+          setTaskChoice(null);
           void client.invalidateQueries();
           message.success("操作已完成");
         }}
@@ -620,7 +923,7 @@ export function ApprovalDetailModal({
                       value: "applicant",
                       label: "申请人 · 修改后从起点重新提交",
                     },
-                    ...(d?.returnTargets.map((target) => ({
+                    ...(actionSnapshot?.returnTargets.map((target) => ({
                       value: target.id,
                       label: `${target.name} · 重新办理后继续流程`,
                     })) ?? []),
@@ -644,9 +947,10 @@ export function ApprovalDetailModal({
                 <UserSelect />
               </Form.Item>
             )}
-            {["APPROVE", "REJECT"].includes(action) && writable.length > 0 && (
-              <WorkflowFields fields={writable} />
-            )}
+            {["APPROVE", "REJECT"].includes(action) &&
+              actionWritable.length > 0 && (
+                <WorkflowFields fields={actionWritable} />
+              )}
             <Form.Item
               name="comment"
               label={action === "COMMENT" ? "评论" : "处理意见"}
@@ -668,6 +972,39 @@ export function ApprovalDetailModal({
         )}
       </FormModal>
       <ApprovalEditModal record={editing} onClose={() => setEditing(null)} />
+      <FormModal
+        title="恢复流程执行"
+        open={recovering !== null}
+        form={recoveryForm}
+        width={520}
+        onCancel={() => setRecovering(null)}
+        onSubmit={async (values) => {
+          if (!recovering) return;
+          await api(`/operations/requests/${recovering.id}/recover`, {
+            method: "POST",
+            body: jsonBody({
+              version: recovering.version,
+              reason: values.reason,
+            }),
+          });
+          setRecovering(null);
+          await client.invalidateQueries();
+          message.success("已按原固定节点重新检查并恢复");
+        }}
+      >
+        <Alert
+          className="form-message"
+          type="info"
+          title="先完成账号交接、权限恢复或子流程启用。恢复会重新核验原固定版本，依赖仍无效时继续保留失败状态。"
+        />
+        <Form.Item
+          name="reason"
+          label="恢复说明"
+          rules={[{ required: true, whitespace: true }]}
+        >
+          <Input.TextArea rows={3} maxLength={300} showCount />
+        </Form.Item>
+      </FormModal>
     </>
   );
 }

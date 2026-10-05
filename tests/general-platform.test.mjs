@@ -2,10 +2,10 @@
  * 通用平台的真实 HTTP/MySQL 验收，仅允许随机命名的独立基线工程和两种隔离数据库。
  * 测试凭据不打印；清理只使用本次记录的精确主键，单例监控策略恢复原业务配置。
  */
+import { isolatedSql as runIsolatedSql } from "./support/isolated-compose.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import { loginWithCaptcha } from "./support/captcha.mjs";
 
 const base = process.env.API_BASE;
@@ -35,25 +35,8 @@ async function api(path, token, method = "GET", body, status = 200) {
 
 /** SQL 仅供没有业务删除入口的测试历史清理，不接受用户输入、日常项目或任意数据库名称。 */
 function isolatedSql(statement) {
-  assert(isolated, "禁止向日常数据库执行验收写入");
-  const execution = spawnSync(
-    "docker",
-    [
-      "compose",
-      "-p",
-      project,
-      "-f",
-      "compose.verify.yaml",
-      "exec",
-      "-T",
-      database,
-      "sh",
-      "-c",
-      'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --skip-column-names',
-    ],
-    { input: statement, encoding: "utf8", windowsHide: true },
-  );
-  assert.equal(execution.status, 0, execution.stderr);
+  assert(isolated, "SQL 仅允许本次独立验收项目");
+  runIsolatedSql(statement);
 }
 
 /** 清理条件只包含服务端返回的正整数主键，空集合使用无匹配哨兵，不能退化为全表删除。 */

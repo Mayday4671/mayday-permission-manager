@@ -11,6 +11,7 @@ import { Button, Result, Spin } from "antd";
 import { useAuth } from "./lib/auth";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { LoginPage } from "./pages/LoginPage";
+import { OidcCallbackPage } from "./pages/OidcCallbackPage";
 import { PortalPage, ArticlePage } from "./pages/PortalPage";
 import { PortalChannelPage } from "./pages/PortalChannelPage";
 import { adminPages, adminRouteTarget } from "./lib/workspace-model";
@@ -262,6 +263,7 @@ export default function Application() {
           <Route path="/articles/:id" element={<ArticlePage />} />
         )}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/auth/oidc/callback" element={<OidcCallbackPage />} />
         <Route element={<Protected />}>
           <Route path="/admin" element={<AdminLayout />}>
             {adminPages.map((page) => {

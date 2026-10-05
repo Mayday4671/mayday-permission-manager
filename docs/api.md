@@ -2,7 +2,7 @@
 
 ## 协议
 
-统一前缀 `/api`。除 `/auth/login`、`/auth/captcha/challenge`、`/auth/captcha/verify`、`/platform/features`、`/public/**` 和健康检查外都需要：
+统一前缀 `/api`。本地登录、拼图、企业登录开始/回调和 MFA 挑战验证是匿名认证入口，仍受各自一次性挑战与失败限额保护；公开提供方名称、`/platform/features`、`/public/**` 和健康检查也可匿名访问。其他接口需要：
 
 ```http
 Authorization: Bearer <登录返回的令牌>
@@ -22,13 +22,19 @@ Content-Type: application/json
 
 - `POST /auth/captcha/challenge`：`username`，返回 `challengeId/background/piece/width/height/pieceSize/y/expiresIn`。图片是 PNG data URL，不返回缺口横坐标；有效期 120 秒，换图作废该账号/来源的旧题。
 - `POST /auth/captcha/verify`：`challengeId/username/x/elapsedMs`，x 是原图坐标，不是缩放后的屏幕像素；通过返回 `captchaToken/expiresIn`，凭证有效期 60 秒。每题只允许一次验证，失败必须换题。
-- `POST /auth/login`：`username/password/captchaToken`，返回 `token`。验证凭证绑定账号/来源且只能使用一次；缺少、伪造、过期、换账号使用或重放返回 400。密码错误返回 401，同时消费验证凭证，不能重复尝试密码。保留原登录失败限流。
+- `POST /auth/login`：`username/password/captchaToken`。未启用 MFA 返回 `token`；已启用时只返回 `mfaRequired/challengeId`，没有业务令牌，完成第二因素后才签发。验证凭证绑定账号/来源且只能使用一次；缺少、伪造、过期、换账号使用或重放返回 400。密码错误返回 401，同时消费验证凭证。失败限流跨节点与重启保留。
 - `GET /auth/me`：自身资料、权限字符串列表、支持数据范围的资源摘要、admin 标识。资源集合从 PermissionCatalog 的 scoped 标记派生。
 - `POST /auth/logout`：撤销当前会话。
 - `PUT /auth/profile`：`nickname/email/phone`，不允许更改组织和角色。
 - `PUT /auth/password`：`oldPassword/newPassword`，成功后所有会话失效。
 
-拼图及凭证响应 `Cache-Control: no-store`，不写入 URL、数据库或日志正文。每来源最多获取 120 题/分钟，全局挑战/凭证/来源窗口各上限 2048；当前是单实例内存状态，服务重启会要求重新验证。多实例应使用共享存储与原子消费。本地拼图是基础自动化门槛，不代表无法被图像识别算法自动完成；高风险部署仍需专业风控/MFA。
+拼图及凭证响应 `Cache-Control: no-store`，原始通过凭证不写入 URL、数据库或日志；共享记录采用摘要及原子消费。每来源最多获取 120 题/分钟，全局挑战/凭证/来源窗口各上限 2048。A 节点验证后可在 B 登录，一次性凭证不能重放，重启不清空失败窗口。本地拼图是基础自动化门槛，不能替代专业风控。
+
+身份专用前缀为 `/auth/identity`：`GET /providers` 返回启用名称；`POST /oidc/start` 发起登录，`POST /oidc/complete` 交换授权码。`POST /oidc/bind` 需当前登录与近期再认证；`GET /bindings` 只返回本人绑定，`POST /bindings/{id}/remove` 再认证后解绑并撤销会话。不存在按邮箱自动绑定管理员的接口。
+
+`GET /mfa` 返回本人状态；`POST /mfa/enroll` 密码验证后生成待确认密钥，`POST /mfa/confirm` 用验证码确认并仅一次返回恢复码；`POST /mfa/verify` 消费首因素挑战及 TOTP/恢复码后签发令牌。`POST /mfa/recovery`、`/mfa/disable` 都要求近期再认证，旧因素与会话失效。`POST /users/{id}/mfa/reset` 是管理员有理由恢复，需要本人当场再认证、目标用户管理范围及重置权限。请求 DTO 见控制器与生成契约；配置、限额、密钥恢复与审计见[企业身份](identity.md)。
+
+上述为接口应满足的身份契约，不能等同于最终验收完成。2026-10-05 复查发现默认重复读隔离下身份解绑与 MFA 开通的并发旧快照风险，已在旧 Jar 真实复现，并通过等待账户锁后的关联/因素 `FOR UPDATE` 当前读修复。新 Jar 的三项真实两连接竞态专项通过，没有提前签发会话；E4 仍需完整身份、冷启动与浏览器验收。完整原生 r6 中断未生成最终报告，相同制品 r7 尚未完成，状态见[完整功能追加记录](full-functions-validation-20261004/README.md)。
 
 ## 工作台与系统
 
@@ -61,9 +67,9 @@ Content-Type: application/json
 - `POST /bulk/users/import/preview`：multipart `file`，最多 2 MB、1000 行，返回原记录号和逐行错误；只校验，不写业务数据，密码只显示是否提供。
 - `POST /bulk/users/import/commit?idempotencyKey=...`：重新上传校验后的原文件，键为 16–64 位字母/数字/连字符。同账号、资源、键和文件重复提交返回原任务；同键不同内容拒绝。只创建新用户，任一行失败整批回滚。
 - `POST /bulk/users/exports`：`{keyword,enabled,departmentId}`，创建后台 CSV 导出，最多 10 万行，复用用户列表范围与字段授权。
-- `GET /bulk/jobs`：当前账号最近 20 个任务；`GET /bulk/jobs/{id}`：状态与进度；`GET /bulk/jobs/{id}/download`：本人成功导出的结果。任务状态为 QUEUED/RUNNING/SUCCEEDED/FAILED。
+- `GET /bulk/jobs`：当前账号最近 20 个任务；`GET /bulk/jobs/{id}`：状态与进度；`GET /bulk/jobs/{id}/download`：本人成功导出的结果。任务状态为 QUEUED/RUNNING/SUCCEEDED/FAILED/CANCELLED。`POST .../{id}/cancel` 取消排队或运行导出，`POST .../{id}/retry` 本人显式重试失败或取消任务，重新检查当前授权。
 
-导入需要 `users:import/create` 和 ALL 用户范围，角色/部门/联系方式仍独立检查。导出需 `users:view/export`；执行和下载重新检查账号、权限和范围变化。结果保留 24 小时；每人最多 2 个活动导出，工作器及待执行队列有界。导出工作器当前单实例，重启将未完成导出标为失败，需重新创建；不是可跨节点恢复的长任务平台。
+导入需要 `users:import/create` 和 ALL 用户范围，角色/部门/联系方式仍独立检查。导出需 `users:view/export`；提交幂等键、执行、取消/重试和下载都检查归属与当前授权。结果保留 24 小时；每人最多 2 个活动导出，工作器及共享待执行队列有界。持久租约到期由其他节点接管，结果存共享数据库且本机缓存可恢复；旧工作器不能迟到提交，详见[多实例执行](cluster.md)。
 
 ## 角色
 
@@ -142,12 +148,12 @@ Content-Type: application/json
 
 `GET /operations/realtime/stream` 复用 Authorization Bearer 头，至少具有 `messages:view` 或 `requests:view`。返回 ready/heartbeat/changed 事件，payload 只有 `{topics,time}`；topics 按当前权限裁剪为 messages/requests，没有业务正文或用户清单。主令牌不允许放入 URL。
 
-SSE 在业务事务提交后发送刷新提示，客户端重新调用授权查询；每次发送和 10 秒心跳重查会话与权限，失去某个领域权限后裁剪对应主题，全部订阅权限或会话失效时关闭。每账号最多 4 条、全站 500 条连接，5 分钟轮换。当前单实例、无历史事件重放，前端断线重连重新取数并保留 15 秒轮询兜底。
+SSE 从共享数据库读取事务提交后的刷新提示，客户端重新调用授权查询；每次发送和 10 秒心跳重查会话与权限，失去某个领域权限后裁剪主题，全部订阅权限或会话失效时关闭。每账号最多 4 条、全站 500 条连接的配额跨实例一致，5 分钟轮换。没有客户端历史事件重放，断线重连重新取数并保留 15 秒轮询兜底。
 
 ## 客户反馈
 
 - `POST /public/feedback`：`{type,title,content,articleId?,contact?}`，type 为 QUESTION/SUGGESTION/CORRECTION，返回一次性展示的 48 位随机 receipt 与创建时间。
-- `POST /public/feedback/track`：`{receipt}`，只返回状态和公开回复；查询码仅放正文，数据库仅存摘要，无匿名列表/按 ID 查询。当前按连接来源每小时最多 10 次提交、120 次查询，计数为进程内状态。
+- `POST /public/feedback/track`：`{receipt}`，只返回状态和公开回复；查询码仅放正文，数据库仅存摘要，无匿名列表/按 ID 查询。当前按连接来源每小时最多 10 次提交、120 次查询，计数使用共享数据库状态，跨节点与重启保留。
 - `GET /operations/feedback`、`GET .../{id}`：后台按 keyword/status/page/size 查询，需 `feedback:view`；详情包含内部处理历史。
 - `POST .../{id}/process`：`{version,assigneeId,status,publicReply,internalNote}`，需 `feedback:process`，更改处理人另需 `feedback:assign`。status 为 OPEN/PROCESSING/RESOLVED/CLOSED，解决时必须填写公开回复。
 - `GET .../assignees?keyword=...`：分配候选仅返回有查看/处理权的有效账号 ID 与名称，不提供通讯录；分配成功可产生站内通知。
@@ -163,7 +169,7 @@ SSE 在业务事务提交后发送刷新提示，客户端重新调用授权查�
 - `GET/POST /operations/scheduler`、`PUT/DELETE .../{id}`：任务配置；编辑为 `{name,handler,cron,description,enabled,alertUserId,version}`，cron 为六段表达式。`POST .../{id}/run` 需独立 `scheduler:execute`。
 - `GET /operations/job-logs`：按 keyword/jobId/page/size 查询真实执行结果；删除配置不删除独立执行历史。失败先回滚业务事务，再保存失败记录；站内失败提醒独立重试最近一天未完成的最早 100 条，已投递项退出队列，不回滚执行结果。未配置或失效接收人明确跳过，恢复权限后不补发这批历史提醒；消息模块关闭时保留待发状态。
 
-调度只执行注册处理器，不接收任意 SQL、脚本、类名或 URL。默认数据库事务超时 30 秒，适合短维护用例，但不能强制中断任意 CPU 运算或外部调用；长任务应提交专用队列，外部副作用需自身幂等。监控和调度未作为集群故障管理平台验收。
+调度只执行注册处理器，不接收任意 SQL、脚本、类名或 URL。默认数据库事务超时 30 秒，适合短维护用例，但不能强制中断任意 CPU 运算或外部调用；长任务应提交专用队列，外部副作用需自身幂等。注册任务的跨节点领取、幂等和故障恢复使用专门验证；本机监控不替代外部生产故障管理平台。
 
 ## 图片采集
 
@@ -185,20 +191,29 @@ V15 起，DELETE `/crawler/tasks/{id}` 对已经产生文章的配置采用归�
 - 定义字段：`name/code/description/categoryId/businessType/enabled/schema/version`；businessType 为 GENERAL 或 CONTENT。
 - schema 包含 fields、nodes、startNodeId、applicantType/applicantIds、allowSelfApproval、allowRepeatApproval、allowWithdraw。字段和节点均使用稳定 ID；详见 `WorkflowSchema.java` 与 `types/workflow.ts`。
 - `GET /operations/workflows/options?businessType=CONTENT` 只返回当前可发起的已发布流程和表单；`GET .../roles` 返回流程用角色选项。
+- 开始填写时冻结显式选中的完整流程选项。目录刷新或发布新版不能悄悄替换已填写的字段/版本；旧版正式提交返回 409 并保留输入。只有用户显式重新选择流程，才切换版本并清空旧版字段。
 - `POST /operations/workflows/simulate` 输入 schema/applicantId/values，只校验并返回运行路径，不落审批数据或通知。
 - `GET /operations/workflows/templates` 返回可复用表单/节点模板，使用 `workflows:view`；模板复制为草稿后才可发布。节点可配置 timeoutMinutes，到期产生提醒，不自动审批。
+- `GET /operations/workflows/subprocess-options` 只返回可用 GENERAL 子流程的版本候选；`GET .../subprocess-versions/{versionId}` 返回经过权限校验的冻结字段/节点元数据。子流程必须绑定具体不可变版本，并配置显式输入输出映射；不能以“总是最新”改写在途实例。
 
 ## 审批实例
 
 - `GET /operations/requests?box=mine|drafts|todo|done|participated|copies|all`；all 单独鉴权。`GET .../{id}` 与 `/{id}/history` 返回按参与权和字段读权过滤的详情/历史。
+- 详情可传 `?taskId=...` 选择本人当前待办，`myTasks` 只返回本人的有效审批任务 `{id,nodeId,nodeName}`。同人并行任务可以分别办理；他人、排队、其他申请或过期任务 ID 返回 403。动作、可写字段及 `returnTargets` 由服务器按选定任务计算，不能由客户端任务列表推断授权。
 - `POST /operations/requests`：`definitionId/versionId/title/values`；内容审批再传 `businessId/businessRevisionId/businessVersion`。必须绑定当前已发布流程版本及文章当前修订。
 - `POST /operations/requests/{id}/decision`：`version/taskId/action/comment/targetUserId/targetNodeId/values`。action 为 APPROVE/REJECT/RETURN/TERMINATE/WITHDRAW/COMMENT/TRANSFER/ADD_SIGN；驳回、退回、终止和评论需要原因或内容，转交/加签需要目标用户。values 只能包含当前节点可写字段。
 - `POST /operations/requests/drafts` 保存未提交草稿；`PUT /operations/requests/{id}` 保存本人草稿/退回/撤回后的修改；`POST .../{id}/submit` 完整校验后提交或重提。编辑体为 `version/title/values/businessVersion`；不能换发起人、流程或业务修订。
+- OA `values` 中的 NUMBER/MONEY/CALCULATED 及明细数值列，在详情、提交历史和 `changes.before/after` 中返回精确十进制字符串；字段 `min/max` 也按字符串返回。建议提交原字符串，禁止通过 `Number()` 中转。旧 JSON 数字请求仍由局部解码器精确读取；人员/部门/文件和其他实体 ID 保持整数。该约定只作用于审批表单，不改写其他模块数字类型；先完成字段授权裁剪，再进行响应编码。
+- 十进制响应保留条件判断所需的原表示：负 scale 的值返回指数形式（例如 `"1E+3"`），其余值返回保留小数位的普通表示（例如 `"500.00"`）；`min/max` 同样处理。普通数值比较按值进行，CONTAINS 按原文本表示进行。回填后未修改的值应原样提交，不能把 `"1E+3"` 展开为 `"1000"`，否则可能改变既有分支命中；服务器不会为此批量改写历史 JSON。
 - `DELETE /operations/requests/{id}?version=...` 只删除本人未提交草稿，正式申请不能删除。`POST .../{id}/copies/read` 只标记本人的抄送已读，不改变申请版本。
 - RETURN 的 targetNodeId 为空表示退回申请人修改；指定 ID 只能来自详情 returnTargets 中当前有效路径的已办节点。TERMINATE 单独要求 requests:manage，不替代审批人决定；终止、终止性驳回和通过不能重提。
 - 实例 runNumber 区分提交轮次，任务 nodeVisit 区分节点重办批次；history 的 submittedValues 为各轮提交的权限裁剪快照。`status` 可单独过滤实例状态，全部申请不含他人的未提交草稿。
+- 任务 `activatedAt` 是服务端记录的实际激活证据，客户端不可修改。当前表单按当前轮真实激活节点裁剪；每条历史的 `fields/files/submittedValues` 按该历史轮次分别裁剪，合法旧历史不授予新轮字段或附件。WAITING 和从未激活即取消的任务不产生字段授权。
+- RETURNED/WITHDRAWN 的保存修改是私人稿，只有申请人详情和本人列表显示新标题/值；其他参与者、管理员及其列表/搜索仍依据最后已提交视图。正式重提成功才替换提交表单并递增轮次。EDIT 字段和新附件不向其他参与者显示，文件直链执行相同规则；提交冲突不清空私人稿。
 - `GET .../{id}/files/{fileId}` 检查字段附件读权；`GET .../{id}/content-files/{fileId}` 检查送审内容快照附件。
 - `GET .../{id}/events`、`POST .../{id}/retry-notifications` 为审批管理员的可靠通知运维入口。
+- `POST .../{id}/recover` 需审批管理权、打开版本及恢复理由，仅恢复持久失败节点；不直接把申请标为成功，不修改冻结版本。并行实例有持久执行令牌，详情包含当前节点、父/root 关联和经过参与授权过滤的子申请元数据；子申请不能由发起人独立编辑或重提，办理仍验证其独立任务与字段权限。
+- `GET .../{id}/subprocess-repair-options` 返回尚未生成子申请的失败调用及人员修复候选；`POST .../{id}/subprocess-repair` 接收 `{version,tokenId,childNodeId,targetUserIds,reason}`。两者同时要求 `requests:manage/reassign` 与 `users:view`，校验原申请人、原人员和新人员的数据范围。只保存此调用的审批/抄送人员覆盖，随后显式恢复；不能更换子流程版本、跳过节点或重新启用停用账号。已生成子申请在其自身详情进行人员交接。
 - `POST /operations/requests/{id}/remind`：`{version}`，需 `requests:remind`，申请人可催办自己的运行中申请，审批管理员另需 `requests:manage`；30 分钟冷却，通知当前有效待办人。
 - 工作台待办使用 `/operations/requests?box=todo&page=1&size=3`，需要同时具有 `requests:view` 和 `requests:approve`。数据库按当前账号的待处理任务筛选，不会把后续尚未到达的节点或其他审批人的任务返回给首页。
 - 到达审批节点、转交和加签会创建对应人员的待办及站内通知；结束时通知申请人。事件与审批事务共同提交，由后台每 3 秒扫描投递并重试失败事件。工作台和顶栏通过 SSE 提示立即重新取数，并在页面可见时每 15 秒轮询兜底，重新聚焦也刷新；离线登录后读取持久通知。已读只影响消息数量，必须执行审批动作才能清除待办；超时提醒同样不会代替业务决定。
@@ -211,7 +226,7 @@ V15 起，DELETE `/crawler/tasks/{id}` 对已经产生文章的配置采用归�
 - `GET /operations/delegations/scopes`：已发布启用流程名称候选，不返回模型、表单或人员。
 - `POST /operations/delegations`：`targetId/startsAt/endsAt/definitionIds/reason`；空范围表示全部。身份取自会话，最长 90 天，时段采用北京时间且左闭右开；接收人检查启用、审批/查看权及用户数据范围。
 - `POST /operations/delegations/{id}/revoke`：`{version}`，只有本人可撤销；到期/撤销不自动收回已经激活的任务。
-- `POST /operations/requests/{id}/handover`：`{version,fromUserId,targetUserId,reason}`，需 `requests:manage/reassign` 与 `users:view` 数据范围。当前及未来审批人员的实例级交接，保留顺签顺序、原任务历史和期限；退回重提保留覆盖，发布版本不变。
+- `POST /operations/requests/{id}/handover`：`{version,fromUserId,targetUserId,reason}`，需 `requests:manage/reassign` 与 `users:view` 数据范围。当前及未来审批/抄送人员的实例级交接，保留顺签顺序、原任务历史和期限；退回重提保留覆盖，发布版本不变。审批新人员需有效审批与查看权，抄送新人员需有效查看权；已删除原账号只允许 ALL 用户范围管理员修复，历史记录原编号。
 - 详情 `canHandover/handoverSources` 由服务端授权裁剪；普通参与者不返回未来人员修复目录。任务增加 `originalAssigneeId/originalAssigneeName/delegationId/assignmentNote`，历史增加 DELEGATE/HANDOVER；不允许客户端修改这些来源字段。
 
 所有动作继续检查版本和当前权限。接收人不能自审或制造同一路径重复审批；委托条件不适用时回到原人办理，不自动通过。用户权限撤销在接口立即生效。

@@ -3,9 +3,9 @@
  * 覆盖 Bearer 头鉴权、收件人隔离、提交后事件、催办限频、超时快照和权限撤销断流。
  * 已发布历史不能通过业务接口删除；清理只对隔离库中的本次精确 ID 执行。
  */
+import { isolatedSql } from "./support/isolated-compose.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { loginWithCaptcha } from "./support/captcha.mjs";
 
 const base = process.env.API_BASE;
@@ -36,25 +36,8 @@ async function call(path, token, method = "GET", data, status = 200) {
 }
 
 function sql(statement) {
-  assert(isolated, "只能清理独立验收数据库");
-  const result = spawnSync(
-    "docker",
-    [
-      "compose",
-      "-p",
-      project,
-      "-f",
-      "compose.verify.yaml",
-      "exec",
-      "-T",
-      database,
-      "sh",
-      "-c",
-      'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --skip-column-names',
-    ],
-    { input: statement, encoding: "utf8", windowsHide: true },
-  );
-  assert.equal(result.status, 0, result.stderr);
+  assert(isolated, "SQL 仅允许本次独立验收项目");
+  isolatedSql(statement);
 }
 
 async function waitUntil(check, timeout = 15000) {

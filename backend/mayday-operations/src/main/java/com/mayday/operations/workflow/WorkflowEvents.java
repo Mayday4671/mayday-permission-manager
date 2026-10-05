@@ -20,6 +20,7 @@ public class WorkflowEvents {
   private final NotificationRepository notifications;
   private final UserRepository users;
   private final MessagePublisher publisher;
+  private final WorkflowPrivateDrafts privateDrafts;
 
   /** 调用方必须处于业务事务；事件键稳定且唯一，事件不存储敏感表单值。 */
   @Transactional(propagation = Propagation.MANDATORY)
@@ -29,9 +30,11 @@ public class WorkflowEvents {
     event.setRequestId(request.getId());
     event.setRecipientId(recipientId);
     event.setEventKey(key);
-    String title = "审批通知 · " + request.getTitle();
+    // 通知面向审批参与者，旧库私人标题覆盖也必须与详情采用相同安全读取边界。
+    String submittedTitle = privateDrafts.title(request, false);
+    String title = "审批通知 · " + submittedTitle;
     event.setTitle(title.substring(0, Math.min(title.length(), 160)));
-    event.setBody(text + "：" + request.getTitle());
+    event.setBody(text + "：" + submittedTitle);
     events.save(event);
   }
 

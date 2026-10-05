@@ -162,7 +162,9 @@ export function ConditionGroupEditor({
           ]}
           onChange={(operator) => change({ ...rule, operator })}
         />
-        {field?.type === "SINGLE" ? (
+        {/* 分组与旧单条件保持相同语义：包含编辑文字子串，等于/不等于选原始选项。 */}
+        {field?.type === "SINGLE" &&
+        ["EQ", "NE"].includes(rule.operator ?? "") ? (
           <Select
             aria-label={`判断${path}值`}
             value={rule.value || undefined}

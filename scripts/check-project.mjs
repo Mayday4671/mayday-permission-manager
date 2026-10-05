@@ -47,6 +47,9 @@ run(process.execPath, [
   "tests/theme-model.test.mjs",
   "tests/generator.test.mjs",
   "tests/delivery-tools.test.mjs",
+  "tests/development-configuration.test.mjs",
+  "tests/isolated-compose.test.mjs",
+  "tests/cluster-release-gate.test.mjs",
 ]);
 run(
   process.execPath,

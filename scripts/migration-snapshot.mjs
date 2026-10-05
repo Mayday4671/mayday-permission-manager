@@ -1,5 +1,55 @@
 import assert from "node:assert/strict";
 
+/** 迁移前按旧结构保留全部业务列；只排除明确会自然增长/过期的运维、会话与挑战记录。 */
+export function preservedBusinessColumns(schema) {
+  const operational = new Set([
+    "flyway_schema_history",
+    "sys_session",
+    "sys_audit_log",
+    "sys_change_audit",
+    "ops_monitor_sample",
+    "ops_job_execution",
+    "sys_identity_challenge",
+    "sys_realtime_connection",
+    "sys_realtime_event",
+    "sys_realtime_guard",
+    "sys_security_guard",
+    "sys_security_rate",
+    "sys_security_state",
+  ]);
+  return Object.fromEntries(
+    schema
+      .filter((table) => !operational.has(table.name))
+      .map((table) => [
+        table.name,
+        table.columns.map((column) => column.name).join(","),
+      ]),
+  );
+}
+
+/** JSON/HEX 保留列分隔、换行、BLOB 和 NULL；原始旧列不能因新增字段而丢失保留核对。 */
+export function snapshotJsonFields(table, fields) {
+  const builtin =
+    "kind='menus' AND code='crawler' AND path='/admin/crawler' AND name IN ('图片采集','采集数据')";
+  return (
+    "JSON_ARRAY(" +
+    fields
+      .split(",")
+      .map((field) => {
+        assert(/^[A-Za-z][A-Za-z0-9_]*$/.test(field), "业务快照列名不合法");
+        const expression =
+          table === "sys_entry" && field === "name"
+            ? `CASE WHEN ${builtin} THEN '采集数据' ELSE name END`
+            : table === "sys_entry" && ["version", "updated_at"].includes(field)
+              ? `CASE WHEN ${builtin} THEN NULL ELSE ${field} END`
+              : "`" + field + "`";
+        return `IF((${expression}) IS NULL,NULL,HEX(CAST((${expression}) AS BINARY)))`;
+      })
+      .join(",") +
+    ")"
+  );
+}
+
 /** V15 唯一允许修改的旧资料是内置采集菜单名称；其他字段仍进入原始快照，不放宽权限/内容比对。 */
 export function snapshotFields(table, fields) {
   if (table !== "sys_entry") return fields;

@@ -14,8 +14,13 @@ public interface BulkJobRepository extends JpaRepository<BulkJob, Long> {
   /** 运行限额只统计本人未结束导出，不把导入回执混入导出队列配额。 */
   long countByOwnerIdAndKindAndStatusIn(Long ownerId, String kind, Collection<String> statuses);
 
-  /** 单实例重启恢复仅扫描尚未结束的导出，不重放已经完成的导入。 */
-  List<BulkJob> findByKindAndStatusIn(String kind, Collection<String> statuses);
+  /** 持久队列协调只扫描有界未完成导出，不重放已提交导入。 */
+  List<BulkJob> findTop100ByKindAndStatusInOrderByIdAsc(String kind, Collection<String> statuses);
+
+  /** 作业取消、重试与完成按同一业务行串行更新，不能让旧线程覆盖终态。 */
+  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+  @org.springframework.data.jpa.repository.Query("select job from BulkJob job where job.id=:id")
+  Optional<BulkJob> lock(@org.springframework.data.repository.query.Param("id") Long id);
 
   /** 每轮最多清理一百条过期作业，避免文件清理持有无界数据库事务。 */
   List<BulkJob> findTop100ByExpiresAtBefore(LocalDateTime now);

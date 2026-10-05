@@ -2,6 +2,7 @@ package com.mayday.web;
 
 import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
+import com.mayday.identity.MfaService;
 import com.mayday.security.AccessPolicy;
 import com.mayday.security.LoginThrottle;
 import com.mayday.security.PermissionCatalog;
@@ -45,6 +46,7 @@ public class AuthController {
   private final LoginThrottle throttle;
   private final SlideCaptchaService captcha;
   private final EntryRepository entries;
+  private final MfaService mfa;
 
   /** 消费账号及来源绑定的滑块凭证，限流并验证密码/启用状态后签发不透明会话令牌。 */
   @PostMapping("/login")
@@ -70,8 +72,8 @@ public class AuthController {
     request.setAttribute("audit.username", account.getUsername());
     return ResponseEntity.ok(
         ApiResponse.ok(
-            new LoginView(
-                tokens.issue(account, request.getRemoteAddr(), request.getHeader("User-Agent")))));
+            mfa.loginAfterPrimary(
+                account, request.getRemoteAddr(), request.getHeader("User-Agent"))));
   }
 
   /** 读取真实当前账号和有效授权摘要；本人联系方式可见，但摘要不能代替业务接口授权。 */
@@ -125,8 +127,10 @@ public class AuthController {
   /** 校验原密码及新密码规则，保存 BCrypt 散列后撤销该用户所有已签发会话。 */
   @PutMapping("/password")
   @Transactional
-  public ApiResponse<?> password(@Valid @RequestBody PasswordRequest body) {
+  public ApiResponse<?> password(
+      @Valid @RequestBody PasswordRequest body, HttpServletRequest request) {
     SysUser account = users.findById(access.current().getId()).orElseThrow();
+    mfa.reauthenticate(account.getId(), body.oldPassword(), body.factor(), request.getRemoteAddr());
     if (!encoder.matches(body.oldPassword(), account.getPasswordHash()))
       throw new BusinessException("原密码不正确");
     UserService.validatePassword(body.newPassword());

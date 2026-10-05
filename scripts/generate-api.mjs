@@ -41,7 +41,7 @@ else {
     ? Object.fromEntries(
         readFileSync(join(root, ".env"), "utf8")
           .split(/\r?\n/)
-          .filter((line) => /^[A-Z_]+=/.test(line))
+          .filter((line) => /^[A-Z][A-Z0-9_]*=/.test(line))
           .map((line) => {
             const index = line.indexOf("=");
             return [

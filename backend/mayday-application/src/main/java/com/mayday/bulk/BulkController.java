@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -63,8 +64,10 @@ public class BulkController {
   /** 当前登录人创建导出作业，后台按该人的有效数据范围和字段权限逐页生成文件。 */
   @PostMapping("/{resource}/exports")
   public ApiResponse<BulkContracts.JobView> export(
-      @PathVariable String resource, @Valid @RequestBody BulkContracts.ExportFilter filter) {
-    return ApiResponse.ok(service.export(resource, filter));
+      @PathVariable String resource,
+      @Valid @RequestBody BulkContracts.ExportFilter filter,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+    return ApiResponse.ok(service.export(resource, filter, idempotencyKey));
   }
 
   /** 最近作业列表由服务器固定按本人过滤，不接受客户端指定 ownerId。 */
@@ -77,6 +80,18 @@ public class BulkController {
   @GetMapping("/jobs/{id}")
   public ApiResponse<BulkContracts.JobView> view(@PathVariable Long id) {
     return ApiResponse.ok(service.view(id));
+  }
+
+  /** 本人取消活跃作业立即撤销执行租约，不允许取消他人作业或覆盖已完成结果。 */
+  @PostMapping("/jobs/{id}/cancel")
+  public ApiResponse<BulkContracts.JobView> cancel(@PathVariable Long id) {
+    return ApiResponse.ok(service.cancel(id));
+  }
+
+  /** 本人明确重试失败或取消的导出，再次检查原授权指纹和并行额度。 */
+  @PostMapping("/jobs/{id}/retry")
+  public ApiResponse<BulkContracts.JobView> retry(@PathVariable Long id) {
+    return ApiResponse.ok(service.retry(id));
   }
 
   /** 正文流式下载，不把大文件重新加载为 byte[]，不暴露物理存储路径。 */

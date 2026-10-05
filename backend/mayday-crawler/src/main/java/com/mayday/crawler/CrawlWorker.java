@@ -13,6 +13,15 @@ public class CrawlWorker {
   private final CrawlStore store;
   private final WebFetcher fetcher;
   private final ModuleSwitches modules;
+  private final java.util.Map<Long, CrawlStore.Work> active =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  /** 网络处理与心跳分开运行；数据库故障时不虚假续命，原工作提交仍需有效租约。 */
+  @Scheduled(fixedDelay = 10000)
+  public void heartbeat() {
+    if (!modules.isEnabled("crawler")) return;
+    for (var work : active.values()) store.heartbeat(work);
+  }
 
   /** 关闭模块时不领取队列；网络处理在任务锁外执行，成功与失败均带租约回到持久事务提交。 */
   @Scheduled(
@@ -23,6 +32,7 @@ public class CrawlWorker {
     if (!modules.isEnabled("crawler")) return;
     var work = store.claim();
     if (work == null) return;
+    active.put(work.itemId(), work);
     try {
       boolean image = work.kind().equals("IMAGE");
       var response = fetcher.fetch(work.url(), work.rules(), image);
@@ -40,6 +50,8 @@ public class CrawlWorker {
       String message =
           e instanceof BusinessException ? e.getMessage() : "网络请求或页面解析失败，请检查地址、规则或稍后重试";
       store.finish(work, null, null, message.length() > 300 ? message.substring(0, 300) : message);
+    } finally {
+      active.remove(work.itemId());
     }
   }
 }

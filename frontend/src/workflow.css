@@ -1,4 +1,26 @@
 /* 审批模块使用同一套表格和弹窗，设计器只为字段、节点和连接关系提供工作区。 */
+.oa-flow-join {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--app-primary-soft);
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+  color: var(--app-text-secondary);
+  font-size: 12px;
+}
+.oa-flow-card.subprocess .oa-node-heading {
+  background: var(--app-primary-soft);
+}
+.workflow-mapping-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 1.5fr);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
 .workflow-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

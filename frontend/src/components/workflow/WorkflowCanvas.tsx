@@ -7,6 +7,8 @@ import {
   Bell,
   ChevronRight,
   GitBranch,
+  GitFork,
+  Workflow,
   Minus,
   Scan,
   Plus,
@@ -29,11 +31,13 @@ import {
   type WorkflowEdge,
 } from "../../lib/workflowGraph";
 
-type InsertType = "APPROVAL" | "COPY" | "CONDITION";
+type InsertType = "APPROVAL" | "COPY" | "CONDITION" | "PARALLEL" | "SUBPROCESS";
 const insertOptions = [
   { type: "APPROVAL", label: "审批人", icon: UserRound },
   { type: "COPY", label: "抄送人", icon: Bell },
   { type: "CONDITION", label: "条件分支", icon: GitBranch },
+  { type: "PARALLEL", label: "并行分支", icon: GitFork },
+  { type: "SUBPROCESS", label: "子流程", icon: Workflow },
 ] as const;
 const operatorNames = {
   EQ: "等于",
@@ -112,7 +116,7 @@ function InsertControl({
 
 /**
  * 面向业务管理员的纵向 OA 编排：线路加号定点插入，分支自动汇合，节点卡片编辑业务配置。
- * 直接编辑现有扁平模型，不引入虚构的开始/汇合执行类型，也不更改已发布版本和在途快照。
+ * 条件择一路线，并行全部执行且专属汇合，子流程绑定确定版本；不更改已发布版本和在途快照。
  * 旧草稿的循环、缺失出口和非汇合分支显式显示；渲染有界且不会为显示效果改写数据。
  */
 export function WorkflowCanvas({
@@ -176,6 +180,7 @@ export function WorkflowCanvas({
     if (item.next) pending.push(item.next);
     if (item.type === "CONDITION")
       pending.push(...(item.conditions ?? []).map((rule) => rule.next));
+    if (item.type === "PARALLEL") pending.push(...(item.branches ?? []));
   }
   /** 编辑必须基于当前模型；边已变化、达到限额等错误反馈给用户，不默默改其他分支。 */
   const mutate = (operation: () => WorkflowSpec) => {
@@ -215,15 +220,19 @@ export function WorkflowCanvas({
   const remove = (node: WorkflowNode) =>
     modal.confirm({
       title:
-        node.type === "CONDITION"
-          ? "删除这组条件分支？"
-          : `删除“${node.name}”？`,
+        node.type === "PARALLEL"
+          ? "删除这组并行分支？"
+          : node.type === "CONDITION"
+            ? "删除这组条件分支？"
+            : `删除“${node.name}”？`,
       content:
-        node.type === "CONDITION"
-          ? "保留默认分支的后续流程，移除其他分支独有的节点；公共后续节点会保留。可用撤销恢复。"
-          : node.type === "END"
-            ? "仅删除未被任何节点引用的孤立结束节点，可用撤销恢复。"
-            : "前后节点会自动接续，可用撤销恢复。已发布流程和在途申请保持原版本。",
+        node.type === "PARALLEL"
+          ? "移除整组并行支路及专属汇合，接回汇合后的公共流程。可用撤销恢复。"
+          : node.type === "CONDITION"
+            ? "保留默认分支的后续流程，移除其他分支独有的节点；公共后续节点会保留。可用撤销恢复。"
+            : node.type === "END"
+              ? "仅删除未被任何节点引用的孤立结束节点，可用撤销恢复。"
+              : "前后节点会自动接续，可用撤销恢复。已发布流程和在途申请保持原版本。",
       centered: true,
       okText: "删除",
       okButtonProps: { danger: true },
@@ -244,6 +253,10 @@ export function WorkflowCanvas({
     return `${field.label} ${operatorNames[rule.operator]} ${rule.value}`;
   };
   const peopleSummary = (node: WorkflowNode) => {
+    if (node.type === "SUBPROCESS")
+      return node.subprocess?.versionId
+        ? `已绑定发布版本 #${node.subprocess.versionId}`
+        : "请选择子流程和固定版本";
     if (node.source === "DEPARTMENT_LEADER") return "发起人所在部门负责人";
     const ids = node.assigneeIds ?? [];
     if (!ids.length)
@@ -261,16 +274,22 @@ export function WorkflowCanvas({
       <button
         type="button"
         className="oa-node-settings"
-        aria-label={`设置${node.type === "COPY" ? "抄送" : "审批"}：${node.name}`}
+        aria-label={`设置${node.type === "COPY" ? "抄送" : node.type === "SUBPROCESS" ? "子流程" : "审批"}：${node.name}`}
         disabled={!editable}
         onClick={() => onEditNode(node, null)}
       >
         <span className="oa-node-heading">
-          {node.type === "COPY" ? <Bell size={15} /> : <UserRound size={15} />}
+          {node.type === "COPY" ? (
+            <Bell size={15} />
+          ) : node.type === "SUBPROCESS" ? (
+            <Workflow size={15} />
+          ) : (
+            <UserRound size={15} />
+          )}
           <b>{node.name}</b>
         </span>
         <span
-          className={`oa-node-people ${!node.assigneeIds?.length && node.source !== "DEPARTMENT_LEADER" ? "unconfigured" : ""}`}
+          className={`oa-node-people ${(node.type === "SUBPROCESS" ? !node.subprocess?.versionId : !node.assigneeIds?.length && node.source !== "DEPARTMENT_LEADER") ? "unconfigured" : ""}`}
         >
           {peopleSummary(node)}
           <ChevronRight size={15} />
@@ -352,7 +371,24 @@ export function WorkflowCanvas({
         );
         break;
       }
-      if (node.type !== "CONDITION") {
+      if (node.type === "JOIN") {
+        output.push(
+          <div key={id} className="oa-flow-join">
+            <GitFork size={14} />
+            {node.name} · 全部支路完成
+          </div>,
+        );
+        if (node.next)
+          output.push(
+            connector(
+              { sourceId: id, branchIndex: null, targetId: node.next },
+              `在“${node.name}”后添加节点`,
+            ),
+          );
+        id = node.next;
+        continue;
+      }
+      if (node.type !== "CONDITION" && node.type !== "PARALLEL") {
         output.push(nodeCard(node));
         if (node.next)
           output.push(
@@ -375,33 +411,46 @@ export function WorkflowCanvas({
         continue;
       }
       const join = findWorkflowConditionJoin(spec, node.id);
+      const parallel = node.type === "PARALLEL";
+      const branchCount = parallel
+        ? (node.branches?.length ?? 0)
+        : (node.conditions?.length ?? 0);
       if (
         !node.next ||
-        !node.conditions?.length ||
-        node.conditions.some((rule) => !rule.next)
+        !branchCount ||
+        (node.conditions ?? []).some((rule) => !rule.next)
       )
         damaged = true;
       const branches = [
-        ...(node.conditions ?? []).map((rule, index) => ({
+        ...(parallel
+          ? (node.branches ?? []).map((next) => ({ next }))
+          : (node.conditions ?? [])
+        ).map((rule, index) => ({
           target: rule.next,
           index,
         })),
-        { target: node.next, index: null },
+        ...(!parallel ? [{ target: node.next, index: null }] : []),
       ];
       output.push(
         <section
           key={id}
           className={`oa-condition-group ${join ? "" : "separate-endings"}`}
-          aria-label={`条件分支：${node.name}`}
+          aria-label={`${parallel ? "并行" : "条件"}分支：${node.name}`}
         >
           <div className="oa-condition-toolbar">
-            <Tooltip title="从左到右匹配第一个满足的条件，其他情况走默认分支">
+            <Tooltip
+              title={
+                parallel
+                  ? "全部支路同时进入，全部完成后汇合"
+                  : "从左到右匹配第一个满足的条件，其他情况走默认分支"
+              }
+            >
               <button
                 type="button"
                 disabled={!editable}
                 onClick={() => onEditNode(node, null)}
               >
-                <GitBranch size={14} />
+                {parallel ? <GitFork size={14} /> : <GitBranch size={14} />}
                 {node.name}
               </button>
             </Tooltip>
@@ -409,10 +458,10 @@ export function WorkflowCanvas({
               <Button
                 size="small"
                 icon={<Plus size={13} />}
-                disabled={(node.conditions?.length ?? 0) >= 10}
+                disabled={branchCount >= 10}
                 onClick={() => mutate(() => addWorkflowBranch(spec, node.id))}
               >
-                添加条件
+                {parallel ? "添加支路" : "添加条件"}
               </Button>
             )}
             {editable && (
@@ -431,13 +480,17 @@ export function WorkflowCanvas({
                 <div className="oa-branch-rail top" />
                 <div className="oa-branch-rule">
                   <div className="oa-branch-header">
-                    <b>{index === null ? "其他情况" : `条件${index + 1}`}</b>
+                    <b>
+                      {index === null
+                        ? "其他情况"
+                        : `${parallel ? "支路" : "条件"}${index + 1}`}
+                    </b>
                     {index !== null && editable && (
                       <Space size={0}>
                         <Button
                           type="text"
                           size="small"
-                          aria-label={`条件${index + 1}优先级前移`}
+                          aria-label={`${parallel ? "支路" : "条件"}${index + 1}${parallel ? "位置" : "优先级"}前移`}
                           disabled={index === 0}
                           icon={<ArrowLeft size={12} />}
                           onClick={() =>
@@ -454,10 +507,8 @@ export function WorkflowCanvas({
                         <Button
                           type="text"
                           size="small"
-                          aria-label={`条件${index + 1}优先级后移`}
-                          disabled={
-                            index === (node.conditions?.length ?? 1) - 1
-                          }
+                          aria-label={`${parallel ? "支路" : "条件"}${index + 1}${parallel ? "位置" : "优先级"}后移`}
+                          disabled={index === branchCount - 1}
                           icon={<ArrowRight size={12} />}
                           onClick={() =>
                             mutate(() =>
@@ -473,14 +524,15 @@ export function WorkflowCanvas({
                         <Button
                           type="text"
                           size="small"
-                          aria-label={`删除条件${index + 1}`}
-                          disabled={(node.conditions?.length ?? 0) <= 1}
+                          aria-label={`删除${parallel ? "支路" : "条件"}${index + 1}`}
+                          disabled={branchCount <= (parallel ? 2 : 1)}
                           icon={<Trash2 size={12} />}
                           onClick={() =>
                             modal.confirm({
-                              title: `删除条件${index + 1}？`,
-                              content:
-                                "移除这一条件及它独有的后续节点；公共后续流程会保留。",
+                              title: `删除${parallel ? "支路" : "条件"}${index + 1}？`,
+                              content: parallel
+                                ? "移除该支路及它独有的节点；其余支路、专属汇合和公共后续保留。并行组至少保留两条支路。"
+                                : "移除这一条件及它独有的后续节点；公共后续流程会保留。",
                               centered: true,
                               okText: "删除",
                               okButtonProps: { danger: true },
@@ -502,19 +554,21 @@ export function WorkflowCanvas({
                         ? "unconfigured"
                         : ""
                     }
-                    disabled={index === null || !editable}
+                    disabled={parallel || index === null || !editable}
                     onClick={() => onEditNode(node, index)}
                   >
-                    {index === null
-                      ? "未命中其他条件时进入"
-                      : conditionSummary(node, index)}
-                    {index !== null && <ChevronRight size={14} />}
+                    {parallel
+                      ? "与其他支路同时执行"
+                      : index === null
+                        ? "未命中其他条件时进入"
+                        : conditionSummary(node, index)}
+                    {index !== null && !parallel && <ChevronRight size={14} />}
                   </button>
                 </div>
                 {target ? (
                   connector(
                     { sourceId: node.id, branchIndex: index, targetId: target },
-                    `在“${node.name}”${index === null ? "默认分支" : `条件${index + 1}`}中添加节点`,
+                    `在“${node.name}”${index === null ? "默认分支" : `${parallel ? "支路" : "条件"}${index + 1}`}中添加节点`,
                   )
                 ) : (
                   <Alert type="error" title="分支未连接" />
@@ -525,7 +579,7 @@ export function WorkflowCanvas({
               </div>
             ))}
           </div>
-          {join && (
+          {join && !parallel && (
             <div className="oa-flow-connector">
               {editable && (
                 <InsertControl

@@ -183,6 +183,16 @@ export function removeWorkflowField(
     throw new Error(
       `字段被条件节点“${referenced.map((node) => node.name).join("、")}”使用，请先修改分支条件`,
     );
+  const subprocesses = spec.nodes.filter(
+    (node) =>
+      node.type === "SUBPROCESS" &&
+      (Object.values(node.subprocess?.inputs ?? {}).includes(fieldId) ||
+        Object.hasOwn(node.subprocess?.outputs ?? {}, fieldId)),
+  );
+  if (subprocesses.length)
+    throw new Error(
+      `字段被子流程“${subprocesses.map((node) => node.name).join("、")}”映射，请先修改子流程字段映射`,
+    );
   const result = structuredClone(spec);
   result.fields.splice(index, 1);
   for (const node of result.nodes) {
@@ -246,12 +256,12 @@ export function validateWorkflowFields(
           field.maxLength > 10000)
       )
         issue("文本最大长度须为 1 至 10000 的整数");
-      if (
-        (field.min != null && !Number.isFinite(field.min)) ||
-        (field.max != null && !Number.isFinite(field.max))
-      )
+      // 旧模型 number 与新模型十进制字符串使用同一解析器，不转 Number 再判断范围。
+      const minimum = field.min != null ? decimalParts(field.min) : null;
+      const maximum = field.max != null ? decimalParts(field.max) : null;
+      if ((field.min != null && !minimum) || (field.max != null && !maximum))
         issue("数值上下限必须是有限数值");
-      if (field.min != null && field.max != null && field.min > field.max)
+      if (minimum && maximum && compareDecimal(minimum, maximum) > 0)
         issue("数值下限不能大于上限");
 
       if (field.type === "SINGLE" || field.type === "MULTI") {
@@ -317,6 +327,18 @@ export function validateWorkflowFormReferences(
 ): WorkflowFieldIssue[] {
   const issues: WorkflowFieldIssue[] = [];
   for (const node of spec.nodes) {
+    if (node.type === "SUBPROCESS") {
+      const mappings = [
+        ...Object.values(node.subprocess?.inputs ?? {}),
+        ...Object.keys(node.subprocess?.outputs ?? {}),
+      ];
+      for (const id of new Set(mappings))
+        if (!spec.fields.some((field) => field.id === id))
+          issues.push({
+            fieldId: id,
+            message: `子流程“${node.name}”映射的父字段“${id}”不存在，请重新绑定字段`,
+          });
+    }
     if (node.type !== "CONDITION") continue;
     for (const condition of node.conditions ?? []) {
       let rules;
@@ -393,6 +415,20 @@ function compareDecimal(
   const first = left.digits.padEnd(length, "0");
   const second = right.digits.padEnd(length, "0");
   return first === second ? 0 : (first > second ? 1 : -1) * sign;
+}
+
+/**
+ * 属性面板与发布校验共用精确比较：支持旧 number 和新十进制 string，不做浮点转换。
+ * 无法按 Java BigDecimal 语义解析时返回 null，让调用方保留当前输入并展示配置错误。
+ * 只公开值层包装，避免 UI 接触内部 precision/scale 结构或复制另一套比较规则。
+ */
+export function compareWorkflowDecimals(
+  left: unknown,
+  right: unknown,
+): number | null {
+  const first = decimalParts(left);
+  const second = decimalParts(right);
+  return first && second ? compareDecimal(first, second) : null;
 }
 
 /** ISO 日期不交给 Date 自动进位；2026-02-30、非闰年 02-29 必须明确无效。 */

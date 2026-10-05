@@ -18,4 +18,7 @@ public interface FlowRequestRepository
   boolean existsByAttachmentIdsContains(Long fileId);
 
   boolean existsByBusinessTypeAndBusinessId(String businessType, Long businessId);
+
+  /** 子申请保留历史；父申请取消时仅传播到尚在运行的子申请。 */
+  java.util.List<FlowRequest> findByParentRequestIdOrderByIdAsc(Long parentRequestId);
 }

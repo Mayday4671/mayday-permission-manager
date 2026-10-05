@@ -24,8 +24,9 @@ export interface WorkflowField {
   type: FieldType;
   required?: boolean;
   width?: 12 | 24;
-  min?: number;
-  max?: number;
+  /** OA 字段上下限以十进制字符串传输，兼容已发布旧模型中的 JSON number。 */
+  min?: string | number;
+  max?: string | number;
   maxLength?: number;
   options?: string[];
   placeholder?: string;
@@ -69,7 +70,14 @@ export type WorkflowAction =
 export interface WorkflowNode {
   id: string;
   name: string;
-  type: "APPROVAL" | "COPY" | "CONDITION" | "END";
+  type:
+    | "APPROVAL"
+    | "COPY"
+    | "CONDITION"
+    | "PARALLEL"
+    | "JOIN"
+    | "SUBPROCESS"
+    | "END";
   next?: string;
   source?: "USERS" | "ROLES" | "DEPARTMENT_LEADER";
   assigneeIds?: number[];
@@ -80,6 +88,14 @@ export interface WorkflowNode {
   conditions?: WorkflowCondition[];
   /** 节点进入后计算期限，留空不提醒；同一任务最多一次自动超时提醒。 */
   timeoutMinutes?: number | null;
+  /** 并行全部执行这些入口，next 是专属汇合；不与条件的择一路线混用。 */
+  branches?: string[];
+  /** 绑定不可变版本；输入为子字段→父字段，输出为父字段→子字段。 */
+  subprocess?: {
+    versionId: number | null;
+    inputs: Record<string, string>;
+    outputs: Record<string, string>;
+  } | null;
 }
 export interface WorkflowSpec {
   fields: WorkflowField[];
@@ -122,9 +138,11 @@ export interface WorkflowTask extends BaseRecord {
   originalAssigneeName?: string | null;
   delegationId?: number | null;
   assignmentNote?: string | null;
+  executionTokenId?: string | null;
   status: string;
   mandatory: boolean;
   decidedAt: string | null;
+  activatedAt?: string | null;
   dueAt: string | null;
   timeoutNotifiedAt: string | null;
   runNumber: number;
@@ -133,6 +151,12 @@ export interface WorkflowTask extends BaseRecord {
   readAt: string | null;
 }
 export interface WorkflowHistory extends BaseRecord {
+  subprocessRepair?: {
+    versionId: number;
+    childNodeName: string;
+    before: { value: number; label: string }[];
+    after: { value: number; label: string }[];
+  } | null;
   actorName: string;
   action: string;
   comment: string | null;
@@ -143,6 +167,9 @@ export interface WorkflowHistory extends BaseRecord {
   nodeVisit: number;
   targetNodeId?: string;
   submittedValues?: Record<string, unknown>;
+  /** 历史表单描述和附件按该提交轮的已激活任务授权，与当前轮敏感值分离。 */
+  fields?: WorkflowField[];
+  files?: FileRecord[];
 }
 export interface ApprovalRecord extends BaseRecord {
   title: string;
@@ -161,23 +188,50 @@ export interface ApprovalRecord extends BaseRecord {
   lastRemindedAt: string | null;
   runNumber: number;
   submittedAt: string | null;
+  parentRequestId?: number | null;
+  rootRequestId?: number | null;
 }
 export interface ApprovalDetail extends ApprovalRecord {
   fields: WorkflowField[];
   values: Record<string, unknown>;
+  /** 仅原申请人返回 true；未提交修改与上一已提交轮隔离，终止后也不作为审批结果展示。 */
+  hasPrivateDraft?: boolean;
   valueLabels: Record<string, string>;
   files: FileRecord[];
   tasks: WorkflowTask[];
   history: WorkflowHistory[];
   myTaskId: number | null;
+  /** 服务器核验后的本人当前待办；并行同人多个节点时用于切换办理上下文。 */
+  myTasks?: { id: number; nodeId: string; nodeName: string }[];
   actions: WorkflowAction[];
   writable: string[];
   canWithdraw: boolean;
   canComment: boolean;
   canRemind: boolean;
+  /** 服务器按实际活动待办和申请级冷却返回，客户端不从摘要节点猜测不可催办原因。 */
+  remindUnavailableReason?: string | null;
   canEdit: boolean;
   canTerminate: boolean;
   canHandover?: boolean;
+  canRecover?: boolean;
+  canRepairSubprocess?: boolean;
+  canViewParent?: boolean;
+  execution?: {
+    tokenId: string;
+    nodeId: string;
+    status: string;
+    parentTokenId: string | null;
+    childRequestId: number | null;
+    error?: string | null;
+  }[];
+  childRequests?: {
+    id: number;
+    name: string;
+    status: string;
+    versionId: number;
+    createdAt: string;
+    canView: boolean;
+  }[];
   handoverSources?: { value: number; label: string }[];
   returnTargets: { id: string; name: string }[];
   unreadCopies: number;
@@ -229,6 +283,10 @@ export const actionNames: Record<string, string> = {
   REMIND: "催办",
   DELEGATE: "委托",
   HANDOVER: "人员交接",
+  RECOVER: "恢复执行",
+  SUBPROCESS_START: "启动子流程",
+  SUBPROCESS_RESULT: "子流程结果",
+  SUBPROCESS_REPAIR: "子流程人员修复",
 };
 export const fieldNames: Record<FieldType, string> = {
   TEXT: "单行文字",

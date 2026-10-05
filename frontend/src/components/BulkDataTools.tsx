@@ -4,6 +4,7 @@ import {
   Button,
   Modal,
   Progress,
+  Popconfirm,
   Space,
   Tag,
   Tooltip,
@@ -14,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../lib/auth";
 import {
   commitImport,
+  controlBulkJob,
   createExport,
   downloadBulkResult,
   downloadBulkTemplate,
@@ -33,6 +35,7 @@ const statuses = {
   RUNNING: "导出中",
   SUCCEEDED: "已完成",
   FAILED: "失败",
+  CANCELLED: "已取消",
 };
 
 /** 通用导入预览、原子提交、错误清单与异步导出进度；只为显式注册的业务资源启用。 */
@@ -55,6 +58,8 @@ export function BulkDataTools({
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [controlling, setControlling] = useState<number | null>(null);
+  const [exportKey, setExportKey] = useState(crypto.randomUUID());
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const [previewSize, setPreviewSize] = useState(5);
   const importAllowed =
@@ -98,7 +103,8 @@ export function BulkDataTools({
   const startExport = async () => {
     setExporting(true);
     try {
-      await createExport(resource, filters);
+      await createExport(resource, filters, exportKey);
+      setExportKey(crypto.randomUUID());
       setJobsOpen(true);
       void jobs.refetch();
       message.success("导出任务已创建");
@@ -431,7 +437,7 @@ export function BulkDataTools({
             {
               title: "操作",
               key: "actions",
-              width: 90,
+              width: 150,
               render: (_, job) =>
                 job.kind === "EXPORT" && job.status === "SUCCEEDED" ? (
                   <Button
@@ -448,6 +454,43 @@ export function BulkDataTools({
                   >
                     下载
                   </Button>
+                ) : job.kind === "EXPORT" ? (
+                  <Popconfirm
+                    title={
+                      ["QUEUED", "RUNNING"].includes(job.status)
+                        ? "取消此导出作业？"
+                        : "重新执行此导出作业？"
+                    }
+                    onConfirm={async () => {
+                      if (controlling !== null) return;
+                      setControlling(job.id);
+                      try {
+                        await controlBulkJob(
+                          job.id,
+                          ["QUEUED", "RUNNING"].includes(job.status)
+                            ? "cancel"
+                            : "retry",
+                        );
+                        await jobs.refetch();
+                        message.success("作业状态已更新");
+                      } catch (error) {
+                        message.error((error as Error).message);
+                      } finally {
+                        setControlling(null);
+                      }
+                    }}
+                  >
+                    <Button
+                      type="link"
+                      size="small"
+                      disabled={controlling !== null}
+                      loading={controlling === job.id}
+                    >
+                      {["QUEUED", "RUNNING"].includes(job.status)
+                        ? "取消"
+                        : "重试"}
+                    </Button>
+                  </Popconfirm>
                 ) : null,
             },
           ]}

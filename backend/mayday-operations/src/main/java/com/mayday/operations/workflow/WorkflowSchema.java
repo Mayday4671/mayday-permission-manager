@@ -1,6 +1,7 @@
 package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessException;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -11,9 +12,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import tools.jackson.databind.annotation.JsonSerialize;
 
 /**
- * 运行引擎和设计器共用的发布契约。只支持无循环的审批/条件/结束节点，禁止把未实现的节点保存为可执行流程。 所有 ID 均稳定且与显示名称无关；已发布的 JSON
+ * 运行引擎和设计器共用的发布契约。支持无循环的审批、条件、并行汇合与固定版本子流程，禁止把未实现的节点保存为可执行流程。 所有 ID 均稳定且与显示名称无关；已发布的 JSON
  * 是不可变快照，后续编辑只产生下一发布版本。
  */
 public final class WorkflowSchema {
@@ -26,8 +28,12 @@ public final class WorkflowSchema {
       String type,
       Boolean required,
       Integer width,
-      BigDecimal min,
-      BigDecimal max,
+      @Schema(type = "string", description = "精确十进制下限；兼容旧请求中的 JSON 数字")
+          @JsonSerialize(using = WorkflowDecimalSerializer.class)
+          BigDecimal min,
+      @Schema(type = "string", description = "精确十进制上限；兼容旧请求中的 JSON 数字")
+          @JsonSerialize(using = WorkflowDecimalSerializer.class)
+          BigDecimal max,
       Integer maxLength,
       List<String> options,
       String placeholder,
@@ -91,6 +97,15 @@ public final class WorkflowSchema {
     }
   }
 
+  /** 输入按“子字段→父字段”、输出按“父字段→子字段”绑定；版本编号不可用定义最新版本代替。 */
+  public record Subprocess(
+      Long versionId, Map<String, String> inputs, Map<String, String> outputs) {
+    public Subprocess {
+      inputs = inputs == null ? Map.of() : Map.copyOf(inputs);
+      outputs = outputs == null ? Map.of() : Map.copyOf(outputs);
+    }
+  }
+
   /** 节点保存人员来源、会签规则、字段和动作授权；timeoutMinutes 为空表示不自动提醒。 */
   public record Node(
       String id,
@@ -104,7 +119,40 @@ public final class WorkflowSchema {
       Set<String> writable,
       Set<String> actions,
       List<Condition> conditions,
-      Integer timeoutMinutes) {
+      Integer timeoutMinutes,
+      List<String> branches,
+      Subprocess subprocess) {
+    /** 既有模型及 Java 扩展沿用原签名；没有新增属性时保持单线审批语义。 */
+    public Node(
+        String id,
+        String name,
+        String type,
+        String next,
+        String source,
+        List<Long> assigneeIds,
+        String mode,
+        Set<String> readable,
+        Set<String> writable,
+        Set<String> actions,
+        List<Condition> conditions,
+        Integer timeoutMinutes) {
+      this(
+          id,
+          name,
+          type,
+          next,
+          source,
+          assigneeIds,
+          mode,
+          readable,
+          writable,
+          actions,
+          conditions,
+          timeoutMinutes,
+          List.of(),
+          null);
+    }
+
     /** 旧流程 JSON 未包含超时配置时保持原行为，已有 Java 扩展调用也可继续使用原构造签名。 */
     public Node(
         String id,
@@ -139,6 +187,7 @@ public final class WorkflowSchema {
       writable = writable == null ? Set.of() : Set.copyOf(writable);
       actions = actions == null ? Set.of("APPROVE", "REJECT") : Set.copyOf(actions);
       conditions = conditions == null ? List.of() : List.copyOf(conditions);
+      branches = branches == null ? List.of() : List.copyOf(branches);
     }
   }
 
@@ -316,7 +365,7 @@ public final class WorkflowSchema {
           "节点 ID 必须唯一且格式正确");
       require(
           text(n.name(), 80)
-              && Set.of("APPROVAL", "COPY", "CONDITION", "END")
+              && Set.of("APPROVAL", "COPY", "CONDITION", "PARALLEL", "JOIN", "SUBPROCESS", "END")
                   .contains(Objects.toString(n.type(), "")),
           "节点名称或类型无效");
       require(
@@ -398,21 +447,24 @@ public final class WorkflowSchema {
     Set<String> visiting = new HashSet<>(), done = new HashSet<>();
     walk(s.startNodeId(), nodes, visiting, done);
     require(done.size() == nodes.size(), "存在无法从起点到达的节点");
-    require(s.nodes().stream().anyMatch(n -> "APPROVAL".equals(n.type())), "流程至少需要一个审批节点");
+    WorkflowOrchestration.validate(s);
+    require(
+        s.nodes().stream().anyMatch(n -> Set.of("APPROVAL", "SUBPROCESS").contains(n.type())),
+        "流程至少需要一个审批或子流程节点");
     approvalOnEveryPath(s.startNodeId(), nodes, false, new HashSet<>());
   }
 
   private static void approvalOnEveryPath(
       String id, Map<String, Node> nodes, boolean passed, Set<String> checked) {
     Node n = nodes.get(id);
-    passed = passed || "APPROVAL".equals(n.type());
+    passed = passed || Set.of("APPROVAL", "SUBPROCESS").contains(n.type());
     if (!checked.add(id + ":" + passed)) return;
     if ("END".equals(n.type())) {
       require(passed, "每条分支必须经过至少一个审批节点");
       return;
     }
-    approvalOnEveryPath(n.next(), nodes, passed, checked);
-    for (Condition c : n.conditions()) approvalOnEveryPath(c.next(), nodes, passed, checked);
+    for (String exit : WorkflowOrchestration.exits(n))
+      approvalOnEveryPath(exit, nodes, passed, checked);
   }
 
   private static void walk(
@@ -423,8 +475,7 @@ public final class WorkflowSchema {
     visiting.add(id);
     Node n = nodes.get(id);
     if (!"END".equals(n.type())) {
-      walk(n.next(), nodes, visiting, done);
-      for (Condition c : n.conditions()) walk(c.next(), nodes, visiting, done);
+      for (String exit : WorkflowOrchestration.exits(n)) walk(exit, nodes, visiting, done);
     }
     visiting.remove(id);
     done.add(id);

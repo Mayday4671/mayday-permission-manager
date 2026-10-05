@@ -3,6 +3,7 @@ import { Alert, App, Button, Form, Input, Switch, Tag, Tooltip } from "antd";
 import { KeyRound } from "lucide-react";
 import { ResourcePage } from "../components/ResourcePage";
 import { FormModal } from "../components/FormModal";
+import { IdentityResetMfa } from "../components/IdentityResetMfa";
 import { DepartmentField } from "../components/DepartmentSelect";
 import { RoleSelect, PostSelect } from "../components/LookupSelect";
 import { DictionaryTag } from "../components/DictionarySelect";
@@ -140,7 +141,12 @@ export function UsersPage() {
       createAllowed={session?.dataScopes.users === "ALL"}
       canDelete={(user) => user.username !== "admin" && !isSelf(user)}
       extraActions={(user) =>
-        can("users:reset") ? <ResetPassword user={user} /> : null
+        can("users:reset") ? (
+          <>
+            <ResetPassword user={user} />
+            <IdentityResetMfa user={user} />
+          </>
+        ) : null
       }
       columns={[
         {

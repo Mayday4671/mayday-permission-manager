@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -83,7 +84,7 @@ class RealtimeWorkflowTest {
   void streamRequiresLiveAccountAndCurrentDomainPermission() {
     TokenService tokens = mock(TokenService.class);
     AccessPolicy access = mock(AccessPolicy.class);
-    RealtimeStreams streams = new RealtimeStreams(tokens, access);
+    RealtimeStreams streams = new RealtimeStreams(tokens, access, journal());
     assertThrows(BusinessException.class, () -> streams.open("expired"));
     SysUser user = user(1L);
     when(tokens.authenticate("valid")).thenReturn(Optional.of(user));
@@ -105,7 +106,7 @@ class RealtimeWorkflowTest {
     when(tokens.authenticate("second")).thenReturn(Optional.of(second));
     when(access.hasFor(first, "messages:view")).thenReturn(true);
     when(access.hasFor(second, "messages:view")).thenReturn(true);
-    RealtimeStreams streams = new RealtimeStreams(tokens, access);
+    RealtimeStreams streams = new RealtimeStreams(tokens, access, journal());
     for (int count = 0; count < 4; count++) streams.open("first");
     assertThrows(BusinessException.class, () -> streams.open("first"));
     streams.open("second");
@@ -157,7 +158,13 @@ class RealtimeWorkflowTest {
     when(tasks.findById(1L)).thenReturn(Optional.of(task));
     when(requests.lockById(10L)).thenReturn(Optional.of(request));
     WorkflowReminders reminders =
-        new WorkflowReminders(tasks, requests, events, entityManager, realtime);
+        new WorkflowReminders(
+            tasks,
+            requests,
+            events,
+            entityManager,
+            realtime,
+            mock(com.mayday.operations.workflow.WorkflowOrchestrator.class));
     reminders.timeout(1L);
     reminders.timeout(1L);
     verify(events, times(1)).enqueue(eq(request), eq(2L), eq("timeout:task:1"), anyString());
@@ -172,5 +179,31 @@ class RealtimeWorkflowTest {
     user.setId(id);
     user.setEnabled(true);
     return user;
+  }
+
+  /** 测试共享登记契约而不重新引入生产本机配额；实际跨实例配额由双 Java 专项验证。 */
+  private static com.mayday.operations.realtime.RealtimeJournal journal() {
+    var journal = mock(com.mayday.operations.realtime.RealtimeJournal.class);
+    var connections = new java.util.HashMap<String, Long>();
+    org.mockito.Mockito.doAnswer(
+            call -> {
+              String id = call.getArgument(0);
+              Long user = call.getArgument(1);
+              if (connections.values().stream().filter(user::equals).count() >= 4)
+                throw new BusinessException("实时连接数量过多");
+              connections.put(id, user);
+              return null;
+            })
+        .when(journal)
+        .register(anyString(), anyLong());
+    org.mockito.Mockito.doAnswer(
+            call -> {
+              connections.remove(call.getArgument(0));
+              return null;
+            })
+        .when(journal)
+        .remove(anyString());
+    when(journal.renew(anyString())).thenReturn(true);
+    return journal;
   }
 }

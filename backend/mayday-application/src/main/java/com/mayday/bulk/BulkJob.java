@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
-/** 批量作业的最小持久化状态；导入密码不入库，导出正文写到受控临时目录。 */
+/** 批量作业的最小持久化状态；导入密码不入库，导出临时文件本机生成、成功正文共享持久保存。 */
 @Getter
 @Setter
 @Entity

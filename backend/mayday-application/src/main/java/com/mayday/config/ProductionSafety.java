@@ -7,10 +7,7 @@ import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
+import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -20,16 +17,19 @@ import org.springframework.stereotype.Component;
  * 不自动修改数据库密码或既有账号，失败消息只包含配置名称，不能泄露凭据内容。
  */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
 @RequiredArgsConstructor
-public class ProductionSafety implements InitializingBean, ApplicationRunner {
+@DependsOnDatabaseInitialization
+public class ProductionSafety implements InitializingBean {
   private final Environment environment;
   private final UserRepository users;
   private final PasswordEncoder encoder;
   private static final Set<String> EXAMPLE_SECRETS =
       Set.of("MaydayDb_2026_local", "MaydayRoot_2026_local", "Mayday@2026");
 
-  /** Bean初始化阶段拒绝不安全配置，不能等到首次业务请求时才发现生产门禁未通过。 */
+  /**
+   * 迁移完成后、Web 生命周期开始前校验配置与既有账号；不能在 ApplicationRunner 中检查后再退出。 空库没有既有管理员时继续初始化，后续 BootstrapData
+   * 只能使用已通过门禁的强密码创建账号。
+   */
   @Override
   public void afterPropertiesSet() {
     if (!production()) return;
@@ -50,12 +50,11 @@ public class ProductionSafety implements InitializingBean, ApplicationRunner {
       failures.add("MAYDAY_PUBLIC_ORIGIN必须是无凭据/路径/查询参数的HTTPS站点来源");
     if (!failures.isEmpty())
       throw new IllegalStateException("生产启动检查未通过：" + String.join("；", failures));
+    verifyExistingAdministrator();
   }
 
-  /** 初始化既有库后检查管理员是否仍使用公开示例密码；修改环境变量不能冒充已经轮换数据库凭据。 */
-  @Override
-  public void run(ApplicationArguments arguments) {
-    if (!production()) return;
+  /** 修改环境变量不能冒充已经轮换数据库凭据；仅验证，不覆盖账号或在错误中公开密码摘要。 */
+  private void verifyExistingAdministrator() {
     users
         .findByUsername("admin")
         .ifPresent(

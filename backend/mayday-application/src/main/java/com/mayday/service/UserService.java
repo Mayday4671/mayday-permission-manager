@@ -41,6 +41,7 @@ public class UserService {
   private final PasswordEncoder encoder;
   private final TokenService tokens;
   private final ChangeAuditService changeAudit;
+  private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   /** 将账号转换为页面DTO，部门失效显示未分配；邮箱和电话按当前操作者的独立字段读取权限脱敏。 */
   public UserView view(SysUser u) {
@@ -138,7 +139,11 @@ public class UserService {
     if (contactPermission("phone", "write")) u.setPhone(req.phone());
     else if (req.phone() != null && !Objects.equals(req.phone(), u.getPhone()))
       throw new AccessDeniedException("没有修改电话的权限");
-    if (id != null && !req.enabled()) tokens.revokeUser(id);
+    if (id != null && !req.enabled()) {
+      tokens.revokeUser(id);
+      // 停用必须同时撤销尚未完成的首因素证明，重新启用不能恢复原 MFA/OIDC 绑定挑战。
+      jdbc.update("delete from sys_identity_challenge where user_id=?", id);
+    }
     users.saveAndFlush(u);
     changeAudit.record(
         "用户", u.getId(), id == null ? "创建账号" : "编辑账号/角色分配", before, auditSnapshot(u));
@@ -153,6 +158,11 @@ public class UserService {
       throw new BusinessException("不能删除初始管理员或当前账号");
     tokens.revokeUser(id);
     changeAudit.record("用户", id, "删除账号", auditSnapshot(u), Map.of());
+    // 通过既有数据范围、角色等级与保护账号检查后，精确清理该账号的身份材料；不删除其他业务历史。
+    jdbc.update("delete from sys_identity_challenge where user_id=?", id);
+    jdbc.update("delete from sys_mfa_recovery where user_id=?", id);
+    jdbc.update("delete from sys_mfa_credential where user_id=?", id);
+    jdbc.update("delete from sys_external_identity where user_id=?", id);
     users.delete(u);
   }
 
@@ -172,7 +182,10 @@ public class UserService {
     for (var user : selected) {
       Map<String, Object> before = auditSnapshot(user);
       user.setEnabled(req.enabled());
-      if (!req.enabled()) tokens.revokeUser(user.getId());
+      if (!req.enabled()) {
+        tokens.revokeUser(user.getId());
+        jdbc.update("delete from sys_identity_challenge where user_id=?", user.getId());
+      }
       changeAudit.record(
           "用户", user.getId(), req.enabled() ? "启用账号" : "停用账号", before, auditSnapshot(user));
     }

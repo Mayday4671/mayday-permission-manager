@@ -1,7 +1,7 @@
 /** 门户栏目与分类独立、公开资源隔离、首页编排及并发版本的真实 MySQL 验收；只允许独立验证库。 */
+import { isolatedSql } from "./support/isolated-compose.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { loginWithCaptcha } from "./support/captcha.mjs";
 const base = process.env.API_BASE;
 const isolated =
@@ -11,26 +11,8 @@ const isolated =
   ["upgrade-db", "fresh-db"].includes(process.env.API_TEST_DATABASE) &&
   !!base;
 function sql(statement) {
-  assert(isolated);
-  const result = spawnSync(
-    "docker",
-    [
-      "compose",
-      "-p",
-      process.env.API_TEST_COMPOSE_PROJECT,
-      "-f",
-      "compose.verify.yaml",
-      "exec",
-      "-T",
-      process.env.API_TEST_DATABASE,
-      "sh",
-      "-c",
-      'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE" --batch --raw --skip-column-names --default-character-set=utf8mb4',
-    ],
-    { input: statement, encoding: "utf8", windowsHide: true },
-  );
-  assert.equal(result.status, 0, "隔离库配置快照失败");
-  return result.stdout.trim();
+  assert(isolated, "SQL 仅允许本次独立验收项目");
+  return isolatedSql(statement, { raw: true }).trim();
 }
 async function call(path, token, method = "GET", data, status = 200) {
   const response = await fetch(base + path, {

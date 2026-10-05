@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -113,7 +114,10 @@ public class JobController {
         id == null
             ? new ScheduledJob()
             : jobs.lock(id).orElseThrow(() -> new BusinessException("任务不存在"));
-    if (id != null) OperationSupport.version(job, req.version());
+    if (id != null) {
+      OperationSupport.version(job, req.version());
+      runner.requireIdle(id);
+    }
     job.setName(req.name());
     job.setHandler(req.handler());
     job.setCron(req.cron());
@@ -129,15 +133,32 @@ public class JobController {
   @Transactional
   public ApiResponse<Void> delete(@PathVariable Long id) {
     access.require("scheduler:delete");
+    runner.requireIdle(id);
     jobs.delete(jobs.lock(id).orElseThrow(() -> new BusinessException("任务不存在")));
     return ApiResponse.ok(null);
   }
 
   /** 手动执行需独立execute权限，可验证未启用配置；返回真实成功或失败记录，失败日志不随业务回滚消失。 */
   @PostMapping("/scheduler/{id}/run")
-  public ApiResponse<JobExecution> run(@PathVariable Long id) {
+  public ApiResponse<JobExecution> run(
+      @PathVariable Long id,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
     access.require("scheduler:execute");
-    return ApiResponse.ok(runner.run(id, true));
+    return ApiResponse.ok(runner.run(id, true, idempotencyKey));
+  }
+
+  /** 执行权限下取消排队或执行中的持久任务，旧租约不可提交成功。 */
+  @PostMapping("/job-logs/{id}/cancel")
+  public ApiResponse<JobExecution> cancel(@PathVariable Long id) {
+    access.require("scheduler:execute");
+    return ApiResponse.ok(runner.cancel(id));
+  }
+
+  /** 执行权限下明确恢复失败/取消记录；仍使用原冻结处理器与稳定幂等键。 */
+  @PostMapping("/job-logs/{id}/retry")
+  public ApiResponse<JobExecution> retry(@PathVariable Long id) {
+    access.require("scheduler:execute");
+    return ApiResponse.ok(runner.retry(id));
   }
 
   /** 查看权限下按配置ID和名称分页读执行历史，即使配置已删除也保留日志供诊断；大结果不默认一次加载。 */

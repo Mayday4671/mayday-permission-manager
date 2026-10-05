@@ -193,9 +193,9 @@ test("管理员交接弹窗选择停用原人、有效新人，携带打开版�
     />,
   );
   const dialog = await screen.findByRole("dialog", { name: "人员交接" });
-  await user.click(within(dialog).getByLabelText("原审批人"));
+  await user.click(within(dialog).getByLabelText("原处理人"));
   await user.click(await screen.findByText("原审批人（已停用）"));
-  await user.click(within(dialog).getByLabelText("新审批人"));
+  await user.click(within(dialog).getByLabelText("新处理人"));
   await user.click(await screen.findByText("接收审批人"));
   await user.type(within(dialog).getByLabelText("交接原因"), "离职移交");
   await user.click(within(dialog).getByRole("button", { name: "确认交接" }));
@@ -229,9 +229,9 @@ test("交接请求版本冲突保留输入，不能误报成功", async () => {
     />,
   );
   const dialog = await screen.findByRole("dialog", { name: "人员交接" });
-  await user.click(within(dialog).getByLabelText("原审批人"));
+  await user.click(within(dialog).getByLabelText("原处理人"));
   await user.click(await screen.findByText("待交接人员"));
-  await user.click(within(dialog).getByLabelText("新审批人"));
+  await user.click(within(dialog).getByLabelText("新处理人"));
   await user.click(await screen.findByText("接收审批人"));
   await user.type(within(dialog).getByLabelText("交接原因"), "交接说明");
   await user.click(within(dialog).getByRole("button", { name: "确认交接" }));

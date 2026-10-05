@@ -42,22 +42,22 @@ export function WorkflowHandoverModal({
       <Alert
         type="warning"
         className="form-message"
-        title="交接当前待办和后续节点人员"
-        description="保留原审批记录、顺签次序、字段权限和处理期限。已办结果不更改，发布定义也不更改；原人的有效待办会失效。"
+        title="交接当前待办和后续审批、抄送人员"
+        description="保留原审批记录、顺签次序、字段权限和处理期限。审批目标需要审批权限，抄送目标只需申请查看权限。已办和已抄送记录、发布定义不更改；原人的有效待办会失效。"
       />
       <Form.Item
         name="fromUserId"
-        label="原审批人"
+        label="原处理人"
         rules={[{ required: true, message: "请选择要交接的原人员" }]}
       >
         <Select
-          placeholder="包含已停用人员"
+          placeholder="包含已停用人员；全用户范围可修复已删除来源"
           options={record?.handoverSources ?? []}
         />
       </Form.Item>
       <Form.Item
         name="targetUserId"
-        label="新审批人"
+        label="新处理人"
         rules={[{ required: true, message: "请选择新审批人" }]}
       >
         <UserSelect />

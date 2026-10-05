@@ -1,8 +1,12 @@
 import { useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Alert, Button, Form, Input } from "antd";
+import { useQuery } from "@tanstack/react-query";
 import { Brand } from "../components/shared";
 import { SlideCaptcha } from "../components/SlideCaptcha";
+import { IdentityMfaVerify } from "../components/IdentityMfaVerify";
+import { api } from "../lib/api";
+import { startEnterpriseLogin, type IdentityProvider } from "../lib/identity";
 import { useAuth } from "../lib/auth";
 import { useModules } from "../lib/modules";
 import { adminRouteTarget } from "../lib/workspace-model";
@@ -16,7 +20,13 @@ interface LoginCredentials {
 /** 登录使用真实认证接口。错误就地展示，初始凭证只写入项目说明，不在公共页面泄露。 */
 export function LoginPage() {
   const modules = useModules();
-  const { login, session, can } = useAuth();
+  const { login, completeLogin, session, can } = useAuth();
+  const providers = useQuery({
+    queryKey: ["identity-providers"],
+    queryFn: () => api<IdentityProvider[]>("/auth/identity/providers"),
+    retry: false,
+  });
+  const [mfaChallenge, setMfaChallenge] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   // 导航状态不是可信数据；只接受后台路径，具体页面权限仍由路由守卫重新验证。
@@ -46,8 +56,15 @@ export function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      await login(values.username, values.password, captchaToken);
-      navigate(requestedPath ?? "/admin");
+      const result = await login(
+        values.username,
+        values.password,
+        captchaToken,
+      );
+      form.resetFields(["password"]);
+      if (result?.mfaRequired && result.challengeId)
+        setMfaChallenge(result.challengeId);
+      else navigate(requestedPath ?? "/admin");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -69,7 +86,7 @@ export function LoginPage() {
             <Brand />
           </Link>
           <h2>后台登录</h2>
-          <p>请输入账号和密码</p>
+          <p>{mfaChallenge ? "验证登录身份" : "请输入账号和密码"}</p>
           {error && (
             <Alert
               title={error}
@@ -78,48 +95,84 @@ export function LoginPage() {
               className="login-error"
             />
           )}
-          <Form<LoginCredentials>
-            form={form}
-            layout="vertical"
-            onFinish={async (values) => {
-              if (loading || credentials) return;
-              setError("");
-              setCredentials(values);
-            }}
-            requiredMark={false}
-          >
-            <Form.Item
-              name="username"
-              label="用户名"
-              rules={[{ required: true, message: "请输入用户名" }]}
+          {mfaChallenge ? (
+            <IdentityMfaVerify
+              challengeId={mfaChallenge}
+              onCancel={() => {
+                setMfaChallenge(null);
+                setError("");
+              }}
+              onVerified={async (result) => {
+                await completeLogin(result);
+                navigate(requestedPath ?? "/admin");
+              }}
+            />
+          ) : (
+            <Form<LoginCredentials>
+              form={form}
+              layout="vertical"
+              onFinish={async (values) => {
+                if (loading || credentials) return;
+                setError("");
+                setCredentials(values);
+              }}
+              requiredMark={false}
             >
-              <Input
+              <Form.Item
+                name="username"
+                label="用户名"
+                rules={[{ required: true, message: "请输入用户名" }]}
+              >
+                <Input
+                  size="large"
+                  autoComplete="username"
+                  placeholder="输入你的用户名"
+                />
+              </Form.Item>
+              <Form.Item
+                name="password"
+                label="密码"
+                rules={[{ required: true, message: "请输入密码" }]}
+              >
+                <Input.Password
+                  size="large"
+                  autoComplete="current-password"
+                  placeholder="输入你的登录密码"
+                />
+              </Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
                 size="large"
-                autoComplete="username"
-                placeholder="输入你的用户名"
-              />
-            </Form.Item>
-            <Form.Item
-              name="password"
-              label="密码"
-              rules={[{ required: true, message: "请输入密码" }]}
-            >
-              <Input.Password
-                size="large"
-                autoComplete="current-password"
-                placeholder="输入你的登录密码"
-              />
-            </Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              size="large"
-              block
-              loading={loading}
-            >
-              登录
-            </Button>
-          </Form>
+                block
+                loading={loading}
+              >
+                登录
+              </Button>
+            </Form>
+          )}
+          {!mfaChallenge &&
+            providers.data?.map((provider) => (
+              <Button
+                key={provider.id}
+                block
+                style={{ marginTop: 12 }}
+                disabled={loading}
+                onClick={async () => {
+                  if (loading) return;
+                  setLoading(true);
+                  setError("");
+                  try {
+                    await startEnterpriseLogin(provider.id);
+                  } catch (failure) {
+                    setError((failure as Error).message);
+                    setLoading(false);
+                  }
+                }}
+              >
+                {provider.name}登录
+              </Button>
+            ))}
           <p className="login-support">还没有账号？请联系你的团队管理员。</p>
           <SlideCaptcha
             open={credentials !== null}

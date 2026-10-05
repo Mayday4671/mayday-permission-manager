@@ -3,11 +3,11 @@
  * 审批历史按业务规则不能删除，因此 finally 使用精确登记的测试 ID 清理隔离库，
  * 不在生产接口增加“测试后门”，也不会对日常数据库执行清理。
  */
+import { isolatedSql } from "./support/isolated-compose.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loginWithCaptcha } from "./support/captcha.mjs";
 import { purgeTestFiles } from "./support/files-cleanup.mjs";
-import { spawnSync } from "node:child_process";
 const base = process.env.API_BASE;
 const project = process.env.API_TEST_COMPOSE_PROJECT;
 const database = process.env.API_TEST_DATABASE;
@@ -82,33 +82,8 @@ const ids = (list) => {
   return list.length ? list.join(",") : "-1";
 };
 function sql(statement, administrator = false) {
-  assert(isolated, "只允许独立验收项目");
-  const result = spawnSync(
-    "docker",
-    [
-      "compose",
-      "-p",
-      project,
-      "-f",
-      "compose.verify.yaml",
-      "exec",
-      "-T",
-      database,
-      "sh",
-      "-c",
-      administrator
-        ? 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --skip-column-names'
-        : 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --skip-column-names',
-    ],
-    {
-      input: statement,
-      encoding: "utf8",
-      windowsHide: true,
-      maxBuffer: 1024 * 1024,
-    },
-  );
-  assert.equal(result.status, 0, result.stderr);
-  return result.stdout;
+  assert(isolated, "SQL 仅允许本次独立验收项目");
+  return isolatedSql(statement, { administrator, maxBuffer: 1024 * 1024 });
 }
 test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, async (t) => {
   const admin = await login("admin", process.env.ADMIN_PASSWORD);
@@ -616,17 +591,17 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
           total: 999999,
         };
         const request = await submit(definition, { values });
-        assert.equal(request.values.total, 500);
+        assert.equal(request.values.total, "500.00");
         await decide(request.id, a, "APPROVE", { values: { total: 1 } }, 403);
         const modified = await decide(request.id, a, "APPROVE", {
           values: { price: "250.00" },
         });
-        assert.equal(modified.values.total, 1250);
+        assert.equal(modified.values.total, "1250.00");
         assert.equal(modified.currentNodeId, "special");
         const bDetail = await detail(request.id, b.token);
         assert.deepEqual(Object.keys(bDetail.values), ["total"]);
-        assert.equal(bDetail.values.total, 1250);
-        assert.equal(bDetail.history.at(-1).changes.total.after, 1250);
+        assert.equal(bDetail.values.total, "1250.00");
+        assert.equal(bDetail.history.at(-1).changes.total.after, "1250.00");
         await decide(request.id, b, "APPROVE");
         const second = await submit(definition, {
           values: { ...values, kind: "其他", price: "500.00" },
@@ -646,7 +621,7 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
             values: { ...values, price: "0.10", quantity: 3 },
           },
         );
-        assert.equal((await detail(second.id)).values.total, 0.3);
+        assert.equal((await detail(second.id)).values.total, "0.30");
         assert.equal(
           (await decide(second.id, a, "APPROVE")).status,
           "APPROVED",
@@ -678,7 +653,7 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
           { version: saved.version },
           400,
         );
-        assert.equal((await detail(request.id)).values.total, 1250);
+        assert.equal((await detail(request.id)).values.total, "1250.00");
       },
     );
     // OA 生命周期验收使用独立库、真实行锁和权限，不用模拟状态代替业务执行。
@@ -828,7 +803,7 @@ test("审批运行、设计模型和内容审核闭环", { skip: !isolated }, as
         assert.equal(submitted.runNumber, 1);
         assert.deepEqual(
           submitted.history.find((h) => h.action === "SUBMIT").submittedValues,
-          valid,
+          { ...valid, items: [{ item: "交通", cost: "30.25" }] },
         );
         await call(
           `/operations/requests/${draft.id}?version=${submitted.version}`,

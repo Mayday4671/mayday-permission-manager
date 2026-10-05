@@ -10,7 +10,7 @@ import {
   captchaToken,
   captchaRequest,
 } from "./support/captcha.mjs";
-import { spawnSync } from "node:child_process";
+import { isolatedSql } from "./support/isolated-compose.mjs";
 
 const isolated =
   /^mayday-check-\d+-[a-f0-9]{6}$/.test(
@@ -674,31 +674,12 @@ test("隔离数据库权限专项回归", { skip: !isolated }, async (t) => {
           assert(Number.isSafeInteger(user.id));
           assert(["last_active_at", "created_at"].includes(column));
           const minutes = column === "created_at" ? 721 : 31;
-          const result = spawnSync(
-            "docker",
-            [
-              "compose",
-              "-p",
-              process.env.API_TEST_COMPOSE_PROJECT,
-              "-f",
-              "compose.verify.yaml",
-              "exec",
-              "-T",
-              process.env.API_TEST_DATABASE,
-              "sh",
-              "-c",
-              'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE"',
-            ],
-            {
-              // 从真实签发时间相对回拨，避免MySQL会话显示时区与Java UTC存储规则影响超时夹具。
-              input: `UPDATE sys_session SET ${column}=${column}-INTERVAL ${minutes} MINUTE WHERE user_id=${user.id}; SELECT ROW_COUNT();`,
-              encoding: "utf8",
-              windowsHide: true,
-            },
+          // 从真实签发时间相对回拨，避免 MySQL 时区与 Java UTC 存储规则影响超时夹具。
+          const output = isolatedSql(
+            `UPDATE sys_session SET ${column}=${column}-INTERVAL ${minutes} MINUTE WHERE user_id=${user.id}; SELECT ROW_COUNT();`,
           );
-          assert.equal(result.status, 0, "隔离会话时间夹具建立失败");
           assert.match(
-            result.stdout,
+            output,
             /\b1\s*$/,
             "时间回拨必须恰好影响本测试的一条会话",
           );
@@ -735,28 +716,9 @@ test("隔离数据库权限专项回归", { skip: !isolated }, async (t) => {
     // 调度历史没有产品删除入口；仅在已验证的隔离项目中按本测试创建的精确 job_id 清理。
     if (created.jobs.length) {
       assert(created.jobs.every(Number.isSafeInteger));
-      const cleaned = spawnSync(
-        "docker",
-        [
-          "compose",
-          "-p",
-          process.env.API_TEST_COMPOSE_PROJECT,
-          "-f",
-          "compose.verify.yaml",
-          "exec",
-          "-T",
-          process.env.API_TEST_DATABASE,
-          "sh",
-          "-c",
-          'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE"',
-        ],
-        {
-          input: `DELETE FROM ops_job_execution WHERE job_id IN (${created.jobs.join(",")});`,
-          encoding: "utf8",
-          windowsHide: true,
-        },
+      isolatedSql(
+        `DELETE FROM ops_job_execution WHERE job_id IN (${created.jobs.join(",")});`,
       );
-      assert.equal(cleaned.status, 0, "隔离调度历史清理失败");
       for (const id of created.jobs)
         await api(`/operations/scheduler/${id}`, admin, "DELETE");
     }

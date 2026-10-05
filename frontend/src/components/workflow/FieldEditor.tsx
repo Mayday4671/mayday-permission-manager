@@ -189,10 +189,11 @@ export function FieldEditor({
                   {(type === "NUMBER" || type === "MONEY") && (
                     <div className="form-two-columns">
                       <Form.Item name="min" label="最小值">
-                        <InputNumber />
+                        {/* 与现代属性面板一致：旧入口也用字符串保留上下限的所有十进制位。 */}
+                        <InputNumber<string> stringMode />
                       </Form.Item>
                       <Form.Item name="max" label="最大值">
-                        <InputNumber />
+                        <InputNumber<string> stringMode />
                       </Form.Item>
                     </div>
                   )}
@@ -343,7 +344,9 @@ export function FieldEditor({
                                                         ]}
                                                         label="最小值"
                                                       >
-                                                        <InputNumber />
+                                                        <InputNumber<string>
+                                                          stringMode
+                                                        />
                                                       </Form.Item>
                                                       <Form.Item
                                                         name={[
@@ -352,7 +355,9 @@ export function FieldEditor({
                                                         ]}
                                                         label="最大值"
                                                       >
-                                                        <InputNumber />
+                                                        <InputNumber<string>
+                                                          stringMode
+                                                        />
                                                       </Form.Item>
                                                     </div>
                                                   )}

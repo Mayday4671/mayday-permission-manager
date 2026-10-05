@@ -1,10 +1,10 @@
 package com.mayday.bulk;
 
 import com.mayday.common.BusinessException;
+import com.mayday.operations.cluster.DurableTasks;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.repository.UserRepository;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -12,13 +12,13 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -48,6 +48,15 @@ public class BulkService {
   private final TransactionTemplate transactions;
   private final JsonMapper json;
   private final Path spool;
+  private final DurableTasks durable;
+  private final BulkResultStore results;
+  private final Map<Long, DurableTasks.Lease> running = new ConcurrentHashMap<>();
+  private static final String TASK_TYPE = "BULK_EXPORT";
+
+  /** API 节点可关闭本机工作器，由其他实例领取同一持久队列；不关闭作业控制及下载授权。 */
+  @Value("${mayday.bulk.workers-enabled:true}")
+  private boolean workersEnabled = true;
+
   private final ThreadPoolExecutor worker =
       new ThreadPoolExecutor(
           2,
@@ -70,7 +79,9 @@ public class BulkService {
       List<BulkResourceAdapter> adapters,
       PlatformTransactionManager manager,
       JsonMapper json,
-      @Value("${mayday.bulk.spool-directory:${java.io.tmpdir}/mayday-bulk}") String directory) {
+      DurableTasks durable,
+      BulkResultStore results,
+      BulkSpoolCleanup spoolManager) {
     this.jobs = jobs;
     this.users = users;
     this.access = access;
@@ -81,29 +92,12 @@ public class BulkService {
                 Collectors.toUnmodifiableMap(BulkResourceAdapter::resource, adapter -> adapter));
     this.transactions = new TransactionTemplate(manager);
     this.json = json;
-    this.spool = Path.of(directory).toAbsolutePath().normalize();
+    this.durable = durable;
+    this.results = results;
+    this.spool = spoolManager.directory();
   }
 
-  /** 临时导出文件不承诺跨容器保留；单实例重启明确中断任务，用户可重新创建作业。 */
-  @PostConstruct
-  public void initialize() {
-    try {
-      Files.createDirectories(spool);
-    } catch (IOException exception) {
-      throw new IllegalStateException("批量作业临时目录不可写", exception);
-    }
-    transactions.executeWithoutResult(
-        status -> {
-          for (BulkJob job : jobs.findByKindAndStatusIn("EXPORT", ACTIVE)) {
-            job.setStatus("FAILED");
-            job.setFailure("服务已重启，请重新创建导出任务");
-            deleteResult(job);
-          }
-        });
-    cleanup();
-  }
-
-  /** 停止接受新导出并中断执行；持久化任务在下次单实例启动时明确标记失败。 */
+  /** 停止本机线程；未提交作业由其他实例在原租约到期后重领，不影响已完成共享正文。 */
   @PreDestroy
   public void stop() {
     worker.shutdownNow();
@@ -162,8 +156,11 @@ public class BulkService {
         });
   }
 
-  /** 每个账号最多两个未完成作业，全局队列也有上限；拒绝时留下可读失败状态而非失联任务。 */
-  public BulkContracts.JobView export(String resource, BulkContracts.ExportFilter filter) {
+  /** 每个账号最多两个未完成作业；先持久化作业再排队，启动扫描修复排队前崩溃的窄窗口。 */
+  public BulkContracts.JobView export(
+      String resource, BulkContracts.ExportFilter filter, String requestKey) {
+    String idempotencyKey = requestKey == null ? UUID.randomUUID().toString() : requestKey;
+    if (!idempotencyKey.matches("[a-zA-Z0-9-]{16,64}")) throw new BusinessException("导出提交标识无效");
     BulkResourceAdapter adapter = adapter(resource);
     adapter.requireExport();
     if (filter.keyword() != null && filter.keyword().length() > 200
@@ -174,18 +171,24 @@ public class BulkService {
         transactions.execute(
             status -> {
               users.lockById(ownerId).orElseThrow(() -> new AccessDeniedException("账号不存在"));
+              var previous = jobs.findByOwnerIdAndIdempotencyKey(ownerId, idempotencyKey);
+              if (previous.isPresent()) {
+                var found = previous.get();
+                if (!"EXPORT".equals(found.getKind())
+                    || !resource.equals(found.getResource())
+                    || !json.writeValueAsString(filter).equals(found.getQueryJson()))
+                  throw new BusinessException("提交标识已用于其他导出");
+                return found;
+              }
               if (jobs.countByOwnerIdAndKindAndStatusIn(ownerId, "EXPORT", ACTIVE) >= 2)
                 throw new BusinessException("已有两个导出任务执行中，请稍后重试");
               BulkJob created = newJob(ownerId, resource);
               created.setQueryJson(json.writeValueAsString(filter));
+              created.setIdempotencyKey(idempotencyKey);
               created.setResultKey(UUID.randomUUID().toString());
               return jobs.saveAndFlush(created);
             });
-    try {
-      worker.execute(() -> execute(job.getId()));
-    } catch (RejectedExecutionException exception) {
-      fail(job.getId(), "导出队列已满，请稍后重试");
-    }
+    durable.enqueue(TASK_TYPE, String.valueOf(job.getId()), String.valueOf(job.getId()), 3);
     return view(job.getId());
   }
 
@@ -207,8 +210,8 @@ public class BulkService {
     if (!"EXPORT".equals(job.getKind()) || !"SUCCEEDED".equals(job.getStatus()))
       throw new BusinessException("任务尚未完成");
     Path file = result(job.getResultKey(), false);
-    if (!Files.isRegularFile(file)) throw new BusinessException("临时导出文件已清理，请重新创建任务");
-    return new FileSystemResource(file);
+    if (!results.restore(job.getId(), file)) throw new BusinessException("导出正文不可用，请重新创建任务");
+    return results.resource(file);
   }
 
   /** 文件名由注册业务标题和服务器作业编号组成，不采用用户上传名称或目录路径。 */
@@ -246,10 +249,58 @@ public class BulkService {
     return adapter;
   }
 
-  private void execute(Long id) {
+  /** 短扫描只提交已持久化作业；每实例最多两个执行线程，重启后的过期租约重新生成单份正文。 */
+  @Scheduled(fixedDelayString = "${mayday.bulk.poll-ms:1000}", initialDelay = 3000)
+  public synchronized void dispatch() {
+    if (!workersEnabled || worker.isShutdown() || running.size() >= 2) return;
+    // 修复“业务作业已提交、排队之前崩溃”的窄窗口；稳定业务键保证重复协调不创建第二份队列。
+    for (BulkJob job : jobs.findTop100ByKindAndStatusInOrderByIdAsc("EXPORT", ACTIVE)) {
+      String key = String.valueOf(job.getId());
+      if (durable.state(TASK_TYPE, key) == null) durable.enqueue(TASK_TYPE, key, key, 3);
+      else
+        durable.synchronizeTerminal(
+            TASK_TYPE,
+            key,
+            terminal ->
+                jobs.lock(job.getId())
+                    .ifPresent(
+                        current -> {
+                          if (ACTIVE.contains(current.getStatus())) {
+                            current.setStatus(terminal);
+                            current.setFailure(
+                                "FAILED".equals(terminal) ? "自动恢复重试已达上限，可手动重试" : "已取消");
+                          }
+                        }));
+    }
+    while (running.size() < 2) {
+      var lease = durable.claim(TASK_TYPE);
+      if (lease == null) return;
+      running.put(lease.id(), lease);
+      try {
+        worker.execute(() -> execute(lease));
+      } catch (RejectedExecutionException failure) {
+        running.remove(lease.id());
+        durable.failed(lease, "本机工作队列繁忙，稍后恢复", true);
+        return;
+      }
+    }
+  }
+
+  /** 独立心跳不会等待文件或分页工作；取消/失效后不延长租约，旧线程下一次检查会退出。 */
+  @Scheduled(fixedDelay = 5000)
+  public void renewLeases() {
+    for (var lease : running.values()) durable.heartbeat(lease);
+  }
+
+  private void execute(DurableTasks.Lease lease) {
+    long id = Long.parseLong(lease.payload());
     BulkJob job = jobs.findById(id).orElse(null);
-    if (job == null) return;
-    Path temporary = result(job.getResultKey(), true);
+    if (job == null) {
+      durable.failed(lease, "业务作业已清理", false);
+      running.remove(lease.id());
+      return;
+    }
+    Path temporary = spool.resolve(job.getResultKey() + "-" + lease.token() + ".part");
     try {
       int processed = 0;
       try (BufferedWriter output = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8)) {
@@ -265,34 +316,116 @@ public class BulkService {
                   adapter.requireExport();
                   return adapter.exportHeaders();
                 }));
-        update(id, "RUNNING", 0, 0);
+        update(lease, id, "RUNNING", 0, 0);
         for (int page = 1; ; page++) {
-          if (Thread.currentThread().isInterrupted()) throw new BusinessException("导出已中断，请重试");
+          if (Thread.currentThread().isInterrupted() || !durable.heartbeat(lease))
+            throw new DurableTasks.LostLease();
           int currentPage = page;
-          BulkResourceAdapter.ExportPage batch =
-              asOwner(job, () -> adapter.exportPage(filter, currentPage));
+          var batch = asOwner(job, () -> adapter.exportPage(filter, currentPage));
           if (batch.total() > MAX_EXPORT_ROWS || processed + batch.rows().size() > MAX_EXPORT_ROWS)
             throw new BusinessException("单次最多导出 100000 条，请缩小筛选范围");
           for (List<String> row : batch.rows()) CsvCodec.writeRow(output, row);
           processed += batch.rows().size();
-          update(id, "RUNNING", processed, batch.total());
+          output.flush();
+          if (Files.size(temporary) > 32L * 1024 * 1024)
+            throw new BusinessException("单份导出最大 32 MB，请缩小筛选范围");
+          update(lease, id, "RUNNING", processed, batch.total());
           if (batch.rows().isEmpty() || processed >= batch.total()) break;
         }
-        output.flush();
       }
-      // 同文件系统先完成正文再替换正式文件，状态成功只在文件可读后发布。
-      Files.move(temporary, result(job.getResultKey(), false), StandardCopyOption.REPLACE_EXISTING);
-      update(id, "SUCCEEDED", processed, processed);
-    } catch (Exception exception) {
-      String failure =
-          exception instanceof BusinessException || exception instanceof AccessDeniedException
-              ? exception.getMessage()
-              : "导出失败，请稍后重试";
-      fail(id, failure);
-      deleteResult(job);
+      int finalProcessed = processed;
+      durable.finish(
+          lease,
+          () -> {
+            asOwner(
+                job,
+                () -> {
+                  adapter(job.getResource()).requireExport();
+                  return null;
+                });
+            results.save(id, temporary);
+            var current = jobs.lock(id).orElseThrow(DurableTasks.LostLease::new);
+            if ("CANCELLED".equals(current.getStatus())) throw new DurableTasks.LostLease();
+            current.setStatus("SUCCEEDED");
+            current.setFailure(null);
+            current.setProcessedRows(finalProcessed);
+            current.setTotalRows(finalProcessed);
+            return null;
+          });
+    } catch (DurableTasks.LostLease failure) {
+      // 原令牌失效不写业务状态，尤其不能删除新实例已成功发布的正文或覆盖取消结果。
+    } catch (Exception failure) {
+      boolean recoverable =
+          !(failure instanceof BusinessException || failure instanceof AccessDeniedException);
+      String explanation = recoverable ? "导出暂时失败，系统将按重试上限恢复" : failure.getMessage();
+      String safeExplanation = explanation == null ? "导出失败" : explanation;
+      durable.failed(
+          lease,
+          safeExplanation,
+          recoverable,
+          next ->
+              jobs.lock(id)
+                  .ifPresent(
+                      current -> {
+                        current.setStatus(next);
+                        current.setFailure(safeExplanation);
+                      }));
     } finally {
+      running.remove(lease.id());
       SecurityContextHolder.clearContext();
+      try {
+        Files.deleteIfExists(temporary);
+      } catch (IOException ignored) {
+        /* 只清理本租约文件，不触碰其他工作器输出。 */
+      }
     }
+  }
+
+  /** 本人取消立即撤销租约；后台线程不再允许发布成功正文，已成功作业不可假装取消。 */
+  public BulkContracts.JobView cancel(Long id) {
+    BulkJob job = owned(id, false);
+    if (!"EXPORT".equals(job.getKind()) || !ACTIVE.contains(job.getStatus()))
+      throw new BusinessException("作业当前不能取消");
+    if (!durable.cancel(
+        TASK_TYPE,
+        String.valueOf(id),
+        () ->
+            jobs.lock(id)
+                .ifPresent(
+                    current -> {
+                      if (!ACTIVE.contains(current.getStatus()))
+                        throw new BusinessException("作业状态已变化，请刷新");
+                      current.setStatus("CANCELLED");
+                      current.setFailure("已取消");
+                    }))) throw new BusinessException("作业状态已变化，请刷新");
+    return view(id);
+  }
+
+  /** 明确重试失败或取消作业；权限已变化必须新建导出，不能复用旧数据范围扩大下载权限。 */
+  public BulkContracts.JobView retry(Long id) {
+    BulkJob job = owned(id, true);
+    if (!"EXPORT".equals(job.getKind())
+        || !List.of("FAILED", "CANCELLED").contains(job.getStatus()))
+      throw new BusinessException("作业当前不能重试");
+    if (!durable.retry(
+        TASK_TYPE,
+        String.valueOf(id),
+        () -> {
+          users.lockById(job.getOwnerId()).orElseThrow();
+          if (jobs.countByOwnerIdAndKindAndStatusIn(job.getOwnerId(), "EXPORT", ACTIVE) >= 2)
+            throw new BusinessException("已有两个导出任务执行中");
+          jobs.lock(id)
+              .ifPresent(
+                  current -> {
+                    if (!List.of("FAILED", "CANCELLED").contains(current.getStatus()))
+                      throw new BusinessException("作业状态已变化，请刷新");
+                    current.setStatus("QUEUED");
+                    current.setFailure(null);
+                    current.setProcessedRows(0);
+                    current.setTotalRows(0);
+                  });
+        })) throw new BusinessException("任务状态已变化，请刷新");
+    return view(id);
   }
 
   private <T> T asOwner(BulkJob job, Supplier<T> work) {
@@ -317,30 +450,21 @@ public class BulkService {
         });
   }
 
-  private void update(Long id, String state, int processed, long total) {
-    transactions.executeWithoutResult(
-        status ->
-            jobs.findById(id)
-                .ifPresent(
-                    job -> {
-                      job.setStatus(state);
-                      job.setProcessedRows(processed);
-                      job.setTotalRows(total);
-                    }));
-  }
-
-  private void fail(Long id, String reason) {
-    transactions.executeWithoutResult(
-        status ->
-            jobs.findById(id)
-                .ifPresent(
-                    job -> {
-                      job.setStatus("FAILED");
-                      job.setFailure(
-                          reason == null
-                              ? "导出失败"
-                              : reason.substring(0, Math.min(reason.length(), 500)));
-                    }));
+  private void update(DurableTasks.Lease lease, Long id, String state, int processed, long total) {
+    durable.fenced(
+        lease,
+        () -> {
+          transactions.executeWithoutResult(
+              status ->
+                  jobs.lock(id)
+                      .ifPresent(
+                          job -> {
+                            job.setStatus(state);
+                            job.setProcessedRows(processed);
+                            job.setTotalRows(total);
+                          }));
+          return null;
+        });
   }
 
   /** 存储键只由服务端 UUID 生成，文件名解析不能接受路径分隔符或客户端指定路径。 */

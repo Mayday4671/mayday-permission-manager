@@ -10,15 +10,17 @@ import com.mayday.operations.repository.FlowRequestRepository;
 import com.mayday.operations.repository.FlowVersionRepository;
 import com.mayday.operations.workflow.WorkflowDefinitions;
 import com.mayday.operations.workflow.WorkflowEngine;
+import com.mayday.operations.workflow.WorkflowFormValuesDeserializer;
 import com.mayday.operations.workflow.WorkflowJson;
 import com.mayday.operations.workflow.WorkflowSchema;
+import com.mayday.operations.workflow.WorkflowSimulation;
+import com.mayday.operations.workflow.WorkflowSubprocessRepair;
 import com.mayday.operations.workflow.WorkflowTemplates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.repository.UserRepository;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,6 +51,7 @@ public class WorkflowController {
   private final AccessPolicy access;
   private final UserRepository users;
   private final WorkflowJson json;
+  private final WorkflowSimulation simulation;
   private final BusinessEventRepository events;
   private final com.mayday.system.repository.RoleRepository roles;
 
@@ -56,9 +59,19 @@ public class WorkflowController {
   @Schema(name = "WorkflowVersionRequest")
   public record Version(@NotNull Long version) {}
 
+  /** 失败恢复必须携带当前申请版本和人工说明，保留管理员修复审计。 */
+  public record Recovery(
+      @NotNull Long version,
+      @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 300)
+          String reason) {}
+
   /** 模拟参数只用于校验与路径展示，不生成申请、待办或通知事件。 */
   public record Simulation(
-      @NotNull WorkflowSchema.Spec schema, Long applicantId, Map<String, Object> values) {}
+      @NotNull WorkflowSchema.Spec schema,
+      Long applicantId,
+      @tools.jackson.databind.annotation.JsonDeserialize(
+              using = WorkflowFormValuesDeserializer.class)
+          Map<String, Object> values) {}
 
   /** 模板没有持久化状态，用户选择后通过正常新建流程接口保存为自己的草稿。 */
   @GetMapping("/workflows/templates")
@@ -82,6 +95,47 @@ public class WorkflowController {
             .filter(com.mayday.system.model.SysRole::isEnabled)
             .map(r -> Map.of("value", r.getId(), "label", r.getName()))
             .toList());
+  }
+
+  /** 子流程选择只返回已发布通用定义及当前版本表单；选定后另读不可变版本，不使用定义 ID 执行。 */
+  @GetMapping("/workflows/subprocess-options")
+  public ApiResponse<?> subprocessOptions(
+      @RequestParam(defaultValue = "") String keyword,
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "10") int size) {
+    access.require("workflows:view");
+    return ApiResponse.ok(
+        PageResult.from(
+            definitions
+                .findAll(
+                    (r, q, c) ->
+                        c.and(
+                            SearchPredicates.contains(c, r.get("name"), keyword),
+                            c.isTrue(r.get("enabled")),
+                            c.equal(r.get("businessType"), "GENERAL"),
+                            c.isNotNull(r.get("publishedVersionId"))),
+                    PageResult.request(page, size))
+                .map(models::option)));
+  }
+
+  /** 编辑已绑定旧版本时读取其确切表单，不把下拉框中的最新发布版回填覆盖原绑定。 */
+  @GetMapping("/workflows/subprocess-versions/{versionId}")
+  public ApiResponse<?> subprocessVersion(@PathVariable Long versionId) {
+    access.require("workflows:view");
+    var version = models.subprocessVersion(versionId);
+    var definition = models.find(version.getDefinitionId(), false);
+    return ApiResponse.ok(
+        Map.of(
+            "definitionId",
+            definition.getId(),
+            "name",
+            definition.getName(),
+            "versionId",
+            version.getId(),
+            "versionNumber",
+            version.getVersionNumber(),
+            "fields",
+            json.spec(version.getSchemaJson()).fields()));
   }
 
   /** 流程管理按分类与启用状态分页，草稿不会替代新申请使用的发布版本。 */
@@ -188,24 +242,8 @@ public class WorkflowController {
         users.findAllById(people.values().stream().flatMap(Collection::stream).distinct().toList()))
       access.checkData("users", user.getId(), user.getDepartmentId());
     var values = WorkflowSchema.form(body.schema(), body.values());
-    List<Map<String, Object>> path = new ArrayList<>();
-    String next = body.schema().startNodeId();
-    for (int count = 0; count <= body.schema().nodes().size(); count++) {
-      var node = body.schema().node(next);
-      var row = new LinkedHashMap<String, Object>();
-      row.put("id", node.id());
-      row.put("name", node.name());
-      row.put("type", node.type());
-      row.put(
-          "approvers",
-          users.findAllById(people.getOrDefault(node.id(), List.of())).stream()
-              .map(u -> Map.of("id", u.getId(), "name", u.getNickname()))
-              .toList());
-      path.add(row);
-      if (node.type().equals("END")) break;
-      next = WorkflowSchema.next(node, values);
-    }
-    return ApiResponse.ok(Map.of("valid", true, "path", path));
+    return ApiResponse.ok(
+        Map.of("valid", true, "path", simulation.path(body.schema(), values, applicant)));
   }
 
   /** 申请分页在数据库按本人、待办、已办或独立全量管理范围过滤。 */
@@ -237,8 +275,9 @@ public class WorkflowController {
 
   /** 详情按当前参与范围与节点可读字段返回，未来节点人员不能提前读取申请。 */
   @GetMapping("/requests/{id}")
-  public ApiResponse<?> request(@PathVariable Long id) {
-    return ApiResponse.ok(engine.detail(id));
+  public ApiResponse<?> request(
+      @PathVariable Long id, @RequestParam(required = false) Long taskId) {
+    return ApiResponse.ok(engine.detail(id, taskId));
   }
 
   /** 处理历史复用详情字段范围，不能借修改前后值绕过当前字段读取授权。 */
@@ -298,6 +337,27 @@ public class WorkflowController {
   public ApiResponse<?> decide(
       @PathVariable Long id, @Valid @RequestBody WorkflowEngine.Action body) {
     return ApiResponse.ok(engine.act(id, body));
+  }
+
+  /** 恢复重试原固定节点，不允许客户端选择新流程版本或注入执行游标。 */
+  @PostMapping("/requests/{id}/recover")
+  @Transactional
+  public ApiResponse<?> recover(@PathVariable Long id, @Valid @RequestBody Recovery body) {
+    return ApiResponse.ok(engine.recover(id, body.version(), body.reason()));
+  }
+
+  /** 目录只包含此申请的待启动失败调用；无修复权限或原来源超出数据范围时拒绝读取。 */
+  @GetMapping("/requests/{id}/subprocess-repair-options")
+  public ApiResponse<?> subprocessRepairOptions(@PathVariable Long id) {
+    return ApiResponse.ok(engine.subprocessRepairOptions(id));
+  }
+
+  /** 独立实例人员修复沿用绑定的发布版本；保存后须显式恢复，不重新启用离职账号。 */
+  @PostMapping("/requests/{id}/subprocess-repair")
+  @Transactional
+  public ApiResponse<?> repairSubprocess(
+      @PathVariable Long id, @Valid @RequestBody WorkflowSubprocessRepair.Repair body) {
+    return ApiResponse.ok(engine.repairSubprocess(id, body));
   }
 
   /** 催办是单独权限动作，不会隐式授予审批或修改申请字段的权限。 */

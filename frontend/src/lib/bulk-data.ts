@@ -46,6 +46,7 @@ export async function commitImport(
 export async function createExport(
   resource: string,
   filters: Record<string, unknown>,
+  idempotencyKey: string = crypto.randomUUID(),
 ) {
   const body: components["schemas"]["ExportFilter"] = {
     keyword: typeof filters.keyword === "string" ? filters.keyword : "",
@@ -60,6 +61,7 @@ export async function createExport(
   return unwrapContract(
     await contractClient.POST("/api/bulk/{resource}/exports", {
       params: { path: { resource } },
+      headers: { "Idempotency-Key": idempotencyKey },
       body,
     }),
   );
@@ -119,5 +121,20 @@ export async function downloadBulkResult(jobId: number, filename: string) {
       parseAs: "blob",
     }),
     filename,
+  );
+}
+
+/** 本人明确取消或恢复作业，服务端同时串行修改队列租约和业务状态。 */
+export async function controlBulkJob(
+  jobId: number,
+  action: "cancel" | "retry",
+): Promise<BulkJob> {
+  return unwrapContract(
+    await contractClient.POST(
+      action === "cancel"
+        ? "/api/bulk/jobs/{id}/cancel"
+        : "/api/bulk/jobs/{id}/retry",
+      { params: { path: { id: jobId } } },
+    ),
   );
 }

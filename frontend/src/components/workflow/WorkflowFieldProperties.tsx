@@ -19,6 +19,7 @@ import {
   type WorkflowField,
 } from "../../types/workflow";
 import { calculationNames } from "../../lib/workflowCalculations";
+import { compareWorkflowDecimals } from "../../lib/workflowForm";
 
 const detailColumnTypes: FieldType[] = [
   "TEXT",
@@ -214,7 +215,9 @@ function FieldSettings({
       : undefined;
   // Java 旧模型的可空数值表示未配置：判断时兼容 null，但编辑其他属性时不归一化旧值。
   const rangeError =
-    field.min != null && field.max != null && field.min > field.max
+    field.min != null &&
+    field.max != null &&
+    compareWorkflowDecimals(field.min, field.max) === 1
       ? "最小值不能大于最大值"
       : undefined;
   const lengthError =
@@ -325,10 +328,11 @@ function FieldSettings({
               htmlFor={`${propertyId}-min`}
               validateStatus={rangeError ? "error" : undefined}
             >
-              <InputNumber
+              <InputNumber<string>
                 id={`${propertyId}-min`}
+                stringMode
                 style={{ width: "100%" }}
-                value={field.min}
+                value={field.min == null ? null : String(field.min)}
                 onChange={(min) => update({ min: min ?? undefined })}
               />
             </Form.Item>
@@ -337,10 +341,11 @@ function FieldSettings({
               htmlFor={`${propertyId}-max`}
               validateStatus={rangeError ? "error" : undefined}
             >
-              <InputNumber
+              <InputNumber<string>
                 id={`${propertyId}-max`}
+                stringMode
                 style={{ width: "100%" }}
-                value={field.max}
+                value={field.max == null ? null : String(field.max)}
                 onChange={(max) => update({ max: max ?? undefined })}
               />
             </Form.Item>

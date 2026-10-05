@@ -20,7 +20,8 @@ export function ApprovalSubmitModal({
   onSuccess?: (record: ApprovalDetail) => void;
 }) {
   const [form] = Form.useForm();
-  const [selected, setSelected] = useState<number>();
+  // 选择时冻结完整发布选项。重新聚焦、通知或其他窗口发布新版，只更新可选目录，不改填写中的版本。
+  const [definition, setDefinition] = useState<WorkflowOption | null>(null);
   const client = useQueryClient();
   const { message } = App.useApp();
   const type = content ? "CONTENT" : "GENERAL";
@@ -32,11 +33,16 @@ export function ApprovalSubmitModal({
       ),
     enabled: open,
   });
-  const definition = options.data?.find((d) => d.id === selected);
+  const newerVersion =
+    definition &&
+    options.data?.find(
+      (item) =>
+        item.id === definition.id && item.versionId !== definition.versionId,
+    );
   useEffect(() => {
     if (open) {
       form.resetFields();
-      setSelected(undefined);
+      setDefinition(null);
       form.setFieldValue(
         "title",
         content
@@ -103,6 +109,13 @@ export function ApprovalSubmitModal({
               className="form-message"
             />
           )}
+          {newerVersion && (
+            <Alert
+              type="warning"
+              title={`流程已发布版本 ${newerVersion.versionNumber}，当前表单仍使用版本 ${definition!.versionNumber}。请重新选择流程后按新版本填写。`}
+              className="form-message"
+            />
+          )}
           <Form.Item
             name="definitionId"
             label="审批流程"
@@ -114,8 +127,16 @@ export function ApprovalSubmitModal({
                 value: d.id,
                 label: d.name + " · 版本 " + d.versionNumber,
               }))}
-              onChange={(value) => {
-                setSelected(value);
+              labelRender={(item) =>
+                definition?.id === item.value
+                  ? `${definition.name} · 版本 ${definition.versionNumber}`
+                  : item.label
+              }
+              onSelect={(value) => {
+                const chosen = options.data?.find((item) => item.id === value);
+                if (!chosen) return;
+                // 显式选择同一流程也可以切到新版本，且清空旧字段，防止跨版本误带数据。
+                setDefinition(structuredClone(chosen));
                 form.setFieldValue("values", {});
               }}
             />

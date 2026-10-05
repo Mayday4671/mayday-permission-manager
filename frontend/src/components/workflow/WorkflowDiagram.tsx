@@ -41,6 +41,9 @@ const labels = {
   APPROVAL: "审批",
   COPY: "抄送",
   CONDITION: "条件",
+  PARALLEL: "并行",
+  JOIN: "汇合",
+  SUBPROCESS: "子流程",
   END: "结束",
 };
 
@@ -51,7 +54,7 @@ function WorkflowCanvasNode({ data }: NodeProps<CanvasNode>) {
     item.type === "END"
       ? []
       : [
-          "default",
+          ...(item.type === "PARALLEL" ? [] : ["default"]),
           ...(item.branches ?? []).map((_, index) => `branch:${index}`),
         ];
   return (
@@ -202,11 +205,15 @@ export function WorkflowDiagram({
     () =>
       items.flatMap((item) => {
         const exits = [
-          {
-            target: item.next,
-            handle: "default",
-            label: item.type === "CONDITION" ? "默认" : "",
-          },
+          ...(item.type === "PARALLEL"
+            ? []
+            : [
+                {
+                  target: item.next,
+                  handle: "default",
+                  label: item.type === "CONDITION" ? "默认" : "",
+                },
+              ]),
           ...(item.branches ?? []).map((target, index) => ({
             target,
             handle: `branch:${index}`,

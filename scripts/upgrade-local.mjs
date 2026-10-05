@@ -35,7 +35,7 @@ const passed = readdirSync(baseline)
       return null;
     }
   })
-  .find((r) => r?.status === "passed");
+  .find((r) => r?.status === "passed" && r.mode !== "native-java");
 assert(passed, "请先完成 scripts/verify-baseline.mjs 隔离验收");
 const sourceFingerprint = deploymentFingerprint(root);
 assertVerifiedInputs(passed.sourceFingerprint, sourceFingerprint);

@@ -174,6 +174,43 @@ test("发起人线路加号选择审批人即自动接续，并打开该新增�
   );
 });
 
+test("真实画布插入并行组展示支路及汇合，添加支路生成审批节点", async () => {
+  const canvas = mountCanvas(initialSpec());
+  await chooseInsert("在发起人后添加节点", "并行分支");
+  const fork = canvas.latest.nodes.find((node) => node.type === "PARALLEL")!;
+  assert.equal(fork.branches?.length, 2);
+  assert.ok(screen.getByText(/全部支路完成/));
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: "添加支路", exact: true }),
+  );
+  assert.equal(
+    canvas.latest.nodes.find((node) => node.id === fork.id)?.branches?.length,
+    3,
+  );
+  const branch = canvas.latest.nodes.find(
+    (node) =>
+      node.id ===
+      canvas.latest.nodes.find((node) => node.id === fork.id)?.branches?.[2],
+  );
+  assert.equal(branch?.type, "APPROVAL");
+  assert.equal(branch?.next, fork.next);
+});
+
+test("真实并行支路线路可插入子流程，只改变当前支路入口", async () => {
+  const canvas = mountCanvas(initialSpec());
+  await chooseInsert("在发起人后添加节点", "并行分支");
+  const fork = canvas.latest.nodes.find((node) => node.type === "PARALLEL")!;
+  const previous = structuredClone(fork.branches!);
+  await chooseInsert(`在“${fork.name}”支路1中添加节点`, "子流程");
+  const child = canvas.latest.nodes.find((node) => node.type === "SUBPROCESS")!;
+  const updated = canvas.latest.nodes.find((node) => node.id === fork.id)!;
+  assert.equal(updated.branches?.[0], child.id);
+  assert.equal(updated.branches?.[1], previous[1]);
+  assert.equal(child.next, previous[0]);
+  assert.equal(canvas.edited.at(-1)?.node.id, child.id);
+});
+
 test("条件线路加号只插入选中的确切规则，不改变同目标的默认与其他规则", async () => {
   const canvas = mountCanvas(branchedSpec());
   await chooseInsert("在“金额分流”条件2中添加节点", "抄送人");

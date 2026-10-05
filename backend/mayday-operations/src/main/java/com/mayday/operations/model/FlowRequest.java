@@ -51,6 +51,13 @@ public class FlowRequest extends BaseEntity {
   @Column(columnDefinition = "longtext")
   private String formData;
 
+  /**
+   * 退回申请人/撤回后尚未重新提交的私人填写 JSON（title、values）。仅申请人读取，管理员查看也只 得到最后已提交轮；保存私人稿不覆盖
+   * formData，正式重提与新轮待办在同一事务中替换并清空此值。
+   */
+  @Column(columnDefinition = "longtext")
+  private String privateDraft;
+
   /** 原始提交不可修改，后续节点修正只写 formData。 */
   @Column(columnDefinition = "longtext")
   private String submittedFormData;
@@ -62,6 +69,19 @@ public class FlowRequest extends BaseEntity {
   /** 管理员交接的实例级人员修复；退回重提沿用，不回退到已经离职的原发布人员。 */
   @Column(columnDefinition = "longtext")
   private String assignmentOverrides;
+
+  /** 新编排每条支路的持久游标；旧单线实例保持空值，不被新执行语义回灌。 */
+  @Column(columnDefinition = "longtext")
+  private String executionState;
+
+  /** 子申请只能由固定版本子流程节点建立；普通提交和编辑接口不接受这些关联字段。 */
+  private Long parentRequestId;
+
+  @Column(length = 40)
+  private String parentTokenId;
+
+  /** 同一父子树先锁根申请，再锁具体子申请，避免父取消与子完成的反向行锁。 */
+  private Long rootRequestId;
 
   @Column(length = 40)
   private String currentNodeId;

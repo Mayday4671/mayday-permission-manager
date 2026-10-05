@@ -25,7 +25,7 @@ public class PublicFeedbackController {
   @PostMapping
   public ApiResponse<FeedbackService.Receipt> submit(
       @Valid @RequestBody FeedbackService.Submit body, HttpServletRequest request) {
-    FeedbackService.limit(request.getRemoteAddr(), true);
+    service.limit(request.getRemoteAddr(), true);
     return ApiResponse.ok(service.submit(body));
   }
 
@@ -33,7 +33,7 @@ public class PublicFeedbackController {
   @PostMapping("/track")
   public ApiResponse<FeedbackService.PublicView> track(
       @Valid @RequestBody Track body, HttpServletRequest request) {
-    FeedbackService.limit(request.getRemoteAddr(), false);
+    service.limit(request.getRemoteAddr(), false);
     return ApiResponse.ok(service.track(body.receipt()));
   }
 }

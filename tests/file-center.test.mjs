@@ -2,6 +2,10 @@
  * 文件中心真实 HTTP/MySQL 验收，仅允许 verify-baseline 的随机隔离项目。
  * 不修改部署存储配置，不操作日常目录；所有账户、目录、文件和业务引用均登记精确 ID 后清理。
  */
+import {
+  isolatedSql,
+  isolatedComposeArguments,
+} from "./support/isolated-compose.mjs";
 import test from "node:test";
 import {
   bindTestPortalCategory,
@@ -53,25 +57,7 @@ async function call(path, token, method = "GET", data, status = 200) {
 /** SQL 只用于核对存储状态和构造旧格式兼容样本，目标必须为已确认的本次隔离库。 */
 function sql(statement) {
   assert(isolated, "SQL 仅允许本次独立验收项目");
-  const result = spawnSync(
-    "docker",
-    [
-      "compose",
-      "-p",
-      project,
-      "-f",
-      "compose.verify.yaml",
-      "exec",
-      "-T",
-      database,
-      "sh",
-      "-c",
-      'MYSQL_PWD="$MYSQL_PASSWORD" exec mysql --user="$MYSQL_USER" --database="$MYSQL_DATABASE" --default-character-set=utf8mb4 --batch --skip-column-names',
-    ],
-    { input: statement, encoding: "utf8", windowsHide: true },
-  );
-  assert.equal(result.status, 0, "隔离文件数据库核对失败");
-  return result.stdout.trim();
+  return isolatedSql(statement).trim();
 }
 
 /** 生成有效栅格 PNG，避免伪装图片或损坏的网络样本让缩略图验收失去意义。 */
@@ -391,13 +377,7 @@ test(
           assert(isolated, "恢复检查只允许隔离环境");
           const service =
             database === "upgrade-db" ? "backend-upgrade" : "backend-fresh";
-          const compose = [
-            "compose",
-            "-p",
-            project,
-            "-f",
-            "compose.verify.yaml",
-          ];
+          const compose = isolatedComposeArguments();
           const docker = (args) => {
             const result = spawnSync("docker", args, {
               encoding: "utf8",
@@ -433,13 +413,23 @@ test(
             : docker([...compose, "ps", "-q", service]);
           if (!nativeRoot) assert(/^[a-f0-9]{12,64}$/.test(container));
           if (nativeRoot) {
+            // 正式本机验收目录由已校验的随机项目名派生，不接受环境变量指定任意允许根目录。
+            const isolatedRoot = resolve(
+              ".local",
+              "baseline",
+              project.replace(/^mayday-check-/, ""),
+              "native-files",
+              database === "fresh-db" ? "fresh" : "upgrade",
+            );
+            const legacyRoot = resolve(
+              ".local",
+              database === "fresh-db"
+                ? "full-functions-fresh-files"
+                : "full-functions-files",
+            );
+            const requested = realpathSync(nativeRoot);
             const allowed = realpathSync(
-              resolve(
-                ".local",
-                database === "fresh-db"
-                  ? "full-functions-fresh-files"
-                  : "full-functions-files",
-              ),
+              requested === isolatedRoot ? isolatedRoot : legacyRoot,
             );
             assert.equal(
               realpathSync(nativeRoot),

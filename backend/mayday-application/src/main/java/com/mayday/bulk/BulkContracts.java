@@ -50,12 +50,13 @@ public final class BulkContracts {
     EXPORT
   }
 
-  /** 异步导出只允许排队、执行、成功、失败状态，浏览器不能通过参数改状态。 */
+  /** 异步导出覆盖排队、执行、成功、失败和取消；浏览器不能通过字段参数直接改变状态。 */
   public enum Status {
     QUEUED,
     RUNNING,
     SUCCEEDED,
-    FAILED
+    FAILED,
+    CANCELLED
   }
 
   /** 注册适配器显式声明筛选，不接受任意属性路径、SQL、Java 类名或远程执行命令。 */

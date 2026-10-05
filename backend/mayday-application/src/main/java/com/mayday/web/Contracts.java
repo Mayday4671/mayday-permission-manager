@@ -25,8 +25,12 @@ public final class Contracts {
       @NotBlank @Size(max = 72) String password,
       @NotBlank(message = "请先完成滑动验证") @Size(max = 64) String captchaToken) {}
 
-  /** 登录响应只返回不透明会话令牌，不能把角色缓存当成请求授权依据。 */
-  public record LoginView(@NotBlank String token) {}
+  /** MFA 账号首因素通过只返回短期挑战；验证完成才返回会话，客户端不能把挑战当作 Bearer。 */
+  public record LoginView(String token, boolean mfaRequired, String challengeId) {
+    public LoginView(String token) {
+      this(token, false, null);
+    }
+  }
 
   /** 数据范围的封闭枚举；多个角色合并后的实际范围由服务端 AccessPolicy 计算。 */
   public enum DataScope {
@@ -48,7 +52,12 @@ public final class Contracts {
   /** 用户自行改密需验证原密码；成功后撤销该用户全部会话，阻止旧令牌继续使用。 */
   public record PasswordRequest(
       @NotBlank @Size(max = 72) String oldPassword,
-      @NotBlank @Size(min = 10, max = 64) String newPassword) {}
+      @NotBlank @Size(min = 10, max = 64) String newPassword,
+      @Size(max = 64) String factor) {
+    public PasswordRequest(String oldPassword, String newPassword) {
+      this(oldPassword, newPassword, null);
+    }
+  }
 
   /** 管理员重置密码输入；目标用户范围和独立 users:reset 权限由服务端另行检查。 */
   public record ResetPasswordRequest(@NotBlank @Size(min = 10, max = 64) String password) {}

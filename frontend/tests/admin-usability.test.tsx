@@ -1776,7 +1776,7 @@ test("申请明细和日期区间使用同一受控表单，增删行不丢其�
   await waitFor(() => assert(submitted));
   assert.deepEqual(submitted, {
     dates: ["2026-10-01", "2026-10-02"],
-    items: [{ item: "住宿", amount: 100 }],
+    items: [{ item: "住宿", amount: "100" }],
   });
 });
 test("保存草稿跳过必填项但复用提交锁，正式提交仍要求表单完整", async () => {
@@ -1864,5 +1864,5 @@ test("明细列属性编辑保留模板约束，并允许修改金额上限", as
   assert.equal(saved.maxRows, 20);
   assert.equal(saved.columns[0].maxLength, 200);
   assert.equal(saved.columns[1].min, 0);
-  assert.equal(saved.columns[1].max, 500);
+  assert.equal(saved.columns[1].max, "500");
 });

@@ -32,6 +32,13 @@ public class CrawlStore implements FileUsage {
   private final StoredFileRepository files;
   private final FilePayloadRepository payloads;
   private final CrawlArticles articles;
+  private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  /** 所有节点使用数据库时间处理租约，应用服务器时钟偏差不改变所有权。 */
+  private LocalDateTime databaseNow() {
+    return jdbc.queryForObject("select current_timestamp(6)", LocalDateTime.class);
+  }
+
   private static final Set<String> ACTIVE = Set.of("QUEUED", "RUNNING");
 
   /** 不可变领取快照，网络工作器只能用原租约提交；配置、页组和序号不会由网页响应覆盖。 */
@@ -186,7 +193,7 @@ public class CrawlStore implements FileUsage {
 
   /** 从到期任务领取一条队列并生成 120 秒租约；数据库内串行领取，网络处理在提交后执行。 */
   public Work claim() {
-    var now = LocalDateTime.now();
+    var now = databaseNow();
     for (Long id : tasks.ready(now, PageRequest.of(0, 10))) {
       var task = tasks.lock(id).orElseThrow();
       if (!ACTIVE.contains(task.getStatus())
@@ -196,7 +203,16 @@ public class CrawlStore implements FileUsage {
         pause(task, "执行账号已停用、删除或权限已撤回");
         continue;
       }
-      items.findByTaskIdAndStatus(id, "FETCHING").forEach(i -> i.setStatus("QUEUED"));
+      items
+          .findByTaskIdAndStatus(id, "FETCHING")
+          .forEach(
+              i -> {
+                if (i.getAttempts() >= 3) {
+                  i.setStatus("FAILED");
+                  i.setError("连续故障恢复已达重试上限，可明确重试");
+                  task.setFailedCount(task.getFailedCount() + 1);
+                } else i.setStatus("QUEUED");
+              });
       items.flush();
       var item = items.findFirstByTaskIdAndStatusOrderByIdAsc(id, "QUEUED").orElse(null);
       if (item == null) {
@@ -224,12 +240,28 @@ public class CrawlStore implements FileUsage {
     return null;
   }
 
+  /** 仅原工作器在未过期期间续期；停止、撤权和到期后旧令牌不能复活。 */
+  public boolean heartbeat(Work work) {
+    var task = tasks.lock(work.taskId()).orElse(null);
+    var now = databaseNow();
+    if (task == null
+        || !ACTIVE.contains(task.getStatus())
+        || !Objects.equals(task.getLeaseToken(), work.lease())
+        || task.getLeaseUntil() == null
+        || !task.getLeaseUntil().isAfter(now)
+        || !authorized(task)) return false;
+    task.setLeaseUntil(now.plusSeconds(120));
+    return true;
+  }
+
   /** 提交前重新验证租约与执行人权限，状态、正文、图片和新链接在同一事务保存。 失败最多重试 3 次并采用等待间隔；重复图片复用文件，容量达到上限后不继续扩张队列。 */
   public void finish(Work work, PageExtractor.Links links, byte[] image, String failure) {
     var task = tasks.lock(work.taskId()).orElse(null);
     if (task == null
         || !ACTIVE.contains(task.getStatus())
-        || !Objects.equals(task.getLeaseToken(), work.lease())) return;
+        || !Objects.equals(task.getLeaseToken(), work.lease())
+        || task.getLeaseUntil() == null
+        || !task.getLeaseUntil().isAfter(databaseNow())) return;
     if (!authorized(task)) {
       pause(task, "执行账号已停用、删除或权限已撤回");
       return;

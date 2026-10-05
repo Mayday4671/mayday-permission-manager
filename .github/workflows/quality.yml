@@ -16,7 +16,8 @@ concurrency:
 jobs:
   checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 冷缓存镜像构建、Docker/原生完整双基线及双实例故障恢复串行执行，保留清理与上传时间。
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -36,12 +37,28 @@ jobs:
         run: node scripts/check-project.mjs
       - name: Java format, unit tests and package
         run: bash ./backend/mvnw -f backend/pom.xml verify
-      - name: Start isolated source database
+      - name: Build and start complete container delivery
         run: |
           node scripts/ci-bootstrap.mjs
-          docker compose up -d --build --wait --wait-timeout 180 mysql backend
+          docker compose up -d --build --wait --wait-timeout 180 mysql backend frontend
+      - name: Frontend image routing and Java reverse proxy
+        run: node scripts/verify-web-image.mjs
       - name: Fresh install, preserved upgrade, permission and module regression
         run: node scripts/verify-baseline.mjs
+      - name: Full native runtime, identity and workflow recovery regression
+        run: node scripts/verify-native-baseline.mjs
+      - name: Dual instance recovery and shared state regression
+        run: node scripts/verify-cluster.mjs backend/mayday-application/target/mayday-application-1.0.0.jar
+      - name: Save sanitized verification summaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-summaries
+          path: |
+            .local/baseline/**/result.json
+            .local/cluster/**/report.json
+          if-no-files-found: ignore
+          # Do not upload private configuration, SQL backups, raw API logs or fixture files.
       - name: Stop CI services
         if: always()
         run: docker compose down --volumes --remove-orphans
