@@ -49,6 +49,8 @@ run(process.execPath, [
   "tests/delivery-tools.test.mjs",
   "tests/development-configuration.test.mjs",
   "tests/isolated-compose.test.mjs",
+  "tests/restore-singleton-fixture.test.mjs",
+  "tests/business-time-verification.test.mjs",
   "tests/cluster-release-gate.test.mjs",
   "tests/verification-diagnostics.test.mjs",
 ]);

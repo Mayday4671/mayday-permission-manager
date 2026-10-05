@@ -1,6 +1,7 @@
 package com.mayday.crawler;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.FileUsage;
 import com.mayday.operations.OperationSupport;
 import com.mayday.operations.model.FilePayload;
@@ -122,7 +123,7 @@ public class CrawlStore implements FileUsage {
     task.setRunnerId(access.current().getId());
     task.setStatus("QUEUED");
     task.setLastError(null);
-    task.setNextFetchAt(LocalDateTime.now());
+    task.setNextFetchAt(BusinessTime.now());
     task.setLeaseToken(null);
     task.setLeaseUntil(null);
     return tasks.saveAndFlush(task);
@@ -269,13 +270,13 @@ public class CrawlStore implements FileUsage {
     var item = items.findById(work.itemId()).orElseThrow();
     task.setLeaseToken(null);
     task.setLeaseUntil(null);
-    task.setNextFetchAt(LocalDateTime.now().plusNanos((long) work.rules().intervalMs() * 1000000));
+    task.setNextFetchAt(BusinessTime.now().plusNanos((long) work.rules().intervalMs() * 1000000));
     if (failure != null) {
       item.setError(failure);
       task.setLastError(failure);
       item.setStatus(item.getAttempts() < 3 ? "QUEUED" : "FAILED");
       if (item.getStatus().equals("FAILED")) task.setFailedCount(task.getFailedCount() + 1);
-      task.setNextFetchAt(LocalDateTime.now().plusSeconds(Math.min(30, item.getAttempts() * 5L)));
+      task.setNextFetchAt(BusinessTime.now().plusSeconds(Math.min(30, item.getAttempts() * 5L)));
       return;
     }
     item.setError(null);

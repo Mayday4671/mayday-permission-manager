@@ -1,6 +1,7 @@
 package com.mayday.web;
 
 import com.mayday.common.ApiResponse;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.PageResult;
 import com.mayday.content.Notice;
 import com.mayday.content.NoticeRepository;
@@ -64,7 +65,7 @@ public class DashboardController {
     List<Map<String, Object>> trend = new ArrayList<>();
     if (access.has("logs:view"))
       for (int dayOffset = 6; dayOffset >= 0; dayOffset--) {
-        LocalDate date = LocalDate.now().minusDays(dayOffset);
+        LocalDate date = BusinessTime.today().minusDays(dayOffset);
         trend.add(
             Map.of(
                 "date",

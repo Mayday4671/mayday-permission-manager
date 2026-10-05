@@ -7,6 +7,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { loginWithCaptcha } from "./support/captcha.mjs";
+import {
+  assertSingletonFixtureVersion,
+  captureSingletonFixture,
+  restoreSingletonFixture,
+} from "./support/restore-singleton-fixture.mjs";
 
 const base = process.env.API_BASE;
 const project = process.env.API_TEST_COMPOSE_PROJECT;
@@ -52,6 +57,8 @@ test("客户反馈、监控、调度与脱敏变更审计", { skip: !isolated },
   const made = { users: [], roles: [], feedback: [], jobs: [] };
   const secrets = [admin, password, contact];
   let originalPolicy;
+  let originalPolicyFixture;
+  let ownedPolicyVersion;
 
   async function role(label, permissions) {
     const result = await api("/system/roles", admin, "POST", {
@@ -296,7 +303,14 @@ test("客户反馈、监控、调度与脱敏变更审计", { skip: !isolated },
         const snapshot = await api("/operations/monitor", viewer.token);
         assert.equal(snapshot.database, true);
         assert(snapshot.heapUsed >= 0 && snapshot.threads > 0);
+        // API 不暴露 last_alert_at，原始基线必须来自隔离库完整行，不能只备份响应投影。
+        originalPolicyFixture = captureSingletonFixture("ops_monitor_policy");
         originalPolicy = await api("/operations/monitor/policy", admin);
+        assertSingletonFixtureVersion(
+          originalPolicyFixture,
+          originalPolicy.version,
+        );
+        ownedPolicyVersion = originalPolicy.version;
         assert.equal("lastAlertAt" in originalPolicy, false);
         const edit = {
           ...originalPolicy,
@@ -333,6 +347,7 @@ test("客户反馈、监控、调度与脱敏变更审计", { skip: !isolated },
           "PUT",
           edit,
         );
+        ownedPolicyVersion = saved.version;
         assert.equal(saved.databaseThresholdMs, 1234);
         assert(saved.version > originalPolicy.version);
         await api(
@@ -532,9 +547,18 @@ test("客户反馈、监控、调度与脱敏变更审计", { skip: !isolated },
   } finally {
     if (originalPolicy) {
       const current = await api("/operations/monitor/policy", admin);
-      await api("/operations/monitor/policy", admin, "PUT", {
+      // 使用本测试拥有的版本，其他操作或监控告警更新均须导致失败，不能被清理覆盖。
+      assert.equal(
+        current.version,
+        ownedPolicyVersion,
+        "监控单例策略在测试期间被其他操作修改，拒绝覆盖",
+      );
+      const restored = await api("/operations/monitor/policy", admin, "PUT", {
         ...originalPolicy,
-        version: current.version,
+        version: ownedPolicyVersion,
+      });
+      restoreSingletonFixture(originalPolicyFixture, {
+        version: restored.version,
       });
     }
     const feedbackIds = ids(made.feedback),

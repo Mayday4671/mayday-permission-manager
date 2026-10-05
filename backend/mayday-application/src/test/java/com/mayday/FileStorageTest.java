@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.FileUsage;
 import com.mayday.operations.model.FileDirectory;
 import com.mayday.operations.model.FilePayload;
@@ -40,7 +41,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import javax.imageio.ImageIO;
@@ -183,7 +183,7 @@ class FileStorageTest {
     String json = JsonMapper.builder().build().writeValueAsString(file);
     assertFalse(json.contains("must-not-leak"));
     assertFalse(json.contains("storageKey"));
-    file.setDeletedAt(LocalDateTime.now());
+    file.setDeletedAt(BusinessTime.now());
     assertThrows(BusinessException.class, () -> content.open(file));
   }
 
@@ -225,8 +225,8 @@ class FileStorageTest {
     assertThrows(
         BusinessException.class, () -> fixture.service.batch("RECYCLE", List.of(1L), null));
     assertNull(file.getDeletedAt());
-    file.setDeletedAt(LocalDateTime.now());
-    file.setPurgeRequestedAt(LocalDateTime.now());
+    file.setDeletedAt(BusinessTime.now());
+    file.setPurgeRequestedAt(BusinessTime.now());
     assertThrows(
         BusinessException.class, () -> fixture.service.batch("RESTORE", List.of(1L), null));
     assertTrue(file.getDeletedAt() != null);

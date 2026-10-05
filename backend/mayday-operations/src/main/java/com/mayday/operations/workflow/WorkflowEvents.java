@@ -1,12 +1,12 @@
 package com.mayday.operations.workflow;
 
+import com.mayday.common.BusinessTime;
 import com.mayday.operations.MessagePublisher;
 import com.mayday.operations.model.BusinessEvent;
 import com.mayday.operations.model.FlowRequest;
 import com.mayday.operations.repository.BusinessEventRepository;
 import com.mayday.operations.repository.NotificationRepository;
 import com.mayday.system.repository.UserRepository;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -44,7 +44,7 @@ public class WorkflowEvents {
     var event = events.lockById(id).orElse(null);
     if (event == null
         || !"PENDING".equals(event.getStatus())
-        || event.getNextAttemptAt().isAfter(LocalDateTime.now())) return;
+        || event.getNextAttemptAt().isAfter(BusinessTime.now())) return;
     if (notifications.findByEventKey(event.getEventKey()).isPresent()) {
       event.setStatus("DELIVERED");
       return;
@@ -75,7 +75,7 @@ public class WorkflowEvents {
     if (event == null || !"PENDING".equals(event.getStatus())) return;
     event.setAttempts(Math.min(event.getAttempts() + 1, 10000));
     event.setNextAttemptAt(
-        LocalDateTime.now().plusSeconds(Math.min(3600, 1L << Math.min(12, event.getAttempts()))));
+        BusinessTime.now().plusSeconds(Math.min(3600, 1L << Math.min(12, event.getAttempts()))));
     event.setLastError("投递暂时失败，系统将自动重试");
   }
 }

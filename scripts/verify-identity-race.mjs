@@ -462,6 +462,8 @@ AND r.INDEX_NAME='PRIMARY' AND r.LOCK_DATA='${userId}';`),
         [
           "-Xms64m",
           "-Xmx384m",
+          // 身份安全时间点独立于业务区；UTC 宿主仍必须通过真实并发登录/撤销边界。
+          "-Duser.timezone=UTC",
           "-jar",
           artifact,
           "--spring.config.location=classpath:/application.yml",

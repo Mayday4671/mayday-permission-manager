@@ -1,6 +1,7 @@
 package com.mayday.service;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.content.ContentRevisionRepository;
 import com.mayday.content.NoticeRepository;
 import com.mayday.content.PortalCategory;
@@ -233,7 +234,7 @@ public class PortalStructureService {
     channel.setSortOrder(input.sortOrder());
     channel.setEnabled(input.enabled());
     // 分类次序也是栏目配置；即使基本字段未变，也必须递增版本，防止旧弹窗覆盖另一人的分类调整。
-    if (id != null) channel.setUpdatedAt(java.time.LocalDateTime.now());
+    if (id != null) channel.setUpdatedAt(BusinessTime.now());
     channels.saveAndFlush(channel);
     for (int index = 0; index < input.categoryIds().size(); index++) {
       Long categoryId = input.categoryIds().get(index);

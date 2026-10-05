@@ -1,6 +1,7 @@
 package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.FileUsage;
 import com.mayday.common.SearchPredicates;
 import com.mayday.operations.OperationSupport;
@@ -507,7 +508,7 @@ public class WorkflowEngine implements FileUsage {
         requestTasks.stream().anyMatch(task -> currentApprovalTask(request, task));
     boolean reminderCoolingDown =
         request.getLastRemindedAt() != null
-            && request.getLastRemindedAt().isAfter(LocalDateTime.now().minusMinutes(30));
+            && request.getLastRemindedAt().isAfter(BusinessTime.now().minusMinutes(30));
     out.put(
         "canRemind",
         hasReminderTarget
@@ -652,7 +653,7 @@ public class WorkflowEngine implements FileUsage {
     request.setApplicantName(access.current().getNickname());
     request.setStatus(draft ? "DRAFT" : "PENDING");
     request.setRunNumber(draft ? 0 : 1);
-    request.setSubmittedAt(draft ? null : LocalDateTime.now());
+    request.setSubmittedAt(draft ? null : BusinessTime.now());
     request.setBusinessType(definition.getBusinessType());
     request.setBusinessId(input.businessId());
     request.setBusinessRevisionId(input.businessRevisionId());
@@ -709,7 +710,7 @@ public class WorkflowEngine implements FileUsage {
       request.setPrivateDraft(null);
     }
     request.getAttachmentIds().addAll(fileIds(spec, form));
-    request.setUpdatedAt(LocalDateTime.now());
+    request.setUpdatedAt(BusinessTime.now());
     if (submit) {
       var definition = definitions.find(request.getDefinitionId(), true);
       if (!definition.isEnabled() || definition.getPublishedVersionId() == null)
@@ -726,7 +727,7 @@ public class WorkflowEngine implements FileUsage {
       request.setExecutionState(null);
       request.setCompletedAt(null);
       request.setLastRemindedAt(null);
-      request.setSubmittedAt(LocalDateTime.now());
+      request.setSubmittedAt(BusinessTime.now());
       if (request.getSubmittedFormData() == null)
         request.setSubmittedFormData(request.getFormData());
       request.setStatus("PENDING");
@@ -932,7 +933,7 @@ public class WorkflowEngine implements FileUsage {
         task.setDueAt(
             node.timeoutMinutes() == null
                 ? null
-                : LocalDateTime.now().plusMinutes(node.timeoutMinutes()));
+                : BusinessTime.now().plusMinutes(node.timeoutMinutes()));
         tasks.saveAndFlush(task);
         if (!"WAITING".equals(task.getStatus())) activate(request, task);
       }
@@ -965,7 +966,7 @@ public class WorkflowEngine implements FileUsage {
   void finish(FlowRequest request, String status, boolean propagate) {
     boolean active = "PENDING".equals(request.getStatus());
     request.setStatus(status);
-    request.setCompletedAt("RETURNED".equals(status) ? null : LocalDateTime.now());
+    request.setCompletedAt("RETURNED".equals(status) ? null : BusinessTime.now());
     request.setCurrentNodeId(null);
     request.setCurrentApproverId(null);
     for (var task : tasks.findByRequestIdOrderByIdAsc(request.getId()))
@@ -1038,7 +1039,7 @@ public class WorkflowEngine implements FileUsage {
                         candidate,
                         "COPY".equals(task.getKind()) ? "requests:view" : "requests:approve"))
             .orElseThrow(() -> new BusinessException("处理人权限已失效，请撤回或由管理员终止"));
-    if (task.getActivatedAt() == null) task.setActivatedAt(LocalDateTime.now());
+    if (task.getActivatedAt() == null) task.setActivatedAt(BusinessTime.now());
     if (!request.getApproverIds().contains(user.getId()))
       request.getApproverIds().add(user.getId());
     events.enqueue(
@@ -1165,7 +1166,7 @@ public class WorkflowEngine implements FileUsage {
       if ("WAITING".equals(old.getStatus())) replacement = old;
       else {
         old.setStatus("TRANSFERRED");
-        old.setDecidedAt(LocalDateTime.now());
+        old.setDecidedAt(BusinessTime.now());
         replacement = new FlowTask();
         replacement.setRequestId(id);
         replacement.setNodeId(old.getNodeId());
@@ -1201,7 +1202,7 @@ public class WorkflowEngine implements FileUsage {
         request.getCurrentNodeId() == null ? null : spec.node(request.getCurrentNodeId()),
         sourceName + " → " + target.getNickname() + "；" + input.reason().trim(),
         target);
-    request.setUpdatedAt(LocalDateTime.now());
+    request.setUpdatedAt(BusinessTime.now());
     requests.flush();
     refreshParticipants(request);
     return detail(id);
@@ -1237,7 +1238,7 @@ public class WorkflowEngine implements FileUsage {
     var caller = schema(request).node((String) audit.get("callerNodeId"));
     var decision = record(request, "SUBPROCESS_REPAIR", caller, input.reason().trim(), null);
     decision.setChangesJson(json.write(Map.of(WorkflowSubprocessRepair.AUDIT_KEY, audit)));
-    request.setUpdatedAt(LocalDateTime.now());
+    request.setUpdatedAt(BusinessTime.now());
     requests.flush();
     refreshParticipants(request);
     return detail(id);
@@ -1326,7 +1327,7 @@ public class WorkflowEngine implements FileUsage {
                 "COPY".equals(task.getKind())
                     && task.getAssigneeId().equals(access.current().getId())
                     && task.getReadAt() == null)
-        .forEach(task -> task.setReadAt(LocalDateTime.now()));
+        .forEach(task -> task.setReadAt(BusinessTime.now()));
   }
 
   FlowDecision record(
@@ -1394,7 +1395,7 @@ public class WorkflowEngine implements FileUsage {
       if (input.values() != null && !input.values().isEmpty())
         throw new BusinessException("评论不能修改表单");
       record(request, action, null, input.comment(), null);
-      request.setUpdatedAt(LocalDateTime.now());
+      request.setUpdatedAt(BusinessTime.now());
     } else {
       access.require("requests:approve");
       var current = tasks.findByRequestIdOrderByIdAsc(id);
@@ -1443,7 +1444,7 @@ public class WorkflowEngine implements FileUsage {
           if (input.comment() == null || input.comment().isBlank())
             throw new BusinessException("请输入驳回原因");
           task.setStatus("REJECTED");
-          task.setDecidedAt(LocalDateTime.now());
+          task.setDecidedAt(BusinessTime.now());
           finish(request, "REJECTED");
         }
         case "RETURN" -> {
@@ -1453,7 +1454,7 @@ public class WorkflowEngine implements FileUsage {
               && !returnTargets(request, task).contains(input.targetNodeId()))
             throw new BusinessException("只能退回当前实际路径中已办理的审批节点");
           task.setStatus("RETURNED");
-          task.setDecidedAt(LocalDateTime.now());
+          task.setDecidedAt(BusinessTime.now());
           if (task.getExecutionTokenId() != null) {
             orchestrator.returned(request, task, input.targetNodeId(), this);
             break;
@@ -1471,7 +1472,7 @@ public class WorkflowEngine implements FileUsage {
         }
         case "APPROVE" -> {
           task.setStatus("APPROVED");
-          task.setDecidedAt(LocalDateTime.now());
+          task.setDecidedAt(BusinessTime.now());
           tasks.flush();
           var group =
               tasks.findByRequestIdOrderByIdAsc(id).stream()
@@ -1554,7 +1555,7 @@ public class WorkflowEngine implements FileUsage {
           added.setExecutionTokenId(task.getExecutionTokenId());
           added.setDueAt(task.getDueAt());
           // 此分支已在同一申请锁内核验接收人的启用、审批权限和人员规则，立即取得办理资格。
-          added.setActivatedAt(LocalDateTime.now());
+          added.setActivatedAt(BusinessTime.now());
           if (action.equals("TRANSFER")) {
             added.setOriginalAssigneeId(
                 task.getOriginalAssigneeId() == null
@@ -1569,7 +1570,7 @@ public class WorkflowEngine implements FileUsage {
           tasks.saveAndFlush(added);
           if (action.equals("TRANSFER")) {
             task.setStatus("TRANSFERRED");
-            task.setDecidedAt(LocalDateTime.now());
+            task.setDecidedAt(BusinessTime.now());
           }
           if (!request.getApproverIds().contains(targetId)) request.getApproverIds().add(targetId);
           events.enqueue(
@@ -1584,7 +1585,7 @@ public class WorkflowEngine implements FileUsage {
       decision.setNodeVisit(task.getNodeVisit());
       decision.setTargetNodeId(input.targetNodeId());
       decision.setChangesJson(changes.isEmpty() ? null : json.write(changes));
-      request.setUpdatedAt(LocalDateTime.now());
+      request.setUpdatedAt(BusinessTime.now());
     }
     requests.flush();
     refreshParticipants(request);
@@ -1614,7 +1615,7 @@ public class WorkflowEngine implements FileUsage {
         && !access.has("requests:manage")) throw new AccessDeniedException("只有申请人或审批管理员可以催办");
     OperationSupport.version(request, version);
     if (!"PENDING".equals(request.getStatus())) throw new BusinessException("已结束申请不能催办");
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = BusinessTime.now();
     if (request.getLastRemindedAt() != null
         && request.getLastRemindedAt().isAfter(now.minusMinutes(30)))
       throw new BusinessException("每项申请 30 分钟内只能催办一次");

@@ -1,6 +1,7 @@
 package com.mayday.operations.model;
 
 import com.mayday.common.BaseEntity;
+import com.mayday.common.BusinessTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -30,7 +31,7 @@ public class BusinessEvent extends BaseEntity {
   private String status = "PENDING";
 
   private int attempts;
-  private LocalDateTime nextAttemptAt = LocalDateTime.now();
+  private LocalDateTime nextAttemptAt = BusinessTime.now();
 
   @Column(length = 500)
   private String lastError;

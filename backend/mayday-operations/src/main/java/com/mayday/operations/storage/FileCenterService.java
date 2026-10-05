@@ -1,6 +1,7 @@
 package com.mayday.operations.storage;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.FileUsage;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
@@ -273,7 +274,7 @@ public class FileCenterService {
       if (target != null && !Objects.equals(target.getOwnerId(), file.getOwnerId()))
         throw new BusinessException("文件只能移动到所属用户的目录");
     }
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = BusinessTime.now();
     for (StoredFile file : selected) {
       switch (action) {
         case "MOVE" -> file.setDirectoryId(target == null ? null : target.getId());

@@ -1,6 +1,7 @@
 package com.mayday.operations;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.RichText;
 import com.mayday.operations.model.Delivery;
 import com.mayday.operations.model.Notification;
@@ -8,7 +9,6 @@ import com.mayday.operations.realtime.RealtimeEvents;
 import com.mayday.operations.repository.DeliveryRepository;
 import com.mayday.operations.repository.NotificationRepository;
 import com.mayday.system.repository.UserRepository;
-import java.time.LocalDateTime;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -61,7 +61,7 @@ public class MessagePublisher {
     notification.setRecipientType("USERS");
     notification.setRecipientIds(Set.of(recipientId));
     notification.setSenderName(senderName);
-    notification.setPublishedAt(LocalDateTime.now());
+    notification.setPublishedAt(BusinessTime.now());
     notification.setTargetType(targetType);
     notification.setTargetId(targetId);
     notification.setEventKey(eventKey);

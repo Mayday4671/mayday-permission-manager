@@ -9,6 +9,11 @@ import assert from "node:assert/strict";
 import { loginWithCaptcha } from "./support/captcha.mjs";
 import { purgeTestFiles } from "./support/files-cleanup.mjs";
 import {
+  assertSingletonFixtureVersion,
+  captureSingletonFixture,
+  restoreSingletonFixture,
+} from "./support/restore-singleton-fixture.mjs";
+import {
   bindTestPortalCategory,
   deleteTestPortalChannel,
 } from "./support/portal.mjs";
@@ -217,7 +222,12 @@ test("真实 MySQL 权限与业务回归", async (t) => {
         const readToken = await login(reader.username),
           editToken = await login(editor.username),
           operateToken = await login(operator.username);
+        // 单例配置没有测试专用副本，必须在首次写入前保存隔离库的完整物理行。
+        // HTTP 仅用于恢复业务字段，不能据此遗漏数据库中的隐藏字段或 NULL。
+        const originalFixture = captureSingletonFixture("udp_relay_config");
         const original = await request("/relay/config", { token: admin });
+        assertSingletonFixtureVersion(originalFixture, original.version);
+        let ownedVersion = original.version;
         const payload = (row) => ({
           bindIp: row.bindIp,
           bindPort: row.bindPort,
@@ -277,6 +287,7 @@ test("真实 MySQL 权限与业务回归", async (t) => {
             sendPort: 19003,
             transportMode: "NIO",
           });
+          ownedVersion = saved.version;
           await put("/relay/config", editToken, payload(original), 409);
           await post(
             "/relay/start",
@@ -370,9 +381,20 @@ test("真实 MySQL 权限与业务回归", async (t) => {
           if (state.state === "RUNNING")
             await post("/relay/stop", admin, { runId: state.runId });
           const current = await request("/relay/config", { token: admin });
-          await put("/relay/config", admin, {
+          // 只接受本测试最后一次成功写入的版本；不得借最新版本覆盖并发修改。
+          assert.equal(
+            current.version,
+            ownedVersion,
+            "UDP 单例配置在测试期间被其他操作修改，拒绝覆盖",
+          );
+          const restored = await put("/relay/config", admin, {
             ...payload(original),
-            version: current.version,
+            version: ownedVersion,
+          });
+          // 业务列全部相等后，精确复原本测试 API 写入推进的版本和更新时间。
+          // 条件更新还会校验完整当前行，读写间发生竞争时验收必须失败。
+          restoreSingletonFixture(originalFixture, {
+            version: restored.version,
           });
         }
       },

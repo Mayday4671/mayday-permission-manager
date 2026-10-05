@@ -7,11 +7,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.repository.UserRepository;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -68,7 +68,7 @@ class BulkSecurityTest {
     job.setPermissionSignature("original");
     job.setQueryJson("private filters");
     job.setResultKey("private storage key");
-    job.setExpiresAt(LocalDateTime.now().plusHours(1));
+    job.setExpiresAt(BusinessTime.now().plusHours(1));
     when(jobs.findById(7L)).thenReturn(Optional.of(job));
     return job;
   }

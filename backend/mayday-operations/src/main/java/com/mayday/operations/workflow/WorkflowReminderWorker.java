@@ -1,8 +1,8 @@
 package com.mayday.operations.workflow;
 
+import com.mayday.common.BusinessTime;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.operations.repository.FlowTaskRepository;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -22,7 +22,7 @@ public class WorkflowReminderWorker {
   @Scheduled(fixedDelay = 30_000L, initialDelay = 20_000L)
   public void run() {
     if (!modules.isEnabled("approvals")) return;
-    for (Long taskId : tasks.due(LocalDateTime.now(), PageRequest.of(0, 100))) {
+    for (Long taskId : tasks.due(BusinessTime.now(), PageRequest.of(0, 100))) {
       try {
         reminders.timeout(taskId);
       } catch (RuntimeException error) {

@@ -1,7 +1,7 @@
 package com.mayday.operations.service;
 
+import com.mayday.common.BusinessTime;
 import com.mayday.operations.repository.ScheduledJobRepository;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -22,7 +22,7 @@ public class JobSchedule {
   public void tick() {
     if (!modules.isEnabled("scheduler")) return;
     runner.recover();
-    for (var job : jobs.findByEnabledTrueAndNextRunAtLessThanEqual(LocalDateTime.now())) {
+    for (var job : jobs.findByEnabledTrueAndNextRunAtLessThanEqual(BusinessTime.now())) {
       try {
         runner.run(job.getId(), false);
       } catch (Exception e) {

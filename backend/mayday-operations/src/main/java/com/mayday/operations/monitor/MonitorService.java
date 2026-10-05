@@ -1,6 +1,7 @@
 package com.mayday.operations.monitor;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.EntityVersions;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.operations.MessagePublisher;
@@ -132,7 +133,7 @@ public class MonitorService {
             ? extended.getProcessCpuLoad()
             : -1;
     return new Snapshot(
-        LocalDateTime.now(),
+        BusinessTime.now(),
         runtime.getUptime(),
         System.getProperty("java.version"),
         operatingSystem.getAvailableProcessors(),
@@ -153,7 +154,7 @@ public class MonitorService {
     if (minutes < 5 || minutes > 60) throw new BusinessException("趋势窗口需为5至60分钟");
     return samples
         .findByNodeIdAndCreatedAtGreaterThanEqualOrderByIdDesc(
-            nodeId, LocalDateTime.now().minusMinutes(minutes), PageRequest.of(0, 120))
+            nodeId, BusinessTime.now().minusMinutes(minutes), PageRequest.of(0, 120))
         .stream()
         .sorted(Comparator.comparing(MonitorSample::getId))
         .map(
@@ -219,7 +220,7 @@ public class MonitorService {
                 sample.setDatabaseHealthy(snapshot.database());
                 sample.setDatabaseLatencyMs(snapshot.databaseLatencyMs());
                 samples.save(sample);
-                samples.deleteByCreatedAtBefore(LocalDateTime.now().minusDays(7));
+                samples.deleteByCreatedAtBefore(BusinessTime.now().minusDays(7));
               });
     } catch (RuntimeException exception) {
       org.slf4j.LoggerFactory.getLogger(MonitorService.class).warn("监控采样未持久化，稍后重试");
@@ -245,7 +246,7 @@ public class MonitorService {
                     snapshot.databaseLatencyMs() >= policy.getDatabaseThresholdMs();
                 if ((!heapAlert && !latencyAlert)
                     || (policy.getLastAlertAt() != null
-                        && policy.getLastAlertAt().isAfter(LocalDateTime.now().minusMinutes(30))))
+                        && policy.getLastAlertAt().isAfter(BusinessTime.now().minusMinutes(30))))
                   return;
                 messages.publish(
                     "monitor:" + nodeId + ":" + (System.currentTimeMillis() / 1_800_000L),
@@ -255,7 +256,7 @@ public class MonitorService {
                     "服务监控",
                     "MONITOR",
                     1L);
-                policy.setLastAlertAt(LocalDateTime.now());
+                policy.setLastAlertAt(BusinessTime.now());
               });
     } catch (RuntimeException exception) {
       org.slf4j.LoggerFactory.getLogger(MonitorService.class).warn("监控提醒尚未投递，下次采样重试");

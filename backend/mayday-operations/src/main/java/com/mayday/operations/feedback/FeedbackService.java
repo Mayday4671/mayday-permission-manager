@@ -1,6 +1,7 @@
 package com.mayday.operations.feedback;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.EntityVersions;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.common.PageResult;
@@ -214,7 +215,7 @@ public class FeedbackService {
     }
     feedback.setStatus(request.status());
     if (request.publicReply() != null && !request.publicReply().isBlank())
-      feedback.setRepliedAt(LocalDateTime.now());
+      feedback.setRepliedAt(BusinessTime.now());
     FeedbackHistory history = new FeedbackHistory();
     history.setFeedbackId(id);
     history.setActor(access.current().getUsername());

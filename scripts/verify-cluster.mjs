@@ -59,6 +59,8 @@ const hash = (value) => createHash("sha256").update(value).digest("hex");
 const report = {
   runId,
   project,
+  nodeVersion: process.version,
+  jvmDefaultTimeZones: { a: "UTC", b: "Asia/Shanghai" },
   artifactSha256: hash(readFileSync(jar)),
   startedAt: new Date().toISOString(),
   status: "running",
@@ -198,6 +200,8 @@ async function start(name, port, workers, options = {}) {
     [
       "-Xms96m",
       "-Xmx512m",
+      // 两个节点故意使用不同宿主时区，业务 DATETIME 和安全 Instant 必须跨节点一致。
+      `-Duser.timezone=${name === "a" ? "UTC" : "Asia/Shanghai"}`,
       "-jar",
       jar,
       "--spring.config.location=classpath:/application.yml",

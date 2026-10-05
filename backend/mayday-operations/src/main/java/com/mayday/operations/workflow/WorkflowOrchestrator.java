@@ -1,6 +1,7 @@
 package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.operations.model.FlowRequest;
 import com.mayday.operations.model.FlowTask;
 import com.mayday.operations.repository.FlowRequestRepository;
@@ -10,7 +11,6 @@ import com.mayday.operations.workflow.WorkflowSchema.Node;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.repository.UserRepository;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -301,7 +301,7 @@ public class WorkflowOrchestrator {
     } while (progressed
         && state.getTokens().stream().anyMatch(token -> "ACTIVE".equals(token.getStatus())));
     request.setExecutionState(json.write(state));
-    request.setUpdatedAt(LocalDateTime.now());
+    request.setUpdatedAt(BusinessTime.now());
     var current =
         tasks.findByRequestIdOrderByIdAsc(request.getId()).stream()
             .filter(task -> "PENDING".equals(task.getStatus()))
@@ -354,7 +354,7 @@ public class WorkflowOrchestrator {
       task.setDueAt(
           node.timeoutMinutes() == null
               ? null
-              : LocalDateTime.now().plusMinutes(node.timeoutMinutes()));
+              : BusinessTime.now().plusMinutes(node.timeoutMinutes()));
       tasks.saveAndFlush(task);
       if (!"WAITING".equals(task.getStatus())) host.activate(request, task);
     }
@@ -446,7 +446,7 @@ public class WorkflowOrchestrator {
     child.setStatus("PENDING");
     child.setFormData(json.write(form));
     child.setSubmittedFormData(child.getFormData());
-    child.setSubmittedAt(LocalDateTime.now());
+    child.setSubmittedAt(BusinessTime.now());
     child.setAttachmentIds(attachments);
     requests.saveAndFlush(child);
     token.setChildRequestId(child.getId());

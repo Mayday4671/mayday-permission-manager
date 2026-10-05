@@ -1,6 +1,7 @@
 package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.PageResult;
 import com.mayday.operations.OperationSupport;
 import com.mayday.operations.model.FlowDelegation;
@@ -91,7 +92,7 @@ public class WorkflowDelegations {
     access.require("users:view");
     Long ownerId = access.current().getId();
     if (ownerId.equals(input.targetId())) throw new BusinessException("不能委托给自己");
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = BusinessTime.now();
     if (input.startsAt().isBefore(now.minusMinutes(1))
         || !input.endsAt().isAfter(input.startsAt())
         || Duration.between(input.startsAt(), input.endsAt()).compareTo(Duration.ofDays(90)) > 0
@@ -139,7 +140,7 @@ public class WorkflowDelegations {
       throw new AccessDeniedException("只能撤销本人创建的委托");
     OperationSupport.version(delegation, version);
     if (delegation.getRevokedAt() != null) throw new BusinessException("委托已撤销");
-    delegation.setRevokedAt(LocalDateTime.now());
+    delegation.setRevokedAt(BusinessTime.now());
     delegations.flush();
     return view(delegation);
   }
@@ -154,7 +155,7 @@ public class WorkflowDelegations {
                     && access.hasFor(u, "requests:approve")
                     && access.hasFor(u, "requests:view"))
         .isEmpty()) return Optional.empty();
-    return delegations.effective(ownerId, LocalDateTime.now()).stream()
+    return delegations.effective(ownerId, BusinessTime.now()).stream()
         .filter(d -> scopeIds(d).isEmpty() || scopeIds(d).contains(definitionId))
         .filter(
             d ->
@@ -188,7 +189,7 @@ public class WorkflowDelegations {
     out.put("reason", delegation.getReason());
     out.put("revokedAt", delegation.getRevokedAt());
     out.put("createdAt", delegation.getCreatedAt());
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = BusinessTime.now();
     out.put(
         "status",
         delegation.getRevokedAt() != null

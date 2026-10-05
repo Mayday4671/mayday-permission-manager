@@ -33,13 +33,13 @@ public abstract class BaseEntity {
   /** 首次保存统一生成服务端时间，不能信任客户端传入的创建时间。 */
   @PrePersist
   protected void onCreate() {
-    createdAt = LocalDateTime.now();
+    createdAt = BusinessTime.now();
     updatedAt = createdAt;
   }
 
   /** 只刷新修改时间；创建时间保持不可变，供历史排序和审计追溯。 */
   @PreUpdate
   protected void onUpdate() {
-    updatedAt = LocalDateTime.now();
+    updatedAt = BusinessTime.now();
   }
 }

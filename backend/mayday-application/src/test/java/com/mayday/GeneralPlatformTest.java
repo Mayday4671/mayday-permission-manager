@@ -22,6 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.operations.MessagePublisher;
 import com.mayday.operations.model.JobExecution;
@@ -120,7 +121,7 @@ class GeneralPlatformTest {
     job.setHandler("FAIL_TEST");
     job.setCron("0 */5 * * * *");
     job.setEnabled(true);
-    job.setNextRunAt(LocalDateTime.now().minusMinutes(1));
+    job.setNextRunAt(BusinessTime.now().minusMinutes(1));
     job.setAlertUserId(2L);
     SysUser recipient = new SysUser();
     recipient.setId(2L);
@@ -156,7 +157,7 @@ class GeneralPlatformTest {
     assertEquals(71L, failed.getId());
     assertFalse(failed.getResult().contains("password"));
     assertNull(failed.getFailureNotifiedAt(), "失败投递必须仍留在重试队列");
-    assertTrue(job.getNextRunAt().isAfter(LocalDateTime.now()));
+    assertTrue(job.getNextRunAt().isAfter(BusinessTime.now()));
     var order = inOrder(transactions, executions, messages);
     order.verify(transactions).rollback(any(TransactionStatus.class));
     order.verify(executions).saveAndFlush(any(JobExecution.class));
@@ -428,7 +429,7 @@ class GeneralPlatformTest {
                 transactions));
     doReturn(
             new MonitorService.Snapshot(
-                LocalDateTime.now(), 1000, "21", 4, 10, 90, 100, 100, true, 20, "test", "UTC", 5))
+                BusinessTime.now(), 1000, "21", 4, 10, 90, 100, 100, true, 20, "test", "UTC", 5))
         .when(monitor)
         .sample();
     monitor.collect();

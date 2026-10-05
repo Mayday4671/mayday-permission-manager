@@ -1,7 +1,7 @@
 package com.mayday.operations.workflow;
 
+import com.mayday.common.BusinessTime;
 import com.mayday.operations.repository.BusinessEventRepository;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,7 +19,7 @@ public class WorkflowEventWorker {
   @Scheduled(fixedDelay = 3000, initialDelay = 5000)
   public void run() {
     if (!modules.isEnabled("approvals")) return;
-    for (Long id : events.due(LocalDateTime.now(), PageRequest.of(0, 100)))
+    for (Long id : events.due(BusinessTime.now(), PageRequest.of(0, 100)))
       try {
         delivery.deliver(id);
       } catch (Exception error) {

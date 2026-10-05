@@ -15,6 +15,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.crawler.CrawlArticleImageRepository;
 import com.mayday.crawler.CrawlArticleRepository;
 import com.mayday.crawler.CrawlArticles;
@@ -35,7 +36,6 @@ import com.mayday.system.repository.RoleRepository;
 import com.mayday.system.repository.UserRepository;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
@@ -204,7 +204,7 @@ class CrawlerIntegrationTest {
     tx.executeWithoutResult(
         s -> {
           var task = tasks.findById(id).orElseThrow();
-          task.setNextFetchAt(LocalDateTime.now().minusSeconds(1));
+          task.setNextFetchAt(BusinessTime.now().minusSeconds(1));
         });
   }
 
@@ -287,7 +287,7 @@ class CrawlerIntegrationTest {
             tasks
                 .findById(task.getId())
                 .orElseThrow()
-                .setLeaseUntil(LocalDateTime.now().minusSeconds(1)));
+                .setLeaseUntil(BusinessTime.now().minusSeconds(1)));
     var recovered = store.claim();
     assertNotNull(recovered);
     assertEquals(old.itemId(), recovered.itemId());

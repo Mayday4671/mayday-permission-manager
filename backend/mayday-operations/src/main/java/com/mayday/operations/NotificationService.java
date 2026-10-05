@@ -1,6 +1,7 @@
 package com.mayday.operations;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.RichText;
 import com.mayday.common.SearchPredicates;
 import com.mayday.operations.model.Delivery;
@@ -195,7 +196,7 @@ public class NotificationService {
   public static String displayStatus(Notification notification) {
     return "PUBLISHED".equals(notification.getStatus())
             && notification.getExpiresAt() != null
-            && !notification.getExpiresAt().isAfter(LocalDateTime.now())
+            && !notification.getExpiresAt().isAfter(BusinessTime.now())
         ? "EXPIRED"
         : notification.getStatus();
   }
@@ -204,7 +205,7 @@ public class NotificationService {
   public static Specification<Notification> state(String status) {
     return (r, q, c) -> {
       if (status == null || status.isBlank()) return c.conjunction();
-      var now = LocalDateTime.now();
+      var now = BusinessTime.now();
       if ("EXPIRED".equals(status))
         return c.and(
             c.equal(r.get("status"), "PUBLISHED"), c.lessThanOrEqualTo(r.get("expiresAt"), now));
@@ -244,7 +245,7 @@ public class NotificationService {
       draftOnly(notification);
       OperationSupport.version(notification, request.version());
     }
-    if (request.expiresAt() != null && !request.expiresAt().isAfter(LocalDateTime.now()))
+    if (request.expiresAt() != null && !request.expiresAt().isAfter(BusinessTime.now()))
       throw new BusinessException("过期时间必须晚于当前时间");
     if ("ALL".equals(request.recipientType()) && !request.recipientIds().isEmpty())
       throw new BusinessException("全部用户无需额外选择目标");
@@ -322,12 +323,12 @@ public class NotificationService {
     draftOnly(notification);
     OperationSupport.version(notification, version);
     if (notification.getExpiresAt() != null
-        && !notification.getExpiresAt().isAfter(LocalDateTime.now()))
+        && !notification.getExpiresAt().isAfter(BusinessTime.now()))
       throw new BusinessException("通知已过期，请修改草稿");
     var recipients = recipients(notification);
     validateFiles(notification.getAttachmentIds());
     notification.setStatus("PUBLISHED");
-    notification.setPublishedAt(LocalDateTime.now());
+    notification.setPublishedAt(BusinessTime.now());
     for (var u : recipients) {
       var delivery = new Delivery();
       delivery.setNotification(notification);
@@ -349,7 +350,7 @@ public class NotificationService {
     if (!"PUBLISHED".equals(notification.getStatus())) throw new BusinessException("只有已发布通知可以撤回");
     OperationSupport.version(notification, version);
     notification.setStatus("WITHDRAWN");
-    notification.setWithdrawnAt(LocalDateTime.now());
+    notification.setWithdrawnAt(BusinessTime.now());
     notifications.flush();
     realtime.changed(
         deliveries.findByNotificationId(id).stream().map(Delivery::getRecipientId).toList(),
@@ -396,7 +397,7 @@ public class NotificationService {
             c.equal(r.get("notification").get("status"), "PUBLISHED"),
             c.or(
                 c.isNull(r.get("notification").get("expiresAt")),
-                c.greaterThan(r.get("notification").get("expiresAt"), LocalDateTime.now())),
+                c.greaterThan(r.get("notification").get("expiresAt"), BusinessTime.now())),
             SearchPredicates.contains(c, r.get("notification").get("title"), keyword),
             read == null
                 ? c.conjunction()
@@ -444,7 +445,7 @@ public class NotificationService {
   @Transactional
   public void read(Long id) {
     ownMessage(id);
-    deliveries.markRead(id, access.current().getId(), LocalDateTime.now());
+    deliveries.markRead(id, access.current().getId(), BusinessTime.now());
     realtime.changed(Set.of(access.current().getId()), "messages");
   }
 
@@ -452,7 +453,7 @@ public class NotificationService {
   @Transactional
   public int readAll() {
     access.require("messages:view");
-    int updated = deliveries.markAllRead(access.current().getId(), LocalDateTime.now());
+    int updated = deliveries.markAllRead(access.current().getId(), BusinessTime.now());
     if (updated > 0) realtime.changed(Set.of(access.current().getId()), "messages");
     return updated;
   }

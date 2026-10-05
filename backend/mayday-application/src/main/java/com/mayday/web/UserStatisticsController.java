@@ -2,14 +2,13 @@ package com.mayday.web;
 
 import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.model.AuditLog;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.repository.UserRepository;
 import jakarta.persistence.EntityManager;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,8 +38,8 @@ public class UserStatisticsController {
     access.require("users:view");
     if (!Set.of(7, 30, 90).contains(days)) throw new BusinessException("统计窗口仅支持 7、30 或 90 天");
     var scope = access.<SysUser>filter("users", "id");
-    var start = LocalDate.now().minusDays(days - 1).atStartOfDay();
-    var end = LocalDate.now().plusDays(1).atStartOfDay();
+    var start = BusinessTime.today().minusDays(days - 1).atStartOfDay();
+    var end = BusinessTime.today().plusDays(1).atStartOfDay();
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("total", users.count(scope));
     result.put(
@@ -62,7 +61,7 @@ public class UserStatisticsController {
     result.put("loginFailure", global ? loginCount(start, end, false, false) : null);
     result.put("from", start.toLocalDate());
     result.put("to", end.minusDays(1).toLocalDate());
-    result.put("timezone", ZoneId.systemDefault().getId());
+    result.put("timezone", BusinessTime.zone().getId());
     List<Map<String, Object>> trend = new ArrayList<>();
     for (int dayOffset = 0; dayOffset < days; dayOffset++) {
       var day = start.plusDays(dayOffset);

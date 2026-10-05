@@ -1,6 +1,7 @@
 package com.mayday.service;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.RichText;
 import com.mayday.content.ContentPublication;
 import com.mayday.content.ContentPublicationRepository;
@@ -180,7 +181,7 @@ public class ContentService {
     return n.getDeletedAt() == null
         && n.isPublished()
         && n.getLiveRevisionId() != null
-        && (n.getLiveOfflineAt() == null || n.getLiveOfflineAt().isAfter(LocalDateTime.now()));
+        && (n.getLiveOfflineAt() == null || n.getLiveOfflineAt().isAfter(BusinessTime.now()));
   }
 
   /** 在数据库查询层只选择有效上线且PUBLIC的修订，避免先分页再过滤导致数量泄露或公开草稿正文。 */
@@ -195,7 +196,7 @@ public class ContentService {
             c.isTrue(r.get("liveRevision").get("portalChannel").get("enabled")),
             c.or(
                 c.isNull(r.get("liveOfflineAt")),
-                c.greaterThan(r.get("liveOfflineAt"), LocalDateTime.now())));
+                c.greaterThan(r.get("liveOfflineAt"), BusinessTime.now())));
   }
 
   /** 按动作权限保存新不可变修订，校验版本、分类、标签和附件归属并清理富文本；兼容旧published字段也必须独立发布授权。 */
@@ -292,8 +293,7 @@ public class ContentService {
     option("categories", r.getCategoryId());
     portal.contentChannel(r.getCategoryId(), r.getPortalChannelId());
     for (Long tag : r.getTagIds()) option("tags", tag);
-    LocalDateTime now = LocalDateTime.now(),
-        start = req.publishAt() == null ? now : req.publishAt();
+    LocalDateTime now = BusinessTime.now(), start = req.publishAt() == null ? now : req.publishAt();
     if (req.offlineAt() != null && !req.offlineAt().isAfter(start))
       throw new BusinessException("下线时间必须晚于上线时间");
     if (req.publishAt() != null && !req.publishAt().isAfter(now))
@@ -321,7 +321,7 @@ public class ContentService {
   /** 下线是单一内部操作，人工操作、删除和定时器都关闭同一发布记录。 */
   private void takeOffline(Notice n, String reason) {
     Map<String, Object> before = publicationSnapshot(n);
-    var now = LocalDateTime.now();
+    var now = BusinessTime.now();
     publications
         .findByNoticeIdAndOfflineAtIsNull(n.getId())
         .forEach(
@@ -345,7 +345,7 @@ public class ContentService {
     n.setLiveRevisionId(r.getId());
     n.setLiveRevision(r);
     n.setPublished(true);
-    n.setPublishedAt(LocalDateTime.now());
+    n.setPublishedAt(BusinessTime.now());
     n.setLiveOfflineAt(offlineAt);
     n.setDraftStatus("PUBLISHED");
     clearSchedule(n);
@@ -391,7 +391,7 @@ public class ContentService {
     if (n.isPublished() || n.getScheduledRevisionId() != null) access.require("notices:publish");
     takeOffline(n, "移入回收站");
     clearSchedule(n);
-    n.setDeletedAt(LocalDateTime.now());
+    n.setDeletedAt(BusinessTime.now());
   }
 
   /** 恢复只进入草稿状态，绝不自动重新上线；要求独立恢复权限及版本检查，防止旧弹窗改变回收站状态。 */
@@ -430,7 +430,7 @@ public class ContentService {
   public void applyDue(Long id) {
     var n = notices.lockById(id).orElse(null);
     if (n == null || n.getDeletedAt() != null) return;
-    var now = LocalDateTime.now();
+    var now = BusinessTime.now();
     if (n.isPublished() && n.getLiveOfflineAt() != null && !n.getLiveOfflineAt().isAfter(now))
       takeOffline(n, "定时下线");
     if (n.getScheduledPublishAt() == null || n.getScheduledPublishAt().isAfter(now)) return;

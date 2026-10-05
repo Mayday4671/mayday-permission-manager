@@ -1,6 +1,7 @@
 package com.mayday.service;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
@@ -82,7 +83,7 @@ public class AuditQueryService {
   @Transactional
   public long clean(boolean loginOnly, LocalDate before) {
     access.require(resource(loginOnly) + ":delete");
-    if (before == null || before.isAfter(LocalDate.now().minusDays(30)))
+    if (before == null || before.isAfter(BusinessTime.today().minusDays(30)))
       throw new BusinessException("至少保留最近 30 天的日志");
     org.springframework.data.jpa.domain.DeleteSpecification<AuditLog> filter =
         (r, q, c) ->

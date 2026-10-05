@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.operations.MessagePublisher;
 import com.mayday.operations.model.FlowRequest;
 import com.mayday.operations.model.FlowTask;
@@ -33,7 +34,6 @@ import com.mayday.security.TokenService;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.repository.UserRepository;
 import jakarta.persistence.EntityManager;
-import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -149,7 +149,7 @@ class RealtimeWorkflowTest {
     task.setRequestId(10L);
     task.setNodeId("review");
     task.setAssigneeId(2L);
-    task.setDueAt(LocalDateTime.now().minusMinutes(1));
+    task.setDueAt(BusinessTime.now().minusMinutes(1));
     FlowRequest request = new FlowRequest();
     request.setId(10L);
     request.setApplicantId(2L); // 允许自审时同人不能因 Set.of 重复值而失败。

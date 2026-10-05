@@ -2,6 +2,7 @@ package com.mayday.operations.web;
 
 import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
 import com.mayday.operations.repository.BusinessEventRepository;
@@ -396,7 +397,7 @@ public class WorkflowController {
     engine.accessible(id, false);
     events.findByRequestIdOrderByIdDesc(id).stream()
         .filter(e -> e.getStatus().equals("PENDING"))
-        .forEach(e -> e.setNextAttemptAt(java.time.LocalDateTime.now()));
+        .forEach(e -> e.setNextAttemptAt(BusinessTime.now()));
     return ApiResponse.ok(null);
   }
 }

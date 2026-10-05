@@ -1,5 +1,15 @@
 # 架构与扩展指南
 
+## 业务时间与跨服务器部署
+
+业务 `DATETIME` 和日期按既有数据库约定采用 `Asia/Shanghai`。实体生命周期、排期、通知、委托、调度、采集及报表统一通过 `mayday-common` 的 `BusinessTime.now()/today()` 取值，新模块必须沿用同一入口，禁止业务期限直接调用无时区的 `LocalDateTime.now()/LocalDate.now()`。固定时钟测试使用 `now(Clock)/today(Clock)`；它们读取 `clock.instant()` 后换算业务区，不继承测试时钟或宿主机的显示区。
+
+应用连接池逐连接设置 `SET SESSION time_zone='+08:00'`，Connector/J 的 `connectionTimeZone=Asia/Shanghai`、`preserveInstants=true` 与之对应。JPA 启用 `hibernate.type.java_time_use_direct_jdbc=true`，使用 JDBC 4.2 直接读写 `LocalDate/LocalDateTime`，避免通过 `Timestamp` 中转产生宿主时区偏移。唯一初始化 SQL 同样设置本次导入的会话区；历史迁移和已有业务时间值不重新换算，不修改 MySQL 全局时区或 JVM 全局时区。
+
+验证码、登录会话、MFA/OIDC 挑战和跨节点租约继续使用 UTC `Instant` 或 epoch；不能把业务墙上值当作安全时间点。监控中的 JVM 时区显示实际宿主环境，业务报表的时区说明返回业务区。对应依据为 [Hibernate java-time JDBC 配置](https://github.com/hibernate/hibernate-orm/blob/7.2.24/hibernate-core/src/main/java/org/hibernate/cfg/MappingSettings.java) 和 [Connector/J 时间处理](https://dev.mysql.com/doc/connector-j/en/connector-j-time-instants.html)。原生交付基线让升级实例在 UTC、空库实例在北京时间运行，并对同库跨 JVM 重启的物理 DATETIME 和安全会话执行专项核验；同进程接口往返不能代替跨环境验证。
+
+安全 `Instant` 使用 `hibernate.type.preferred_instant_jdbc_type=TIMESTAMP`：由 Connector/J 的 `preserveInstants` 和一致的 driver/session 区保存实际 epoch，避免默认 `TIMESTAMP_UTC` 绑定中的 UTC Calendar 绕过驱动区转换后，在 MySQL +08:00 会话中产生八小时物理偏移。目前实体中受影响的是 `LoginSession` 的创建、活动及固定到期三字段，Java 类型及 UTC 认证时钟不变。旧版本若已写入偏移的会话，升级后可能需要重新登录；不批量平移旧会话、不延长期限、不修改账号、密码、MFA 或企业身份绑定。此边界由真实 SQL epoch 和跨 JVM 原会话核验覆盖，不能仅比较同一个 ORM 的写入和回读。
+
 ## 模块依赖
 
 `mayday-common` 提供基础响应与契约；system 保存组织、账号和配置；security 依赖 system 实施授权；content 保存内容修订；operations 保存通知、文件、流程、反馈、监控及调度并实现运行引擎和实时刷新；crawler 依赖 operations 的文件契约，实现双层分页图片采集、持久队列和安全网络访问；application 组合所有模块，并实现跨模块业务绑定、批量资源适配和变更审计。

@@ -1,5 +1,6 @@
 package com.mayday.service;
 
+import com.mayday.common.BusinessTime;
 import com.mayday.content.ContentPublication;
 import com.mayday.content.ContentPublicationRepository;
 import com.mayday.content.ContentRevision;
@@ -330,7 +331,7 @@ public class BootstrapData implements CommandLineRunner {
     if (published) {
       n.setLiveRevisionId(r.getId());
       n.setDraftStatus("PUBLISHED");
-      n.setPublishedAt(java.time.LocalDateTime.now());
+      n.setPublishedAt(BusinessTime.now());
       var p = new ContentPublication();
       p.setNoticeId(n.getId());
       p.setRevisionId(r.getId());

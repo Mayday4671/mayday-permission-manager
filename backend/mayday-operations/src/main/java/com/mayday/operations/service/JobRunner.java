@@ -1,6 +1,7 @@
 package com.mayday.operations.service;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.operations.MessagePublisher;
 import com.mayday.operations.cluster.DurableTasks;
@@ -81,7 +82,7 @@ public class JobRunner {
   /** 验证六段Cron并取得下一次时间，不接受脚本、SQL或任意类名作为执行表达式。 */
   public static LocalDateTime next(String cron) {
     try {
-      LocalDateTime next = CronExpression.parse(cron).next(LocalDateTime.now());
+      LocalDateTime next = CronExpression.parse(cron).next(BusinessTime.now());
       if (next == null) throw new IllegalArgumentException();
       return next;
     } catch (IllegalArgumentException exception) {
@@ -110,7 +111,7 @@ public class JobRunner {
                   if (!manual
                       && (!job.isEnabled()
                           || job.getNextRunAt() == null
-                          || job.getNextRunAt().isAfter(LocalDateTime.now()))) return null;
+                          || job.getNextRunAt().isAfter(BusinessTime.now()))) return null;
                   // 手动稳定键不绑定会随首次成功推进的计划时间，否则启用配置的网络重试会被误判为不同内容。
                   return new Work(
                       id,
@@ -311,7 +312,7 @@ public class JobRunner {
     if (!modules.isEnabled("scheduler") || !modules.isEnabled("notifications")) return;
     for (JobExecution failed :
         executions.findTop100ByStatusAndFailureNotifiedAtIsNullAndCreatedAtAfterOrderByIdAsc(
-            "FAILED", LocalDateTime.now().minusDays(1))) notifyFailure(failed);
+            "FAILED", BusinessTime.now().minusDays(1))) notifyFailure(failed);
   }
 
   /** 投递与执行结果分开提交，接收人失效或数据库暂不可用只影响提醒，并保留下一轮重试机会。 */
@@ -330,7 +331,7 @@ public class JobRunner {
                         : users.findById(job.getAlertUserId()).orElse(null);
                 if (recipient == null || !access.hasFor(recipient, "scheduler:view")) {
                   // 未配置或失效接收人不无限占据待发队列，恢复权限不会补发历史跳过的提醒。
-                  pending.setFailureNotifiedAt(LocalDateTime.now());
+                  pending.setFailureNotifiedAt(BusinessTime.now());
                   return;
                 }
                 messages.publish(
@@ -341,7 +342,7 @@ public class JobRunner {
                     "任务调度",
                     "SCHEDULER",
                     execution.getJobId());
-                pending.setFailureNotifiedAt(LocalDateTime.now());
+                pending.setFailureNotifiedAt(BusinessTime.now());
               });
     } catch (RuntimeException failure) {
       org.slf4j.LoggerFactory.getLogger(JobRunner.class)

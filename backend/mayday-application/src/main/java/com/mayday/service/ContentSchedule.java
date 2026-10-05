@@ -1,7 +1,7 @@
 package com.mayday.service;
 
+import com.mayday.common.BusinessTime;
 import com.mayday.content.NoticeRepository;
-import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -19,7 +19,7 @@ public class ContentSchedule {
   /** 每轮最多领取100篇到期内容，每篇调用独立事务重新校验排期；单篇失败保留时间点以供下一轮重试。 */
   @Scheduled(fixedDelayString = "${mayday.content.schedule-delay-ms:5000}")
   public void tick() {
-    var now = LocalDateTime.now();
+    var now = BusinessTime.now();
     var due =
         notices.findAll(
             (r, q, c) ->

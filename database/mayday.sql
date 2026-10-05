@@ -25,6 +25,10 @@
 
 SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
+-- 初始资料中的 NOW(6) 同样遵循北京时间；仅设置本次导入连接，不依赖服务器默认时区或时区表。
+-- 应用连接池也逐连接固定 +08:00，JDBC 直接保存 DATETIME 墙上值，UTC 部署不会平移旧记录。
+SET SESSION time_zone = '+08:00';
+
 -- 空库保护：存在任意已有表/视图就报错；不使用 IF NOT EXISTS 掩盖重复导入。
 -- 临时表只存在于当前连接，失败后断开连接会自动清理，不写入业务库结构。
 CREATE TEMPORARY TABLE mayday_empty_database_guard (

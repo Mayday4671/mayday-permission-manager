@@ -47,6 +47,10 @@ import { verifyIdentityRestart } from "../tests/support/identity-restart.mjs";
 import { verifyIdentityRace } from "./verify-identity-race.mjs";
 import { runVerificationProcess } from "./verification-process.mjs";
 import {
+  publicBusinessTimeFailure,
+  verifyBusinessTime,
+} from "./verify-business-time.mjs";
+import {
   apiDiagnosticReporterOptions,
   publicApiFailureDiagnostic,
 } from "../tests/support/api-test-diagnostics.mjs";
@@ -140,6 +144,8 @@ const result = {
   runId,
   project,
   mode: "native-java",
+  // 运行时属于验收证据；记录版本，不把 Windows 原生进程异常重试成通过。
+  nodeVersion: process.version,
   startedAt: new Date().toISOString(),
   status: "running",
   checks: [],
@@ -240,7 +246,18 @@ async function stopRuntime(label) {
     "隔离 Java 未停止：" + label,
   );
 }
-async function startRuntime(label, ports, extra = {}, expectedFailure = null) {
+async function startRuntime(
+  label,
+  ports,
+  extra = {},
+  expectedFailure = null,
+  timeZone = label === "fresh" ? "Asia/Shanghai" : "UTC",
+) {
+  // 同一制品在不同 JVM 默认区验收；不能依靠把 CI 的 TZ 改成北京时间绕过跨环境缺陷。
+  assert(
+    ["UTC", "Asia/Shanghai"].includes(timeZone),
+    "验收 JVM 时区不在白名单",
+  );
   assert(
     [
       "upgrade",
@@ -286,6 +303,7 @@ async function startRuntime(label, ports, extra = {}, expectedFailure = null) {
   const child = spawn(
     java,
     [
+      `-Duser.timezone=${timeZone}`,
       "-jar",
       join(output, "verified-runtime.jar"),
       "--spring.config.location=classpath:/application.yml",
@@ -999,6 +1017,31 @@ try {
     },
     log: "contract.log",
   });
+  let businessTime;
+  try {
+    businessTime = await verifyBusinessTime({
+      apiBase: `http://127.0.0.1:${ports.fresh.api}/api`,
+      adminPassword: settings.ADMIN_PASSWORD,
+      project,
+      database: "fresh-db",
+      restart: (timeZone) =>
+        startRuntime("fresh", ports.fresh, {}, null, timeZone),
+      sql: (statement) => query(checkCompose, "fresh-db", statement),
+    });
+  } catch (error) {
+    // 失败仍停止整套；仅保存固定阶段、状态和清理结果，不展开口令、正文或 SQL 原始值。
+    result.businessTimeFailure = publicBusinessTimeFailure(error);
+    throw error;
+  }
+  assert(
+    businessTime.status === "passed" &&
+      businessTime.cleanupSucceeded === true &&
+      businessTime.restored === true &&
+      businessTime.checks.length === 9 &&
+      businessTime.checks.every((check) => check.status === "passed"),
+    "跨 JVM 物理业务时间、安全会话和自有夹具清理必须全部通过",
+  );
+  mark("UTC 与北京时间跨 JVM 保持物理 DATETIME 和安全会话时间点", businessTime);
   const beforeTests = {
     upgrade: staticSnapshot("upgrade-db"),
     fresh: staticSnapshot("fresh-db"),

@@ -1,5 +1,6 @@
 package com.mayday.operations.workflow;
 
+import com.mayday.common.BusinessTime;
 import com.mayday.operations.model.FlowTask;
 import com.mayday.operations.realtime.RealtimeEvents;
 import com.mayday.operations.repository.FlowRequestRepository;
@@ -35,7 +36,7 @@ public class WorkflowReminders {
     if (request == null || !"PENDING".equals(request.getStatus())) return;
     // 第一次读可能早于等待行锁，刷新实体确保读到前一个决策事务提交后的任务状态。
     entityManager.refresh(candidate);
-    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime now = BusinessTime.now();
     if (!"PENDING".equals(candidate.getStatus())
         || (candidate.getExecutionTokenId() == null
             ? !Objects.equals(candidate.getNodeId(), request.getCurrentNodeId())

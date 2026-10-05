@@ -1,6 +1,7 @@
 package com.mayday.bulk;
 
 import com.mayday.common.BusinessException;
+import com.mayday.common.BusinessTime;
 import com.mayday.operations.cluster.DurableTasks;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.model.SysUser;
@@ -12,7 +13,6 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -224,8 +224,7 @@ public class BulkService {
     BulkJob job = jobs.findById(id).orElseThrow(() -> new BusinessException("作业不存在"));
     if (!Objects.equals(job.getOwnerId(), access.current().getId()))
       throw new AccessDeniedException("只能访问自己的批量作业");
-    if (job.getExpiresAt().isBefore(LocalDateTime.now()))
-      throw new BusinessException("作业已过期，请重新执行");
+    if (job.getExpiresAt().isBefore(BusinessTime.now())) throw new BusinessException("作业已过期，请重新执行");
     if ("EXPORT".equals(job.getKind())) {
       adapter(job.getResource()).requireExport();
       if (strict && !identity.signature().equals(job.getPermissionSignature()))
@@ -239,7 +238,7 @@ public class BulkService {
     job.setOwnerId(ownerId);
     job.setResource(resource);
     job.setPermissionSignature(identity.signature());
-    job.setExpiresAt(LocalDateTime.now().plusHours(24));
+    job.setExpiresAt(BusinessTime.now().plusHours(24));
     return job;
   }
 
@@ -490,7 +489,7 @@ public class BulkService {
   public void cleanup() {
     transactions.executeWithoutResult(
         status -> {
-          for (BulkJob job : jobs.findTop100ByExpiresAtBefore(LocalDateTime.now())) {
+          for (BulkJob job : jobs.findTop100ByExpiresAtBefore(BusinessTime.now())) {
             deleteResult(job);
             if (job.getResultKey() == null
                 || !Files.exists(result(job.getResultKey(), false))
