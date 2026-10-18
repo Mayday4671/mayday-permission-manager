@@ -1,5 +1,69 @@
 /** 自动从 contracts/openapi.json 生成；请修改服务端 DTO 后重新生成，禁止手工编辑。 */
 export interface paths {
+  "/api/agentscope/conversations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AgentScopeController_conversations"];
+    put?: never;
+    post: operations["AgentScopeController_createConversation"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/agentscope/conversations/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["AgentScopeController_deleteConversation"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/agentscope/conversations/{id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AgentScopeController_messages"];
+    put?: never;
+    post: operations["AgentScopeController_send"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/agentscope/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AgentScopeController_status"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/captcha/challenge": {
     parameters: {
       query?: never;
@@ -2352,6 +2416,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/system/agentscope/configuration": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AgentScopeSettingsController_getSettings"];
+    put: operations["AgentScopeSettingsController_saveSettings"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/system/changes": {
     parameters: {
       query?: never;
@@ -2754,10 +2834,43 @@ export interface components {
       /** Format: int64 */
       version: number;
     };
+    AgentScopeSettingsRequest: {
+      apiSecret?: string;
+      clearApiSecret: boolean;
+      /** Format: int32 */
+      maxContextMessages: number;
+      /** Format: int32 */
+      maxMessageLength: number;
+      model: string;
+      /** Format: int32 */
+      requestTimeoutSeconds: number;
+      systemPrompt: string;
+    };
+    AgentScopeSettingsView: {
+      apiSecretConfigured?: boolean;
+      apiSecretOverrideStored?: boolean;
+      configurationSource?: string;
+      /** Format: int32 */
+      maxContextMessages?: number;
+      /** Format: int32 */
+      maxMessageLength?: number;
+      model?: string;
+      modelReady?: boolean;
+      moduleEnabled?: boolean;
+      /** Format: int32 */
+      requestTimeoutSeconds?: number;
+      sdkVersion?: string;
+      systemPrompt?: string;
+    };
     AlertRecipientOption: {
       label: string;
       /** Format: int64 */
       value: number;
+    };
+    ApiResponseAgentScopeSettingsView: {
+      data: components["schemas"]["AgentScopeSettingsView"];
+      message: string;
+      success: boolean;
     };
     ApiResponseAuthorization: {
       data: components["schemas"]["Authorization"];
@@ -2781,6 +2894,11 @@ export interface components {
     };
     ApiResponseCompletion: {
       data: components["schemas"]["Completion"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseConversationView: {
+      data: components["schemas"]["ConversationView"];
       message: string;
       success: boolean;
     };
@@ -2926,6 +3044,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponsePageResultConversationView: {
+      data: components["schemas"]["PageResultConversationView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponsePageResultFeedbackAdminView: {
       data: components["schemas"]["PageResultFeedbackAdminView"];
       message: string;
@@ -2933,6 +3056,11 @@ export interface components {
     };
     ApiResponsePageResultJobExecution: {
       data: components["schemas"]["PageResultJobExecution"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponsePageResultMessageView: {
+      data: components["schemas"]["PageResultMessageView"];
       message: string;
       success: boolean;
     };
@@ -2971,6 +3099,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseStatusView: {
+      data: components["schemas"]["StatusView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseStorageInfo: {
       data: components["schemas"]["StorageInfo"];
       message: string;
@@ -2978,6 +3111,11 @@ export interface components {
     };
     ApiResponseStoredFile: {
       data: components["schemas"]["StoredFile"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseTurnView: {
+      data: components["schemas"]["TurnView"];
       message: string;
       success: boolean;
     };
@@ -3136,6 +3274,17 @@ export interface components {
     ContentVersion: {
       /** Format: int64 */
       version: number;
+    };
+    ConversationView: {
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: int64 */
+      id?: number;
+      /** Format: date-time */
+      lastMessageAt?: string;
+      title?: string;
+      /** Format: date-time */
+      updatedAt?: string;
     };
     CrawlerConfigEdit: {
       name: string;
@@ -3469,6 +3618,15 @@ export interface components {
       mfaRequired?: boolean;
       token?: string;
     };
+    MessageView: {
+      content?: string;
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: int64 */
+      id?: number;
+      role?: string;
+      status?: string;
+    };
     MonitorHistoryPoint: {
       /** Format: double */
       cpuUsage: number;
@@ -3575,6 +3733,15 @@ export interface components {
       /** Format: int64 */
       total?: number;
     };
+    PageResultConversationView: {
+      items?: components["schemas"]["ConversationView"][];
+      /** Format: int32 */
+      page?: number;
+      /** Format: int32 */
+      size?: number;
+      /** Format: int64 */
+      total?: number;
+    };
     PageResultFeedbackAdminView: {
       items?: components["schemas"]["FeedbackAdminView"][];
       /** Format: int32 */
@@ -3586,6 +3753,15 @@ export interface components {
     };
     PageResultJobExecution: {
       items?: components["schemas"]["JobExecution"][];
+      /** Format: int32 */
+      page?: number;
+      /** Format: int32 */
+      size?: number;
+      /** Format: int64 */
+      total?: number;
+    };
+    PageResultMessageView: {
+      items?: components["schemas"]["MessageView"][];
       /** Format: int32 */
       page?: number;
       /** Format: int32 */
@@ -3762,6 +3938,10 @@ export interface components {
       /** Format: int64 */
       version?: number;
     };
+    SendMessageRequest: {
+      content: string;
+      requestId: string;
+    };
     SessionView: {
       admin: boolean;
       dataScopes: {
@@ -3802,6 +3982,17 @@ export interface components {
       enabled?: boolean;
       /** Format: int64 */
       recoveryCodesRemaining?: number;
+    };
+    StatusView: {
+      /** Format: int32 */
+      contextMessageCount?: number;
+      enabled?: boolean;
+      /** Format: int32 */
+      maxMessageLength?: number;
+      modelReady?: boolean;
+      /** Format: int32 */
+      requestTimeoutSeconds?: number;
+      version?: string;
     };
     Stop: {
       runId: string;
@@ -3867,6 +4058,10 @@ export interface components {
     };
     Track: {
       receipt: string;
+    };
+    TurnView: {
+      assistant?: components["schemas"]["MessageView"];
+      user?: components["schemas"]["MessageView"];
     };
     UserRequest: {
       /** Format: int64 */
@@ -3988,6 +4183,142 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  AgentScopeController_conversations: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePageResultConversationView"];
+        };
+      };
+    };
+  };
+  AgentScopeController_createConversation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseConversationView"];
+        };
+      };
+    };
+  };
+  AgentScopeController_deleteConversation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseVoid"];
+        };
+      };
+    };
+  };
+  AgentScopeController_messages: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePageResultMessageView"];
+        };
+      };
+    };
+  };
+  AgentScopeController_send: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SendMessageRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTurnView"];
+        };
+      };
+    };
+  };
+  AgentScopeController_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseStatusView"];
+        };
+      };
+    };
+  };
   CaptchaController_challenge: {
     parameters: {
       query?: never;
@@ -8137,6 +8468,50 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  AgentScopeSettingsController_getSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseAgentScopeSettingsView"];
+        };
+      };
+    };
+  };
+  AgentScopeSettingsController_saveSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AgentScopeSettingsRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseAgentScopeSettingsView"];
         };
       };
     };

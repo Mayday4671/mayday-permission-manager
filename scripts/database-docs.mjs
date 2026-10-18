@@ -18,7 +18,7 @@ const parse = (text) =>
         .map((line) => JSON.parse(line))
     : [];
 /** 只解析本项目 SHOW CREATE 格式的业务建表语句；不执行 SQL，也不读取业务数据。 */
-function documentedSchema() {
+export function documentedSchema() {
   const source = readFileSync(
     resolve(root, "database/mayday.sql"),
     "utf8",
@@ -27,7 +27,7 @@ function documentedSchema() {
     value.replace(/''/g, "'").replace(/\\(['\\])/g, "$1");
   const tables = {};
   const create =
-    /CREATE TABLE `([^`]+)` \(([\s\S]*?)\) ENGINE=[^;]+COMMENT='((?:[^'\\]|\\.|'')*)';/g;
+    /CREATE TABLE `([^`]+)` \(([\s\S]*?)\) (?:ENGINE=[^;]+|DEFAULT CHARACTER SET[^;]+)COMMENT='((?:[^'\\]|\\.|'')*)';/g;
   for (const [, name, body, comment] of source.matchAll(create)) {
     const columns = {};
     for (const line of body.split("\n")) {

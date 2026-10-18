@@ -119,6 +119,16 @@ public final class PermissionCatalog {
               actions("publish", "发布内容", "restore", "恢复内容", "purge", "永久删除"),
               true),
           new Group("workorders", "工单管理", actions(), true),
+          new Group(
+              "agentscope",
+              "智能体",
+              Map.of(
+                  "view", "查看自己的会话",
+                  "create", "新建会话",
+                  "chat", "发送消息",
+                  "delete", "删除自己的会话",
+                  "configure", "配置模型与密钥"),
+              false),
           // generator:permission-groups
           new Group(
               "logs", "操作日志", Map.of("view", "查看", "export", "导出", "delete", "清理历史日志"), false));

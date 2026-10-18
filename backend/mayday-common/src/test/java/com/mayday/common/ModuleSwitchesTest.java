@@ -19,6 +19,7 @@ class ModuleSwitchesTest {
     assertFalse(modules.isEnabled("approvals"));
     assertTrue(modules.isEnabled("crawler"));
     assertFalse(modules.isEnabled("workorders"));
+    assertFalse(modules.isEnabled("agentscope"));
   }
 
   /** 覆盖集合、单条、附件直接请求，同时验证相似路径不会被模糊前缀误伤。 */
@@ -26,7 +27,12 @@ class ModuleSwitchesTest {
   void disabledModulesBlockCollectionsItemsAndAttachments() {
     ModuleSwitches modules = new ModuleSwitches();
     modules.setEnabled(
-        Map.of("content", false, "notifications", false, "crawler", false, "udp", false));
+        Map.of(
+            "content", false,
+            "notifications", false,
+            "crawler", false,
+            "udp", false,
+            "agentscope", false));
     for (String path :
         new String[] {
           "/api/content/notices",
@@ -41,6 +47,7 @@ class ModuleSwitchesTest {
           "/api/crawler/tasks/1/images/2",
           "/api/relay/start"
         }) assertFalse(modules.pathEnabled(path), path);
+    assertFalse(modules.pathEnabled("/api/agentscope/conversations"));
     assertFalse(modules.permissionEnabled("requests:approve"));
     assertFalse(modules.permissionEnabled("notices:publish"));
     assertTrue(modules.permissionEnabled("users:update"));

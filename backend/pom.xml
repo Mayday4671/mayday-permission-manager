@@ -21,6 +21,7 @@
     <module>mayday-crawler</module>
     <module>mayday-netty</module>
     <module>mayday-workorders</module>
+    <module>mayday-agentscope</module>
     <!-- generator:maven-modules -->
     <module>mayday-application</module>
   </modules>
@@ -30,6 +31,8 @@
     <netty.version>4.1.105.Final</netty.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <springdoc.version>3.0.3</springdoc.version>
+    <!-- 所有 AgentScope Java 组件共享同一版本，避免核心与扩展间的二进制不兼容。 -->
+    <agentscope.version>2.0.4</agentscope.version>
     <swagger-annotations.version>2.2.47</swagger-annotations.version>
     <spotless.version>2.44.3</spotless.version>
   </properties>

@@ -45,6 +45,7 @@ export function responseError(
 export async function api<T>(
   path: string,
   options: RequestInit = {},
+  timeoutMs = 20000,
 ): Promise<T> {
   const token = tokenStore.get();
   const response = await fetch(`/api${path}`, {
@@ -57,8 +58,8 @@ export async function api<T>(
       ...options.headers,
     },
     signal: options.signal
-      ? AbortSignal.any([options.signal, AbortSignal.timeout(20000)])
-      : AbortSignal.timeout(20000),
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
+      : AbortSignal.timeout(timeoutMs),
   });
   const result: unknown = await response.json().catch(() => null);
   const envelope =

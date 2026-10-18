@@ -56,6 +56,22 @@ export const adminPages = [
     group: "独立入口",
     icon: "notices",
   },
+  {
+    path: "/admin/agentscope",
+    title: "智能体",
+    permission: "agentscope:view",
+    screen: "agentscope",
+    group: "独立入口",
+    icon: "dashboard",
+  },
+  {
+    path: "/admin/agentscope-settings",
+    title: "智能体配置",
+    permission: "agentscope:configure",
+    screen: "agentscopeSettings",
+    group: "系统管理",
+    icon: "settings",
+  },
   // generator:frontend-pages
   {
     path: "/admin/udp-relay",

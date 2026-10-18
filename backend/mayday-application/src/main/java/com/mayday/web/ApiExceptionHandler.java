@@ -2,6 +2,8 @@ package com.mayday.web;
 
 import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
+import com.mayday.common.ConflictException;
+import com.mayday.common.ServiceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -24,6 +26,20 @@ public class ApiExceptionHandler {
   @ExceptionHandler(BusinessException.class)
   ResponseEntity<?> business(BusinessException exception) {
     return response(400, exception.getMessage());
+  }
+
+  /**
+   * Concurrent turns and stale operation tokens are explicit conflicts, not validation failures.
+   */
+  @ExceptionHandler(ConflictException.class)
+  ResponseEntity<?> conflict(ConflictException exception) {
+    return response(409, exception.getMessage());
+  }
+
+  /** External model outages use 503 and a sanitized message so providers cannot leak secrets. */
+  @ExceptionHandler(ServiceUnavailableException.class)
+  ResponseEntity<?> unavailable(ServiceUnavailableException exception) {
+    return response(503, exception.getMessage());
   }
 
   /** 已认证用户的授权拒绝返回 403，客户端据此保留登录并提示无权访问。 */

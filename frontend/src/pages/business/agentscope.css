@@ -1,0 +1,341 @@
+.agent-scope-page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agent-settings-page {
+  width: min(100%, 1120px);
+  margin-inline: auto;
+}
+
+.agent-settings-page .ant-card-body {
+  padding: 24px;
+}
+
+.agent-settings-page .ant-form-item-extra {
+  max-width: 640px;
+}
+
+.agent-settings-footer {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--app-border);
+}
+
+.agent-scope-heading,
+.agent-scope-chat-heading,
+.agent-scope-list-heading,
+.agent-scope-composer-footer,
+.agent-scope-history-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.agent-scope-heading-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-scope-heading h3 {
+  margin: 0 0 4px;
+}
+
+.agent-scope-readiness {
+  flex: none;
+}
+
+.agent-scope-workspace {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.agent-scope-conversations,
+.agent-scope-chat {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.agent-scope-conversations .ant-card-body,
+.agent-scope-chat .ant-card-body {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.agent-scope-list-heading {
+  min-height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.agent-scope-conversation-list {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+.agent-scope-conversation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius);
+}
+
+.agent-scope-conversation:hover,
+.agent-scope-conversation.is-selected {
+  border-color: var(--app-primary-border);
+  background: var(--app-primary-bg);
+}
+
+.agent-scope-conversation-select {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.agent-scope-conversation-select:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: 2px;
+}
+
+.agent-scope-conversation-select > .anticon {
+  margin-top: 3px;
+  color: var(--app-text-secondary);
+}
+
+.agent-scope-conversation-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-scope-conversation-title,
+.agent-scope-conversation-date {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-scope-conversation-title {
+  font-size: 13px;
+}
+
+.agent-scope-conversation-date {
+  color: var(--app-text-secondary);
+  font-size: 12px;
+}
+
+.agent-scope-list-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 12px 8px;
+  border-top: 1px solid var(--app-border);
+}
+
+.agent-scope-chat-heading {
+  min-height: 62px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.agent-scope-chat-heading > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.agent-scope-chat-heading .ant-typography-secondary {
+  font-size: 12px;
+}
+
+.agent-scope-chat-heading .ant-tag {
+  margin-inline-end: 0;
+}
+
+.agent-scope-transcript {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 20px clamp(16px, 4vw, 56px);
+}
+
+.agent-scope-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 100%;
+  margin: 0 auto 24px;
+}
+
+.agent-scope-avatar {
+  flex: none;
+  background: var(--app-primary-bg);
+  color: var(--app-primary-text);
+}
+
+.agent-scope-message-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.agent-scope-message-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.agent-scope-message-meta .ant-typography-secondary {
+  font-size: 12px;
+}
+
+.agent-scope-message-content {
+  color: var(--app-text);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.agent-scope-message.is-assistant .agent-scope-message-content {
+  padding: 12px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-fill);
+}
+
+.agent-scope-message.is-pending {
+  opacity: 0.72;
+}
+
+.agent-scope-generating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -10px 0 12px 42px;
+  color: var(--app-text-secondary);
+  font-size: 13px;
+}
+
+.agent-scope-history-footer {
+  min-height: 44px;
+  padding: 0 20px;
+  border-top: 1px solid var(--app-border);
+}
+
+.agent-scope-history-footer > .ant-typography {
+  font-size: 12px;
+}
+
+.agent-scope-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--app-border);
+}
+
+.agent-scope-composer textarea {
+  resize: vertical;
+}
+
+.agent-scope-composer-footer .ant-typography {
+  font-size: 12px;
+}
+
+.agent-scope-empty-chat {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  place-items: center;
+}
+
+.agent-scope-loading {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+}
+
+@media (max-width: 900px) {
+  .agent-scope-workspace {
+    flex: none;
+    height: auto;
+    max-height: none;
+    grid-template-columns: 1fr;
+  }
+
+  .agent-scope-conversations {
+    max-height: 280px;
+  }
+
+  .agent-scope-chat {
+    min-height: 620px;
+  }
+}
+
+@media (max-width: 600px) {
+  .agent-settings-page .ant-card-body {
+    padding: 16px;
+  }
+
+  .agent-settings-page .form-two-columns {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .agent-scope-heading,
+  .agent-scope-composer-footer {
+    align-items: flex-start;
+  }
+
+  .agent-scope-heading .ant-btn {
+    flex: none;
+  }
+
+  .agent-scope-heading-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .agent-scope-composer-footer {
+    flex-direction: column;
+  }
+
+  .agent-scope-composer-footer .ant-btn {
+    align-self: flex-end;
+  }
+
+  .agent-scope-transcript {
+    padding: 16px;
+  }
+
+  .agent-scope-composer {
+    padding-inline: 12px;
+  }
+}

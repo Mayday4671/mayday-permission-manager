@@ -55,7 +55,10 @@ public class BootstrapData implements CommandLineRunner {
   @Override
   @Transactional
   public void run(String... args) {
-    if (users.findByUsername("admin").isPresent()) return;
+    if (users.findByUsername("admin").isPresent()) {
+      ensureNavigationPages();
+      return;
+    }
     UserService.validatePassword(password);
     SysRole admin = role("admin", "超级管理员", "完整管理权限，内置角色受保护", PermissionCatalog.ALL, "ALL");
     if (!seedDemoData) {
@@ -145,6 +148,7 @@ public class BootstrapData implements CommandLineRunner {
       menu.setPermission(nav[i][1] + ":view");
       entries.save(menu);
     }
+    ensureNavigationPages();
     var categoryDictionary = entry("dictionaries", "内容分类", "content.category", null, "历史内容分类字典", 1);
     categoryDictionary.setValue("公告,产品动态,团队故事,使用指南");
     int categoryOrder = 0;
@@ -217,18 +221,7 @@ public class BootstrapData implements CommandLineRunner {
    */
   private void initializeClean(SysRole admin) {
     user("admin", "管理员", null, null, admin, password);
-    Set<String> existingMenus = new HashSet<>();
-    entries
-        .findByKindOrderBySortOrderAscIdAsc("menus")
-        .forEach(menu -> existingMenus.add(menu.getCode()));
-    int order = 0;
-    for (var page : NavigationCatalog.PAGES) {
-      if (existingMenus.contains(page.code())) continue;
-      SystemEntry menu = entry("menus", page.name(), page.code(), null, "系统内置导航", order++);
-      menu.setPath(page.path());
-      menu.setPermission(page.permission());
-      entries.save(menu);
-    }
+    ensureNavigationPages();
     var status = entry("dictionaries", "账号状态", "user.status", null, "账号启用状态；与 enabled 布尔字段对应", 0);
     status.setValue("启用,停用");
     dictionaryItem(status, "启用", "true", 0);
@@ -238,6 +231,24 @@ public class BootstrapData implements CommandLineRunner {
       entry(
           "categories", name, "category_" + categoryOrder, null, "初始内容分类，可按业务调整", categoryOrder++);
     entry("settings", "平台名称", "site.name", null, "对外展示名称，请在网站配置中调整", 0).setValue("Mayday");
+  }
+
+  /**
+   * Adds newly implemented routes during ordinary restarts without overwriting customized menu
+   * names or grants.
+   */
+  private void ensureNavigationPages() {
+    Set<String> existingMenus = new HashSet<>();
+    List<SystemEntry> menus = entries.findByKindOrderBySortOrderAscIdAsc("menus");
+    menus.forEach(menu -> existingMenus.add(menu.getCode()));
+    int order = menus.stream().mapToInt(SystemEntry::getSortOrder).max().orElse(-1) + 1;
+    for (var page : NavigationCatalog.PAGES) {
+      if (existingMenus.contains(page.code())) continue;
+      SystemEntry menu = entry("menus", page.name(), page.code(), null, "系统内置导航", order++);
+      menu.setPath(page.path());
+      menu.setPermission(page.permission());
+      entries.save(menu);
+    }
   }
 
   private SysRole role(

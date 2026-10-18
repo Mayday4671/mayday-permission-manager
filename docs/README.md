@@ -6,6 +6,8 @@
 - [生产部署与运行](production.md)：启动门禁、会话期限、迁移与运行账号、探针、错误定位和数据库/文件恢复。
 - [企业登录与多因素认证](identity.md)：固定OIDC提供方、本地账号绑定、TOTP、恢复码、管理恢复和共享身份状态；最终状态见追加验收。
 - [多实例与持久任务](cluster.md)：共享验证码/限流、跨节点即时提示、租约隔离、重试取消恢复和集群验证入口。
+- [AgentScope 独立智能体模块](agentscope.md)：稳定版本、独立开关、MySQL 会话状态、权限隔离、模型密钥和复用边界。
+- [AgentScope 模块验收记录](agentscope-validation-20261018/README.md)：V32 模块隔离验收，以及 V33/V34 模型配置界面和旧菜单整合验收。
 - [完整功能追加记录](full-functions-validation-20261004/README.md)：E1–E6的实现、真实检查与尚未完成的验收项。
 - [2026-10-04 企业交付检查](enterprise-validation-20261004/README.md)：本轮补齐、全量回归与页面验收状态，不把自动检查等同于全部产品验收。
 - [模块生成器、功能裁剪与工程规范](engineering.md)：模块生成、统一代码风格、接口类型生成和 GitHub Actions。

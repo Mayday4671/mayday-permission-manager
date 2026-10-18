@@ -91,7 +91,16 @@ mayday:
       udp: ${MODULE_UDP_ENABLED:true}
       workorders: ${MODULE_WORKORDERS_ENABLED:false}
       feedback: ${MODULE_FEEDBACK_ENABLED:true}
+      agentscope: ${MODULE_AGENTSCOPE_ENABLED:false}
       # generator:module-environment
+  agentscope:
+    api-key: ${DASHSCOPE_API_KEY:}
+    model: ${MAYDAY_AGENTSCOPE_MODEL:dashscope:qwen-plus}
+    version: ${AGENTSCOPE_VERSION:2.0.4}
+    request-timeout-seconds: ${MAYDAY_AGENTSCOPE_TIMEOUT_SECONDS:120}
+    max-message-length: ${MAYDAY_AGENTSCOPE_MAX_MESSAGE_LENGTH:4000}
+    max-context-messages: ${MAYDAY_AGENTSCOPE_MAX_CONTEXT_MESSAGES:40}
+    system-prompt: ${MAYDAY_AGENTSCOPE_SYSTEM_PROMPT:你是 Mayday 工作空间中的通用助手。请以中文清晰、准确地回答问题；你无法访问平台业务数据或执行外部操作，遇到超出上下文的信息时应如实说明。}
 
 # 契约仅允许管理员读取；生产环境可以通过 API_DOCS_ENABLED=false 彻底关闭。
 springdoc:

@@ -128,6 +128,16 @@ const WorkOrderPage = lazy(() =>
     default: module.WorkOrderPage,
   })),
 );
+const AgentScopePage = lazy(() =>
+  import("./pages/business/AgentScopePage").then((module) => ({
+    default: module.AgentScopePage,
+  })),
+);
+const AgentScopeSettingsPage = lazy(() =>
+  import("./pages/business/AgentScopeSettingsPage").then((module) => ({
+    default: module.AgentScopeSettingsPage,
+  })),
+);
 // generator:frontend-imports
 const FeedbackPage = lazy(() =>
   import("./pages/operations/FeedbackPage").then((module) => ({
@@ -269,6 +279,8 @@ export default function Application() {
                 sessions: SessionsPage,
                 changes: ChangesPage,
                 workorders: WorkOrderPage,
+                agentscope: AgentScopePage,
+                agentscopeSettings: AgentScopeSettingsPage,
                 // generator:frontend-screens
                 workflows: WorkflowsPage,
                 workflowDesigner: WorkflowDesignerPage,

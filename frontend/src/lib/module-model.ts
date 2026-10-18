@@ -16,6 +16,7 @@ const pageModules: Record<string, string> = {
   "/admin/crawler-config": "crawler",
   "/admin/udp-relay": "udp",
   "/admin/workorders": "workorders",
+  "/admin/agentscope": "agentscope",
   "/admin/feedback": "feedback",
   "/admin/scheduler": "scheduler",
   // generator:frontend-modules

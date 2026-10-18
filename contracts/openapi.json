@@ -41,6 +41,96 @@
         ],
         "type": "object"
       },
+      "AgentScopeSettingsRequest": {
+        "properties": {
+          "apiSecret": {
+            "maxLength": 512,
+            "type": "string"
+          },
+          "clearApiSecret": {
+            "type": "boolean"
+          },
+          "maxContextMessages": {
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 2,
+            "type": "integer"
+          },
+          "maxMessageLength": {
+            "format": "int32",
+            "maximum": 4000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "maxLength": 102,
+            "minLength": 1,
+            "pattern": "^dashscope:[A-Za-z0-9][A-Za-z0-9._-]{0,95}$",
+            "type": "string"
+          },
+          "requestTimeoutSeconds": {
+            "format": "int32",
+            "maximum": 300,
+            "minimum": 10,
+            "type": "integer"
+          },
+          "systemPrompt": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "clearApiSecret",
+          "maxContextMessages",
+          "maxMessageLength",
+          "model",
+          "requestTimeoutSeconds",
+          "systemPrompt"
+        ],
+        "type": "object"
+      },
+      "AgentScopeSettingsView": {
+        "properties": {
+          "apiSecretConfigured": {
+            "type": "boolean"
+          },
+          "apiSecretOverrideStored": {
+            "type": "boolean"
+          },
+          "configurationSource": {
+            "type": "string"
+          },
+          "maxContextMessages": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxMessageLength": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "modelReady": {
+            "type": "boolean"
+          },
+          "moduleEnabled": {
+            "type": "boolean"
+          },
+          "requestTimeoutSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sdkVersion": {
+            "type": "string"
+          },
+          "systemPrompt": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "AlertRecipientOption": {
         "properties": {
           "label": {
@@ -54,6 +144,25 @@
         "required": [
           "label",
           "value"
+        ],
+        "type": "object"
+      },
+      "ApiResponseAgentScopeSettingsView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentScopeSettingsView"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
         ],
         "type": "object"
       },
@@ -137,6 +246,25 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Completion"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
+      "ApiResponseConversationView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ConversationView"
           },
           "message": {
             "type": "string"
@@ -718,6 +846,25 @@
         ],
         "type": "object"
       },
+      "ApiResponsePageResultConversationView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResultConversationView"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponsePageResultFeedbackAdminView": {
         "properties": {
           "data": {
@@ -741,6 +888,25 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PageResultJobExecution"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
+      "ApiResponsePageResultMessageView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResultMessageView"
           },
           "message": {
             "type": "string"
@@ -889,6 +1055,25 @@
         ],
         "type": "object"
       },
+      "ApiResponseStatusView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StatusView"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponseStorageInfo": {
         "properties": {
           "data": {
@@ -912,6 +1097,25 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/StoredFile"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
+      "ApiResponseTurnView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TurnView"
           },
           "message": {
             "type": "string"
@@ -1463,6 +1667,30 @@
         "required": [
           "version"
         ],
+        "type": "object"
+      },
+      "ConversationView": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastMessageAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "CrawlRules": {
@@ -2508,6 +2736,28 @@
         },
         "type": "object"
       },
+      "MessageView": {
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "MonitorHistoryPoint": {
         "properties": {
           "cpuUsage": {
@@ -2852,6 +3102,29 @@
         },
         "type": "object"
       },
+      "PageResultConversationView": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationView"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "PageResultFeedbackAdminView": {
         "properties": {
           "items": {
@@ -2880,6 +3153,29 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/JobExecution"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PageResultMessageView": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MessageView"
             },
             "type": "array"
           },
@@ -3443,6 +3739,25 @@
         ],
         "type": "object"
       },
+      "SendMessageRequest": {
+        "properties": {
+          "content": {
+            "maxLength": 4000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "requestId": {
+            "minLength": 1,
+            "pattern": "^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "requestId"
+        ],
+        "type": "object"
+      },
       "SessionView": {
         "properties": {
           "admin": {
@@ -3571,6 +3886,32 @@
           "recoveryCodesRemaining": {
             "format": "int64",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "StatusView": {
+        "properties": {
+          "contextMessageCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxMessageLength": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "modelReady": {
+            "type": "boolean"
+          },
+          "requestTimeoutSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "version": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -3748,6 +4089,17 @@
         "required": [
           "receipt"
         ],
+        "type": "object"
+      },
+      "TurnView": {
+        "properties": {
+          "assistant": {
+            "$ref": "#/components/schemas/MessageView"
+          },
+          "user": {
+            "$ref": "#/components/schemas/MessageView"
+          }
+        },
         "type": "object"
       },
       "UserRequest": {
@@ -4179,6 +4531,252 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/agentscope/conversations": {
+      "get": {
+        "operationId": "AgentScopeController_conversations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResultConversationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:view')"
+      },
+      "post": {
+        "operationId": "AgentScopeController_createConversation",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseConversationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:create')"
+      }
+    },
+    "/api/agentscope/conversations/{id}": {
+      "delete": {
+        "operationId": "AgentScopeController_deleteConversation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:delete')"
+      }
+    },
+    "/api/agentscope/conversations/{id}/messages": {
+      "get": {
+        "operationId": "AgentScopeController_messages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResultMessageView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:view')"
+      },
+      "post": {
+        "operationId": "AgentScopeController_send",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTurnView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:view') and @access.has('agentscope:chat')"
+      }
+    },
+    "/api/agentscope/status": {
+      "get": {
+        "operationId": "AgentScopeController_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStatusView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:view')"
+      }
+    },
     "/api/auth/captcha/challenge": {
       "post": {
         "operationId": "CaptchaController_challenge",
@@ -11281,6 +11879,66 @@
         "tags": [
           "relay-controller"
         ]
+      }
+    },
+    "/api/system/agentscope/configuration": {
+      "get": {
+        "operationId": "AgentScopeSettingsController_getSettings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAgentScopeSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-settings-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:configure')"
+      },
+      "put": {
+        "operationId": "AgentScopeSettingsController_saveSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentScopeSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAgentScopeSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-settings-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:configure')"
       }
     },
     "/api/system/changes": {

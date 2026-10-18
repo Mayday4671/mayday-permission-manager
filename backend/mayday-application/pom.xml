@@ -18,6 +18,11 @@
       <artifactId>mayday-workorders</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.mayday</groupId>
+      <artifactId>mayday-agentscope</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- generator:maven-dependencies -->
     <dependency>
       <groupId>org.springdoc</groupId>

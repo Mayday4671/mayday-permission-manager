@@ -25,7 +25,8 @@ public class ModuleSwitches {
           "udp",
           "scheduler",
           "workorders",
-          "feedback"
+          "feedback",
+          "agentscope"
           // generator:module-keys
           );
   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
@@ -61,6 +62,7 @@ public class ModuleSwitches {
   private boolean defaultEnabled(String module) {
     return switch (module) {
       case "workorders" -> false;
+      case "agentscope" -> false;
       // generator:module-defaults
       default -> true;
     };
@@ -75,6 +77,8 @@ public class ModuleSwitches {
 
   /** 权限目录保留完整注册项；仅在请求授权时过滤关闭模块，不能用超级管理员绕过。 */
   public boolean permissionEnabled(String permission) {
+    // 配置页必须在智能体模块关闭时仍可访问，便于管理员先完成模型配置。
+    if ("agentscope:configure".equals(permission)) return true;
     String resource = permission.split(":", 2)[0];
     String module =
         switch (resource) {
@@ -87,6 +91,7 @@ public class ModuleSwitches {
           case "scheduler" -> "scheduler";
           case "workorders" -> "workorders";
           case "feedback" -> "feedback";
+          case "agentscope" -> "agentscope";
           // generator:permission-modules
           default -> null;
         };
@@ -122,7 +127,8 @@ public class ModuleSwitches {
             Map.entry("/api/operations/job-logs/**", "scheduler"),
             Map.entry("/api/crawler/**", "crawler"),
             Map.entry("/api/relay/**", "udp"),
-            Map.entry("/api/business/workorders/**", "workorders")
+            Map.entry("/api/business/workorders/**", "workorders"),
+            Map.entry("/api/agentscope/**", "agentscope")
             // generator:api-modules
             );
     return patterns.entrySet().stream()

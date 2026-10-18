@@ -1,5 +1,6 @@
 package com.mayday.service;
 
+import com.mayday.agentscope.AgentScopeAccountCleanup;
 import com.mayday.common.BaseEntity;
 import com.mayday.common.BusinessException;
 import com.mayday.common.PageResult;
@@ -42,6 +43,7 @@ public class UserService {
   private final TokenService tokens;
   private final ChangeAuditService changeAudit;
   private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+  private final AgentScopeAccountCleanup agentScopeAccountCleanup;
 
   /** 将账号转换为页面DTO，部门失效显示未分配；邮箱和电话按当前操作者的独立字段读取权限脱敏。 */
   public UserView view(SysUser u) {
@@ -163,6 +165,8 @@ public class UserService {
     jdbc.update("delete from sys_mfa_recovery where user_id=?", id);
     jdbc.update("delete from sys_mfa_credential where user_id=?", id);
     jdbc.update("delete from sys_external_identity where user_id=?", id);
+    // AgentScope 状态表使用框架的 userId/sessionId 复合键，不受 sys_user 外键级联；账号删除时显式清除。
+    agentScopeAccountCleanup.deleteAccountData(id);
     users.delete(u);
   }
 

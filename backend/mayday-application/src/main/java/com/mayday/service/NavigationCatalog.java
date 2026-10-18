@@ -40,6 +40,7 @@ public final class NavigationCatalog {
           page("workflows", "流程定义", "/admin/workflows"),
           page("requests", "审批申请", "/admin/requests"),
           page("workorders", "工单管理", "/admin/workorders"),
+          page("agentscope", "智能体", "/admin/agentscope"),
           page("feedback", "客户反馈", "/admin/feedback"),
           page("scheduler", "任务调度", "/admin/scheduler"),
           page("monitor", "服务监控", "/admin/monitor"),
