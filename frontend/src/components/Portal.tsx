@@ -125,6 +125,7 @@ export function SiteFrame({
           </nav>
           <PortalSearch
             keyword={new URLSearchParams(location.search).get("q") ?? ""}
+            channelScoped={Boolean(activeChannelCode)}
             onSearch={search}
           />
           {appearance.allowed && (
@@ -312,9 +313,11 @@ export function ContactDetails({ info }: { info?: SiteConfig }) {
 /** 搜索内容与 URL 同步；回退、分类跳转及清空操作不会残留输入框里的旧关键词。 */
 export function PortalSearch({
   keyword,
+  channelScoped,
   onSearch,
 }: {
   keyword: string;
+  channelScoped: boolean;
   onSearch: (value: string) => void;
 }) {
   const [input, setInput] = useState(keyword);
@@ -323,7 +326,7 @@ export function PortalSearch({
     <form
       className="site-search"
       role="search"
-      aria-label="站内内容搜索"
+      aria-label={channelScoped ? "搜索当前栏目内容" : "站内内容搜索"}
       onSubmit={(event) => {
         event.preventDefault();
         onSearch(input.trim());

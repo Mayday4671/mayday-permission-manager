@@ -215,6 +215,10 @@ test("分类只改变当前栏目查询，搜索保留栏目及分类并重置�
     name: "从这里，开始高效使用",
     level: 1,
   });
+  assert(
+    screen.getByRole("search", { name: "搜索当前栏目内容" }),
+    "栏目页搜索应明确提示仅搜索当前栏目，避免被误解为全站搜索",
+  );
   fireEvent.click(
     screen.getByRole("button", { name: "业务帮助", exact: true }),
   );
