@@ -64,9 +64,13 @@
         <configuration>
           <lineEndings>UNIX</lineEndings>
           <java>
-            <googleJavaFormat>
-              <version>1.25.2</version>
-            </googleJavaFormat>
+            <!-- Mayday Java 标准：Eclipse JDT 执行 Allman/4空格/120列，规则来自 config/eclipse/Mayday-Java.prefs（对应 config/Mayday-Java-Standard.xml）。 -->
+            <eclipse>
+              <file>${maven.multiModuleProjectDirectory}/config/eclipse/Mayday-Java.prefs</file>
+            </eclipse>
+            <importOrder>
+              <order>java,javax,jakarta,,\#</order>
+            </importOrder>
             <removeUnusedImports/>
             <trimTrailingWhitespace/>
             <endWithNewline/>

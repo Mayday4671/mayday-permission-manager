@@ -1,5 +1,18 @@
 package com.mayday.workorders;
 
+import java.util.Optional;
+
+import com.mayday.security.AccessPolicy;
+import com.mayday.workorders.WorkOrderContracts.WorkOrderRequest;
+import com.mayday.workorders.mapper.WorkOrderMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -9,65 +22,61 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.mayday.security.AccessPolicy;
-import com.mayday.workorders.WorkOrderContracts.WorkOrderRequest;
-import com.mayday.workorders.mapper.WorkOrderMapper;
-import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.security.access.AccessDeniedException;
-
 /** 保护模板的关键安全边界；生成的接口还需在真实 MySQL 中验证行级范围和事务。 */
 @ExtendWith(MockitoExtension.class)
-class WorkOrderServiceTest {
-  @Mock private WorkOrderMapper repository;
-  @Mock private AccessPolicy access;
-  private WorkOrderService service;
+class WorkOrderServiceTest
+{
+    @Mock
+    private WorkOrderMapper repository;
+    @Mock
+    private AccessPolicy access;
+    private WorkOrderService service;
 
-  /** 每项安全检查使用独立服务和仓储模拟，避免前一用例的授权结果残留。 */
-  @BeforeEach
-  void setUp() {
-    service = new WorkOrderService(repository, access);
-  }
+    /** 每项安全检查使用独立服务和仓储模拟，避免前一用例的授权结果残留。 */
+    @BeforeEach
+    void setUp()
+    {
+        service = new WorkOrderService(repository, access);
+    }
 
-  /** 动作未授权时必须在访问仓储前失败，不能先查询再隐藏结果。 */
-  @Test
-  void missingPermissionDoesNotReadEntityMapper() {
-    doThrow(new AccessDeniedException("denied")).when(access).require("workorders:view");
-    assertThrows(AccessDeniedException.class, () -> service.get(1L));
-    verify(repository, never()).findById(anyLong());
-  }
+    /** 动作未授权时必须在访问仓储前失败，不能先查询再隐藏结果。 */
+    @Test
+    void missingPermissionDoesNotReadEntityMapper()
+    {
+        doThrow(new AccessDeniedException("denied")).when(access).require("workorders:view");
+        assertThrows(AccessDeniedException.class, () -> service.get(1L));
+        verify(repository, never()).findById(anyLong());
+    }
 
-  /** 删除与查看采用相同行级范围，不能用已有动作权限越过记录所有权。 */
-  @Test
-  void outOfScopeRecordCannotBeDeleted() {
-    WorkOrder entity = existing();
-    when(repository.findById(1L)).thenReturn(Optional.of(entity));
-    doThrow(new AccessDeniedException("denied")).when(access).checkData("workorders", 2L, 3L);
-    assertThrows(AccessDeniedException.class, () -> service.delete(1L, 4L));
-    verify(repository, never()).delete(entity);
-  }
+    /** 删除与查看采用相同行级范围，不能用已有动作权限越过记录所有权。 */
+    @Test
+    void outOfScopeRecordCannotBeDeleted()
+    {
+        WorkOrder entity = existing();
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+        doThrow(new AccessDeniedException("denied")).when(access).checkData("workorders", 2L, 3L);
+        assertThrows(AccessDeniedException.class, () -> service.delete(1L, 4L));
+        verify(repository, never()).delete(entity);
+    }
 
-  /** 过期版本不能保存或刷新实体，防止覆盖已经提交的新值。 */
-  @Test
-  void staleVersionCannotBeOverwritten() {
-    when(repository.findById(1L)).thenReturn(Optional.of(existing()));
-    WorkOrderRequest request = new WorkOrderRequest("测试", "测试", true, 3L);
-    assertThrows(OptimisticLockingFailureException.class, () -> service.update(1L, request));
-    // MyBatis-Flex 无持久化上下文；版本前置校验失败时不应产生任何更新调用。
-    verify(repository, never()).update(any(), anyBoolean());
-  }
+    /** 过期版本不能保存或刷新实体，防止覆盖已经提交的新值。 */
+    @Test
+    void staleVersionCannotBeOverwritten()
+    {
+        when(repository.findById(1L)).thenReturn(Optional.of(existing()));
+        WorkOrderRequest request = new WorkOrderRequest("测试", "测试", true, 3L);
+        assertThrows(OptimisticLockingFailureException.class, () -> service.update(1L, request));
+        // MyBatis-Flex 无持久化上下文；版本前置校验失败时不应产生任何更新调用。
+        verify(repository, never()).update(any(), anyBoolean());
+    }
 
-  private WorkOrder existing() {
-    WorkOrder entity = new WorkOrder();
-    entity.setId(1L);
-    entity.setOwnerId(2L);
-    entity.setDepartmentId(3L);
-    entity.setVersion(4L);
-    return entity;
-  }
+    private WorkOrder existing()
+    {
+        WorkOrder entity = new WorkOrder();
+        entity.setId(1L);
+        entity.setOwnerId(2L);
+        entity.setDepartmentId(3L);
+        entity.setVersion(4L);
+        return entity;
+    }
 }

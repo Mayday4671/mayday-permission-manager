@@ -19,35 +19,39 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/operations")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class NotificationAttachmentController {
-  private final NotificationService service;
-  private final StoredFileMapper files;
-  private final StoredFileContent content;
+public class NotificationAttachmentController
+{
+    private final NotificationService service;
+    private final StoredFileMapper files;
+    private final StoredFileContent content;
 
-  /** 校验当前收件人和通知有效期后，才允许读取当前通知确实关联的附件。 */
-  @GetMapping("/messages/{messageId}/attachments/{fileId}")
-  public ResponseEntity<Resource> received(
-      @PathVariable Long messageId, @PathVariable Long fileId) {
-    var notification = service.ownNotification(messageId);
-    if (!notification.getAttachmentIds().contains(fileId)) {
-      throw new AccessDeniedException("文件不属于此通知");
+    /** 校验当前收件人和通知有效期后，才允许读取当前通知确实关联的附件。 */
+    @GetMapping("/messages/{messageId}/attachments/{fileId}")
+    public ResponseEntity<Resource> received(@PathVariable Long messageId, @PathVariable Long fileId)
+    {
+        var notification = service.ownNotification(messageId);
+        if (!notification.getAttachmentIds().contains(fileId))
+        {
+            throw new AccessDeniedException("文件不属于此通知");
+        }
+        return download(fileId);
     }
-    return download(fileId);
-  }
 
-  /** 管理者仍须满足通知数据范围，不通过附件地址扩大原有通知查看权限。 */
-  @GetMapping("/notifications/{notificationId}/attachments/{fileId}")
-  public ResponseEntity<Resource> managed(
-      @PathVariable Long notificationId, @PathVariable Long fileId) {
-    var notification = service.getManaged(notificationId);
-    if (!notification.getAttachmentIds().contains(fileId)) {
-      throw new AccessDeniedException("文件不属于此通知");
+    /** 管理者仍须满足通知数据范围，不通过附件地址扩大原有通知查看权限。 */
+    @GetMapping("/notifications/{notificationId}/attachments/{fileId}")
+    public ResponseEntity<Resource> managed(@PathVariable Long notificationId, @PathVariable Long fileId)
+    {
+        var notification = service.getManaged(notificationId);
+        if (!notification.getAttachmentIds().contains(fileId))
+        {
+            throw new AccessDeniedException("文件不属于此通知");
+        }
+        return download(fileId);
     }
-    return download(fileId);
-  }
 
-  private ResponseEntity<Resource> download(Long id) {
-    var file = files.findById(id).orElseThrow(() -> new BusinessException("文件不存在"));
-    return content.response(file, false, false);
-  }
+    private ResponseEntity<Resource> download(Long id)
+    {
+        var file = files.findById(id).orElseThrow(() -> new BusinessException("文件不存在"));
+        return content.response(file, false, false);
+    }
 }

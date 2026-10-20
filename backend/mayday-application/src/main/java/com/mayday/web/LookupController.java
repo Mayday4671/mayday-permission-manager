@@ -1,5 +1,10 @@
 package com.mayday.web;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.mayday.common.exception.BusinessException;
 import com.mayday.common.persistence.PageResult;
 import com.mayday.common.persistence.SearchPredicates;
@@ -13,10 +18,6 @@ import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SystemEntry;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,122 +29,96 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/system")
 @RequiredArgsConstructor
-public class LookupController {
-  private final EntryMapper entries;
-  private final RoleMapper roles;
-  private final UserMapper users;
-  private final AccessPolicy access;
-  private final com.mayday.common.util.ModuleSwitches modules;
+public class LookupController
+{
+    private final EntryMapper entries;
+    private final RoleMapper roles;
+    private final UserMapper users;
+    private final AccessPolicy access;
+    private final com.mayday.common.util.ModuleSwitches modules;
 
-  /** 选择器遵守同一用户数据范围，永不因下拉框泄露范围外账号或联系方式。 */
-  @GetMapping("/options/{kind}")
-  public ApiResponse<?> options(
-      @PathVariable String kind,
-      @RequestParam(defaultValue = "") String keyword,
-      @RequestParam(defaultValue = "1") int page,
-      @RequestParam(defaultValue = "30") int size) {
-    if ("users".equals(kind)) {
-      access.require("users:view");
-      var userFilter = access.filter("users", "id").and(new QueryColumn("enabled").eq(true));
-      SearchPredicates.anyOf(
-          userFilter,
-          SearchPredicates.contains("nickname", keyword),
-          SearchPredicates.contains("username", keyword));
-      var found = users.paginate(PageResult.request(page, size), userFilter.orderBy("id desc"));
-      return ApiResponse.ok(
-          PageResult.from(
-              found.map(
-                  user ->
-                      Map.of(
-                          "value",
-                          user.getId(),
-                          "label",
-                          user.getNickname() + " · " + user.getUsername()))));
+    /** 选择器遵守同一用户数据范围，永不因下拉框泄露范围外账号或联系方式。 */
+    @GetMapping("/options/{kind}")
+    public ApiResponse<?> options(@PathVariable String kind, @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "30") int size)
+    {
+        if ("users".equals(kind))
+        {
+            access.require("users:view");
+            var userFilter = access.filter("users", "id").and(new QueryColumn("enabled").eq(true));
+            SearchPredicates.anyOf(userFilter, SearchPredicates.contains("nickname", keyword),
+                    SearchPredicates.contains("username", keyword));
+            var found = users.paginate(PageResult.request(page, size), userFilter.orderBy("id desc"));
+            return ApiResponse.ok(PageResult.from(found.map(
+                    user -> Map.of("value", user.getId(), "label", user.getNickname() + " · " + user.getUsername()))));
+        }
+        if (!Set.of("categories", "tags", "approvalcategories").contains(kind))
+        {
+            throw new BusinessException("未知选项类型");
+        }
+        if ("approvalcategories".equals(kind))
+        {
+            if (!access.has("workflows:view") && !access.has("requests:create"))
+            {
+                access.require("approvalcategories:view");
+            }
+        } else if (!access.has("notices:view"))
+        {
+            access.require(kind + ":view");
+        }
+        var found = entries.paginate(PageResult.request(page, size),
+                QueryWrapper.create().where(new QueryColumn("kind").eq(kind)).and(new QueryColumn("enabled").eq(true))
+                        .and(SearchPredicates.contains("name", keyword)).orderBy("sort_order asc, id asc"));
+        return ApiResponse
+                .ok(PageResult.from(found.map(entry -> Map.of("value", entry.getId(), "label", entry.getName()))));
     }
-    if (!Set.of("categories", "tags", "approvalcategories").contains(kind)) {
-      throw new BusinessException("未知选项类型");
-    }
-    if ("approvalcategories".equals(kind)) {
-      if (!access.has("workflows:view") && !access.has("requests:create")) {
-        access.require("approvalcategories:view");
-      }
-    } else if (!access.has("notices:view")) {
-      access.require(kind + ":view");
-    }
-    var found =
-        entries.paginate(
-            PageResult.request(page, size),
-            QueryWrapper.create()
-                .where(new QueryColumn("kind").eq(kind))
-                .and(new QueryColumn("enabled").eq(true))
-                .and(SearchPredicates.contains("name", keyword))
-                .orderBy("sort_order asc, id asc"));
-    return ApiResponse.ok(
-        PageResult.from(
-            found.map(entry -> Map.of("value", entry.getId(), "label", entry.getName()))));
-  }
 
-  /** 菜单只包含启用、注册路由匹配且当前用户有权的入口；关闭门户时移除其管理入口。 */
-  @GetMapping("/navigation")
-  public ApiResponse<?> navigation() {
-    return ApiResponse.ok(
-        entries.findByKindOrderBySortOrderAscIdAsc("menus").stream()
-            .filter(SystemEntry::isEnabled)
-            .filter(entry -> NavigationCatalog.matches(entry.getPath(), entry.getPermission()))
-            .filter(
-                entry ->
-                    !"/admin/site-settings".equals(entry.getPath()) || modules.isEnabled("portal"))
-            .filter(entry -> entry.getPermission() != null && access.has(entry.getPermission()))
-            .toList());
-  }
+    /** 菜单只包含启用、注册路由匹配且当前用户有权的入口；关闭门户时移除其管理入口。 */
+    @GetMapping("/navigation")
+    public ApiResponse<?> navigation()
+    {
+        return ApiResponse
+                .ok(entries.findByKindOrderBySortOrderAscIdAsc("menus").stream().filter(SystemEntry::isEnabled)
+                        .filter(entry -> NavigationCatalog.matches(entry.getPath(), entry.getPermission()))
+                        .filter(entry -> !"/admin/site-settings".equals(entry.getPath()) || modules.isEnabled("portal"))
+                        .filter(entry -> entry.getPermission() != null && access.has(entry.getPermission())).toList());
+    }
 
-  /** 表单基础选项按使用场景授权返回；角色还需通过可授予范围校验，不输出角色完整权限。 */
-  @GetMapping("/lookups")
-  public ApiResponse<?> lookups() {
-    List<?> departments = List.of();
-    List<?> roleOptions = List.of();
-    if (access.has("users:view")
-        || access.has("departments:view")
-        || access.has("requests:create")
-        || access.has("workflows:view")) {
-      departments =
-          entries.findByKindOrderBySortOrderAscIdAsc("departments").stream()
-              .map(
-                  entry -> {
-                    Map<String, Object> option = new LinkedHashMap<>();
-                    option.put("id", entry.getId());
-                    option.put("name", entry.getName());
-                    option.put("parentId", entry.getParentId());
-                    option.put("enabled", entry.isEnabled());
-                    return option;
-                  })
-              .toList();
+    /** 表单基础选项按使用场景授权返回；角色还需通过可授予范围校验，不输出角色完整权限。 */
+    @GetMapping("/lookups")
+    public ApiResponse<?> lookups()
+    {
+        List<?> departments = List.of();
+        List<?> roleOptions = List.of();
+        if (access.has("users:view") || access.has("departments:view") || access.has("requests:create")
+                || access.has("workflows:view"))
+        {
+            departments = entries.findByKindOrderBySortOrderAscIdAsc("departments").stream().map(entry -> {
+                Map<String, Object> option = new LinkedHashMap<>();
+                option.put("id", entry.getId());
+                option.put("name", entry.getName());
+                option.put("parentId", entry.getParentId());
+                option.put("enabled", entry.isEnabled());
+                return option;
+            }).toList();
+        }
+        if (access.has("users:assign") || access.has("roles:view"))
+        {
+            roleOptions = roles.findAll().stream().filter(SysRole::isEnabled).filter(role -> {
+                try
+                {
+                    access.checkGrant(List.of(role));
+                    return true;
+                } catch (org.springframework.security.access.AccessDeniedException ex)
+                {
+                    return false;
+                }
+            }).map(role -> Map.of("id", role.getId(), "name", role.getName(), "code", role.getCode())).toList();
+        }
+        var posts = access.has("users:view") || access.has("posts:view")
+                ? entries.findByKindOrderBySortOrderAscIdAsc("posts").stream().filter(SystemEntry::isEnabled)
+                        .map(entry -> Map.of("id", entry.getId(), "name", entry.getName())).toList()
+                : List.of();
+        return ApiResponse.ok(Map.of("departments", departments, "roles", roleOptions, "posts", posts));
     }
-    if (access.has("users:assign") || access.has("roles:view")) {
-      roleOptions =
-          roles.findAll().stream()
-              .filter(SysRole::isEnabled)
-              .filter(
-                  role -> {
-                    try {
-                      access.checkGrant(List.of(role));
-                      return true;
-                    } catch (org.springframework.security.access.AccessDeniedException ex) {
-                      return false;
-                    }
-                  })
-              .map(
-                  role ->
-                      Map.of("id", role.getId(), "name", role.getName(), "code", role.getCode()))
-              .toList();
-    }
-    var posts =
-        access.has("users:view") || access.has("posts:view")
-            ? entries.findByKindOrderBySortOrderAscIdAsc("posts").stream()
-                .filter(SystemEntry::isEnabled)
-                .map(entry -> Map.of("id", entry.getId(), "name", entry.getName()))
-                .toList()
-            : List.of();
-    return ApiResponse.ok(Map.of("departments", departments, "roles", roleOptions, "posts", posts));
-  }
 }

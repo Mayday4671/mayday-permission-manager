@@ -1,8 +1,9 @@
 package com.mayday.web;
 
+import java.util.Map;
+
 import com.mayday.common.util.ModuleSwitches;
 import com.mayday.common.web.ApiResponse;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,15 +13,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/platform")
 @RequiredArgsConstructor
-public class PlatformController {
-  private final ModuleSwitches modules;
+public class PlatformController
+{
+    private final ModuleSwitches modules;
 
-  /** 前后端消费同一份有效开关，模块依赖已由服务端计算，客户端无需复制依赖规则。 */
-  @GetMapping("/features")
-  public ApiResponse<FeatureView> features() {
-    return ApiResponse.ok(new FeatureView(modules.snapshot()));
-  }
+    /** 前后端消费同一份有效开关，模块依赖已由服务端计算，客户端无需复制依赖规则。 */
+    @GetMapping("/features")
+    public ApiResponse<FeatureView> features()
+    {
+        return ApiResponse.ok(new FeatureView(modules.snapshot()));
+    }
 
-  /** 客户端导航所需的模块启用清单；只反映部署功能，不代表当前账号已被授予访问权限。 */
-  public record FeatureView(Map<String, Boolean> modules) {}
+    /** 客户端导航所需的模块启用清单；只反映部署功能，不代表当前账号已被授予访问权限。 */
+    public record FeatureView(Map<String, Boolean> modules) {
+    }
 }

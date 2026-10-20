@@ -1,12 +1,14 @@
 package com.mayday.operations.feedback;
 
+import java.util.List;
+
+import jakarta.validation.Valid;
+
 import com.mayday.common.persistence.PageResult;
 import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.mapper.UserMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,62 +23,58 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/operations/feedback")
 @RequiredArgsConstructor
-public class FeedbackController {
-  private final FeedbackService service;
-  private final AccessPolicy access;
-  private final UserMapper users;
+public class FeedbackController
+{
+    private final FeedbackService service;
+    private final AccessPolicy access;
+    private final UserMapper users;
 
-  /** 后台按条件分页读取反馈；服务层独立执行查看权限，不依赖菜单隐藏。 */
-  @GetMapping
-  public ApiResponse<PageResult<FeedbackService.AdminView>> list(
-      @RequestParam(defaultValue = "") String keyword,
-      @RequestParam(required = false) String status,
-      @RequestParam(defaultValue = "1") int page,
-      @RequestParam(defaultValue = "10") int size) {
-    return ApiResponse.ok(service.list(keyword, status, page, size));
-  }
+    /** 后台按条件分页读取反馈；服务层独立执行查看权限，不依赖菜单隐藏。 */
+    @GetMapping
+    public ApiResponse<PageResult<FeedbackService.AdminView>> list(@RequestParam(defaultValue = "") String keyword,
+            @RequestParam(required = false) String status, @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size)
+    {
+        return ApiResponse.ok(service.list(keyword, status, page, size));
+    }
 
-  /** 读取后台反馈详情和完整内部处理历史；仅已授权人员可调用。 */
-  @GetMapping("/{id}")
-  public ApiResponse<FeedbackService.AdminView> detail(@PathVariable Long id) {
-    return ApiResponse.ok(service.detail(id));
-  }
+    /** 读取后台反馈详情和完整内部处理历史；仅已授权人员可调用。 */
+    @GetMapping("/{id}")
+    public ApiResponse<FeedbackService.AdminView> detail(@PathVariable Long id)
+    {
+        return ApiResponse.ok(service.detail(id));
+    }
 
-  /** 提交带版本的处理动作，公开回复与内部备注使用分离字段；冲突时整次操作回滚。 */
-  @PostMapping("/{id}/process")
-  public ApiResponse<FeedbackService.AdminView> process(
-      @PathVariable Long id, @Valid @RequestBody FeedbackService.Process request) {
-    return ApiResponse.ok(service.process(id, request));
-  }
+    /** 提交带版本的处理动作，公开回复与内部备注使用分离字段；冲突时整次操作回滚。 */
+    @PostMapping("/{id}/process")
+    public ApiResponse<FeedbackService.AdminView> process(@PathVariable Long id,
+            @Valid @RequestBody FeedbackService.Process request)
+    {
+        return ApiResponse.ok(service.process(id, request));
+    }
 
-  /** 分配权限下最多返回100个搜索候选，再校验反馈查看/处理权限，防止无效负责人接受任务。 */
-  @GetMapping("/assignees")
-  @Transactional(readOnly = true)
-  public ApiResponse<List<Assignee>> assignees(@RequestParam(defaultValue = "") String keyword) {
-    access.require("feedback:view");
-    access.require("feedback:assign");
-    return ApiResponse.ok(
-        users
-            .paginate(
-                1,
-                100,
-                com.mybatisflex.core.query.QueryWrapper.create()
-                    .where(new com.mybatisflex.core.query.QueryColumn("enabled").eq(true))
-                    .and(
-                        com.mayday.common.persistence.SearchPredicates.contains(
-                            "nickname", keyword)))
-            .getRecords()
-            .stream()
-            .filter(
-                user ->
-                    access.hasFor(user, "feedback:process") && access.hasFor(user, "feedback:view"))
-            .map(user -> new Assignee(user.getId(), user.getNickname()))
-            .toList());
-  }
+    /** 分配权限下最多返回100个搜索候选，再校验反馈查看/处理权限，防止无效负责人接受任务。 */
+    @GetMapping("/assignees")
+    @Transactional(readOnly = true)
+    public ApiResponse<List<Assignee>> assignees(@RequestParam(defaultValue = "") String keyword)
+    {
+        access.require("feedback:view");
+        access.require("feedback:assign");
+        return ApiResponse
+                .ok(users
+                        .paginate(1, 100,
+                                com.mybatisflex.core.query.QueryWrapper.create()
+                                        .where(new com.mybatisflex.core.query.QueryColumn("enabled").eq(true))
+                                        .and(com.mayday.common.persistence.SearchPredicates.contains("nickname",
+                                                keyword)))
+                        .getRecords().stream()
+                        .filter(user -> access.hasFor(user, "feedback:process") && access.hasFor(user, "feedback:view"))
+                        .map(user -> new Assignee(user.getId(), user.getNickname())).toList());
+    }
 
-  /** 分配候选只包含账号ID和显示名，不暴露联系方式、角色详情或登录凭据。 */
-  @Schema(
-      name = "FeedbackAssignee",
-      requiredProperties = {"value", "label"})
-  public record Assignee(Long value, String label) {}
+    /** 分配候选只包含账号ID和显示名，不暴露联系方式、角色详情或登录凭据。 */
+    @Schema(name = "FeedbackAssignee", requiredProperties =
+    {"value", "label"})
+    public record Assignee(Long value, String label) {
+    }
 }

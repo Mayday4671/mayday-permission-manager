@@ -1,10 +1,11 @@
 package com.mayday.workorders;
 
+import jakarta.validation.Valid;
+
 import com.mayday.common.persistence.PageResult;
 import com.mayday.common.web.ApiResponse;
 import com.mayday.workorders.WorkOrderContracts.WorkOrderRequest;
 import com.mayday.workorders.WorkOrderContracts.WorkOrderView;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,47 +22,50 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/business/workorders")
 @RequiredArgsConstructor
-public class WorkOrderController {
-  private final WorkOrderService service;
+public class WorkOrderController
+{
+    private final WorkOrderService service;
 
-  /** 查询已授权的数据分页；总数与条目共享数据范围条件，不能通过计数泄露范围外记录。 */
-  @GetMapping
-  @PreAuthorize("@access.has('workorders:view')")
-  public ApiResponse<PageResult<WorkOrderView>> list(
-      @RequestParam(defaultValue = "") String keyword,
-      @RequestParam(required = false) Boolean enabled,
-      @RequestParam(defaultValue = "1") int page,
-      @RequestParam(defaultValue = "10") int size) {
-    return ApiResponse.ok(service.list(keyword, enabled, page, size));
-  }
+    /** 查询已授权的数据分页；总数与条目共享数据范围条件，不能通过计数泄露范围外记录。 */
+    @GetMapping
+    @PreAuthorize("@access.has('workorders:view')")
+    public ApiResponse<PageResult<WorkOrderView>> list(@RequestParam(defaultValue = "") String keyword,
+            @RequestParam(required = false) Boolean enabled, @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size)
+    {
+        return ApiResponse.ok(service.list(keyword, enabled, page, size));
+    }
 
-  /** 按主键读取仍需通过业务层范围检查，具有查看动作并不代表可以访问所有记录。 */
-  @GetMapping("/{id}")
-  @PreAuthorize("@access.has('workorders:view')")
-  public ApiResponse<WorkOrderView> get(@PathVariable Long id) {
-    return ApiResponse.ok(service.get(id));
-  }
+    /** 按主键读取仍需通过业务层范围检查，具有查看动作并不代表可以访问所有记录。 */
+    @GetMapping("/{id}")
+    @PreAuthorize("@access.has('workorders:view')")
+    public ApiResponse<WorkOrderView> get(@PathVariable Long id)
+    {
+        return ApiResponse.ok(service.get(id));
+    }
 
-  /** 只接收已校验的业务字段；创建者、部门与时间由有效登录身份及服务器赋值。 */
-  @PostMapping
-  @PreAuthorize("@access.has('workorders:create')")
-  public ApiResponse<WorkOrderView> create(@Valid @RequestBody WorkOrderRequest request) {
-    return ApiResponse.ok(service.create(request));
-  }
+    /** 只接收已校验的业务字段；创建者、部门与时间由有效登录身份及服务器赋值。 */
+    @PostMapping
+    @PreAuthorize("@access.has('workorders:create')")
+    public ApiResponse<WorkOrderView> create(@Valid @RequestBody WorkOrderRequest request)
+    {
+        return ApiResponse.ok(service.create(request));
+    }
 
-  /** 修改要求动作权限、行级范围和当前版本同时满足；并发冲突返回失败而非覆盖别人修改。 */
-  @PutMapping("/{id}")
-  @PreAuthorize("@access.has('workorders:update')")
-  public ApiResponse<WorkOrderView> update(
-      @PathVariable Long id, @Valid @RequestBody WorkOrderRequest request) {
-    return ApiResponse.ok(service.update(id, request));
-  }
+    /** 修改要求动作权限、行级范围和当前版本同时满足；并发冲突返回失败而非覆盖别人修改。 */
+    @PutMapping("/{id}")
+    @PreAuthorize("@access.has('workorders:update')")
+    public ApiResponse<WorkOrderView> update(@PathVariable Long id, @Valid @RequestBody WorkOrderRequest request)
+    {
+        return ApiResponse.ok(service.update(id, request));
+    }
 
-  /** 删除显式提交当前版本，业务层再检查范围与数据库引用；任何校验失败都不会部分删除。 */
-  @DeleteMapping("/{id}")
-  @PreAuthorize("@access.has('workorders:delete')")
-  public ApiResponse<Void> delete(@PathVariable Long id, @RequestParam Long version) {
-    service.delete(id, version);
-    return ApiResponse.ok(null);
-  }
+    /** 删除显式提交当前版本，业务层再检查范围与数据库引用；任何校验失败都不会部分删除。 */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("@access.has('workorders:delete')")
+    public ApiResponse<Void> delete(@PathVariable Long id, @RequestParam Long version)
+    {
+        service.delete(id, version);
+        return ApiResponse.ok(null);
+    }
 }

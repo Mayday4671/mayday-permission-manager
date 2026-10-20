@@ -10,3 +10,10 @@ indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
+
+# Mayday Java 标准：Java/XML 4 空格；JSON/YAML 维持 2 空格（见 backend/config/Mayday-Java-Standard.xml）。
+[*.java]
+indent_size = 4
+
+[*.xml]
+indent_size = 4

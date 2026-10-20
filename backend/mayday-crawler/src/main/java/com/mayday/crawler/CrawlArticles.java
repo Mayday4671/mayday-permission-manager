@@ -1,5 +1,12 @@
 package com.mayday.crawler;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import com.mayday.common.exception.BusinessException;
 import com.mayday.common.persistence.PageResult;
 import com.mayday.common.persistence.SearchPredicates;
@@ -8,228 +15,182 @@ import com.mayday.crawler.mapper.CrawlArticleMapper;
 import com.mayday.crawler.mapper.CrawlItemMapper;
 import com.mayday.crawler.mapper.CrawlTaskMapper;
 import com.mayday.security.AccessPolicy;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 文章归档与读取共用任务的授权边界。写入由 CrawlStore 在任务锁内调用，文章和图片关联与队列一并提交。 卡片只返回摘要；正文分页按 ordinal/id 排序，详情一次最多返回
- * 100,000 字符并提示截断。
+ * 文章归档与读取共用任务的授权边界。写入由 CrawlStore 在任务锁内调用，文章和图片关联与队列一并提交。 卡片只返回摘要；正文分页按
+ * ordinal/id 排序，详情一次最多返回 100,000 字符并提示截断。
  */
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class CrawlArticles {
-  private final CrawlArticleMapper articles;
-  private final CrawlArticleImageMapper links;
-  private final CrawlItemMapper items;
-  private final CrawlTaskMapper tasks;
-  private final AccessPolicy access;
+public class CrawlArticles
+{
+    private final CrawlArticleMapper articles;
+    private final CrawlArticleImageMapper links;
+    private final CrawlItemMapper items;
+    private final CrawlTaskMapper tasks;
+    private final AccessPolicy access;
 
-  /** 以任务与分页组根地址确定文章，重试只更新当前页正文，不重复拼接已经保存的分页内容。 */
-  public CrawlArticle savePage(CrawlStore.Work work, CrawlItem item, PageExtractor.Links parsed) {
-    var text = parsed.article();
-    if (text == null) {
-      return null;
+    /** 以任务与分页组根地址确定文章，重试只更新当前页正文，不重复拼接已经保存的分页内容。 */
+    public CrawlArticle savePage(CrawlStore.Work work, CrawlItem item, PageExtractor.Links parsed)
+    {
+        var text = parsed.article();
+        if (text == null)
+        {
+            return null;
+        }
+        String hash = ImageBytes.hash(work.root());
+        var article = articles.findByTaskIdAndSourceHash(work.taskId(), hash).orElseGet(() -> {
+            var created = new CrawlArticle();
+            created.setTaskId(work.taskId());
+            created.setSourceUrl(work.root());
+            created.setSourceHash(hash);
+            return created;
+        });
+        if (article.getId() == null || work.ordinal() == 0)
+        {
+            article.setTitle(
+                    !text.title().isBlank() ? text.title() : !parsed.title().isBlank() ? parsed.title() : "未命名文章");
+            article.setAuthor(text.author());
+            article.setPublishedAt(text.publishedAt());
+            article.setSummary(ArticleExtractor.limit(text.body().replaceAll("\\s+", " "), 300));
+        } else if (article.getSummary().isBlank() && !text.body().isBlank())
+        {
+            article.setSummary(ArticleExtractor.limit(text.body().replaceAll("\\s+", " "), 300));
+        }
+        articles.save(article);
+        item.setArticleId(article.getId());
+        item.setArticleBody(text.body());
+        item.setBodyTruncated(text.truncated());
+        return article;
     }
-    String hash = ImageBytes.hash(work.root());
-    var article =
-        articles
-            .findByTaskIdAndSourceHash(work.taskId(), hash)
-            .orElseGet(
-                () -> {
-                  var created = new CrawlArticle();
-                  created.setTaskId(work.taskId());
-                  created.setSourceUrl(work.root());
-                  created.setSourceHash(hash);
-                  return created;
-                });
-    if (article.getId() == null || work.ordinal() == 0) {
-      article.setTitle(
-          !text.title().isBlank()
-              ? text.title()
-              : !parsed.title().isBlank() ? parsed.title() : "未命名文章");
-      article.setAuthor(text.author());
-      article.setPublishedAt(text.publishedAt());
-      article.setSummary(ArticleExtractor.limit(text.body().replaceAll("\\s+", " "), 300));
-    } else if (article.getSummary().isBlank() && !text.body().isBlank()) {
-      article.setSummary(ArticleExtractor.limit(text.body().replaceAll("\\s+", " "), 300));
+
+    /** 图片队列可复用，但每篇文章的引用独立建立，防止去重后另一篇文章丢失图片。 */
+    public void link(CrawlArticle article, CrawlItem image, int order)
+    {
+        if (article == null || image == null || links.existsByArticleIdAndItemId(article.getId(), image.getId()))
+        {
+            return;
+        }
+        var link = new CrawlArticleImage();
+        link.setArticleId(article.getId());
+        link.setItemId(image.getId());
+        link.setSortOrder(order);
+        links.save(link);
     }
-    articles.save(article);
-    item.setArticleId(article.getId());
-    item.setArticleBody(text.body());
-    item.setBodyTruncated(text.truncated());
-    return article;
-  }
 
-  /** 图片队列可复用，但每篇文章的引用独立建立，防止去重后另一篇文章丢失图片。 */
-  public void link(CrawlArticle article, CrawlItem image, int order) {
-    if (article == null
-        || image == null
-        || links.existsByArticleIdAndItemId(article.getId(), image.getId())) {
-      return;
+    /** 彻底清理任务数据时先清除文章图片关联，避免引用约束阻止后续队列和正文删除。 */
+    public void deleteLinks(Long task)
+    {
+        links.deleteForTask(task);
     }
-    var link = new CrawlArticleImage();
-    link.setArticleId(article.getId());
-    link.setItemId(image.getId());
-    link.setSortOrder(order);
-    links.save(link);
-  }
 
-  /** 彻底清理任务数据时先清除文章图片关联，避免引用约束阻止后续队列和正文删除。 */
-  public void deleteLinks(Long task) {
-    links.deleteForTask(task);
-  }
-
-  /** 判断配置删除应归档还是物理清理；已有文章的数据生命周期不受配置删除影响。 */
-  public boolean hasData(Long task) {
-    return articles.existsByTaskId(task);
-  }
-
-  /** 仅彻底清理数据时移除归档文章，普通配置归档保留历史正文与来源。 */
-  public void deleteArticles(Long task) {
-    articles.deleteByTaskId(task);
-  }
-
-  /** 下载失败或尚在队列的封面不返回地址；浏览器只请求已入库图片的鉴权接口。 */
-  private List<CrawlItem> saved(List<CrawlItem> images) {
-    var seen = new HashSet<Long>();
-    return images.stream()
-        .filter(
-            i ->
-                i.getFileId() != null
-                    && Set.of("SUCCESS", "DUPLICATE").contains(i.getStatus())
-                    && seen.add(i.getFileId()))
-        .toList();
-  }
-
-  private Card card(CrawlArticle a, List<CrawlItem> images, int pages, CrawlTask task) {
-    var saved = saved(images);
-    return new Card(
-        a.getId(),
-        a.getTitle(),
-        a.getSummary(),
-        a.getAuthor(),
-        a.getPublishedAt(),
-        a.getSourceUrl(),
-        a.getCreatedAt(),
-        pages,
-        saved.size(),
-        (int)
-            images.stream()
-                .filter(i -> Set.of("QUEUED", "FETCHING").contains(i.getStatus()))
-                .count(),
-        (int)
-            images.stream()
-                .filter(i -> Set.of("FAILED", "SKIPPED").contains(i.getStatus()))
-                .count(),
-        saved.isEmpty() ? null : saved.getFirst().getId(),
-        task.getId(),
-        task.getName(),
-        task.getStatus(),
-        task.getRules().maxImages());
-  }
-
-  /** 跨任务列表在 SQL 内先应用所有者授权，再分页和统计，最多返回 24 篇摘要。 */
-  @Transactional(readOnly = true)
-  public PageResult<Card> list(Long task, String keyword, int page, int size) {
-    access.require("crawler:view");
-    boolean all = access.has("crawler:all");
-    Long owner = access.current().getId();
-    // 跨任务卡片必须先在 SQL 内限制任务所有者，再统计总数和分页，不能取回所有文章后在前端过滤。
-    var allowedTasks =
-        com.mybatisflex.core.query.QueryWrapper.create()
-            .select(new com.mybatisflex.core.query.QueryColumn("id"))
-            .from(CrawlTask.class);
-    if (!all) {
-      allowedTasks.where(new com.mybatisflex.core.query.QueryColumn("owner_id").eq(owner));
+    /** 判断配置删除应归档还是物理清理；已有文章的数据生命周期不受配置删除影响。 */
+    public boolean hasData(Long task)
+    {
+        return articles.existsByTaskId(task);
     }
-    var filter =
-        com.mybatisflex.core.query.QueryWrapper.create()
-            .where(new com.mybatisflex.core.query.QueryColumn("task_id").in(allowedTasks));
-    if (task != null) {
-      filter.and(new com.mybatisflex.core.query.QueryColumn("task_id").eq(task));
+
+    /** 仅彻底清理数据时移除归档文章，普通配置归档保留历史正文与来源。 */
+    public void deleteArticles(Long task)
+    {
+        articles.deleteByTaskId(task);
     }
-    filter.and(SearchPredicates.contains("title", keyword));
-    var data =
-        articles.paginate(PageResult.request(page, Math.min(size, 24)), filter.orderBy("id desc"));
-    var byId = new HashMap<Long, CrawlTask>();
-    tasks
-        .findAllById(data.getRecords().stream().map(CrawlArticle::getTaskId).distinct().toList())
-        .forEach(t -> byId.put(t.getId(), t));
-    return PageResult.from(
-        data.map(
-            a ->
-                card(
-                    a,
-                    links.images(a.getId()),
-                    (int) items.countByArticleId(a.getId()),
-                    byId.get(a.getTaskId()))));
-  }
 
-  /** 调用方先检查任务访问权；文章编号必须确实属于该任务，正文按页序且受总字符预算约束。 */
-  @Transactional(readOnly = true)
-  public Detail detail(Long task, Long id) {
-    var a =
-        articles
-            .findById(id)
-            .filter(article -> article.getTaskId().equals(task))
-            .orElseThrow(() -> new BusinessException("采集文章不存在"));
-    var images = links.images(id);
-    var pages = items.findByArticleIdOrderByOrdinalAscIdAsc(id);
-    var parts = new ArrayList<Part>();
-    int budget = 100000;
-    boolean truncated = false;
-    for (var page : pages) {
-      String body = CrawlRules.text(page.getArticleBody());
-      String bounded = ArticleExtractor.limit(body, budget);
-      boolean cut = page.isBodyTruncated() || body.length() > bounded.length();
-      truncated |= cut;
-      if (!bounded.isBlank() || parts.isEmpty()) {
-        parts.add(new Part(page.getId(), page.getUrl(), bounded, cut));
-      }
-      budget -= bounded.length();
+    /** 下载失败或尚在队列的封面不返回地址；浏览器只请求已入库图片的鉴权接口。 */
+    private List<CrawlItem> saved(List<CrawlItem> images)
+    {
+        var seen = new HashSet<Long>();
+        return images.stream().filter(i -> i.getFileId() != null
+                && Set.of("SUCCESS", "DUPLICATE").contains(i.getStatus()) && seen.add(i.getFileId())).toList();
     }
-    return new Detail(
-        card(a, images, pages.size(), tasks.findById(task).orElseThrow()),
-        parts,
-        saved(images).stream()
-            .map(i -> new Picture(i.getId(), i.getFileId(), i.getBytes()))
-            .toList(),
-        truncated);
-  }
 
-  /** 列表摘要与真实采集计数；图片数只统计已保存的不同文件，不相信文章标题里的“10P”等提示。 */
-  public record Card(
-      Long id,
-      String title,
-      String summary,
-      String author,
-      String publishedAt,
-      String sourceUrl,
-      LocalDateTime collectedAt,
-      int pageCount,
-      int imageCount,
-      int pendingImages,
-      int failedImages,
-      Long coverItemId,
-      Long taskId,
-      String taskName,
-      String taskStatus,
-      int imageLimit) {}
+    private Card card(CrawlArticle a, List<CrawlItem> images, int pages, CrawlTask task)
+    {
+        var saved = saved(images);
+        return new Card(a.getId(), a.getTitle(), a.getSummary(), a.getAuthor(), a.getPublishedAt(), a.getSourceUrl(),
+                a.getCreatedAt(), pages, saved.size(),
+                (int) images.stream().filter(i -> Set.of("QUEUED", "FETCHING").contains(i.getStatus())).count(),
+                (int) images.stream().filter(i -> Set.of("FAILED", "SKIPPED").contains(i.getStatus())).count(),
+                saved.isEmpty() ? null : saved.getFirst().getId(), task.getId(), task.getName(), task.getStatus(),
+                task.getRules().maxImages());
+    }
 
-  /** 文章的单页纯文本；保留源地址和截断标记，不能把多页正文无限制拼接成响应。 */
-  public record Part(Long id, String sourceUrl, String body, boolean truncated) {}
+    /** 跨任务列表在 SQL 内先应用所有者授权，再分页和统计，最多返回 24 篇摘要。 */
+    @Transactional(readOnly = true)
+    public PageResult<Card> list(Long task, String keyword, int page, int size)
+    {
+        access.require("crawler:view");
+        boolean all = access.has("crawler:all");
+        Long owner = access.current().getId();
+        // 跨任务卡片必须先在 SQL 内限制任务所有者，再统计总数和分页，不能取回所有文章后在前端过滤。
+        var allowedTasks = com.mybatisflex.core.query.QueryWrapper.create()
+                .select(new com.mybatisflex.core.query.QueryColumn("id")).from(CrawlTask.class);
+        if (!all)
+        {
+            allowedTasks.where(new com.mybatisflex.core.query.QueryColumn("owner_id").eq(owner));
+        }
+        var filter = com.mybatisflex.core.query.QueryWrapper.create()
+                .where(new com.mybatisflex.core.query.QueryColumn("task_id").in(allowedTasks));
+        if (task != null)
+        {
+            filter.and(new com.mybatisflex.core.query.QueryColumn("task_id").eq(task));
+        }
+        filter.and(SearchPredicates.contains("title", keyword));
+        var data = articles.paginate(PageResult.request(page, Math.min(size, 24)), filter.orderBy("id desc"));
+        var byId = new HashMap<Long, CrawlTask>();
+        tasks.findAllById(data.getRecords().stream().map(CrawlArticle::getTaskId).distinct().toList())
+                .forEach(t -> byId.put(t.getId(), t));
+        return PageResult.from(data.map(a -> card(a, links.images(a.getId()), (int) items.countByArticleId(a.getId()),
+                byId.get(a.getTaskId()))));
+    }
 
-  /** 已完成图片的内部关联；客户端仍通过任务与条目鉴权接口读取正文，不使用公开存储路径。 */
-  public record Picture(Long id, Long fileId, long bytes) {}
+    /** 调用方先检查任务访问权；文章编号必须确实属于该任务，正文按页序且受总字符预算约束。 */
+    @Transactional(readOnly = true)
+    public Detail detail(Long task, Long id)
+    {
+        var a = articles.findById(id).filter(article -> article.getTaskId().equals(task))
+                .orElseThrow(() -> new BusinessException("采集文章不存在"));
+        var images = links.images(id);
+        var pages = items.findByArticleIdOrderByOrdinalAscIdAsc(id);
+        var parts = new ArrayList<Part>();
+        int budget = 100000;
+        boolean truncated = false;
+        for (var page : pages)
+        {
+            String body = CrawlRules.text(page.getArticleBody());
+            String bounded = ArticleExtractor.limit(body, budget);
+            boolean cut = page.isBodyTruncated() || body.length() > bounded.length();
+            truncated |= cut;
+            if (!bounded.isBlank() || parts.isEmpty())
+            {
+                parts.add(new Part(page.getId(), page.getUrl(), bounded, cut));
+            }
+            budget -= bounded.length();
+        }
+        return new Detail(card(a, images, pages.size(), tasks.findById(task).orElseThrow()), parts,
+                saved(images).stream().map(i -> new Picture(i.getId(), i.getFileId(), i.getBytes())).toList(),
+                truncated);
+    }
 
-  /** 详情一次最多返回 10 万字符，图片仍由页面按已保存关联分页展示。 */
-  public record Detail(Card article, List<Part> pages, List<Picture> images, boolean truncated) {}
+    /** 列表摘要与真实采集计数；图片数只统计已保存的不同文件，不相信文章标题里的“10P”等提示。 */
+    public record Card(Long id, String title, String summary, String author, String publishedAt, String sourceUrl,
+            LocalDateTime collectedAt, int pageCount, int imageCount, int pendingImages, int failedImages,
+            Long coverItemId, Long taskId, String taskName, String taskStatus, int imageLimit) {
+    }
+
+    /** 文章的单页纯文本；保留源地址和截断标记，不能把多页正文无限制拼接成响应。 */
+    public record Part(Long id, String sourceUrl, String body, boolean truncated) {
+    }
+
+    /** 已完成图片的内部关联；客户端仍通过任务与条目鉴权接口读取正文，不使用公开存储路径。 */
+    public record Picture(Long id, Long fileId, long bytes) {
+    }
+
+    /** 详情一次最多返回 10 万字符，图片仍由页面按已保存关联分页展示。 */
+    public record Detail(Card article, List<Part> pages, List<Picture> images, boolean truncated) {
+    }
 }

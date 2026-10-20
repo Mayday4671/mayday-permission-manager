@@ -1,5 +1,7 @@
 package com.mayday.web;
 
+import jakarta.validation.Valid;
+
 import com.mayday.common.persistence.PageResult;
 import com.mayday.common.persistence.SearchPredicates;
 import com.mayday.common.web.ApiResponse;
@@ -10,7 +12,6 @@ import com.mayday.service.ContentService;
 import com.mayday.web.ContentContracts.Draft;
 import com.mayday.web.ContentContracts.Publish;
 import com.mayday.web.ContentContracts.Version;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,158 +29,153 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/content/notices")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class NoticeController {
-  private final NoticeMapper notices;
-  private final ContentPublicationMapper publications;
-  private final ContentService service;
-  private final AccessPolicy access;
-  private final com.mayday.service.PortalStructureService portal;
+public class NoticeController
+{
+    private final NoticeMapper notices;
+    private final ContentPublicationMapper publications;
+    private final ContentService service;
+    private final AccessPolicy access;
+    private final com.mayday.service.PortalStructureService portal;
 
-  /** 内容编辑所用的栏目与分类选项只要求内容查看权，不能用于修改门户配置。 */
-  @GetMapping("/portal-options")
-  public ApiResponse<java.util.List<com.mayday.service.PortalStructureService.ChannelView>>
-      portalOptions() {
-    return ApiResponse.ok(portal.options());
-  }
+    /** 内容编辑所用的栏目与分类选项只要求内容查看权，不能用于修改门户配置。 */
+    @GetMapping("/portal-options")
+    public ApiResponse<java.util.List<com.mayday.service.PortalStructureService.ChannelView>> portalOptions()
+    {
+        return ApiResponse.ok(portal.options());
+    }
 
-  /** 内容范围进入分页 SQL；普通管理筛选草稿，公开内容选择器按线上修订搜索、过滤栏目与模板。 */
-  @GetMapping
-  public ApiResponse<?> list(
-      @RequestParam(defaultValue = "") String keyword,
-      @RequestParam(required = false) Boolean published,
-      @RequestParam(required = false) String status,
-      @RequestParam(required = false) Long categoryId,
-      @RequestParam(required = false) Long portalChannelId,
-      @RequestParam(required = false) String portalTemplate,
-      @RequestParam(required = false) Boolean publiclyVisible,
-      @RequestParam(defaultValue = "1") int page,
-      @RequestParam(defaultValue = "10") int size) {
-    access.require("notices:view");
-    boolean visibleOnly = Boolean.TRUE.equals(publiclyVisible);
-    var filter = access.filter("notices", "author_id");
-    filter.and(new com.mybatisflex.core.query.QueryColumn("deleted_at").isNull());
-    // 公开列表按上线修订标题搜索，管理列表按草稿标题搜索；不能借搜索探测未发布标题。
-    filter.and(
-        visibleOnly
-            ? com.mayday.content.mapper.NoticeMapper.liveTitleContains(keyword)
-            : SearchPredicates.contains("title", keyword));
-    if (published != null) {
-      filter.and(new com.mybatisflex.core.query.QueryColumn("published").eq(published));
+    /** 内容范围进入分页 SQL；普通管理筛选草稿，公开内容选择器按线上修订搜索、过滤栏目与模板。 */
+    @GetMapping
+    public ApiResponse<?> list(@RequestParam(defaultValue = "") String keyword,
+            @RequestParam(required = false) Boolean published, @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long categoryId, @RequestParam(required = false) Long portalChannelId,
+            @RequestParam(required = false) String portalTemplate,
+            @RequestParam(required = false) Boolean publiclyVisible, @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size)
+    {
+        access.require("notices:view");
+        boolean visibleOnly = Boolean.TRUE.equals(publiclyVisible);
+        var filter = access.filter("notices", "author_id");
+        filter.and(new com.mybatisflex.core.query.QueryColumn("deleted_at").isNull());
+        // 公开列表按上线修订标题搜索，管理列表按草稿标题搜索；不能借搜索探测未发布标题。
+        filter.and(visibleOnly
+                ? com.mayday.content.mapper.NoticeMapper.liveTitleContains(keyword)
+                : SearchPredicates.contains("title", keyword));
+        if (published != null)
+        {
+            filter.and(new com.mybatisflex.core.query.QueryColumn("published").eq(published));
+        }
+        if (status != null && !status.isBlank())
+        {
+            filter.and(new com.mybatisflex.core.query.QueryColumn("draft_status").eq(status));
+        }
+        if (visibleOnly)
+        {
+            filter.and(ContentService.publiclyVisible());
+        }
+        if (categoryId != null || portalChannelId != null || portalTemplate != null)
+        {
+            filter.and(com.mayday.content.mapper.NoticeMapper.revisionPointerFilter(visibleOnly, categoryId,
+                    portalChannelId, portalTemplate));
+        }
+        return ApiResponse.ok(PageResult
+                .from(notices.paginate(PageResult.request(page, size), filter.orderBy("id desc")).map(service::view)));
     }
-    if (status != null && !status.isBlank()) {
-      filter.and(new com.mybatisflex.core.query.QueryColumn("draft_status").eq(status));
+
+    /** 读取当前有权管理的非回收内容，服务层检查查看权限与记录所属范围。 */
+    @GetMapping("/{id}")
+    public ApiResponse<?> detail(@PathVariable Long id)
+    {
+        return ApiResponse.ok(service.view(service.managed(id, false)));
     }
-    if (visibleOnly) {
-      filter.and(ContentService.publiclyVisible());
+
+    /** 修订历史继承主内容的查看边界，不能借修订 ID 读取他人或范围外草稿。 */
+    @GetMapping("/{id}/revisions")
+    public ApiResponse<?> revisions(@PathVariable Long id)
+    {
+        return ApiResponse.ok(service.history(id));
     }
-    if (categoryId != null || portalChannelId != null || portalTemplate != null) {
-      filter.and(
-          com.mayday.content.mapper.NoticeMapper.revisionPointerFilter(
-              visibleOnly, categoryId, portalChannelId, portalTemplate));
+
+    /** 先验证主内容访问权，再分页读取该内容的发布记录，不直接放开记录表查询。 */
+    @GetMapping("/{id}/publications")
+    public ApiResponse<?> publications(@PathVariable Long id, @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size)
+    {
+        service.managed(id, false);
+        return ApiResponse.ok(PageResult.from(
+                publications.paginate(PageResult.request(page, size), com.mybatisflex.core.query.QueryWrapper.create()
+                        .where(new com.mybatisflex.core.query.QueryColumn("notice_id").eq(id)).orderBy("id desc"))));
     }
-    return ApiResponse.ok(
-        PageResult.from(
-            notices
-                .paginate(PageResult.request(page, size), filter.orderBy("id desc"))
+
+    /** 创建草稿修订，作者和部门来自当前身份，文件引用与正文清洗由服务层统一处理。 */
+    @PostMapping
+    @Transactional
+    public ApiResponse<?> create(@Valid @RequestBody Draft request)
+    {
+        return ApiResponse.ok(service.save(null, request));
+    }
+
+    /** 保存新草稿并验证当前版本；已上线内容继续展示原上线修订，保存不暗中替换公开正文。 */
+    @PutMapping("/{id}")
+    @Transactional
+    public ApiResponse<?> update(@PathVariable Long id, @Valid @RequestBody Draft request)
+    {
+        return ApiResponse.ok(service.save(id, request));
+    }
+
+    /** 独立发布动作检查发布权限、修订版本、审批状态及定时窗口，事务内更新上线指针。 */
+    @PostMapping("/{id}/publish")
+    @Transactional
+    public ApiResponse<?> publish(@PathVariable Long id, @Valid @RequestBody Publish request)
+    {
+        return ApiResponse.ok(service.publish(id, request));
+    }
+
+    /** 下线前验证发布权限和当前版本，停止前台展示同时保留修订与发布历史。 */
+    @PostMapping("/{id}/offline")
+    @Transactional
+    public ApiResponse<?> offline(@PathVariable Long id, @Valid @RequestBody Version request)
+    {
+        return ApiResponse.ok(service.offline(id, request.version()));
+    }
+
+    /** 在删除权限与内容范围内移入回收站；公开可见性同时关闭，保留恢复所需历史。 */
+    @DeleteMapping("/{id}")
+    @Transactional
+    public ApiResponse<?> delete(@PathVariable Long id)
+    {
+        service.delete(id);
+        return ApiResponse.ok(null);
+    }
+
+    /** 回收站查询仍受同一内容数据范围约束，只返回已回收记录。 */
+    @GetMapping("/recycle")
+    public ApiResponse<?> recycle(@RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "10") int size)
+    {
+        access.require("notices:view");
+        return ApiResponse.ok(PageResult.from(notices
+                .paginate(PageResult.request(page, size),
+                        access.filter("notices", "author_id")
+                                .and(new com.mybatisflex.core.query.QueryColumn("deleted_at").isNotNull())
+                                .and(SearchPredicates.contains("title", keyword)).orderBy("id desc"))
                 .map(service::view)));
-  }
+    }
 
-  /** 读取当前有权管理的非回收内容，服务层检查查看权限与记录所属范围。 */
-  @GetMapping("/{id}")
-  public ApiResponse<?> detail(@PathVariable Long id) {
-    return ApiResponse.ok(service.view(service.managed(id, false)));
-  }
+    /** 恢复回收记录需单独恢复权限与原 version，不因恢复而自动重新发布。 */
+    @PostMapping("/{id}/restore")
+    @Transactional
+    public ApiResponse<?> restore(@PathVariable Long id, @Valid @RequestBody Version request)
+    {
+        return ApiResponse.ok(service.restore(id, request.version()));
+    }
 
-  /** 修订历史继承主内容的查看边界，不能借修订 ID 读取他人或范围外草稿。 */
-  @GetMapping("/{id}/revisions")
-  public ApiResponse<?> revisions(@PathVariable Long id) {
-    return ApiResponse.ok(service.history(id));
-  }
-
-  /** 先验证主内容访问权，再分页读取该内容的发布记录，不直接放开记录表查询。 */
-  @GetMapping("/{id}/publications")
-  public ApiResponse<?> publications(
-      @PathVariable Long id,
-      @RequestParam(defaultValue = "1") int page,
-      @RequestParam(defaultValue = "10") int size) {
-    service.managed(id, false);
-    return ApiResponse.ok(
-        PageResult.from(
-            publications.paginate(
-                PageResult.request(page, size),
-                com.mybatisflex.core.query.QueryWrapper.create()
-                    .where(new com.mybatisflex.core.query.QueryColumn("notice_id").eq(id))
-                    .orderBy("id desc"))));
-  }
-
-  /** 创建草稿修订，作者和部门来自当前身份，文件引用与正文清洗由服务层统一处理。 */
-  @PostMapping
-  @Transactional
-  public ApiResponse<?> create(@Valid @RequestBody Draft request) {
-    return ApiResponse.ok(service.save(null, request));
-  }
-
-  /** 保存新草稿并验证当前版本；已上线内容继续展示原上线修订，保存不暗中替换公开正文。 */
-  @PutMapping("/{id}")
-  @Transactional
-  public ApiResponse<?> update(@PathVariable Long id, @Valid @RequestBody Draft request) {
-    return ApiResponse.ok(service.save(id, request));
-  }
-
-  /** 独立发布动作检查发布权限、修订版本、审批状态及定时窗口，事务内更新上线指针。 */
-  @PostMapping("/{id}/publish")
-  @Transactional
-  public ApiResponse<?> publish(@PathVariable Long id, @Valid @RequestBody Publish request) {
-    return ApiResponse.ok(service.publish(id, request));
-  }
-
-  /** 下线前验证发布权限和当前版本，停止前台展示同时保留修订与发布历史。 */
-  @PostMapping("/{id}/offline")
-  @Transactional
-  public ApiResponse<?> offline(@PathVariable Long id, @Valid @RequestBody Version request) {
-    return ApiResponse.ok(service.offline(id, request.version()));
-  }
-
-  /** 在删除权限与内容范围内移入回收站；公开可见性同时关闭，保留恢复所需历史。 */
-  @DeleteMapping("/{id}")
-  @Transactional
-  public ApiResponse<?> delete(@PathVariable Long id) {
-    service.delete(id);
-    return ApiResponse.ok(null);
-  }
-
-  /** 回收站查询仍受同一内容数据范围约束，只返回已回收记录。 */
-  @GetMapping("/recycle")
-  public ApiResponse<?> recycle(
-      @RequestParam(defaultValue = "") String keyword,
-      @RequestParam(defaultValue = "1") int page,
-      @RequestParam(defaultValue = "10") int size) {
-    access.require("notices:view");
-    return ApiResponse.ok(
-        PageResult.from(
-            notices
-                .paginate(
-                    PageResult.request(page, size),
-                    access
-                        .filter("notices", "author_id")
-                        .and(new com.mybatisflex.core.query.QueryColumn("deleted_at").isNotNull())
-                        .and(SearchPredicates.contains("title", keyword))
-                        .orderBy("id desc"))
-                .map(service::view)));
-  }
-
-  /** 恢复回收记录需单独恢复权限与原 version，不因恢复而自动重新发布。 */
-  @PostMapping("/{id}/restore")
-  @Transactional
-  public ApiResponse<?> restore(@PathVariable Long id, @Valid @RequestBody Version request) {
-    return ApiResponse.ok(service.restore(id, request.version()));
-  }
-
-  /** 彻底清理只接受回收站内有权处理的内容，服务层保护关联审批和仍被使用的资源。 */
-  @DeleteMapping("/{id}/purge")
-  @Transactional
-  public ApiResponse<?> purge(@PathVariable Long id) {
-    service.purge(id);
-    return ApiResponse.ok(null);
-  }
+    /** 彻底清理只接受回收站内有权处理的内容，服务层保护关联审批和仍被使用的资源。 */
+    @DeleteMapping("/{id}/purge")
+    @Transactional
+    public ApiResponse<?> purge(@PathVariable Long id)
+    {
+        service.purge(id);
+        return ApiResponse.ok(null);
+    }
 }

@@ -1,16 +1,22 @@
 package com.mayday.common.persistence;
 
 import java.util.Objects;
+
 import org.springframework.dao.OptimisticLockingFailureException;
 
 /** 业务编辑与删除共用的乐观锁检查；不接受缺失版本号，防止覆盖别人刚提交的数据。 */
-public final class EntityVersions {
-  private EntityVersions() {}
-
-  /** 拒绝缺失或过期版本；调用方仍需在同一事务保存实体，由 JPA 再检查读取之后发生的并发修改。 */
-  public static void requireCurrent(BaseEntity entity, Long expectedVersion) {
-    if (expectedVersion == null || !Objects.equals(entity.getVersion(), expectedVersion)) {
-      throw new OptimisticLockingFailureException("记录版本已变化，请刷新后重试");
+public final class EntityVersions
+{
+    private EntityVersions()
+    {
     }
-  }
+
+    /** 拒绝缺失或过期版本；调用方仍需在同一事务保存实体，由 JPA 再检查读取之后发生的并发修改。 */
+    public static void requireCurrent(BaseEntity entity, Long expectedVersion)
+    {
+        if (expectedVersion == null || !Objects.equals(entity.getVersion(), expectedVersion))
+        {
+            throw new OptimisticLockingFailureException("记录版本已变化，请刷新后重试");
+        }
+    }
 }

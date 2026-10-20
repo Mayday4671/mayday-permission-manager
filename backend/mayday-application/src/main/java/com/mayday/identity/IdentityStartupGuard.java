@@ -10,20 +10,24 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @DependsOnDatabaseInitialization
-public class IdentityStartupGuard implements InitializingBean {
-  private final MfaCredentialMapper credentials;
-  private final IdentitySecrets secrets;
+public class IdentityStartupGuard implements InitializingBean
+{
+    private final MfaCredentialMapper credentials;
+    private final IdentitySecrets secrets;
 
-  /** 逐行验证持久密钥，不加载完整凭据集合；错误只说明配置不匹配，不输出共享密钥或密文。 */
-  @Override
-  public void afterPropertiesSet() {
-    for (var row : credentials.selectAllRows()) {
-      try {
-        secrets.decrypt(row.getString("secret_cipher"), "mfa:" + row.getLong("user_id"));
-      } catch (IllegalStateException invalid) {
-        throw new IllegalStateException(
-            "已有 MFA 凭据无法解密，请恢复与数据库匹配的 MAYDAY_IDENTITY_ENCRYPTION_KEY", invalid);
-      }
+    /** 逐行验证持久密钥，不加载完整凭据集合；错误只说明配置不匹配，不输出共享密钥或密文。 */
+    @Override
+    public void afterPropertiesSet()
+    {
+        for (var row : credentials.selectAllRows())
+        {
+            try
+            {
+                secrets.decrypt(row.getString("secret_cipher"), "mfa:" + row.getLong("user_id"));
+            } catch (IllegalStateException invalid)
+            {
+                throw new IllegalStateException("已有 MFA 凭据无法解密，请恢复与数据库匹配的 MAYDAY_IDENTITY_ENCRYPTION_KEY", invalid);
+            }
+        }
     }
-  }
 }

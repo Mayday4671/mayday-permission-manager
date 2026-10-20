@@ -23,88 +23,89 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class ContentFileController {
-  private final NoticeMapper notices;
-  private final ContentRevisionMapper revisions;
-  private final ContentService content;
-  private final StoredFileMapper files;
-  private final StoredFileContent fileContent;
-  private final WorkflowEngine approvals;
+public class ContentFileController
+{
+    private final NoticeMapper notices;
+    private final ContentRevisionMapper revisions;
+    private final ContentService content;
+    private final StoredFileMapper files;
+    private final StoredFileContent fileContent;
+    private final WorkflowEngine approvals;
 
-  private ResponseEntity<?> missing() {
-    return ResponseEntity.status(404)
-        .cacheControl(CacheControl.noStore())
-        .body(ApiResponse.error("文件不存在或内容未公开"));
-  }
-
-  /** 每次请求核对当前线上修订的封面，内容下架或替换封面后旧请求立即失去公开访问权。 */
-  @GetMapping("/public/articles/{id}/cover")
-  public ResponseEntity<?> cover(@PathVariable Long id) {
-    return publicFile(id, null, true);
-  }
-
-  /** 只下载当前公开修订实际关联的附件，猜测无关文件 ID 不会扩展公开访问范围。 */
-  @GetMapping("/public/articles/{id}/files/{fileId}")
-  public ResponseEntity<?> attachment(@PathVariable Long id, @PathVariable Long fileId) {
-    return publicFile(id, fileId, false);
-  }
-
-  private ResponseEntity<?> publicFile(Long id, Long fileId, boolean image) {
-    var found =
-        java.util.Optional.ofNullable(
-            notices.selectOneByQuery(
-                com.mybatisflex.core.query.QueryWrapper.create()
-                    .where(
-                        ContentService.publiclyVisible()
-                            .and(new com.mybatisflex.core.query.QueryColumn("id").eq(id)))));
-    if (found.isEmpty()) {
-      return missing();
+    private ResponseEntity<?> missing()
+    {
+        return ResponseEntity.status(404).cacheControl(CacheControl.noStore()).body(ApiResponse.error("文件不存在或内容未公开"));
     }
-    var r = revisions.findById(found.get().getLiveRevisionId()).orElseThrow();
-    if (image) {
-      fileId = r.getCoverId();
-    } else if (!r.getAttachmentIds().contains(fileId)) {
-      return missing();
-    }
-    return fileId == null ? missing() : download(fileId, image);
-  }
 
-  /** 管理端检查内容数据范围、修订归属及文件关联后读取，不单凭文件 ID 授予访问权。 */
-  @GetMapping("/content/notices/{id}/revisions/{revisionId}/files/{fileId}")
-  public ResponseEntity<?> managed(
-      @PathVariable Long id,
-      @PathVariable Long revisionId,
-      @PathVariable Long fileId,
-      @RequestParam(defaultValue = "false") boolean image) {
-    content.managed(id, false);
-    var r = content.revision(revisionId, id);
-    if (image ? !fileId.equals(r.getCoverId()) : !r.getAttachmentIds().contains(fileId)) {
-      return missing();
+    /** 每次请求核对当前线上修订的封面，内容下架或替换封面后旧请求立即失去公开访问权。 */
+    @GetMapping("/public/articles/{id}/cover")
+    public ResponseEntity<?> cover(@PathVariable Long id)
+    {
+        return publicFile(id, null, true);
     }
-    return download(fileId, image);
-  }
 
-  /** 审批参与者只能读取该请求绑定的内容快照附件，后续新修订不能替换待审批材料。 */
-  @GetMapping("/operations/requests/{requestId}/content-files/{fileId}")
-  public ResponseEntity<?> approval(
-      @PathVariable Long requestId,
-      @PathVariable Long fileId,
-      @RequestParam(defaultValue = "false") boolean image) {
-    var request = approvals.accessible(requestId, false);
-    if (!"CONTENT".equals(request.getBusinessType())) {
-      return missing();
+    /** 只下载当前公开修订实际关联的附件，猜测无关文件 ID 不会扩展公开访问范围。 */
+    @GetMapping("/public/articles/{id}/files/{fileId}")
+    public ResponseEntity<?> attachment(@PathVariable Long id, @PathVariable Long fileId)
+    {
+        return publicFile(id, fileId, false);
     }
-    var revision = content.revision(request.getBusinessRevisionId(), request.getBusinessId());
-    if (image
-        ? !fileId.equals(revision.getCoverId())
-        : !revision.getAttachmentIds().contains(fileId)) {
-      return missing();
-    }
-    return download(fileId, image);
-  }
 
-  private ResponseEntity<?> download(Long id, boolean image) {
-    var file = files.findById(id).orElseThrow(() -> new BusinessException("文件不存在"));
-    return fileContent.response(file, image, false);
-  }
+    private ResponseEntity<?> publicFile(Long id, Long fileId, boolean image)
+    {
+        var found = java.util.Optional.ofNullable(notices.selectOneByQuery(com.mybatisflex.core.query.QueryWrapper
+                .create()
+                .where(ContentService.publiclyVisible().and(new com.mybatisflex.core.query.QueryColumn("id").eq(id)))));
+        if (found.isEmpty())
+        {
+            return missing();
+        }
+        var r = revisions.findById(found.get().getLiveRevisionId()).orElseThrow();
+        if (image)
+        {
+            fileId = r.getCoverId();
+        } else if (!r.getAttachmentIds().contains(fileId))
+        {
+            return missing();
+        }
+        return fileId == null ? missing() : download(fileId, image);
+    }
+
+    /** 管理端检查内容数据范围、修订归属及文件关联后读取，不单凭文件 ID 授予访问权。 */
+    @GetMapping("/content/notices/{id}/revisions/{revisionId}/files/{fileId}")
+    public ResponseEntity<?> managed(@PathVariable Long id, @PathVariable Long revisionId, @PathVariable Long fileId,
+            @RequestParam(defaultValue = "false") boolean image)
+    {
+        content.managed(id, false);
+        var r = content.revision(revisionId, id);
+        if (image ? !fileId.equals(r.getCoverId()) : !r.getAttachmentIds().contains(fileId))
+        {
+            return missing();
+        }
+        return download(fileId, image);
+    }
+
+    /** 审批参与者只能读取该请求绑定的内容快照附件，后续新修订不能替换待审批材料。 */
+    @GetMapping("/operations/requests/{requestId}/content-files/{fileId}")
+    public ResponseEntity<?> approval(@PathVariable Long requestId, @PathVariable Long fileId,
+            @RequestParam(defaultValue = "false") boolean image)
+    {
+        var request = approvals.accessible(requestId, false);
+        if (!"CONTENT".equals(request.getBusinessType()))
+        {
+            return missing();
+        }
+        var revision = content.revision(request.getBusinessRevisionId(), request.getBusinessId());
+        if (image ? !fileId.equals(revision.getCoverId()) : !revision.getAttachmentIds().contains(fileId))
+        {
+            return missing();
+        }
+        return download(fileId, image);
+    }
+
+    private ResponseEntity<?> download(Long id, boolean image)
+    {
+        var file = files.findById(id).orElseThrow(() -> new BusinessException("文件不存在"));
+        return fileContent.response(file, image, false);
+    }
 }

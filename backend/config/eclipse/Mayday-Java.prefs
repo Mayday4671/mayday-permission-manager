@@ -1,0 +1,27 @@
+# Mayday Java 标准（对应 config/Mayday-Java-Standard.xml 的 IntelliJ 方案）
+# 由 Eclipse JDT 格式器执行：Allman 大括号、4 空格缩进、8 空格续行、120 列、LF。
+eclipse.preferences.version=1
+org.eclipse.jdt.core.formatter.lineSplit=120
+org.eclipse.jdt.core.formatter.tabulation.char=space
+org.eclipse.jdt.core.formatter.tabulation.size=4
+org.eclipse.jdt.core.formatter.continuation_indentation=2
+org.eclipse.jdt.core.formatter.continuation_indentation_for_array_initializer=2
+org.eclipse.jdt.core.formatter.use_on_off_tags=true
+org.eclipse.jdt.core.formatter.brace_position_for_type_declaration=next_line
+org.eclipse.jdt.core.formatter.brace_position_for_method_declaration=next_line
+org.eclipse.jdt.core.formatter.brace_position_for_constructor_declaration=next_line
+org.eclipse.jdt.core.formatter.brace_position_for_block=next_line
+org.eclipse.jdt.core.formatter.brace_position_for_switch=next_line
+org.eclipse.jdt.core.formatter.brace_position_for_array_initializer=next_line
+org.eclipse.jdt.core.formatter.brace_position_for_lambda_in_array=next_line
+org.eclipse.jdt.core.formatter.insert_new_line_before_else_in_if_statement=true
+org.eclipse.jdt.core.formatter.insert_new_line_before_catch_in_try_statement=true
+org.eclipse.jdt.core.formatter.insert_new_line_before_finally_in_try_statement=true
+org.eclipse.jdt.core.formatter.insert_new_line_after_opening_brace_in_array_initializer=true
+org.eclipse.jdt.core.formatter.insert_new_line_before_closing_brace_in_array_initializer=true
+org.eclipse.jdt.core.formatter.blank_lines_before_field=0
+org.eclipse.jdt.core.formatter.blank_lines_before_method=1
+org.eclipse.jdt.core.formatter.blank_lines_before_imports=1
+org.eclipse.jdt.core.formatter.blank_lines_after_imports=1
+org.eclipse.jdt.core.formatter.blank_lines_between_import_groups=1
+org.eclipse.jdt.core.formatter.number_of_empty_lines_to_preserve=1

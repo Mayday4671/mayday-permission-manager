@@ -8,7 +8,8 @@ import lombok.Setter;
 @Getter
 @Setter
 @Table("contract_sample")
-public class ContractSampleEntity extends BaseEntity {
-  private String userName;
-  private Long departmentId;
+public class ContractSampleEntity extends BaseEntity
+{
+    private String userName;
+    private Long departmentId;
 }

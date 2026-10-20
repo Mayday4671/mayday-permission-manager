@@ -1,65 +1,67 @@
 package com.mayday.operations.model;
 
+import java.time.LocalDateTime;
+
 import com.mayday.common.persistence.BaseEntity;
 import com.mybatisflex.annotation.Table;
-import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
 /** 每人一条待办。申请主记录行锁保护整组会签；转交保留原任务为历史，加签标记为必签。 */
 @Getter
 @Setter
-@Table(
-    value = "ops_flow_task",
-    onInsert = BaseEntity.CreatedAtListener.class,
-    onUpdate = BaseEntity.UpdatedAtListener.class)
-public class FlowTask extends BaseEntity {
-  private Long requestId;
+@Table(value = "ops_flow_task", onInsert = BaseEntity.CreatedAtListener.class, onUpdate = BaseEntity.UpdatedAtListener.class)
+public class FlowTask extends BaseEntity
+{
+    private Long requestId;
 
-  private String nodeId;
+    private String nodeId;
 
-  private String nodeName;
+    private String nodeName;
 
-  private Long assigneeId;
+    private Long assigneeId;
 
-  private String assigneeName;
+    private String assigneeName;
 
-  /** 临时委托或管理员交接前的原指定人；为空表示任务没有发生归属替换。 */
-  private Long originalAssigneeId;
+    /** 临时委托或管理员交接前的原指定人；为空表示任务没有发生归属替换。 */
+    private Long originalAssigneeId;
 
-  private String originalAssigneeName;
+    private String originalAssigneeName;
 
-  /** 已激活的任务保存委托来源；委托撤销或到期不追溯改变该任务。 */
-  private Long delegationId;
+    /** 已激活的任务保存委托来源；委托撤销或到期不追溯改变该任务。 */
+    private Long delegationId;
 
-  private String assignmentNote;
+    private String assignmentNote;
 
-  private String status = "PENDING";
+    private String status = "PENDING";
 
-  private boolean mandatory;
+    private boolean mandatory;
 
-  /** 任务属于哪个提交轮次和节点办理批次；旧任务只用于历史展示。 */
-  private int runNumber = 1;
+    /** 任务属于哪个提交轮次和节点办理批次；旧任务只用于历史展示。 */
+    private int runNumber = 1;
 
-  private int nodeVisit;
+    private int nodeVisit;
 
-  /** 并行办理只核验本游标的访问批次，不能用申请最后激活的节点排除其他合法支路。 */
-  private String executionTokenId;
+    /** 并行办理只核验本游标的访问批次，不能用申请最后激活的节点排除其他合法支路。 */
+    private String executionTokenId;
 
-  /** 抄送没有审批能力；顺签尚未轮到的任务为 WAITING，不计入个人待办。 */
-  private String kind = "APPROVAL";
+    /** 抄送没有审批能力；顺签尚未轮到的任务为 WAITING，不计入个人待办。 */
+    private String kind = "APPROVAL";
 
-  /** 仅抄送接收者能标记已读，不能修改其他接收者的阅读状态。 */
-  private LocalDateTime readAt;
+    /** 仅抄送接收者能标记已读，不能修改其他接收者的阅读状态。 */
+    private LocalDateTime readAt;
 
-  private LocalDateTime decidedAt;
+    private LocalDateTime decidedAt;
 
-  /** 实际获得节点办理/抄送资格的时间。顺签排队及其取消记录保持为空，不能仅凭任务状态授予字段读取权； 激活、人员委托、站内事件与业务推进同事务提交，回滚时不会留下虚假的授权凭证。 */
-  private LocalDateTime activatedAt;
+    /**
+     * 实际获得节点办理/抄送资格的时间。顺签排队及其取消记录保持为空，不能仅凭任务状态授予字段读取权；
+     * 激活、人员委托、站内事件与业务推进同事务提交，回滚时不会留下虚假的授权凭证。
+     */
+    private LocalDateTime activatedAt;
 
-  /** 从申请冻结的节点超时配置推算；转交和加签继承当前节点期限，不因换人重置。 */
-  private LocalDateTime dueAt;
+    /** 从申请冻结的节点超时配置推算；转交和加签继承当前节点期限，不因换人重置。 */
+    private LocalDateTime dueAt;
 
-  /** 同一任务只投递一次自动超时提醒，轮询和服务重启不会重复轰炸。 */
-  private LocalDateTime timeoutNotifiedAt;
+    /** 同一任务只投递一次自动超时提醒，轮询和服务重启不会重复轰炸。 */
+    private LocalDateTime timeoutNotifiedAt;
 }

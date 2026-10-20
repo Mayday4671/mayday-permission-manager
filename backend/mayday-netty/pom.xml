@@ -61,9 +61,13 @@
         <configuration>
           <lineEndings>UNIX</lineEndings>
           <java>
-            <googleJavaFormat>
-              <version>1.25.2</version>
-            </googleJavaFormat>
+            <!-- 与父级一致的 Mayday Java 标准；独立复用时需连同 backend/config 一起复制。 -->
+            <eclipse>
+              <file>${project.basedir}/../config/eclipse/Mayday-Java.prefs</file>
+            </eclipse>
+            <importOrder>
+              <order>java,javax,jakarta,,\#</order>
+            </importOrder>
             <removeUnusedImports/>
             <trimTrailingWhitespace/>
             <endWithNewline/>
