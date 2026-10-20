@@ -1,10 +1,10 @@
 package com.mayday.operations.storage;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.FileUsage;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.util.FileUsage;
 import com.mayday.operations.OperationSupport;
 import com.mayday.operations.mapper.FileDirectoryMapper;
 import com.mayday.operations.mapper.NotificationMapper;
@@ -47,21 +47,36 @@ public class FileCenterService {
   private final StorageSettings settings;
   private final StoredFileContent content;
 
+  /** 提取用于展示和下载的文件名，去除目录与控制字符；此名称不参与存储对象键生成。 */
+  public static String safeName(String original) {
+    String name = Objects.toString(original, "file").replace('\\', '/');
+    name = name.substring(name.lastIndexOf('/') + 1).replaceAll("[\\p{Cntrl}]", "");
+    if (name.isBlank() || name.length() > 255) {
+      throw new BusinessException("文件名无效");
+    }
+    return name;
+  }
+
   /** 所有者、目录和回收状态均在 SQL 分页前过滤，避免返回条数和总数泄露越权记录。 */
   @Transactional(readOnly = true)
   public PageResult<StoredFile> list(
       String keyword, Long directoryId, boolean deleted, int page, int size) {
     access.require("files:view");
-    if (directoryId != null && directoryId > 0) directory(directoryId, false);
+    if (directoryId != null && directoryId > 0) {
+      directory(directoryId, false);
+    }
     com.mybatisflex.core.query.QueryWrapper filter =
         com.mybatisflex.core.query.QueryWrapper.create();
-    if (!access.has("files:all"))
+    if (!access.has("files:all")) {
       filter.where(
           new com.mybatisflex.core.query.QueryColumn("owner_id").eq(access.current().getId()));
+    }
     if (directoryId != null) {
-      if (directoryId == 0)
+      if (directoryId == 0) {
         filter.and(new com.mybatisflex.core.query.QueryColumn("directory_id").isNull());
-      else filter.and(new com.mybatisflex.core.query.QueryColumn("directory_id").eq(directoryId));
+      } else {
+        filter.and(new com.mybatisflex.core.query.QueryColumn("directory_id").eq(directoryId));
+      }
     }
     filter.and(
         deleted
@@ -79,8 +94,9 @@ public class FileCenterService {
   }
 
   private StoredFile checkOwner(StoredFile file) {
-    if (!access.has("files:all") && !Objects.equals(file.getOwnerId(), access.current().getId()))
+    if (!access.has("files:all") && !Objects.equals(file.getOwnerId(), access.current().getId())) {
       throw new AccessDeniedException("无权访问此文件");
+    }
     return file;
   }
 
@@ -88,8 +104,10 @@ public class FileCenterService {
     var result =
         (lock ? directories.lock(id) : directories.findById(id))
             .orElseThrow(() -> new BusinessException("目录不存在"));
-    if (!access.has("files:all") && !Objects.equals(result.getOwnerId(), access.current().getId()))
+    if (!access.has("files:all")
+        && !Objects.equals(result.getOwnerId(), access.current().getId())) {
       throw new AccessDeniedException("无权访问此目录");
+    }
     return result;
   }
 
@@ -113,26 +131,32 @@ public class FileCenterService {
             .chars()
             .anyMatch(
                 character ->
-                    character == '/' || character == '\\' || Character.isISOControl(character)))
+                    character == '/' || character == '\\' || Character.isISOControl(character))) {
       throw new BusinessException("目录名不能为空或包含路径字符");
+    }
     FileDirectory value = id == null ? new FileDirectory() : directory(id, true);
-    if (id != null) OperationSupport.version(value, version);
+    if (id != null) {
+      OperationSupport.version(value, version);
+    }
     Long ownerId = id == null ? access.current().getId() : value.getOwnerId();
     long targetParent = parentId == null ? 0 : parentId;
     if (targetParent > 0) {
       FileDirectory parent = directory(targetParent, true);
-      if (!Objects.equals(parent.getOwnerId(), ownerId))
+      if (!Objects.equals(parent.getOwnerId(), ownerId)) {
         throw new BusinessException("父目录与子目录必须属于同一用户");
+      }
       Set<Long> visited = new HashSet<>();
       while (parent != null) {
-        if (!visited.add(parent.getId()) || Objects.equals(parent.getId(), id))
+        if (!visited.add(parent.getId()) || Objects.equals(parent.getId(), id)) {
           throw new BusinessException("不能把目录移入自身或其子目录");
+        }
         parent = parent.getParentId() == 0 ? null : directory(parent.getParentId(), false);
       }
     }
     if (directories.existsByOwnerIdAndParentIdAndNameAndIdNot(
-        ownerId, targetParent, normalizedName, id == null ? -1L : id))
+        ownerId, targetParent, normalizedName, id == null ? -1L : id)) {
       throw new BusinessException("同级目录中已存在此名称");
+    }
     if (id == null) {
       value.setOwnerId(ownerId);
       value.setOwnerName(access.current().getNickname());
@@ -148,8 +172,9 @@ public class FileCenterService {
     access.require("files:delete");
     FileDirectory value = directory(id, true);
     OperationSupport.version(value, version);
-    if (directories.existsByParentId(id) || files.existsByDirectoryId(id))
+    if (directories.existsByParentId(id) || files.existsByDirectoryId(id)) {
       throw new BusinessException("目录仍有子目录或文件（含回收文件），请先移动或清理");
+    }
     directories.delete(value);
   }
 
@@ -157,15 +182,19 @@ public class FileCenterService {
   @Transactional(rollbackFor = IOException.class)
   public StoredFile upload(MultipartFile upload, Long directoryId) throws IOException {
     access.require("files:create");
-    if (upload.isEmpty() || upload.getSize() > settings.maximumBytes())
+    if (upload.isEmpty() || upload.getSize() > settings.maximumBytes()) {
       throw new BusinessException("文件大小须为 1 字节到 " + settings.maximumBytes() / 1024 / 1024 + " MB");
+    }
     FileDirectory target =
         directoryId == null || directoryId == 0 ? null : directory(directoryId, true);
-    if (target != null && !Objects.equals(target.getOwnerId(), access.current().getId()))
+    if (target != null && !Objects.equals(target.getOwnerId(), access.current().getId())) {
       throw new BusinessException("上传文件只能选择本人目录");
+    }
     String name = safeName(upload.getOriginalFilename());
     String extension = name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
-    if (!ALLOWED_EXTENSIONS.contains(extension)) throw new BusinessException("不支持此文件类型");
+    if (!ALLOWED_EXTENSIONS.contains(extension)) {
+      throw new BusinessException("不支持此文件类型");
+    }
     String mime = "application/octet-stream";
     byte[] thumbnail = null;
     if (IMAGE_EXTENSIONS.contains(extension)) {
@@ -194,7 +223,9 @@ public class FileCenterService {
         new TransactionSynchronization() {
           @Override
           public void afterCompletion(int status) {
-            if (status == STATUS_COMMITTED) return;
+            if (status == STATUS_COMMITTED) {
+              return;
+            }
             for (String key : writtenKeys) {
               try {
                 storage.delete(key);
@@ -219,18 +250,11 @@ public class FileCenterService {
     return files.save(file);
   }
 
-  /** 提取用于展示和下载的文件名，去除目录与控制字符；此名称不参与存储对象键生成。 */
-  public static String safeName(String original) {
-    String name = Objects.toString(original, "file").replace('\\', '/');
-    name = name.substring(name.lastIndexOf('/') + 1).replaceAll("[\\p{Cntrl}]", "");
-    if (name.isBlank() || name.length() > 255) throw new BusinessException("文件名无效");
-    return name;
-  }
-
   private void unreferenced(StoredFile file) {
     if (notifications.existsByAttachmentIdsContains(file.getId())
-        || businessReferences.stream().anyMatch(reference -> reference.referenced(file.getId())))
+        || businessReferences.stream().anyMatch(reference -> reference.referenced(file.getId()))) {
       throw new BusinessException("文件被业务记录引用，不能回收或永久删除");
+    }
   }
 
   /** 批量授权全部通过才修改，任何越权、引用或状态错误都会回滚整批。 永久删除只记录清理意图；后台任务成功清理后才移除元信息，失败记录可以在回收站查看。 */
@@ -247,8 +271,9 @@ public class FileCenterService {
     access.require(permission);
     // 按 ID 固定锁顺序，两个批次包含相同文件时避免反向锁顺序引发死锁。
     List<Long> ordered = identifiers.stream().distinct().sorted().toList();
-    if (ordered.isEmpty() || ordered.size() > 100)
+    if (ordered.isEmpty() || ordered.size() > 100) {
       throw new BusinessException("一次操作须选择 1 到 100 个文件");
+    }
     FileDirectory target =
         "MOVE".equals(action) && directoryId != null && directoryId > 0
             ? directory(directoryId, true)
@@ -261,13 +286,22 @@ public class FileCenterService {
                         files.lock(identifier).orElseThrow(() -> new BusinessException("文件不存在"))))
             .toList();
     for (StoredFile file : selected) {
-      if (file.getPurgeRequestedAt() != null) throw new BusinessException("文件正在永久清理，不能修改或恢复");
+      if (file.getPurgeRequestedAt() != null) {
+        throw new BusinessException("文件正在永久清理，不能修改或恢复");
+      }
       if ("RESTORE".equals(action) || "PURGE".equals(action)) {
-        if (file.getDeletedAt() == null) throw new BusinessException("只有回收站文件可以恢复或永久删除");
-      } else if (file.getDeletedAt() != null) throw new BusinessException("请先恢复回收站文件");
-      if ("RECYCLE".equals(action) || "PURGE".equals(action)) unreferenced(file);
-      if (target != null && !Objects.equals(target.getOwnerId(), file.getOwnerId()))
+        if (file.getDeletedAt() == null) {
+          throw new BusinessException("只有回收站文件可以恢复或永久删除");
+        }
+      } else if (file.getDeletedAt() != null) {
+        throw new BusinessException("请先恢复回收站文件");
+      }
+      if ("RECYCLE".equals(action) || "PURGE".equals(action)) {
+        unreferenced(file);
+      }
+      if (target != null && !Objects.equals(target.getOwnerId(), file.getOwnerId())) {
         throw new BusinessException("文件只能移动到所属用户的目录");
+      }
     }
     LocalDateTime now = BusinessTime.now();
     for (StoredFile file : selected) {

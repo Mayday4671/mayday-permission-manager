@@ -54,10 +54,14 @@ public class BulkSpoolCleanup {
   /** 整个进程生命周期独占缓存目录。两个IP即使端口相同也不能误用一个spool；启动即拒绝第二实例， 不等并发下载损坏才报错。锁文件不删除，避免删除后另一进程锁住新文件产生双重所有者。 */
   @PostConstruct
   public synchronized void initialize() {
-    if (instanceLock != null && instanceLock.isValid()) return;
+    if (instanceLock != null && instanceLock.isValid()) {
+      return;
+    }
     try {
       Files.createDirectories(spool);
-      if (!safeRoot()) throw new IOException("目录不满足受控路径要求");
+      if (!safeRoot()) {
+        throw new IOException("目录不满足受控路径要求");
+      }
       lockChannel =
           FileChannel.open(
               spool.resolve(".mayday-spool.lock"),
@@ -65,7 +69,9 @@ public class BulkSpoolCleanup {
               StandardOpenOption.WRITE,
               LinkOption.NOFOLLOW_LINKS);
       instanceLock = lockChannel.tryLock();
-      if (instanceLock == null) throw new IOException("缓存目录已经被其他实例占用");
+      if (instanceLock == null) {
+        throw new IOException("缓存目录已经被其他实例占用");
+      }
     } catch (IOException | OverlappingFileLockException failure) {
       close();
       throw new IllegalStateException(
@@ -109,7 +115,9 @@ public class BulkSpoolCleanup {
               Files.readAttributes(child, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
           if (!attributes.isRegularFile()
               || attributes.isSymbolicLink()
-              || attributes.lastModifiedTime().toMillis() >= cutoff) continue;
+              || attributes.lastModifiedTime().toMillis() >= cutoff) {
+            continue;
+          }
           String name = child.getFileName().toString();
           var part = PART.matcher(name);
           var download = DOWNLOAD.matcher(name);
@@ -120,11 +128,16 @@ public class BulkSpoolCleanup {
           } else if (download.matches()) {
             // 下载缓存没有独立租约；仍存在未过期作业时保留它，防止回收长时间正在重建的下载文件。
             eligible = inactive(download.group(1));
-          } else if (cache.matches()) eligible = inactive(cache.group(1));
-          else continue;
+          } else if (cache.matches()) {
+            eligible = inactive(cache.group(1));
+          } else {
+            continue;
+          }
           if (eligible
               && safeRoot()
-              && results.deleteExpiredCache(child, cutoff, attributes.fileKey())) deleted++;
+              && results.deleteExpiredCache(child, cutoff, attributes.fileKey())) {
+            deleted++;
+          }
         } catch (IOException vanished) {
           /* 子项由自己的工作器/下载线程移走时继续本轮，不记录部署路径。 */
         }
@@ -138,29 +151,32 @@ public class BulkSpoolCleanup {
   @PreDestroy
   public synchronized void close() {
     closeScan();
-    if (instanceLock != null)
+    if (instanceLock != null) {
       try {
         instanceLock.release();
       } catch (IOException ignored) {
         /* 操作系统在进程退出时也释放该锁。 */
       }
-    if (lockChannel != null)
+    }
+    if (lockChannel != null) {
       try {
         lockChannel.close();
       } catch (IOException ignored) {
         /* 仅关闭本实例句柄。 */
       }
+    }
     instanceLock = null;
     lockChannel = null;
   }
 
   private void closeScan() {
-    if (scan != null)
+    if (scan != null) {
       try {
         scan.close();
       } catch (IOException ignored) {
         /* 只释放本实例句柄。 */
       }
+    }
     scan = null;
     cursor = null;
   }

@@ -3,7 +3,7 @@ package com.mayday.agentscope;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.util.Base64;
 import org.junit.jupiter.api.Test;
 

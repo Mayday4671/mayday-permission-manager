@@ -14,8 +14,9 @@ public final class StorageKeys {
 
   /** 限定分片加 UUID 及可选缩略图后缀，拒绝绝对路径、路径穿越和任意客户端对象键。 */
   public static String validate(String key) {
-    if (key == null || !key.matches("[0-9a-f]{2}/[0-9a-f-]{36}(?:\\.thumb\\.png)?"))
+    if (key == null || !key.matches("[0-9a-f]{2}/[0-9a-f-]{36}(?:\\.thumb\\.png)?")) {
       throw new IllegalArgumentException("文件存储键无效");
+    }
     return key;
   }
 }

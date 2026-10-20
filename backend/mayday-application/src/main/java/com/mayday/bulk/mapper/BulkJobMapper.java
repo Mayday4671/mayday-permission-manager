@@ -1,7 +1,7 @@
 package com.mayday.bulk.mapper;
 
 import com.mayday.bulk.BulkJob;
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import java.time.LocalDateTime;
@@ -63,7 +63,7 @@ public interface BulkJobMapper extends EntityMapper<BulkJob> {
     return selectCountByQuery(
         QueryWrapper.create()
             .where(new QueryColumn("result_key").eq(resultKey))
-            .and(new QueryColumn("expires_at").gt(com.mayday.common.BusinessTime.now())));
+            .and(new QueryColumn("expires_at").gt(com.mayday.common.util.BusinessTime.now())));
   }
 
   /** 最近二十条固定由服务器传入本人 ID，不提供任意用户作业浏览接口。 */

@@ -1,6 +1,6 @@
 package com.mayday.operations.model;
 
-import com.mayday.common.BaseEntity;
+import com.mayday.common.persistence.BaseEntity;
 import com.mybatisflex.annotation.Table;
 import lombok.Getter;
 import lombok.Setter;

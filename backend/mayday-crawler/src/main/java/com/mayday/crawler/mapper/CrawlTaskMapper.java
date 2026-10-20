@@ -1,6 +1,6 @@
 package com.mayday.crawler.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.crawler.CrawlTask;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;

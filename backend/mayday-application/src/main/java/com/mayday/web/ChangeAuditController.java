@@ -1,8 +1,8 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.PageResult;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.ChangeAuditService.Difference;
 import com.mayday.system.mapper.ChangeAuditMapper;
@@ -30,20 +30,6 @@ public class ChangeAuditController {
   private final AccessPolicy access;
   private final ObjectMapper mapper;
 
-  /** 业务变更的白名单差异响应，仅含可读字段前后值；不返回密码、令牌、联系方式或整份原始请求。 */
-  @Schema(
-      name = "ChangeAuditView",
-      requiredProperties = {"id", "version", "actor", "resource", "action", "createdAt", "changes"})
-  public record View(
-      Long id,
-      Long version,
-      String actor,
-      String resource,
-      Long resourceId,
-      String action,
-      LocalDateTime createdAt,
-      List<Difference> changes) {}
-
   /** 列表采用服务端分页，字段内容在脱敏审计服务中已收紧。 */
   @GetMapping
   public ApiResponse<PageResult<View>> list(
@@ -52,11 +38,11 @@ public class ChangeAuditController {
       @RequestParam(defaultValue = "10") int size) {
     access.require("logs:view");
     var filter = com.mybatisflex.core.query.QueryWrapper.create();
-    com.mayday.common.SearchPredicates.anyOf(
+    com.mayday.common.persistence.SearchPredicates.anyOf(
         filter,
-        com.mayday.common.SearchPredicates.contains("actor", keyword),
-        com.mayday.common.SearchPredicates.contains("action", keyword),
-        com.mayday.common.SearchPredicates.contains("resource", keyword));
+        com.mayday.common.persistence.SearchPredicates.contains("actor", keyword),
+        com.mayday.common.persistence.SearchPredicates.contains("action", keyword),
+        com.mayday.common.persistence.SearchPredicates.contains("resource", keyword));
     return ApiResponse.ok(
         PageResult.from(
             repository
@@ -83,4 +69,18 @@ public class ChangeAuditController {
         audit.getCreatedAt(),
         mapper.readValue(audit.getChangesJson(), new TypeReference<List<Difference>>() {}));
   }
+
+  /** 业务变更的白名单差异响应，仅含可读字段前后值；不返回密码、令牌、联系方式或整份原始请求。 */
+  @Schema(
+      name = "ChangeAuditView",
+      requiredProperties = {"id", "version", "actor", "resource", "action", "createdAt", "changes"})
+  public record View(
+      Long id,
+      Long version,
+      String actor,
+      String resource,
+      Long resourceId,
+      String action,
+      LocalDateTime createdAt,
+      List<Difference> changes) {}
 }

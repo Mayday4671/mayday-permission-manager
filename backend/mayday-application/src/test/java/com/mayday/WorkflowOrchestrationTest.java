@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.workflow.WorkflowExecutionState;
 import com.mayday.operations.workflow.WorkflowJson;
 import com.mayday.operations.workflow.WorkflowOrchestration;
@@ -21,6 +21,67 @@ import org.junit.jupiter.api.Test;
 
 /** 结构校验与持久游标回归；真实并发、父子事务和权限由隔离 MySQL HTTP 专项另外证明。 */
 class WorkflowOrchestrationTest {
+  private static Spec parallel(
+      String join, List<String> branches, Set<String> leftWrite, Set<String> rightWrite) {
+    var nodes = new ArrayList<Node>();
+    nodes.add(
+        new Node(
+            "fork",
+            "并行",
+            "PARALLEL",
+            join,
+            null,
+            List.of(),
+            null,
+            Set.of(),
+            Set.of(),
+            Set.of(),
+            List.of(),
+            null,
+            branches,
+            null));
+    nodes.add(approval("left", 2L, "join", leftWrite));
+    nodes.add(approval("right", 3L, "join", rightWrite));
+    nodes.add(
+        new Node(
+            "join", "汇合", "JOIN", "end", null, List.of(), null, Set.of(), Set.of(), Set.of(),
+            List.of()));
+    nodes.add(end());
+    return spec(nodes);
+  }
+
+  private static Node approval(String id, Long person, String next, Set<String> writable) {
+    return new Node(
+        id,
+        id,
+        "APPROVAL",
+        next,
+        "USERS",
+        List.of(person),
+        "ALL",
+        Set.of("memo"),
+        writable,
+        Set.of("APPROVE", "REJECT"),
+        List.of());
+  }
+
+  private static Node end() {
+    return new Node(
+        "end", "结束", "END", null, null, List.of(), null, Set.of(), Set.of(), Set.of(), List.of());
+  }
+
+  private static Spec spec(List<Node> nodes) {
+    return new Spec(
+        List.of(new Field("memo", "说明", "TEXT", true, 24, null, null, 100, List.of())),
+        nodes,
+        nodes.get(0).id(),
+        "ALL",
+        Set.of(),
+        false,
+        false,
+        true);
+  }
+
   @Test
   void parallelRequiresDedicatedJoinAndDisjointBranches() {
     Spec spec = parallel("join", List.of("left", "right"), Set.of(), Set.of());
@@ -88,66 +149,5 @@ class WorkflowOrchestrationTest {
     var second = cyclic.add("review", first.getId(), List.of());
     first.setParentTokenId(second.getId());
     assertThrows(BusinessException.class, () -> json.execution(json.write(cyclic)));
-  }
-
-  private static Spec parallel(
-      String join, List<String> branches, Set<String> leftWrite, Set<String> rightWrite) {
-    var nodes = new ArrayList<Node>();
-    nodes.add(
-        new Node(
-            "fork",
-            "并行",
-            "PARALLEL",
-            join,
-            null,
-            List.of(),
-            null,
-            Set.of(),
-            Set.of(),
-            Set.of(),
-            List.of(),
-            null,
-            branches,
-            null));
-    nodes.add(approval("left", 2L, "join", leftWrite));
-    nodes.add(approval("right", 3L, "join", rightWrite));
-    nodes.add(
-        new Node(
-            "join", "汇合", "JOIN", "end", null, List.of(), null, Set.of(), Set.of(), Set.of(),
-            List.of()));
-    nodes.add(end());
-    return spec(nodes);
-  }
-
-  private static Node approval(String id, Long person, String next, Set<String> writable) {
-    return new Node(
-        id,
-        id,
-        "APPROVAL",
-        next,
-        "USERS",
-        List.of(person),
-        "ALL",
-        Set.of("memo"),
-        writable,
-        Set.of("APPROVE", "REJECT"),
-        List.of());
-  }
-
-  private static Node end() {
-    return new Node(
-        "end", "结束", "END", null, null, List.of(), null, Set.of(), Set.of(), Set.of(), List.of());
-  }
-
-  private static Spec spec(List<Node> nodes) {
-    return new Spec(
-        List.of(new Field("memo", "说明", "TEXT", true, 24, null, null, 100, List.of())),
-        nodes,
-        nodes.get(0).id(),
-        "ALL",
-        Set.of(),
-        false,
-        false,
-        true);
   }
 }

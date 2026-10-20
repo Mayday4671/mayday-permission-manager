@@ -9,6 +9,21 @@ import java.util.Map;
 public final class BulkContracts {
   private BulkContracts() {}
 
+  /** 区分导入幂等回执与异步导出，下载动作仅适用于 EXPORT。 */
+  public enum Kind {
+    IMPORT,
+    EXPORT
+  }
+
+  /** 异步导出覆盖排队、执行、成功、失败和取消；浏览器不能通过字段参数直接改变状态。 */
+  public enum Status {
+    QUEUED,
+    RUNNING,
+    SUCCEEDED,
+    FAILED,
+    CANCELLED
+  }
+
   /** 行号对应 CSV 原始数据行（标题占第 1 行），浏览器可直接定位错误来源。 */
   @Schema(requiredProperties = {"rowNumber", "values", "errors"})
   public record ImportRow(int rowNumber, Map<String, String> values, List<String> errors) {}
@@ -43,21 +58,6 @@ public final class BulkContracts {
       String failure,
       LocalDateTime createdAt,
       LocalDateTime expiresAt) {}
-
-  /** 区分导入幂等回执与异步导出，下载动作仅适用于 EXPORT。 */
-  public enum Kind {
-    IMPORT,
-    EXPORT
-  }
-
-  /** 异步导出覆盖排队、执行、成功、失败和取消；浏览器不能通过字段参数直接改变状态。 */
-  public enum Status {
-    QUEUED,
-    RUNNING,
-    SUCCEEDED,
-    FAILED,
-    CANCELLED
-  }
 
   /** 注册适配器显式声明筛选，不接受任意属性路径、SQL、Java 类名或远程执行命令。 */
   public record ExportFilter(

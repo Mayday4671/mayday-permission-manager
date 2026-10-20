@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.exception;
 
 /** A required external dependency is unavailable or has not been configured. */
 public class ServiceUnavailableException extends RuntimeException {

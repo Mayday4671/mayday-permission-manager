@@ -1,7 +1,7 @@
 package com.mayday.operations.feedback;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.PageResult;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.mapper.UserMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,12 +25,6 @@ public class FeedbackController {
   private final FeedbackService service;
   private final AccessPolicy access;
   private final UserMapper users;
-
-  /** 分配候选只包含账号ID和显示名，不暴露联系方式、角色详情或登录凭据。 */
-  @Schema(
-      name = "FeedbackAssignee",
-      requiredProperties = {"value", "label"})
-  public record Assignee(Long value, String label) {}
 
   /** 后台按条件分页读取反馈；服务层独立执行查看权限，不依赖菜单隐藏。 */
   @GetMapping
@@ -68,7 +62,9 @@ public class FeedbackController {
                 100,
                 com.mybatisflex.core.query.QueryWrapper.create()
                     .where(new com.mybatisflex.core.query.QueryColumn("enabled").eq(true))
-                    .and(com.mayday.common.SearchPredicates.contains("nickname", keyword)))
+                    .and(
+                        com.mayday.common.persistence.SearchPredicates.contains(
+                            "nickname", keyword)))
             .getRecords()
             .stream()
             .filter(
@@ -77,4 +73,10 @@ public class FeedbackController {
             .map(user -> new Assignee(user.getId(), user.getNickname()))
             .toList());
   }
+
+  /** 分配候选只包含账号ID和显示名，不暴露联系方式、角色详情或登录凭据。 */
+  @Schema(
+      name = "FeedbackAssignee",
+      requiredProperties = {"value", "label"})
+  public record Assignee(Long value, String label) {}
 }

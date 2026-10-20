@@ -21,7 +21,8 @@ public interface IdentityChallengeMapper {
   /** 写入新挑战；令牌、来源与浏览器关联只存摘要。 */
   default void insert(Challenge challenge, Instant expiresAt) {
     Db.updateBySql(
-        "insert into sys_identity_challenge(token_hash,purpose,user_id,source_hash,browser_hash,session_hash,credential_hash,credential_revision,payload_cipher,expires_at,created_at) values(?,?,?,?,?,?,?,?,?,?,?)",
+        "insert into sys_identity_challenge(token_hash,purpose,user_id,source_hash,browser_hash,session_hash,"
+            + "credential_hash,credential_revision,payload_cipher,expires_at,created_at) values(?,?,?,?,?,?,?,?,?,?,?)",
         challenge.hash(),
         challenge.purpose(),
         challenge.userId(),
@@ -44,7 +45,8 @@ public interface IdentityChallengeMapper {
   /** 一次性消费：未消费、失败次数未超限且未过期才成功。 */
   default int consume(String hash, Instant now) {
     return Db.updateBySql(
-        "update sys_identity_challenge set consumed_at=? where token_hash=? and consumed_at is null and failed_attempts<5 and expires_at>?",
+        "update sys_identity_challenge set consumed_at=? where token_hash=? and consumed_at is null and "
+            + "failed_attempts<5 and expires_at>?",
         Timestamp.from(now),
         hash,
         Timestamp.from(now));
@@ -53,7 +55,8 @@ public interface IdentityChallengeMapper {
   /** 失败计数独立提交，不随业务回滚。 */
   default void fail(String hash) {
     Db.updateBySql(
-        "update sys_identity_challenge set failed_attempts=least(failed_attempts+1,5) where token_hash=? and consumed_at is null",
+        "update sys_identity_challenge set failed_attempts=least(failed_attempts+1,5) where token_hash=? and "
+            + "consumed_at is null",
         hash);
   }
 

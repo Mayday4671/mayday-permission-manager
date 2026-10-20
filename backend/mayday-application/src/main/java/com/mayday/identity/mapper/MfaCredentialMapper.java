@@ -67,7 +67,8 @@ public interface MfaCredentialMapper {
   /** 原子消费恢复码；影响行数即验证结果。 */
   default int consumeRecovery(String codeHash, Long userId, String revision, Instant now) {
     return Db.updateBySql(
-        "update sys_mfa_recovery set used_at=? where code_hash=? and user_id=? and credential_revision=? and used_at is null",
+        "update sys_mfa_recovery set used_at=? where code_hash=? and user_id=? and credential_revision=? and used_at is"
+            + " null",
         Timestamp.from(now),
         codeHash,
         userId,

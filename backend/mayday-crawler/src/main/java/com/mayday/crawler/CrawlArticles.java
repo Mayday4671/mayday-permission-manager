@@ -1,8 +1,8 @@
 package com.mayday.crawler;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
 import com.mayday.crawler.mapper.CrawlArticleImageMapper;
 import com.mayday.crawler.mapper.CrawlArticleMapper;
 import com.mayday.crawler.mapper.CrawlItemMapper;
@@ -32,38 +32,12 @@ public class CrawlArticles {
   private final CrawlTaskMapper tasks;
   private final AccessPolicy access;
 
-  /** 列表摘要与真实采集计数；图片数只统计已保存的不同文件，不相信文章标题里的“10P”等提示。 */
-  public record Card(
-      Long id,
-      String title,
-      String summary,
-      String author,
-      String publishedAt,
-      String sourceUrl,
-      LocalDateTime collectedAt,
-      int pageCount,
-      int imageCount,
-      int pendingImages,
-      int failedImages,
-      Long coverItemId,
-      Long taskId,
-      String taskName,
-      String taskStatus,
-      int imageLimit) {}
-
-  /** 文章的单页纯文本；保留源地址和截断标记，不能把多页正文无限制拼接成响应。 */
-  public record Part(Long id, String sourceUrl, String body, boolean truncated) {}
-
-  /** 已完成图片的内部关联；客户端仍通过任务与条目鉴权接口读取正文，不使用公开存储路径。 */
-  public record Picture(Long id, Long fileId, long bytes) {}
-
-  /** 详情一次最多返回 10 万字符，图片仍由页面按已保存关联分页展示。 */
-  public record Detail(Card article, List<Part> pages, List<Picture> images, boolean truncated) {}
-
   /** 以任务与分页组根地址确定文章，重试只更新当前页正文，不重复拼接已经保存的分页内容。 */
   public CrawlArticle savePage(CrawlStore.Work work, CrawlItem item, PageExtractor.Links parsed) {
     var text = parsed.article();
-    if (text == null) return null;
+    if (text == null) {
+      return null;
+    }
     String hash = ImageBytes.hash(work.root());
     var article =
         articles
@@ -98,7 +72,9 @@ public class CrawlArticles {
   public void link(CrawlArticle article, CrawlItem image, int order) {
     if (article == null
         || image == null
-        || links.existsByArticleIdAndItemId(article.getId(), image.getId())) return;
+        || links.existsByArticleIdAndItemId(article.getId(), image.getId())) {
+      return;
+    }
     var link = new CrawlArticleImage();
     link.setArticleId(article.getId());
     link.setItemId(image.getId());
@@ -171,11 +147,15 @@ public class CrawlArticles {
         com.mybatisflex.core.query.QueryWrapper.create()
             .select(new com.mybatisflex.core.query.QueryColumn("id"))
             .from(CrawlTask.class);
-    if (!all) allowedTasks.where(new com.mybatisflex.core.query.QueryColumn("owner_id").eq(owner));
+    if (!all) {
+      allowedTasks.where(new com.mybatisflex.core.query.QueryColumn("owner_id").eq(owner));
+    }
     var filter =
         com.mybatisflex.core.query.QueryWrapper.create()
             .where(new com.mybatisflex.core.query.QueryColumn("task_id").in(allowedTasks));
-    if (task != null) filter.and(new com.mybatisflex.core.query.QueryColumn("task_id").eq(task));
+    if (task != null) {
+      filter.and(new com.mybatisflex.core.query.QueryColumn("task_id").eq(task));
+    }
     filter.and(SearchPredicates.contains("title", keyword));
     var data =
         articles.paginate(PageResult.request(page, Math.min(size, 24)), filter.orderBy("id desc"));
@@ -211,8 +191,9 @@ public class CrawlArticles {
       String bounded = ArticleExtractor.limit(body, budget);
       boolean cut = page.isBodyTruncated() || body.length() > bounded.length();
       truncated |= cut;
-      if (!bounded.isBlank() || parts.isEmpty())
+      if (!bounded.isBlank() || parts.isEmpty()) {
         parts.add(new Part(page.getId(), page.getUrl(), bounded, cut));
+      }
       budget -= bounded.length();
     }
     return new Detail(
@@ -223,4 +204,32 @@ public class CrawlArticles {
             .toList(),
         truncated);
   }
+
+  /** 列表摘要与真实采集计数；图片数只统计已保存的不同文件，不相信文章标题里的“10P”等提示。 */
+  public record Card(
+      Long id,
+      String title,
+      String summary,
+      String author,
+      String publishedAt,
+      String sourceUrl,
+      LocalDateTime collectedAt,
+      int pageCount,
+      int imageCount,
+      int pendingImages,
+      int failedImages,
+      Long coverItemId,
+      Long taskId,
+      String taskName,
+      String taskStatus,
+      int imageLimit) {}
+
+  /** 文章的单页纯文本；保留源地址和截断标记，不能把多页正文无限制拼接成响应。 */
+  public record Part(Long id, String sourceUrl, String body, boolean truncated) {}
+
+  /** 已完成图片的内部关联；客户端仍通过任务与条目鉴权接口读取正文，不使用公开存储路径。 */
+  public record Picture(Long id, Long fileId, long bytes) {}
+
+  /** 详情一次最多返回 10 万字符，图片仍由页面按已保存关联分页展示。 */
+  public record Detail(Card article, List<Part> pages, List<Picture> images, boolean truncated) {}
 }

@@ -1,6 +1,6 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.ApiResponse;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.operations.workflow.WorkflowDelegations;
 import com.mayday.operations.workflow.WorkflowEngine;
 import jakarta.validation.Valid;

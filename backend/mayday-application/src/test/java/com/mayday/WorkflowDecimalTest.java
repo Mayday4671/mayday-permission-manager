@@ -64,7 +64,9 @@ class WorkflowDecimalTest {
   @Test
   void nestedFormPayloadsAreBoundedBeforeFieldValidation() {
     String nested = "{\"leaf\":1}";
-    for (int depth = 0; depth < 14; depth++) nested = "{\"nested\":" + nested + "}";
+    for (int depth = 0; depth < 14; depth++) {
+      nested = "{\"nested\":" + nested + "}";
+    }
     String source = "{\"values\":" + nested + "}";
     assertThrows(
         RuntimeException.class,

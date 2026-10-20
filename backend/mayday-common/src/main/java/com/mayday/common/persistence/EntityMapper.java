@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.persistence;
 
 import com.mybatisflex.core.BaseMapper;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -46,10 +46,14 @@ public interface EntityMapper<T extends BaseEntity> extends BaseMapper<T> {
   /** 统一保存：插入或整行更新；版本过期抛冲突，成功后回写递增版本。 */
   default <S extends T> S save(S entity) {
     if (entity.getId() == null) {
-      if (entity.getVersion() == null) entity.setVersion(0L);
+      if (entity.getVersion() == null) {
+        entity.setVersion(0L);
+      }
       insert(entity);
     } else {
-      if (update(entity, false) == 0) throw new OptimisticLockingFailureException("版本冲突");
+      if (update(entity, false) == 0) {
+        throw new OptimisticLockingFailureException("版本冲突");
+      }
       entity.setVersion(entity.getVersion() + 1);
     }
     return entity;

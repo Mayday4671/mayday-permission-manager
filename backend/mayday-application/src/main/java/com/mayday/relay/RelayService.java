@@ -1,6 +1,6 @@
 package com.mayday.relay;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.netty.RelayConfig;
 import com.mayday.netty.RelaySnapshot;
 import com.mayday.netty.UdpRelay;
@@ -52,7 +52,9 @@ public class RelayService {
   public synchronized RelaySettings save(RelayConfig config, Long version) {
     access.require("relay:view");
     access.require("relay:configure");
-    if (relay.snapshot().state().equals("RUNNING")) throw new BusinessException("请先停止转发再修改配置");
+    if (relay.snapshot().state().equals("RUNNING")) {
+      throw new BusinessException("请先停止转发再修改配置");
+    }
     return transaction.execute(
         status -> {
           var row = settings();
@@ -79,8 +81,9 @@ public class RelayService {
   public synchronized RelaySnapshot stop(String runId) {
     access.require("relay:view");
     access.require("relay:control");
-    if (!Objects.equals(runId, relay.snapshot().runId()))
+    if (!Objects.equals(runId, relay.snapshot().runId())) {
       throw new BusinessException("转发批次已变化，请刷新后重试");
+    }
     return relay.stop();
   }
 

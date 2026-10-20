@@ -3,7 +3,7 @@ package com.mayday.bulk;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -25,9 +25,10 @@ class CsvCodecTest {
   void rejectsMalformedOrAmbiguousFiles() {
     for (String input :
         List.of(
-            "name,name\na,b", "name\n\"open", "name\n\"closed\"more", "name,value\na", "name\n"))
+            "name,name\na,b", "name\n\"open", "name\n\"closed\"more", "name,value\na", "name\n")) {
       assertThrows(
           BusinessException.class, () -> CsvCodec.parse(input.getBytes(StandardCharsets.UTF_8)));
+    }
     assertThrows(BusinessException.class, () -> CsvCodec.parse(new byte[] {(byte) 0xff}));
     assertThrows(
         BusinessException.class, () -> CsvCodec.parse(new byte[CsvCodec.MAX_IMPORT_BYTES + 1]));

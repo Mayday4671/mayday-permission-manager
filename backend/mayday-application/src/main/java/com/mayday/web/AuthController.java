@@ -1,7 +1,7 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.identity.MfaService;
 import com.mayday.security.AccessPolicy;
 import com.mayday.security.LoginThrottle;
@@ -53,8 +53,9 @@ public class AuthController {
   public ResponseEntity<ApiResponse<LoginView>> login(
       @Valid @RequestBody LoginRequest body, HttpServletRequest request) {
     request.setAttribute("audit.username", body.username());
-    if (!throttle.allowed(request.getRemoteAddr(), body.username()))
+    if (!throttle.allowed(request.getRemoteAddr(), body.username())) {
       return ResponseEntity.status(429).body(ApiResponse.error("尝试次数过多，请 15 分钟后重试"));
+    }
     // 必须由服务端消费绑定账号/来源的一次性验证凭证；不能只依赖页面滑块状态。
     captcha.consume(body.captchaToken(), body.username(), request.getRemoteAddr());
     SysUser account = users.findByUsername(body.username()).orElse(null);
@@ -131,8 +132,9 @@ public class AuthController {
       @Valid @RequestBody PasswordRequest body, HttpServletRequest request) {
     SysUser account = users.findById(access.current().getId()).orElseThrow();
     mfa.reauthenticate(account.getId(), body.oldPassword(), body.factor(), request.getRemoteAddr());
-    if (!encoder.matches(body.oldPassword(), account.getPasswordHash()))
+    if (!encoder.matches(body.oldPassword(), account.getPasswordHash())) {
       throw new BusinessException("原密码不正确");
+    }
     UserService.validatePassword(body.newPassword());
     account.setPasswordHash(encoder.encode(body.newPassword()));
     users.save(account);

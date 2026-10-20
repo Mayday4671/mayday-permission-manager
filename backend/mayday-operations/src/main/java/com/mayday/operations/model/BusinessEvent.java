@@ -1,7 +1,7 @@
 package com.mayday.operations.model;
 
-import com.mayday.common.BaseEntity;
-import com.mayday.common.BusinessTime;
+import com.mayday.common.persistence.BaseEntity;
+import com.mayday.common.util.BusinessTime;
 import com.mybatisflex.annotation.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;

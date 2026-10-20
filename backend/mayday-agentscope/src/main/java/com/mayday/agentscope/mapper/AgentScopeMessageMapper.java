@@ -1,7 +1,7 @@
 package com.mayday.agentscope.mapper;
 
 import com.mayday.agentscope.AgentScopeMessage;
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;

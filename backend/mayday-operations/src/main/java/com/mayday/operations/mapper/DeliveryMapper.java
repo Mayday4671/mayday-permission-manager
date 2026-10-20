@@ -1,6 +1,6 @@
 package com.mayday.operations.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.operations.model.Delivery;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -68,11 +68,12 @@ public interface DeliveryMapper extends EntityMapper<Delivery> {
         "exists (select 1 from ops_notification n where n.id = notification_id"
             + " and n.status = 'PUBLISHED' and (n.expires_at is null or n.expires_at > ?)"
             + " and lower(n.title) like ? escape '!')";
-    String escaped = com.mayday.common.SearchPredicates.escapedLiteral(keyword);
+    String escaped = com.mayday.common.persistence.SearchPredicates.escapedLiteral(keyword);
     wrapper.and(new com.mybatisflex.core.query.RawQueryCondition(exists, now, "%" + escaped + "%"));
-    if (read != null)
+    if (read != null) {
       wrapper.and(
           read ? new QueryColumn("read_at").isNotNull() : new QueryColumn("read_at").isNull());
+    }
     return wrapper;
   }
 }

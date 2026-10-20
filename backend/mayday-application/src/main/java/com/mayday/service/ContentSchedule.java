@@ -1,6 +1,6 @@
 package com.mayday.service;
 
-import com.mayday.common.BusinessTime;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.content.mapper.NoticeMapper;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -36,11 +36,12 @@ public class ContentSchedule {
                                         .and(new QueryColumn("live_offline_at").le(now)))))
                 .orderBy("id asc")
                 .limit(100));
-    for (var n : due)
+    for (var n : due) {
       try {
         service.applyDue(n.getId());
       } catch (RuntimeException error) {
         log.warn("内容排期处理失败，将重试，内容 ID {}，异常类型 {}", n.getId(), error.getClass().getSimpleName());
       }
+    }
   }
 }

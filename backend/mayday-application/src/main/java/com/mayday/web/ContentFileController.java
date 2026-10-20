@@ -1,7 +1,7 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.content.mapper.ContentRevisionMapper;
 import com.mayday.content.mapper.NoticeMapper;
 import com.mayday.operations.mapper.StoredFileMapper;
@@ -57,10 +57,15 @@ public class ContentFileController {
                     .where(
                         ContentService.publiclyVisible()
                             .and(new com.mybatisflex.core.query.QueryColumn("id").eq(id)))));
-    if (found.isEmpty()) return missing();
+    if (found.isEmpty()) {
+      return missing();
+    }
     var r = revisions.findById(found.get().getLiveRevisionId()).orElseThrow();
-    if (image) fileId = r.getCoverId();
-    else if (!r.getAttachmentIds().contains(fileId)) return missing();
+    if (image) {
+      fileId = r.getCoverId();
+    } else if (!r.getAttachmentIds().contains(fileId)) {
+      return missing();
+    }
     return fileId == null ? missing() : download(fileId, image);
   }
 
@@ -73,8 +78,9 @@ public class ContentFileController {
       @RequestParam(defaultValue = "false") boolean image) {
     content.managed(id, false);
     var r = content.revision(revisionId, id);
-    if (image ? !fileId.equals(r.getCoverId()) : !r.getAttachmentIds().contains(fileId))
+    if (image ? !fileId.equals(r.getCoverId()) : !r.getAttachmentIds().contains(fileId)) {
       return missing();
+    }
     return download(fileId, image);
   }
 
@@ -85,11 +91,15 @@ public class ContentFileController {
       @PathVariable Long fileId,
       @RequestParam(defaultValue = "false") boolean image) {
     var request = approvals.accessible(requestId, false);
-    if (!"CONTENT".equals(request.getBusinessType())) return missing();
+    if (!"CONTENT".equals(request.getBusinessType())) {
+      return missing();
+    }
     var revision = content.revision(request.getBusinessRevisionId(), request.getBusinessId());
     if (image
         ? !fileId.equals(revision.getCoverId())
-        : !revision.getAttachmentIds().contains(fileId)) return missing();
+        : !revision.getAttachmentIds().contains(fileId)) {
+      return missing();
+    }
     return download(fileId, image);
   }
 

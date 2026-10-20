@@ -1,7 +1,7 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.operations.mapper.FlowRequestMapper;
 import com.mayday.operations.mapper.FlowTaskMapper;
 import com.mayday.operations.model.FlowRequest;
@@ -44,7 +44,9 @@ public class WorkflowOrchestrator {
     if (state == null) {
       state = new WorkflowExecutionState();
       state.add(next, null, List.of());
-      if (request.getRootRequestId() == null) request.setRootRequestId(request.getId());
+      if (request.getRootRequestId() == null) {
+        request.setRootRequestId(request.getId());
+      }
     }
     pump(request, state, host);
   }
@@ -52,7 +54,9 @@ public class WorkflowOrchestrator {
   /** 待办身份绑定游标和访问批次，申请最后激活的另一条支路不会使当前合法待办失效。 */
   public boolean current(FlowRequest request, FlowTask task) {
     var state = json.execution(request.getExecutionState());
-    if (state == null || task.getExecutionTokenId() == null) return false;
+    if (state == null || task.getExecutionTokenId() == null) {
+      return false;
+    }
     Token token = state.require(task.getExecutionTokenId());
     return "APPROVAL".equals(token.getStatus())
         && token.getNodeId().equals(task.getNodeId())
@@ -76,12 +80,15 @@ public class WorkflowOrchestrator {
     }
     var state = json.execution(request.getExecutionState());
     Token token = state.require(task.getExecutionTokenId());
-    if (!returnTargets(request, task).contains(target))
+    if (!returnTargets(request, task).contains(target)) {
       throw new BusinessException("退回目标不在当前支路已办理路径");
+    }
     Token restart = token;
     while (restart.getParentTokenId() != null) {
       Token parent = state.require(restart.getParentTokenId());
-      if (!parent.getTrail().contains(target)) break;
+      if (!parent.getTrail().contains(target)) {
+        break;
+      }
       restart = parent;
     }
     Set<String> cancelled = state.descendants(restart.getId());
@@ -99,7 +106,9 @@ public class WorkflowOrchestrator {
 
   /** 详情只提供本人当前游标已过审批节点；汇合后不会提供任意已结束支路作为跳转目标。 */
   public List<String> returnTargets(FlowRequest request, FlowTask task) {
-    if (task == null || task.getExecutionTokenId() == null) return List.of();
+    if (task == null || task.getExecutionTokenId() == null) {
+      return List.of();
+    }
     var token = json.execution(request.getExecutionState()).require(task.getExecutionTokenId());
     List<String> trail = token.getTrail();
     return trail.stream().filter(id -> !id.equals(task.getNodeId())).distinct().toList();
@@ -108,7 +117,9 @@ public class WorkflowOrchestrator {
   /** 当前节点集合用于运行图，不返回隐藏字段值、未来人员或子流程表单快照。 */
   public Set<String> currentNodes(FlowRequest request) {
     var state = json.execution(request.getExecutionState());
-    if (state == null) return Set.of();
+    if (state == null) {
+      return Set.of();
+    }
     Set<String> ids = new LinkedHashSet<>();
     state.getTokens().stream()
         .filter(token -> Set.of("APPROVAL", "WAIT_CHILD", "FAILED").contains(token.getStatus()))
@@ -136,7 +147,9 @@ public class WorkflowOrchestrator {
 
   /** 管理员明确恢复原节点，先修复人员/权限/停用依赖；固定版本与字段映射不会变成最新草稿。 */
   public void recover(FlowRequest request, String reason, WorkflowEngine host) {
-    if (!failed(request)) throw new BusinessException("申请没有可恢复的失败节点");
+    if (!failed(request)) {
+      throw new BusinessException("申请没有可恢复的失败节点");
+    }
     var state = json.execution(request.getExecutionState());
     state.getTokens().stream()
         .filter(token -> "FAILED".equals(token.getStatus()))
@@ -153,7 +166,9 @@ public class WorkflowOrchestrator {
   /** 管理员可查看恢复原因；普通参与者只得到节点状态。子申请入口仍需要独立参与权。 */
   public List<Map<String, Object>> view(FlowRequest request) {
     var state = json.execution(request.getExecutionState());
-    if (state == null) return List.of();
+    if (state == null) {
+      return List.of();
+    }
     return state.getTokens().stream()
         .filter(token -> !"CANCELLED".equals(token.getStatus()))
         .map(
@@ -164,8 +179,10 @@ public class WorkflowOrchestrator {
               row.put("status", token.getStatus());
               row.put("parentTokenId", token.getParentTokenId());
               row.put("childRequestId", token.getChildRequestId());
-              if (access.has("requests:manage")) row.put("error", token.getError());
-              if (token.getChildRequestId() != null)
+              if (access.has("requests:manage")) {
+                row.put("error", token.getError());
+              }
+              if (token.getChildRequestId() != null) {
                 requests
                     .findById(token.getChildRequestId())
                     .ifPresent(
@@ -179,6 +196,7 @@ public class WorkflowOrchestrator {
                                       child.getApplicantId(), access.current().getId())
                                   || child.getApproverIds().contains(access.current().getId()));
                         });
+              }
               return row;
             })
         .toList();
@@ -215,16 +233,25 @@ public class WorkflowOrchestrator {
       request.setExecutionState(json.write(state));
     }
     for (var child : requests.findByParentRequestIdOrderByIdAsc(request.getId()))
-      // 已退回或已结束的子申请只保留结果历史，不因父结束再改写为“取消”。子申请不能独立重提。
-      if ("PENDING".equals(child.getStatus()))
+    // 已退回或已结束的子申请只保留结果历史，不因父结束再改写为“取消”。子申请不能独立重提。
+    {
+      if ("PENDING".equals(child.getStatus())) {
         host.finish(requests.lockById(child.getId()).orElseThrow(), "CANCELLED", false);
-    if (!propagate || request.getParentRequestId() == null) return;
+      }
+    }
+    if (!propagate || request.getParentRequestId() == null) {
+      return;
+    }
     var parent = requests.lockById(request.getParentRequestId()).orElseThrow();
-    if (!"PENDING".equals(parent.getStatus())) return;
+    if (!"PENDING".equals(parent.getStatus())) {
+      return;
+    }
     var parentState = json.execution(parent.getExecutionState());
     Token caller = parentState.require(request.getParentTokenId());
     if (!"WAIT_CHILD".equals(caller.getStatus())
-        || !Objects.equals(caller.getChildRequestId(), request.getId())) return;
+        || !Objects.equals(caller.getChildRequestId(), request.getId())) {
+      return;
+    }
     if (!"APPROVED".equals(status)) {
       host.record(
           parent,
@@ -250,8 +277,12 @@ public class WorkflowOrchestrator {
     do {
       progressed = false;
       for (Token token : new ArrayList<>(state.getTokens())) {
-        if (!"ACTIVE".equals(token.getStatus())) continue;
-        if (++hops > 200) throw new BusinessException("流程推进超过安全上限");
+        if (!"ACTIVE".equals(token.getStatus())) {
+          continue;
+        }
+        if (++hops > 200) {
+          throw new BusinessException("流程推进超过安全上限");
+        }
         progressed = true;
         Node node = host.schema(request).node(token.getNodeId());
         try {
@@ -261,15 +292,19 @@ public class WorkflowOrchestrator {
             case "PARALLEL" -> {
               token.setStatus("WAIT_JOIN");
               token.setJoinNodeId(node.next());
-              for (String branch : node.branches())
+              for (String branch : node.branches()) {
                 state.add(branch, token.getId(), token.getTrail());
+              }
             }
             case "JOIN" -> {
-              if (token.getParentTokenId() == null) throw new BusinessException("汇合节点失去并行父游标");
+              if (token.getParentTokenId() == null) {
+                throw new BusinessException("汇合节点失去并行父游标");
+              }
               Token parent = state.require(token.getParentTokenId());
               if (!"WAIT_JOIN".equals(parent.getStatus())
-                  || !node.id().equals(parent.getJoinNodeId()))
+                  || !node.id().equals(parent.getJoinNodeId())) {
                 throw new BusinessException("支路进入了其他并行组的汇合节点");
+              }
               token.setStatus("DONE");
               var siblings =
                   state.getTokens().stream()
@@ -314,12 +349,16 @@ public class WorkflowOrchestrator {
     request.setCurrentApproverId(current == null ? null : current.getAssigneeId());
     if (state.getTokens().stream()
         .filter(token -> token.getParentTokenId() == null && !"CANCELLED".equals(token.getStatus()))
-        .allMatch(token -> "DONE".equals(token.getStatus()))) host.finish(request, "APPROVED");
+        .allMatch(token -> "DONE".equals(token.getStatus()))) {
+      host.finish(request, "APPROVED");
+    }
   }
 
   private void openTasks(FlowRequest request, Token token, Node node, WorkflowEngine host) {
     List<Long> ids = json.assignees(request.getResolvedAssignees()).get(node.id());
-    if (ids == null || ids.isEmpty()) throw new BusinessException("节点缺少审批人快照");
+    if (ids == null || ids.isEmpty()) {
+      throw new BusinessException("节点缺少审批人快照");
+    }
     var accounts =
         ids.stream()
             .map(
@@ -356,10 +395,13 @@ public class WorkflowOrchestrator {
               ? null
               : BusinessTime.now().plusMinutes(node.timeoutMinutes()));
       tasks.save(task);
-      if (!"WAITING".equals(task.getStatus())) host.activate(request, task);
+      if (!"WAITING".equals(task.getStatus())) {
+        host.activate(request, task);
+      }
     }
-    if ("COPY".equals(node.type())) token.setNodeId(node.next());
-    else {
+    if ("COPY".equals(node.type())) {
+      token.setNodeId(node.next());
+    } else {
       token.setStatus("APPROVAL");
       token.getTrail().add(node.id());
       request.setActivePath(json.write(Map.of("nodes", statePath(request, token))));
@@ -369,7 +411,9 @@ public class WorkflowOrchestrator {
   private List<String> statePath(FlowRequest request, Token current) {
     var nodes = new LinkedHashSet<String>();
     var state = json.execution(request.getExecutionState());
-    if (state != null) state.getTokens().forEach(token -> nodes.addAll(token.getTrail()));
+    if (state != null) {
+      state.getTokens().forEach(token -> nodes.addAll(token.getTrail()));
+    }
     nodes.addAll(current.getTrail());
     return new ArrayList<>(nodes);
   }
@@ -419,12 +463,15 @@ public class WorkflowOrchestrator {
     var form = WorkflowSchema.form(childSpec, input);
     // 输入附件只来自父申请已核验的引用；子节点不能通过映射引入父申请以外的对象。
     var attachments = host.fileIds(childSpec, form);
-    if (!parent.getAttachmentIds().containsAll(attachments))
+    if (!parent.getAttachmentIds().containsAll(attachments)) {
       throw new BusinessException("子流程输入包含父申请未登记附件");
+    }
     int depth = 0;
     var cursor = parent;
     while (cursor.getParentRequestId() != null) {
-      if (++depth >= 4) throw new BusinessException("子流程嵌套超过安全上限");
+      if (++depth >= 4) {
+        throw new BusinessException("子流程嵌套超过安全上限");
+      }
       cursor = requests.findById(cursor.getParentRequestId()).orElseThrow();
     }
     var child = new FlowRequest();
@@ -467,8 +514,10 @@ public class WorkflowOrchestrator {
                 tokenIds.contains(task.getExecutionTokenId())
                     && Set.of("PENDING", "WAITING").contains(task.getStatus()))
         .forEach(task -> task.setStatus("CANCELLED"));
-    for (var child : requests.findByParentRequestIdOrderByIdAsc(request.getId()))
-      if (tokenIds.contains(child.getParentTokenId()) && "PENDING".equals(child.getStatus()))
+    for (var child : requests.findByParentRequestIdOrderByIdAsc(request.getId())) {
+      if (tokenIds.contains(child.getParentTokenId()) && "PENDING".equals(child.getStatus())) {
         host.finish(requests.lockById(child.getId()).orElseThrow(), "CANCELLED", false);
+      }
+    }
   }
 }

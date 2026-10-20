@@ -1,6 +1,6 @@
 package com.mayday.security;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.security.mapper.SecurityStateMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -25,6 +25,17 @@ public class SecurityStateStore implements SecurityState {
     transaction = new TransactionTemplate(manager);
     transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     transaction.setTimeout(10);
+  }
+
+  /** 不可逆存储键只用于定位，一次性验证码的安全性仍来自 256 位随机令牌。 */
+  private static String hash(String value) {
+    try {
+      return HexFormat.of()
+          .formatHex(
+              MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException failure) {
+      throw new IllegalStateException("运行环境缺少 SHA-256", failure);
+    }
   }
 
   @Override
@@ -54,8 +65,9 @@ public class SecurityStateStore implements SecurityState {
         status -> {
           long now = lock();
           if (store.count("sys_security_state") >= 4096
-              || store.count("sys_security_rate") >= 10000)
+              || store.count("sys_security_rate") >= 10000) {
             throw new BusinessException("验证服务繁忙，请稍后再试");
+          }
           store.deleteChallengesOfSubject(hash(subject));
           store.insertState(hash(token), "CHALLENGE", hash(subject), payload, now + ttl);
         });
@@ -66,8 +78,9 @@ public class SecurityStateStore implements SecurityState {
     transaction.executeWithoutResult(
         status -> {
           long now = lock();
-          if (store.count("sys_security_state") >= 4096)
+          if (store.count("sys_security_state") >= 4096) {
             throw new BusinessException("验证服务繁忙，请稍后再试");
+          }
           store.insertState(hash(token), "PROOF", hash(subject), payload, now + ttl);
         });
   }
@@ -75,7 +88,9 @@ public class SecurityStateStore implements SecurityState {
   /** 一次性消费与过期清理共用守卫；独立事务提交后才返回内容，后续业务失败不返还凭证。 */
   @Override
   public String take(String kind, String token) {
-    if (token == null || token.length() > 128) return null;
+    if (token == null || token.length() > 128) {
+      return null;
+    }
     return transaction.execute(
         status -> {
           long now = lock();
@@ -134,21 +149,13 @@ public class SecurityStateStore implements SecurityState {
         status -> {
           long now = lock();
           String key = hash(purpose + ":" + subject);
-          if (counter(key) >= limit) throw new BusinessException("操作过于频繁，请稍后重试");
-          if (store.count("sys_security_rate") >= 10000 && counter(key) == 0)
+          if (counter(key) >= limit) {
+            throw new BusinessException("操作过于频繁，请稍后重试");
+          }
+          if (store.count("sys_security_rate") >= 10000 && counter(key) == 0) {
             throw new BusinessException("服务繁忙，请稍后再试");
+          }
           increment(key, now + durationMillis);
         });
-  }
-
-  /** 不可逆存储键只用于定位，一次性验证码的安全性仍来自 256 位随机令牌。 */
-  private static String hash(String value) {
-    try {
-      return HexFormat.of()
-          .formatHex(
-              MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
-    } catch (NoSuchAlgorithmException failure) {
-      throw new IllegalStateException("运行环境缺少 SHA-256", failure);
-    }
   }
 }

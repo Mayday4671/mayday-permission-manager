@@ -1,8 +1,8 @@
 package com.mayday.service;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.RichText;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.util.RichText;
 import com.mayday.content.ContentPublication;
 import com.mayday.content.ContentRevision;
 import com.mayday.content.Notice;
@@ -48,6 +48,29 @@ public class ContentService {
   private final ChangeAuditService changeAudit;
   private final PortalStructureService portal;
   private final com.mayday.operations.mapper.FlowRequestMapper approvalRequests;
+
+  /** 计算当前有效上线状态，排除回收站、无线上修订和已到下线时间的记录；后台与公开入口复用一致时间语义。 */
+  public static boolean online(Notice n) {
+    return n.getDeletedAt() == null
+        && n.isPublished()
+        && n.getLiveRevisionId() != null
+        && (n.getLiveOfflineAt() == null || n.getLiveOfflineAt().isAfter(BusinessTime.now()));
+  }
+
+  /** 在数据库查询层只选择有效上线且PUBLIC的修订；条件由内容仓储统一定义。 */
+  public static QueryCondition publiclyVisible() {
+    return com.mayday.content.mapper.NoticeMapper.publiclyVisible();
+  }
+
+  /** 记录发布版本与状态，不复制文章正文、附件或客户联系方式到日志。 */
+  private static Map<String, Object> publicationSnapshot(Notice notice) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("内容标题", notice.getTitle());
+    snapshot.put("前台展示", notice.isPublished());
+    snapshot.put("线上修订ID", notice.getLiveRevisionId());
+    snapshot.put("定时下线", notice.getLiveOfflineAt());
+    return snapshot;
+  }
 
   /** 先验证内容查看权限与作者/部门范围，再选择普通读取或主记录行锁；所有管理用例复用此边界，行锁要求调用者处于事务。 */
   public Notice managed(Long id, boolean lock) {
@@ -171,25 +194,15 @@ public class ContentService {
   }
 
   private void checkApproval(Notice n, ContentRevision r) {
-    if (approvalRequired(n) && !"APPROVED".equals(r.getApprovalStatus()))
+    if (approvalRequired(n) && !"APPROVED".equals(r.getApprovalStatus())) {
       throw new BusinessException("当前修订尚未通过发布审核");
+    }
   }
 
   private void active(Notice n) {
-    if (n.getDeletedAt() != null) throw new BusinessException("请先从回收站恢复内容");
-  }
-
-  /** 计算当前有效上线状态，排除回收站、无线上修订和已到下线时间的记录；后台与公开入口复用一致时间语义。 */
-  public static boolean online(Notice n) {
-    return n.getDeletedAt() == null
-        && n.isPublished()
-        && n.getLiveRevisionId() != null
-        && (n.getLiveOfflineAt() == null || n.getLiveOfflineAt().isAfter(BusinessTime.now()));
-  }
-
-  /** 在数据库查询层只选择有效上线且PUBLIC的修订；条件由内容仓储统一定义。 */
-  public static QueryCondition publiclyVisible() {
-    return com.mayday.content.mapper.NoticeMapper.publiclyVisible();
+    if (n.getDeletedAt() != null) {
+      throw new BusinessException("请先从回收站恢复内容");
+    }
   }
 
   /** 按动作权限保存新不可变修订，校验版本、分类、标签和附件归属并清理富文本；兼容旧published字段也必须独立发布授权。 */
@@ -199,19 +212,26 @@ public class ContentService {
     access.require("notices:view");
     Notice n = id == null ? new Notice() : managed(id, true);
     active(n);
-    if (id != null) UserService.version(n, req.version());
+    if (id != null) {
+      UserService.version(n, req.version());
+    }
     // 旧接口显式 published 仍执行发布授权；新编辑器省略它，允许编辑者撰写新草稿而不改线上版本。
-    if (Boolean.TRUE.equals(req.published()) || (req.published() != null && n.isPublished()))
+    if (Boolean.TRUE.equals(req.published()) || (req.published() != null && n.isPublished())) {
       access.require("notices:publish");
-    if (Boolean.FALSE.equals(req.requiresApproval()) && n.isRequiresApproval())
+    }
+    if (Boolean.FALSE.equals(req.requiresApproval()) && n.isRequiresApproval()) {
       access.require("notices:publish");
+    }
     var category =
         option(
             "categories",
             req.categoryId() != null ? req.categoryId() : byName("categories", req.category()));
     Set<Long> tags = new HashSet<>(req.tagIds() == null ? Set.of() : req.tagIds());
-    if (req.tagIds() == null && req.tags() != null)
-      for (String tag : req.tags()) tags.add(byName("tags", tag));
+    if (req.tagIds() == null && req.tags() != null) {
+      for (String tag : req.tags()) {
+        tags.add(byName("tags", tag));
+      }
+    }
     tags.forEach(tag -> option("tags", tag));
     var fileIds = req.attachmentIds() == null ? Set.<Long>of() : req.attachmentIds();
     assets.validate(fileIds, req.coverId());
@@ -229,7 +249,9 @@ public class ContentService {
     n.setSummary(req.summary());
     n.setContent(html);
     n.setTags(new HashSet<>(entries.findAllById(tags).stream().map(SystemEntry::getName).toList()));
-    if (req.requiresApproval() != null) n.setRequiresApproval(req.requiresApproval());
+    if (req.requiresApproval() != null) {
+      n.setRequiresApproval(req.requiresApproval());
+    }
     int number =
         n.getDraftRevisionId() == null
             ? 1
@@ -264,7 +286,9 @@ public class ContentService {
     if (Boolean.TRUE.equals(req.published())) {
       checkApproval(n, r);
       goLive(n, r, null, access.current().getNickname(), "直接发布");
-    } else if (Boolean.FALSE.equals(req.published()) && n.isPublished()) takeOffline(n, "旧接口下线");
+    } else if (Boolean.FALSE.equals(req.published()) && n.isPublished()) {
+      takeOffline(n, "旧接口下线");
+    }
     notices.save(n);
     notices.syncTags(n);
     return view(n);
@@ -279,20 +303,27 @@ public class ContentService {
     if (Objects.equals(n.getLiveRevisionId(), req.revisionId())
         && online(n)
         && req.publishAt() == null
-        && Objects.equals(req.offlineAt(), n.getLiveOfflineAt())) return view(n);
+        && Objects.equals(req.offlineAt(), n.getLiveOfflineAt())) {
+      return view(n);
+    }
     UserService.version(n, req.version());
-    if (!Objects.equals(n.getDraftRevisionId(), req.revisionId()))
+    if (!Objects.equals(n.getDraftRevisionId(), req.revisionId())) {
       throw new BusinessException("只能发布当前修订，请刷新内容");
+    }
     var r = revision(req.revisionId(), id);
     checkApproval(n, r);
     option("categories", r.getCategoryId());
     portal.contentChannel(r.getCategoryId(), r.getPortalChannelId());
-    for (Long tag : r.getTagIds()) option("tags", tag);
+    for (Long tag : r.getTagIds()) {
+      option("tags", tag);
+    }
     LocalDateTime now = BusinessTime.now(), start = req.publishAt() == null ? now : req.publishAt();
-    if (req.offlineAt() != null && !req.offlineAt().isAfter(start))
+    if (req.offlineAt() != null && !req.offlineAt().isAfter(start)) {
       throw new BusinessException("下线时间必须晚于上线时间");
-    if (req.publishAt() != null && !req.publishAt().isAfter(now))
+    }
+    if (req.publishAt() != null && !req.publishAt().isAfter(now)) {
       throw new BusinessException("定时上线时间必须晚于当前时间");
+    }
     n.setScheduleError(null);
     clearSchedule(n);
     if (req.publishAt() != null) {
@@ -301,7 +332,9 @@ public class ContentService {
       n.setScheduledOfflineAt(req.offlineAt());
       n.setScheduledActorId(access.current().getId());
       n.setDraftStatus("SCHEDULED");
-    } else goLive(n, r, req.offlineAt(), access.current().getNickname(), "直接发布");
+    } else {
+      goLive(n, r, req.offlineAt(), access.current().getNickname(), "直接发布");
+    }
     notices.save(n);
     return view(n);
   }
@@ -328,7 +361,9 @@ public class ContentService {
     n.setPublished(false);
     n.setLiveRevisionId(null);
     n.setLiveOfflineAt(null);
-    if ("PUBLISHED".equals(n.getDraftStatus())) n.setDraftStatus("OFFLINE");
+    if ("PUBLISHED".equals(n.getDraftStatus())) {
+      n.setDraftStatus("OFFLINE");
+    }
     changeAudit.record("内容", n.getId(), reason, before, publicationSnapshot(n));
   }
 
@@ -353,16 +388,6 @@ public class ContentService {
     changeAudit.record("内容", n.getId(), reason, Map.of("线上修订ID", "—"), publicationSnapshot(n));
   }
 
-  /** 记录发布版本与状态，不复制文章正文、附件或客户联系方式到日志。 */
-  private static Map<String, Object> publicationSnapshot(Notice notice) {
-    Map<String, Object> snapshot = new LinkedHashMap<>();
-    snapshot.put("内容标题", notice.getTitle());
-    snapshot.put("前台展示", notice.isPublished());
-    snapshot.put("线上修订ID", notice.getLiveRevisionId());
-    snapshot.put("定时下线", notice.getLiveOfflineAt());
-    return snapshot;
-  }
-
   /** 人工下线要求发布权限、目标数据范围及当前版本；关闭线上发布记录与排期，不抹掉历史正文。 */
   @Transactional
   public Map<String, Object> offline(Long id, Long version) {
@@ -382,7 +407,9 @@ public class ContentService {
   public void delete(Long id) {
     access.require("notices:delete");
     var n = managed(id, true);
-    if (n.isPublished() || n.getScheduledRevisionId() != null) access.require("notices:publish");
+    if (n.isPublished() || n.getScheduledRevisionId() != null) {
+      access.require("notices:publish");
+    }
     takeOffline(n, "移入回收站");
     clearSchedule(n);
     n.setDeletedAt(BusinessTime.now());
@@ -395,7 +422,9 @@ public class ContentService {
     access.require("notices:restore");
     var n = managed(id, true);
     UserService.version(n, version);
-    if (n.getDeletedAt() == null) throw new BusinessException("内容不在回收站");
+    if (n.getDeletedAt() == null) {
+      throw new BusinessException("内容不在回收站");
+    }
     n.setDeletedAt(null);
     n.setDraftStatus("DRAFT");
     n.setPublished(false);
@@ -410,9 +439,12 @@ public class ContentService {
   public void purge(Long id) {
     access.require("notices:purge");
     var n = managed(id, true);
-    if (n.getDeletedAt() == null) throw new BusinessException("请先移入回收站");
-    if (approvalRequests.existsByBusinessTypeAndBusinessId("CONTENT", id))
+    if (n.getDeletedAt() == null) {
+      throw new BusinessException("请先移入回收站");
+    }
+    if (approvalRequests.existsByBusinessTypeAndBusinessId("CONTENT", id)) {
       throw new BusinessException("内容仍被审批历史引用，保留在回收站以便审计");
+    }
     publications.deleteByNoticeId(id);
     revisions.deleteByNoticeId(id);
     notices.delete(n);
@@ -422,24 +454,33 @@ public class ContentService {
   @Transactional
   public void applyDue(Long id) {
     var n = notices.lockById(id).orElse(null);
-    if (n == null || n.getDeletedAt() != null) return;
+    if (n == null || n.getDeletedAt() != null) {
+      return;
+    }
     var now = BusinessTime.now();
-    if (n.isPublished() && n.getLiveOfflineAt() != null && !n.getLiveOfflineAt().isAfter(now))
+    if (n.isPublished() && n.getLiveOfflineAt() != null && !n.getLiveOfflineAt().isAfter(now)) {
       takeOffline(n, "定时下线");
-    if (n.getScheduledPublishAt() == null || n.getScheduledPublishAt().isAfter(now)) return;
+    }
+    if (n.getScheduledPublishAt() == null || n.getScheduledPublishAt().isAfter(now)) {
+      return;
+    }
     var actor = users.findById(n.getScheduledActorId()).orElse(null);
     try {
       if (actor == null
           || !access.hasFor(actor, "notices:publish")
           || !access.hasFor(actor, "notices:view")
-          || !access.containsFor(actor, "notices", n.getAuthorId(), n.getDepartmentId()))
+          || !access.containsFor(actor, "notices", n.getAuthorId(), n.getDepartmentId())) {
         throw new BusinessException("原排期操作人的权限已失效，请重新排期");
+      }
       var r = revision(n.getScheduledRevisionId(), id);
       checkApproval(n, r);
       option("categories", r.getCategoryId());
-      for (Long tag : r.getTagIds()) option("tags", tag);
-      if (n.getScheduledOfflineAt() != null && !n.getScheduledOfflineAt().isAfter(now))
+      for (Long tag : r.getTagIds()) {
+        option("tags", tag);
+      }
+      if (n.getScheduledOfflineAt() != null && !n.getScheduledOfflineAt().isAfter(now)) {
         throw new BusinessException("排期有效窗口已结束，请重新排期");
+      }
       goLive(n, r, n.getScheduledOfflineAt(), actor.getNickname(), "定时上线");
       n.setScheduleError(null);
     } catch (BusinessException error) {

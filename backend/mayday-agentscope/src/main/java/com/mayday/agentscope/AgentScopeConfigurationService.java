@@ -1,8 +1,8 @@
 package com.mayday.agentscope;
 
 import com.mayday.agentscope.mapper.AgentScopeConfigMapper;
-import com.mayday.common.BusinessException;
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.ModuleSwitches;
 import com.mayday.security.AccessPolicy;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -48,6 +48,20 @@ public class AgentScopeConfigurationService implements InitializingBean {
     this.transaction = new TransactionTemplate(transactionManager);
   }
 
+  private static void validate(SettingsRequest request) {
+    String model = request.model() == null ? "" : request.model().trim();
+    if (!model.matches("^dashscope:[A-Za-z0-9][A-Za-z0-9._-]{0,95}$")) {
+      throw new BusinessException("模型 ID 格式不正确；百炼模型示例：dashscope:qwen3.7-plus");
+    }
+    String secret = request.apiSecret() == null ? "" : request.apiSecret().trim();
+    if (secret.length() > 512 || secret.chars().anyMatch(Character::isISOControl)) {
+      throw new BusinessException("百炼 API Key 格式不正确");
+    }
+    if (request.systemPrompt() == null || request.systemPrompt().isBlank()) {
+      throw new BusinessException("系统提示词不能为空");
+    }
+  }
+
   /**
    * Loads persisted values after Flyway and uses deployment properties for an empty configuration.
    */
@@ -79,10 +93,14 @@ public class AgentScopeConfigurationService implements InitializingBean {
     StoredSettings previous = selectStored().stream().findFirst().orElse(null);
     String apiKeyCipher = previous == null ? null : previous.apiKeyCipher();
     String submittedSecret = request.apiSecret() == null ? "" : request.apiSecret().trim();
-    if (request.clearApiSecret() && !submittedSecret.isEmpty())
+    if (request.clearApiSecret() && !submittedSecret.isEmpty()) {
       throw new BusinessException("不能同时填写新密钥并选择清除密钥");
-    if (request.clearApiSecret()) apiKeyCipher = null;
-    else if (!submittedSecret.isEmpty()) apiKeyCipher = cipher.encrypt(submittedSecret);
+    }
+    if (request.clearApiSecret()) {
+      apiKeyCipher = null;
+    } else if (!submittedSecret.isEmpty()) {
+      apiKeyCipher = cipher.encrypt(submittedSecret);
+    }
 
     StoredSettings next =
         new StoredSettings(
@@ -161,17 +179,6 @@ public class AgentScopeConfigurationService implements InitializingBean {
         .findFirst()
         .map(row -> row.apiKeyCipher() != null && !row.apiKeyCipher().isBlank())
         .orElse(false);
-  }
-
-  private static void validate(SettingsRequest request) {
-    String model = request.model() == null ? "" : request.model().trim();
-    if (!model.matches("^dashscope:[A-Za-z0-9][A-Za-z0-9._-]{0,95}$"))
-      throw new BusinessException("模型 ID 格式不正确；百炼模型示例：dashscope:qwen3.7-plus");
-    String secret = request.apiSecret() == null ? "" : request.apiSecret().trim();
-    if (secret.length() > 512 || secret.chars().anyMatch(Character::isISOControl))
-      throw new BusinessException("百炼 API Key 格式不正确");
-    if (request.systemPrompt() == null || request.systemPrompt().isBlank())
-      throw new BusinessException("系统提示词不能为空");
   }
 
   /** 读取单例配置行；空结果代表尚未在后台保存，使用部署默认值。 */

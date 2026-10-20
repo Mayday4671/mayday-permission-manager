@@ -74,7 +74,8 @@ public interface SecurityStateMapper {
   /** 原子自增失败窗口；达到上限后不再增长。 */
   default void increment(String rateKey, long expiry) {
     Db.updateBySql(
-        "insert into sys_security_rate(rate_key,attempts,expires_at) values(?,1,?) on duplicate key update attempts=least(attempts+1,1000000)",
+        "insert into sys_security_rate(rate_key,attempts,expires_at) values(?,1,?) on duplicate key update "
+            + "attempts=least(attempts+1,1000000)",
         rateKey,
         expiry);
   }

@@ -30,26 +30,34 @@ public final class Totp {
         result.append(ALPHABET.charAt((buffer >> bits) & 31));
       }
     }
-    if (bits > 0) result.append(ALPHABET.charAt((buffer << (5 - bits)) & 31));
+    if (bits > 0) {
+      result.append(ALPHABET.charAt((buffer << (5 - bits)) & 31));
+    }
     return result.toString();
   }
 
   /** 限定当前及相邻时间窗；返回匹配计数供数据库原子拒绝重放，失败返回 -1。 */
   public static long verify(String secret, String value, Instant now, long lastAcceptedStep) {
-    if (value == null || !value.matches("\\d{6}")) return -1;
+    if (value == null || !value.matches("\\d{6}")) {
+      return -1;
+    }
     long current = now.getEpochSecond() / 30;
     for (long step = current - 1; step <= current + 1; step++) {
       if (step > lastAcceptedStep
           && MessageDigest.isEqual(
               code(secret, step, 6).getBytes(StandardCharsets.US_ASCII),
-              value.getBytes(StandardCharsets.US_ASCII))) return step;
+              value.getBytes(StandardCharsets.US_ASCII))) {
+        return step;
+      }
     }
     return -1;
   }
 
   /** 标准动态截断生成指定长度验证码；公开供协议向量测试，不包含存储或授权副作用。 */
   public static String code(String secret, long step, int digits) {
-    if (digits != 6 && digits != 8) throw new IllegalArgumentException("仅支持 6/8 位 TOTP");
+    if (digits != 6 && digits != 8) {
+      throw new IllegalArgumentException("仅支持 6/8 位 TOTP");
+    }
     try {
       Mac mac = Mac.getInstance("HmacSHA1");
       mac.init(new SecretKeySpec(decode(secret), "HmacSHA1"));
@@ -68,8 +76,9 @@ public final class Totp {
   }
 
   private static byte[] decode(String value) {
-    if (value == null || !value.matches("[A-Z2-7]{16,128}"))
+    if (value == null || !value.matches("[A-Z2-7]{16,128}")) {
       throw new IllegalArgumentException("Base32 格式不正确");
+    }
     java.io.ByteArrayOutputStream result = new java.io.ByteArrayOutputStream();
     int buffer = 0, bits = 0;
     for (char item : value.toCharArray()) {

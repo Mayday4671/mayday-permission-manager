@@ -9,21 +9,6 @@ import java.util.stream.Collectors;
 
 /** 服务端唯一权限字典。菜单只是导航，真正授权使用 resource:action 标识。 新业务接入时先在此注册，再在接口上标注 @PreAuthorize；未知权限一律拒绝保存。 */
 public final class PermissionCatalog {
-  private PermissionCatalog() {}
-
-  /** 资源动作的只读注册项；scoped 标记是否允许角色配置行级范围，不代表自动获得任何操作权限。 */
-  public record Group(String key, String name, Map<String, String> actions, boolean scoped) {}
-
-  private static Map<String, String> actions(String... extras) {
-    Map<String, String> map = new LinkedHashMap<>();
-    map.put("view", "查看");
-    map.put("create", "新增");
-    map.put("update", "编辑");
-    map.put("delete", "删除");
-    for (int i = 0; i < extras.length; i += 2) map.put(extras[i], extras[i + 1]);
-    return Collections.unmodifiableMap(map);
-  }
-
   /** 服务端授予界面的完整目录；菜单展示名可变，但资源和动作键作为稳定授权契约使用。 */
   public static final List<Group> GROUPS =
       List.of(
@@ -147,4 +132,21 @@ public final class PermissionCatalog {
   /** 界面摘要的范围顺序；CUSTOM 是独立部门集合，实际授权不得按本列表顺序求并集。 */
   public static final List<String> SCOPES =
       List.of("SELF", "DEPARTMENT", "DEPARTMENT_TREE", "CUSTOM", "ALL");
+
+  private PermissionCatalog() {}
+
+  private static Map<String, String> actions(String... extras) {
+    Map<String, String> map = new LinkedHashMap<>();
+    map.put("view", "查看");
+    map.put("create", "新增");
+    map.put("update", "编辑");
+    map.put("delete", "删除");
+    for (int i = 0; i < extras.length; i += 2) {
+      map.put(extras[i], extras[i + 1]);
+    }
+    return Collections.unmodifiableMap(map);
+  }
+
+  /** 资源动作的只读注册项；scoped 标记是否允许角色配置行级范围，不代表自动获得任何操作权限。 */
+  public record Group(String key, String name, Map<String, String> actions, boolean scoped) {}
 }

@@ -1,6 +1,6 @@
 package com.mayday.operations.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.operations.model.FlowRequest;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -20,6 +20,43 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface FlowRequestMapper extends EntityMapper<FlowRequest> {
+  /** 各审批视角的 SQL 条件片段；参数顺序与占位符一致，由 boxParams 提供。 */
+  private static String boxCondition(String box) {
+    switch (box) {
+      case "all":
+        return "status <> 'DRAFT'";
+      case "mine":
+        return "applicant_id = ?";
+      case "drafts":
+        return "applicant_id = ? and status = 'DRAFT'";
+      case "participated":
+        return "exists (select 1 from ops_request_step s"
+            + " where s.request_id = ops_flow_request.id and s.approver_id = ?)";
+      case "todo":
+        return "status = 'PENDING' and (id in (select request_id from ops_flow_task"
+            + " where assignee_id = ? and status = 'PENDING')"
+            + " or (schema_snapshot is null and current_approver_id = ?))";
+      case "copies":
+        return "id in (select request_id from ops_flow_task"
+            + " where assignee_id = ? and kind = 'COPY')";
+      default:
+        return "id in (select request_id from ops_flow_task where assignee_id = ?"
+            + " and status in ('APPROVED','REJECTED','RETURNED','TRANSFERRED'))";
+    }
+  }
+
+  /** 与 boxCondition 占位符一一对应的绑定值。 */
+  private static Object[] boxParams(String box, Long userId) {
+    switch (box) {
+      case "all":
+        return new Object[0];
+      case "todo":
+        return new Object[] {userId, userId};
+      default:
+        return new Object[] {userId};
+    }
+  }
+
   default Optional<FlowRequest> lockById(Long id) {
     return Optional.ofNullable(
         selectOneByQuery(QueryWrapper.create().where(new QueryColumn("id").eq(id)).forUpdate()));
@@ -118,47 +155,11 @@ public interface FlowRequestMapper extends EntityMapper<FlowRequest> {
             + " when applicant_id = ? and private_draft is not null"
             + " then json_unquote(json_extract(private_draft, '$.title')) else title end";
     wrapper.where(
-        com.mayday.common.SearchPredicates.containsExpression("lower(" + safeTitle + ")", keyword)
+        com.mayday.common.persistence.SearchPredicates.containsExpression(
+                "lower(" + safeTitle + ")", keyword)
             .and(
                 new com.mybatisflex.core.query.RawQueryCondition(
                     boxCondition(box), boxParams(box, userId))));
     return wrapper.orderBy("id desc");
-  }
-
-  /** 各审批视角的 SQL 条件片段；参数顺序与占位符一致，由 boxParams 提供。 */
-  private static String boxCondition(String box) {
-    switch (box) {
-      case "all":
-        return "status <> 'DRAFT'";
-      case "mine":
-        return "applicant_id = ?";
-      case "drafts":
-        return "applicant_id = ? and status = 'DRAFT'";
-      case "participated":
-        return "exists (select 1 from ops_request_step s"
-            + " where s.request_id = ops_flow_request.id and s.approver_id = ?)";
-      case "todo":
-        return "status = 'PENDING' and (id in (select request_id from ops_flow_task"
-            + " where assignee_id = ? and status = 'PENDING')"
-            + " or (schema_snapshot is null and current_approver_id = ?))";
-      case "copies":
-        return "id in (select request_id from ops_flow_task"
-            + " where assignee_id = ? and kind = 'COPY')";
-      default:
-        return "id in (select request_id from ops_flow_task where assignee_id = ?"
-            + " and status in ('APPROVED','REJECTED','RETURNED','TRANSFERRED'))";
-    }
-  }
-
-  /** 与 boxCondition 占位符一一对应的绑定值。 */
-  private static Object[] boxParams(String box, Long userId) {
-    switch (box) {
-      case "all":
-        return new Object[0];
-      case "todo":
-        return new Object[] {userId, userId};
-      default:
-        return new Object[] {userId};
-    }
   }
 }

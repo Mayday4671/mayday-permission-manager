@@ -48,8 +48,9 @@ public class TokenService {
   public String issue(SysUser user, String ip, String device) {
     SysUser current =
         users.lockById(user.getId()).orElseThrow(() -> new AccessDeniedException("账号已失效，请重新登录"));
-    if (!current.isEnabled() || !current.getPasswordHash().equals(user.getPasswordHash()))
+    if (!current.isEnabled() || !current.getPasswordHash().equals(user.getPasswordHash())) {
       throw new AccessDeniedException("账号凭据已变更，请重新登录");
+    }
     // 锁等待可能持续到其他登录提交之后，取锁成功后的时间，保证配额淘汰顺序反映实际签发顺序。
     Instant now = sessionClock.instant();
     var previous = sessions.findByUserIdOrderByCreatedAtAscTokenHashAsc(current.getId());
@@ -81,7 +82,9 @@ public class TokenService {
   /** 每次请求重新读取会话和有效账号，及时生效撤销、停用和角色变更；活跃时间最多每分钟写一次。 */
   @Transactional
   public Optional<SysUser> authenticate(String token) {
-    if (token.length() > 128) return Optional.empty();
+    if (token.length() > 128) {
+      return Optional.empty();
+    }
     Instant now = sessionClock.instant();
     return sessions
         .findById(hash(token))
@@ -89,8 +92,9 @@ public class TokenService {
         .flatMap(
             session -> {
               if (session.getLastActiveAt() == null
-                  || !session.getLastActiveAt().isAfter(now.minusSeconds(60)))
+                  || !session.getLastActiveAt().isAfter(now.minusSeconds(60))) {
                 session.setLastActiveAt(now);
+              }
               return users.findById(session.getUserId());
             })
         .filter(SysUser::isEnabled);

@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.persistence;
 
 import com.mybatisflex.annotation.Table;
 import lombok.Getter;

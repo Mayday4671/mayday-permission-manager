@@ -1,6 +1,6 @@
 package com.mayday.crawler;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.net.IDN;
 import java.net.InetAddress;
 import java.net.URI;
@@ -17,18 +17,23 @@ public final class WebAddress {
       if (value == null
           || value.length() > 2000
           || value.contains("\\")
-          || value.chars().anyMatch(c -> c < 32)) throw new Exception();
+          || value.chars().anyMatch(c -> c < 32)) {
+        throw new Exception();
+      }
       URI u = new URI(value.trim()).normalize();
       if (!Set.of("http", "https").contains(u.getScheme())
           || u.getHost() == null
           || u.getUserInfo() != null
-          || u.getPort() != -1 && u.getPort() != (u.getScheme().equals("https") ? 443 : 80))
+          || u.getPort() != -1 && u.getPort() != (u.getScheme().equals("https") ? 443 : 80)) {
         throw new Exception();
+      }
       String host = host(u.getHost());
       if (host.equals("localhost")
           || host.endsWith(".localhost")
           || host.endsWith(".local")
-          || !host.contains(".")) throw new Exception();
+          || !host.contains(".")) {
+        throw new Exception();
+      }
       // 保留原始转义；先解码再重建会把游标中的 %26 变成参数分隔符、%2F 变成路径分隔符。
       return new URI(
           u.getScheme()
@@ -48,7 +53,9 @@ public final class WebAddress {
         || raw.contains(":")
         || raw.contains("/")
         || raw.contains("*")
-        || raw.endsWith(".")) throw new BusinessException("请输入准确域名，不包含协议、路径、通配符或端口");
+        || raw.endsWith(".")) {
+      throw new BusinessException("请输入准确域名，不包含协议、路径、通配符或端口");
+    }
     try {
       return IDN.toASCII(raw.trim().toLowerCase(Locale.ROOT), IDN.USE_STD3_ASCII_RULES);
     } catch (Exception e) {
@@ -62,8 +69,11 @@ public final class WebAddress {
     String origin = parse(rules.entryUrl()).getHost();
     if (!url.getHost().equals(origin)
         && (!image
-            || rules.imageHosts().stream().map(WebAddress::host).noneMatch(url.getHost()::equals)))
+            || rules.imageHosts().stream()
+                .map(WebAddress::host)
+                .noneMatch(url.getHost()::equals))) {
       throw new BusinessException(image ? "图片地址不在允许域名内" : "分页和详情必须在入口网站内");
+    }
     return url;
   }
 
@@ -73,7 +83,9 @@ public final class WebAddress {
         || address.isLoopbackAddress()
         || address.isLinkLocalAddress()
         || address.isSiteLocalAddress()
-        || address.isMulticastAddress()) return false;
+        || address.isMulticastAddress()) {
+      return false;
+    }
     byte[] b = address.getAddress();
     if (b.length == 16) {
       // 仅放行 IPv6 全球单播 2000::/3，拒绝过渡、文档和协议特殊用途段。

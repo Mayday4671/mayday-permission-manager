@@ -1,6 +1,6 @@
 package com.mayday.relay;
 
-import com.mayday.common.BaseEntity;
+import com.mayday.common.persistence.BaseEntity;
 import com.mayday.netty.RelayConfig;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Table;

@@ -1,7 +1,7 @@
 package com.mayday.relay;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.netty.RelayConfig;
 import com.mayday.security.AccessPolicy;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -24,34 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class RelayController {
   private final RelayService service;
   private final AccessPolicy access;
-
-  /** 单接收端与单目标转发配置，支持多网卡独立指定收/发地址与内存上限。 端口、网卡归属和传输模式由 RelayConfig 验证，version 阻止覆盖并发配置。 */
-  @Schema(name = "RelaySettingsEdit")
-  public record Edit(
-      @NotBlank @Size(max = 64) String bindIp,
-      int bindPort,
-      @NotBlank @Size(max = 64) String targetIp,
-      int targetPort,
-      int receiveBufferMiB,
-      int sendBufferMiB,
-      int pendingMemoryMiB,
-      @NotNull Long version,
-      @Size(max = 64) String sendIp,
-      Integer sendPort,
-      @Size(max = 10) String transportMode) {
-    /** 兼容 V16 请求：未传新增字段时仍由系统选择发送地址、端口和传输模式。 */
-    public Edit {
-      sendIp = sendIp == null ? "" : sendIp;
-      sendPort = sendPort == null ? 0 : sendPort;
-      transportMode = transportMode == null ? "AUTO" : transportMode;
-    }
-  }
-
-  /** 启动仅使用服务端保存的配置，版本不匹配时拒绝运行过期页面所见配置。 */
-  public record Start(@NotNull Long version) {}
-
-  /** 停止必须指向本次运行标识，避免过期页面误停其他操作者刚启动的实例。 */
-  public record Stop(@NotNull @Size(max = 64) String runId) {}
 
   /** 转发配置读取权限由服务层统一检查，返回运行状态供界面限制修改。 */
   @GetMapping("/config")
@@ -109,4 +81,32 @@ public class RelayController {
   public ApiResponse<?> stop(@Valid @RequestBody Stop request) {
     return ApiResponse.ok(service.stop(request.runId()));
   }
+
+  /** 单接收端与单目标转发配置，支持多网卡独立指定收/发地址与内存上限。 端口、网卡归属和传输模式由 RelayConfig 验证，version 阻止覆盖并发配置。 */
+  @Schema(name = "RelaySettingsEdit")
+  public record Edit(
+      @NotBlank @Size(max = 64) String bindIp,
+      int bindPort,
+      @NotBlank @Size(max = 64) String targetIp,
+      int targetPort,
+      int receiveBufferMiB,
+      int sendBufferMiB,
+      int pendingMemoryMiB,
+      @NotNull Long version,
+      @Size(max = 64) String sendIp,
+      Integer sendPort,
+      @Size(max = 10) String transportMode) {
+    /** 兼容 V16 请求：未传新增字段时仍由系统选择发送地址、端口和传输模式。 */
+    public Edit {
+      sendIp = sendIp == null ? "" : sendIp;
+      sendPort = sendPort == null ? 0 : sendPort;
+      transportMode = transportMode == null ? "AUTO" : transportMode;
+    }
+  }
+
+  /** 启动仅使用服务端保存的配置，版本不匹配时拒绝运行过期页面所见配置。 */
+  public record Start(@NotNull Long version) {}
+
+  /** 停止必须指向本次运行标识，避免过期页面误停其他操作者刚启动的实例。 */
+  public record Stop(@NotNull @Size(max = 64) String runId) {}
 }

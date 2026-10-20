@@ -1,9 +1,9 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.security.SessionPolicy;
 import com.mayday.security.TokenService;
@@ -60,8 +60,9 @@ public class SessionController {
     // 会话本身没有部门列；可见账号集合由用户表的行级并集子查询决定，本人会话始终可见。
     QueryCondition visibleUser = new QueryColumn("id").eq(access.current().getId());
     QueryCondition scopeCondition = access.scopeCondition("users", "id");
-    if (access.has("users:view") && scopeCondition != null)
+    if (access.has("users:view") && scopeCondition != null) {
       visibleUser = visibleUser.or(scopeCondition);
+    }
     QueryWrapper visibleUsers =
         QueryWrapper.create()
             .select(new QueryColumn("id"))
@@ -124,10 +125,14 @@ public class SessionController {
         users
             .findById(s.getUserId())
             .orElseThrow(() -> new AccessDeniedException("会话所属账号不存在，不能操作"));
-    if (!visible(user)) throw new AccessDeniedException("该会话不在您的授权范围内");
+    if (!visible(user)) {
+      throw new AccessDeniedException("该会话不在您的授权范围内");
+    }
     // 猜到 UUID 也不能绕过列表范围；跨账号撤销还要防止低权限管理员强制下线高权限账号。
     // 关闭本人会话属于自助退出，无需获得授予本人角色的权限。
-    if (!Objects.equals(user.getId(), access.current().getId())) access.checkGrant(user.getRoles());
+    if (!Objects.equals(user.getId(), access.current().getId())) {
+      access.checkGrant(user.getRoles());
+    }
     sessions.delete(s);
     return ApiResponse.ok(null);
   }

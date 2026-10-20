@@ -1,6 +1,6 @@
 package com.mayday.identity;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.identity.mapper.ExternalIdentityMapper;
 import com.mayday.security.SecurityStateStore;
 import com.mayday.security.TokenService;
@@ -37,21 +37,16 @@ public class OidcService {
   private final ChangeAuditService changeAudit;
   private final JsonMapper json = JsonMapper.builder().build();
 
-  /** 浏览器只收到公开名称和固定标识；客户端密钥、内部端点和账号映射从不进入匿名配置。 */
-  public record ProviderView(String id, String name) {}
+  private static boolean constant(String expected, String actual) {
+    return expected != null
+        && actual != null
+        && MessageDigest.isEqual(
+            expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));
+  }
 
-  /** HttpOnly cookie 值只交给控制器写响应，公开 DTO 只返回授权 URL。 */
-  public record Start(String authorizationUrl, String browserCookie) {}
-
-  /** 回调结果只返回本地会话/二次验证挑战或绑定完成标志，不能把企业 access token 当成本地会话。 */
-  public record Completion(boolean bound, LoginView login) {}
-
-  /** 个人中心的绑定记录不返回企业 subject/email，解绑依据随机 id 和当前本地身份。 */
-  public record Binding(
-      String id, String providerId, String providerName, String createdAt, String lastLoginAt) {}
-
-  /** nonce/PKCE 与注册配置指纹只在加密挑战里保存，不能由回调重新指定。 */
-  private record Pending(String providerId, String fingerprint, String nonce, String verifier) {}
+  private static BusinessException rejected() {
+    return new BusinessException("企业身份验证已过期或不匹配，请重新开始");
+  }
 
   /** 只公布启用的固定登录选择，不允许匿名用户探测本地是否存在匹配企业账号。 */
   public List<ProviderView> providers() {
@@ -74,11 +69,14 @@ public class OidcService {
     rates.reserve("oidc-start", ip, 30, 60000);
     String credentialHash = null;
     if (binding) {
-      if (userId == null || session == null) throw new BusinessException("请先使用本地账号登录后绑定企业身份");
+      if (userId == null || session == null) {
+        throw new BusinessException("请先使用本地账号登录后绑定企业身份");
+      }
       var user = mfa.reauthenticate(userId, password, factor, ip);
       credentialHash = TokenService.hash(user.getPasswordHash());
-      if (externalIdentities.countByUserAndProvider(userId, providerId) > 0)
+      if (externalIdentities.countByUserAndProvider(userId, providerId) > 0) {
         throw new BusinessException("当前账号已绑定此企业登录方式，请先解除旧绑定");
+      }
     }
     String browser = IdentityStore.random(),
         nonce = IdentityStore.random(),
@@ -106,8 +104,9 @@ public class OidcService {
     } catch (BusinessException invalid) {
       challenge = challenges.read(state, "OIDC_BIND", ip);
     }
-    if (browser == null || !constant(challenge.browserHash(), TokenService.hash(browser)))
+    if (browser == null || !constant(challenge.browserHash(), TokenService.hash(browser))) {
       throw rejected();
+    }
     boolean binding = "OIDC_BIND".equals(challenge.purpose());
     Long expectedUser = challenge.userId();
     if (binding
@@ -116,11 +115,15 @@ public class OidcService {
             || tokens
                 .authenticate(bearer)
                 .filter(user -> user.getId().equals(expectedUser))
-                .isEmpty())) throw rejected();
+                .isEmpty())) {
+      throw rejected();
+    }
     Pending pending =
         json.readValue(secrets.decrypt(challenge.payloadCipher(), "oidc"), Pending.class);
     var provider = properties.provider(pending.providerId());
-    if (!constant(pending.fingerprint(), fingerprint(provider))) throw rejected();
+    if (!constant(pending.fingerprint(), fingerprint(provider))) {
+      throw rejected();
+    }
     challenges.consumeBeforeExchange(challenge);
     String subject = client.exchange(provider, code, pending.nonce(), pending.verifier());
     var finalChallenge = challenge;
@@ -143,7 +146,9 @@ public class OidcService {
                 || tokens
                     .authenticate(bearer)
                     .filter(user -> user.getId().equals(account.getId()))
-                    .isEmpty()) throw rejected();
+                    .isEmpty()) {
+              throw rejected();
+            }
             externalIdentities.insertBinding(
                 UUID.randomUUID().toString(),
                 account.getId(),
@@ -161,7 +166,9 @@ public class OidcService {
           }
           var matches =
               externalIdentities.findByIdentity(provider.getId(), issuerHash, subjectHash);
-          if (matches.isEmpty()) throw new BusinessException("此企业身份尚未绑定本地账号，请先用本地账号登录并在个人中心绑定");
+          if (matches.isEmpty()) {
+            throw new BusinessException("此企业身份尚未绑定本地账号，请先用本地账号登录并在个人中心绑定");
+          }
           Map<String, Object> match = matches.getFirst();
           var account =
               users
@@ -170,11 +177,13 @@ public class OidcService {
                   .orElseThrow(OidcService::rejected);
           // 先锁账号，再用当前读核对映射；RR 下普通读取会继续看到等锁前的旧快照。
           // 与解绑保持账号 → 映射的锁顺序，不能把首次定位映射改为先取映射锁。
-          if (externalIdentities.countLocked((String) match.get("id"), account.getId()) != 1)
+          if (externalIdentities.countLocked((String) match.get("id"), account.getId()) != 1) {
             throw rejected();
+          }
           var login = mfa.loginAfterPrimary(account, ip, device, (String) match.get("id"));
-          if (!login.mfaRequired())
+          if (!login.mfaRequired()) {
             externalIdentities.touchLogin((String) match.get("id"), sessionClock.instant());
+          }
           return new Completion(false, login);
         });
   }
@@ -208,8 +217,12 @@ public class OidcService {
   public void unbind(Long userId, String id, String password, String factor, String ip) {
     mfa.reauthenticate(userId, password, factor, ip);
     var binding = externalIdentities.findProvider(id, userId);
-    if (binding.isEmpty()) throw new BusinessException("绑定不存在或已解除");
-    if (externalIdentities.delete(id, userId) != 1) throw new BusinessException("绑定不存在或已解除");
+    if (binding.isEmpty()) {
+      throw new BusinessException("绑定不存在或已解除");
+    }
+    if (externalIdentities.delete(id, userId) != 1) {
+      throw new BusinessException("绑定不存在或已解除");
+    }
     changeAudit.record(
         "用户",
         userId,
@@ -234,14 +247,19 @@ public class OidcService {
             TokenService.hash(provider.getClientSecret())));
   }
 
-  private static boolean constant(String expected, String actual) {
-    return expected != null
-        && actual != null
-        && MessageDigest.isEqual(
-            expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));
-  }
+  /** 浏览器只收到公开名称和固定标识；客户端密钥、内部端点和账号映射从不进入匿名配置。 */
+  public record ProviderView(String id, String name) {}
 
-  private static BusinessException rejected() {
-    return new BusinessException("企业身份验证已过期或不匹配，请重新开始");
-  }
+  /** HttpOnly cookie 值只交给控制器写响应，公开 DTO 只返回授权 URL。 */
+  public record Start(String authorizationUrl, String browserCookie) {}
+
+  /** 回调结果只返回本地会话/二次验证挑战或绑定完成标志，不能把企业 access token 当成本地会话。 */
+  public record Completion(boolean bound, LoginView login) {}
+
+  /** 个人中心的绑定记录不返回企业 subject/email，解绑依据随机 id 和当前本地身份。 */
+  public record Binding(
+      String id, String providerId, String providerName, String createdAt, String lastLoginAt) {}
+
+  /** nonce/PKCE 与注册配置指纹只在加密挑战里保存，不能由回调重新指定。 */
+  private record Pending(String providerId, String fingerprint, String nonce, String verifier) {}
 }

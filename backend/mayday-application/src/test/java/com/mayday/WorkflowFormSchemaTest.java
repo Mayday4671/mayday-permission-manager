@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.mapper.FlowDefinitionMapper;
 import com.mayday.operations.mapper.FlowRequestMapper;
 import com.mayday.operations.mapper.FlowVersionMapper;
@@ -277,10 +277,6 @@ class WorkflowFormSchemaTest {
     return new StoredFixture(definitions, applicant, approver, access);
   }
 
-  /** 合成仓储与账号只存在于测试进程，不启动数据库或修改真实权限。 */
-  private record StoredFixture(
-      WorkflowDefinitions definitions, SysUser applicant, SysUser approver, AccessPolicy access) {}
-
   /** 每条分支先经过审批，使用稳定节点标识构造最小可执行的合成模型。 */
   private Spec schema(List<String> options, String operator, String value) {
     Field field = new Field("kind", "申请类型", "SINGLE", true, null, null, null, null, options);
@@ -328,4 +324,8 @@ class WorkflowFormSchemaTest {
         false,
         true);
   }
+
+  /** 合成仓储与账号只存在于测试进程，不启动数据库或修改真实权限。 */
+  private record StoredFixture(
+      WorkflowDefinitions definitions, SysUser applicant, SysUser approver, AccessPolicy access) {}
 }

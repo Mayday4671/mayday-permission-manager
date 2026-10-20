@@ -29,7 +29,8 @@ public interface ExternalIdentityMapper {
       String subjectHash,
       java.time.Instant createdAt) {
     Db.updateBySql(
-        "insert into sys_external_identity(id,user_id,provider_id,issuer_hash,subject_hash,created_at) values(?,?,?,?,?,?)",
+        "insert into sys_external_identity(id,user_id,provider_id,issuer_hash,subject_hash,created_at) values(?,?,?,?,"
+            + "?,?)",
         id,
         userId,
         providerId,

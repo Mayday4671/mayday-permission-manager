@@ -7,8 +7,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mayday.bulk.mapper.BulkJobMapper;
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
@@ -24,10 +24,10 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** 批量任务的归属、撤权后下载和 DTO 隔离；不依赖浏览器隐藏按钮作为授权边界。 */
 class BulkSecurityTest {
-  @TempDir Path spool;
   private final BulkJobMapper jobs = mock(BulkJobMapper.class);
   private final AccessPolicy access = mock(AccessPolicy.class);
   private final BulkIdentity identity = mock(BulkIdentity.class);
+  @TempDir Path spool;
   private BulkService service;
 
   private BulkService service() {
@@ -56,7 +56,9 @@ class BulkSecurityTest {
 
   @AfterEach
   void stop() {
-    if (service != null) service.stop();
+    if (service != null) {
+      service.stop();
+    }
   }
 
   private BulkJob job(Long owner) {

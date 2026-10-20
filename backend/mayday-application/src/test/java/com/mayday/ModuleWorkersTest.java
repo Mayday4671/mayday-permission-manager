@@ -3,7 +3,7 @@ package com.mayday;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.util.ModuleSwitches;
 import com.mayday.operations.mapper.BusinessEventMapper;
 import com.mayday.operations.mapper.ScheduledJobMapper;
 import com.mayday.operations.service.JobRunner;

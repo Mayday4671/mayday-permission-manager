@@ -1,6 +1,6 @@
 package com.mayday.system.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.system.model.DepartmentGrant;
 import com.mayday.system.model.SysRole;
 import com.mybatisflex.core.query.QueryColumn;

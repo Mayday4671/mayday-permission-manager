@@ -1,7 +1,7 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.util.ModuleSwitches;
+import com.mayday.common.web.ApiResponse;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

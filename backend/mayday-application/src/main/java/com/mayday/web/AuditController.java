@@ -1,6 +1,6 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.service.AuditQueryService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -53,12 +53,12 @@ public class AuditController {
     return ApiResponse.ok(service.detail(loginOnly, id));
   }
 
-  /** 显式清理某类日志在指定日期之前的记录，业务服务限制保留期限与清理权限。 */
-  public record Cleanup(@NotNull LocalDate before, boolean loginOnly) {}
-
   /** 按批准的日期范围清理日志；普通查看权限不自动获得破坏审计记录的能力。 */
   @DeleteMapping
   public ApiResponse<?> clean(@Valid @RequestBody Cleanup request) {
     return ApiResponse.ok(service.clean(request.loginOnly(), request.before()));
   }
+
+  /** 显式清理某类日志在指定日期之前的记录，业务服务限制保留期限与清理权限。 */
+  public record Cleanup(@NotNull LocalDate before, boolean loginOnly) {}
 }

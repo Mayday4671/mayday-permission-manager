@@ -1,8 +1,8 @@
 package com.mayday.crawler;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.FileUsage;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.util.FileUsage;
 import com.mayday.crawler.mapper.CrawlItemMapper;
 import com.mayday.crawler.mapper.CrawlTaskMapper;
 import com.mayday.operations.OperationSupport;
@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional
 public class CrawlStore implements FileUsage {
+  private static final Set<String> ACTIVE = Set.of("QUEUED", "RUNNING");
   private final CrawlTaskMapper tasks;
   private final CrawlItemMapper items;
   private final AccessPolicy access;
@@ -40,34 +41,25 @@ public class CrawlStore implements FileUsage {
     return tasks.databaseNow();
   }
 
-  private static final Set<String> ACTIVE = Set.of("QUEUED", "RUNNING");
-
-  /** 不可变领取快照，网络工作器只能用原租约提交；配置、页组和序号不会由网页响应覆盖。 */
-  public record Work(
-      Long taskId,
-      Long itemId,
-      String lease,
-      String url,
-      String kind,
-      String root,
-      int ordinal,
-      CrawlRules rules) {}
-
   /** 配置和数据共用任务所有者边界；需要改变状态时获取主任务行锁。 */
   public CrawlTask accessible(Long id, boolean locked) {
     access.require("crawler:view");
     var task =
         (locked ? tasks.lock(id) : tasks.findById(id))
             .orElseThrow(() -> new BusinessException("采集任务不存在"));
-    if (!access.has("crawler:all") && !Objects.equals(task.getOwnerId(), access.current().getId()))
+    if (!access.has("crawler:all")
+        && !Objects.equals(task.getOwnerId(), access.current().getId())) {
       throw new AccessDeniedException("无权访问此采集任务");
+    }
     return task;
   }
 
   /** 配置接口拒绝已删除的配置；数据读取仍经 accessible 校验原所有者，不能因删除而放宽访问。 */
   public CrawlTask configuration(Long id, boolean locked) {
     var task = accessible(id, locked);
-    if (task.isArchived()) throw new BusinessException("采集配置已删除");
+    if (task.isArchived()) {
+      throw new BusinessException("采集配置已删除");
+    }
     return task;
   }
 
@@ -79,12 +71,16 @@ public class CrawlStore implements FileUsage {
     var task = id == null ? new CrawlTask() : configuration(id, true);
     if (id != null) {
       OperationSupport.version(task, version);
-      if (!task.getStatus().equals("DRAFT")) throw new BusinessException("已开始的任务不能修改规则，请复制为新任务");
+      if (!task.getStatus().equals("DRAFT")) {
+        throw new BusinessException("已开始的任务不能修改规则，请复制为新任务");
+      }
     } else {
       users.lockById(access.current().getId()).orElseThrow(() -> new BusinessException("账号不存在"));
       if (tasks.countByOwnerIdAndStatusInAndArchivedFalse(
               access.current().getId(), Set.of("DRAFT", "QUEUED", "RUNNING", "PAUSED"))
-          >= 30) throw new BusinessException("未结束任务已达 30 个，请先清理或完成已有任务");
+          >= 30) {
+        throw new BusinessException("未结束任务已达 30 个，请先清理或完成已有任务");
+      }
       task.setOwnerId(access.current().getId());
       task.setOwnerName(access.current().getNickname());
     }
@@ -99,16 +95,23 @@ public class CrawlStore implements FileUsage {
     access.require("files:create");
     var task = configuration(id, true);
     OperationSupport.version(task, version);
-    if (ACTIVE.contains(task.getStatus())) throw new BusinessException("任务已在执行中");
-    if (task.getStatus().equals("LIMITED")) throw new BusinessException("已达到容量上限，请调整规则后复制新任务");
+    if (ACTIVE.contains(task.getStatus())) {
+      throw new BusinessException("任务已在执行中");
+    }
+    if (task.getStatus().equals("LIMITED")) {
+      throw new BusinessException("已达到容量上限，请调整规则后复制新任务");
+    }
     users
         .lockById(task.getOwnerId())
         .orElseThrow(() -> new BusinessException("任务创建账号已删除，请复制到当前账号"));
-    if (tasks.countByOwnerIdAndStatusInAndArchivedFalse(task.getOwnerId(), ACTIVE) >= 3)
+    if (tasks.countByOwnerIdAndStatusInAndArchivedFalse(task.getOwnerId(), ACTIVE) >= 3) {
       throw new BusinessException("每个账号最多同时运行 3 个任务");
+    }
     if (retry) {
       var failed = items.findByTaskIdAndStatus(id, "FAILED");
-      if (failed.isEmpty()) throw new BusinessException("没有需要重试的失败记录");
+      if (failed.isEmpty()) {
+        throw new BusinessException("没有需要重试的失败记录");
+      }
       failed.forEach(
           i -> {
             i.setStatus("QUEUED");
@@ -118,8 +121,9 @@ public class CrawlStore implements FileUsage {
       task.setFailedCount(0);
     } else if (task.getStatus().equals("DRAFT")) {
       enqueue(task, "LIST", task.getRules().entryUrl(), task.getRules().entryUrl(), null, 0);
-    } else if (!task.getStatus().equals("PAUSED"))
+    } else if (!task.getStatus().equals("PAUSED")) {
       throw new BusinessException("已结束任务请使用重试失败项或复制任务");
+    }
     task.setRunnerId(access.current().getId());
     task.setStatus("QUEUED");
     task.setLastError(null);
@@ -134,7 +138,9 @@ public class CrawlStore implements FileUsage {
     access.require("crawler:stop");
     var task = configuration(id, true);
     OperationSupport.version(task, version);
-    if (!ACTIVE.contains(task.getStatus())) throw new BusinessException("任务当前没有运行");
+    if (!ACTIVE.contains(task.getStatus())) {
+      throw new BusinessException("任务当前没有运行");
+    }
     pause(task, null);
     return tasks.save(task);
   }
@@ -151,7 +157,9 @@ public class CrawlStore implements FileUsage {
   public void delete(Long id) {
     access.require("crawler:delete");
     var task = configuration(id, true);
-    if (ACTIVE.contains(task.getStatus())) throw new BusinessException("请先停止采集再删除任务");
+    if (ACTIVE.contains(task.getStatus())) {
+      throw new BusinessException("请先停止采集再删除任务");
+    }
     // 配置与数据有独立生命周期：已有文章时保留来源、正文及图片引用，不级联删除数据。
     // 空配置仍可物理清理，避免测试或未执行的草稿留下无用的归档记录。
     if (articles.hasData(id)) {
@@ -198,7 +206,9 @@ public class CrawlStore implements FileUsage {
       var task = tasks.lock(id).orElseThrow();
       if (!ACTIVE.contains(task.getStatus())
           || task.getLeaseUntil() != null && task.getLeaseUntil().isAfter(now)
-          || task.getNextFetchAt() != null && task.getNextFetchAt().isAfter(now)) continue;
+          || task.getNextFetchAt() != null && task.getNextFetchAt().isAfter(now)) {
+        continue;
+      }
       if (!authorized(task)) {
         pause(task, "执行账号已停用、删除或权限已撤回");
         continue;
@@ -211,7 +221,9 @@ public class CrawlStore implements FileUsage {
                   i.setStatus("FAILED");
                   i.setError("连续故障恢复已达重试上限，可明确重试");
                   task.setFailedCount(task.getFailedCount() + 1);
-                } else i.setStatus("QUEUED");
+                } else {
+                  i.setStatus("QUEUED");
+                }
                 items.save(i);
               });
       var item = items.findFirstByTaskIdAndStatusOrderByIdAsc(id, "QUEUED").orElse(null);
@@ -249,7 +261,9 @@ public class CrawlStore implements FileUsage {
         || !Objects.equals(task.getLeaseToken(), work.lease())
         || task.getLeaseUntil() == null
         || !task.getLeaseUntil().isAfter(now)
-        || !authorized(task)) return false;
+        || !authorized(task)) {
+      return false;
+    }
     task.setLeaseUntil(now.plusSeconds(120));
     return true;
   }
@@ -261,7 +275,9 @@ public class CrawlStore implements FileUsage {
         || !ACTIVE.contains(task.getStatus())
         || !Objects.equals(task.getLeaseToken(), work.lease())
         || task.getLeaseUntil() == null
-        || !task.getLeaseUntil().isAfter(databaseNow())) return;
+        || !task.getLeaseUntil().isAfter(databaseNow())) {
+      return;
+    }
     if (!authorized(task)) {
       pause(task, "执行账号已停用、删除或权限已撤回");
       return;
@@ -274,7 +290,9 @@ public class CrawlStore implements FileUsage {
       item.setError(failure);
       task.setLastError(failure);
       item.setStatus(item.getAttempts() < 3 ? "QUEUED" : "FAILED");
-      if (item.getStatus().equals("FAILED")) task.setFailedCount(task.getFailedCount() + 1);
+      if (item.getStatus().equals("FAILED")) {
+        task.setFailedCount(task.getFailedCount() + 1);
+      }
       task.setNextFetchAt(BusinessTime.now().plusSeconds(Math.min(30, item.getAttempts() * 5L)));
       return;
     }
@@ -324,9 +342,12 @@ public class CrawlStore implements FileUsage {
         var imageItem = enqueue(task, "IMAGE", url, work.root(), work.url(), 0);
         articles.link(article, imageItem, work.ordinal() * 1000 + position++);
       }
-      for (String url : links.details()) enqueue(task, "DETAIL", url, url, work.url(), 0);
-      for (String url : links.pages())
+      for (String url : links.details()) {
+        enqueue(task, "DETAIL", url, url, work.url(), 0);
+      }
+      for (String url : links.pages()) {
         enqueue(task, work.kind(), url, work.root(), work.url(), work.ordinal() + 1);
+      }
     }
   }
 
@@ -335,23 +356,30 @@ public class CrawlStore implements FileUsage {
     url = WebAddress.allowed(url, task.getRules(), kind.equals("IMAGE")).toString();
     String hash = ImageBytes.hash(url);
     var existing = items.findByTaskIdAndKindAndUrlHash(task.getId(), kind, hash);
-    if (existing.isPresent()) return existing.get();
+    if (existing.isPresent()) {
+      return existing.get();
+    }
     if (items.countByTaskId(task.getId()) >= 5000) {
       task.setStatus("LIMITED");
       task.setLastError("已达到 5000 条采集队列上限");
       return null;
     }
     if (kind.equals("IMAGE")
-        && items.countByTaskIdAndKind(task.getId(), kind) >= task.getRules().maxImages())
+        && items.countByTaskIdAndKind(task.getId(), kind) >= task.getRules().maxImages()) {
       return null;
+    }
     if (kind.equals("DETAIL")
         && ordinal == 0
         && items.countByTaskIdAndKindAndOrdinal(task.getId(), "DETAIL", 0)
-            >= task.getRules().maxDetails()) return null;
+            >= task.getRules().maxDetails()) {
+      return null;
+    }
     if (!kind.equals("IMAGE")
         && items.countByTaskIdAndKindAndRootUrl(task.getId(), kind, root)
-            >= (kind.equals("LIST") ? task.getRules().list() : task.getRules().detail()).maxPages())
+            >= (kind.equals("LIST") ? task.getRules().list() : task.getRules().detail())
+                .maxPages()) {
       return null;
+    }
     var item = new CrawlItem();
     item.setTaskId(task.getId());
     item.setKind(kind);
@@ -369,4 +397,15 @@ public class CrawlStore implements FileUsage {
   public boolean referenced(Long fileId) {
     return items.existsByFileId(fileId);
   }
+
+  /** 不可变领取快照，网络工作器只能用原租约提交；配置、页组和序号不会由网页响应覆盖。 */
+  public record Work(
+      Long taskId,
+      Long itemId,
+      String lease,
+      String url,
+      String kind,
+      String root,
+      int ordinal,
+      CrawlRules rules) {}
 }

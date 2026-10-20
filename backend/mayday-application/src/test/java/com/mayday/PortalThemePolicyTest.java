@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.service.PortalThemePolicy;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -33,7 +33,9 @@ class PortalThemePolicyTest {
         policy.parse(
             PortalThemePolicy.DEFAULT_JSON.replace(
                 "}",
-                ",\"menuStyle\":\"dark\",\"background\":\"slate\",\"surfaceStyle\":\"shadow\",\"contentWidth\":\"boxed\",\"chartPalette\":\"soft\",\"successColor\":\"#AABBCC\",\"warningColor\":\"#123456\",\"errorColor\":\"#654321\"}"));
+                ",\"menuStyle\":\"dark\",\"background\":\"slate\",\"surfaceStyle\":\"shadow\",\"contentWidth\":\"boxed\","
+                    + "\"chartPalette\":\"soft\",\"successColor\":\"#AABBCC\",\"warningColor\":\"#123456\","
+                    + "\"errorColor\":\"#654321\"}"));
     assertEquals("dark", parsed.menuStyle());
     assertEquals("shadow", parsed.surfaceStyle());
     assertEquals("boxed", parsed.contentWidth());
@@ -75,7 +77,9 @@ class PortalThemePolicyTest {
           base.replace(":4", ":\"4\""),
           base.replace("false", "\"false\""),
           base.replace("}", ",\"css\":\"body{}\"}")
-        }) assertThrows(BusinessException.class, () -> policy.parse(invalid));
+        }) {
+      assertThrows(BusinessException.class, () -> policy.parse(invalid));
+    }
   }
 
   @Test

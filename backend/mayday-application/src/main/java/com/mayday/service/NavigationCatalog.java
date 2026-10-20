@@ -1,16 +1,11 @@
 package com.mayday.service;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.util.List;
 import java.util.Set;
 
 /** 已实现页面的服务器登记。菜单权限必须与目标页面完全一致，站内地址格式不是授权白名单。 */
 public final class NavigationCatalog {
-  private NavigationCatalog() {}
-
-  /** 已实现后台页面的固定路由、业务名称和查看权限；数据库菜单只能引用这些登记，不构成独立授权。 */
-  public record Page(String code, String name, String path, String permission) {}
-
   public static final List<Page> PAGES =
       List.of(
           page("dashboard", "工作台", "/admin"),
@@ -48,11 +43,6 @@ public final class NavigationCatalog {
           new Page("changes", "变更记录", "/admin/changes", "logs:view"),
           // generator:navigation-pages
           new Page("tasks", "审批待办", "/admin/tasks", "requests:approve"));
-
-  private static Page page(String code, String name, String path) {
-    return new Page(code, name, path, code + ":view");
-  }
-
   public static final Set<String> ICONS =
       Set.of(
           "dashboard",
@@ -65,6 +55,12 @@ public final class NavigationCatalog {
           "settings",
           "logs");
 
+  private NavigationCatalog() {}
+
+  private static Page page(String code, String name, String path) {
+    return new Page(code, name, path, code + ":view");
+  }
+
   /** 校验路由与对应查看权限的完整组合，拒绝把低权限菜单配置成高权限页面入口。 */
   public static boolean matches(String path, String permission) {
     return PAGES.stream()
@@ -73,8 +69,14 @@ public final class NavigationCatalog {
 
   /** 保存菜单前验证页面与图标白名单；不接受任意外链、未实现页面或伪造权限配对。 */
   public static void validate(String path, String permission, String icon) {
-    if (!matches(path, permission)) throw new BusinessException("请选择已实现的页面及其对应访问权限");
-    if (icon != null && !icon.isBlank() && !ICONS.contains(icon))
+    if (!matches(path, permission)) {
+      throw new BusinessException("请选择已实现的页面及其对应访问权限");
+    }
+    if (icon != null && !icon.isBlank() && !ICONS.contains(icon)) {
       throw new BusinessException("请选择已登记的菜单图标");
+    }
   }
+
+  /** 已实现后台页面的固定路由、业务名称和查看权限；数据库菜单只能引用这些登记，不构成独立授权。 */
+  public record Page(String code, String name, String path, String permission) {}
 }

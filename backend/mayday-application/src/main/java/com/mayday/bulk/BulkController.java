@@ -1,6 +1,6 @@
 package com.mayday.bulk;
 
-import com.mayday.common.ApiResponse;
+import com.mayday.common.web.ApiResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -111,8 +111,9 @@ public class BulkController {
   }
 
   private byte[] bytes(MultipartFile file) throws IOException {
-    if (file.isEmpty() || file.getSize() > CsvCodec.MAX_IMPORT_BYTES)
-      throw new com.mayday.common.BusinessException("导入文件须为 1 字节到 2 MB");
+    if (file.isEmpty() || file.getSize() > CsvCodec.MAX_IMPORT_BYTES) {
+      throw new com.mayday.common.exception.BusinessException("导入文件须为 1 字节到 2 MB");
+    }
     return file.getBytes();
   }
 }

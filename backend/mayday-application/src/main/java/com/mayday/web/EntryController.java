@@ -1,8 +1,8 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.PageResult;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.NavigationCatalog;
 import com.mayday.service.SettingService;
@@ -57,10 +57,13 @@ public class EntryController {
   private final com.mayday.operations.mapper.FlowDefinitionMapper workflows;
 
   private void guard(String kind, String action) {
-    if (!KINDS.contains(kind)) throw new BusinessException("未知资源类型");
+    if (!KINDS.contains(kind)) {
+      throw new BusinessException("未知资源类型");
+    }
     access.require(kind + ":" + action);
-    if ("departments".equals(kind) && !"view".equals(action) && !access.admin())
+    if ("departments".equals(kind) && !"view".equals(action) && !access.admin()) {
       throw new AccessDeniedException("组织结构会影响数据权限，仅超级管理员可调整");
+    }
   }
 
   /** 在资源白名单和该资源查看权限内分页查询，kind 谓词必须进入 SQL 而非事后过滤。 */
@@ -76,14 +79,16 @@ public class EntryController {
     var filter =
         com.mybatisflex.core.query.QueryWrapper.create()
             .where(new com.mybatisflex.core.query.QueryColumn("kind").eq(kind));
-    com.mayday.common.SearchPredicates.anyOf(
+    com.mayday.common.persistence.SearchPredicates.anyOf(
         filter,
-        com.mayday.common.SearchPredicates.contains("name", keyword),
-        com.mayday.common.SearchPredicates.contains("code", keyword));
-    if (groupName != null && !groupName.isBlank())
+        com.mayday.common.persistence.SearchPredicates.contains("name", keyword),
+        com.mayday.common.persistence.SearchPredicates.contains("code", keyword));
+    if (groupName != null && !groupName.isBlank()) {
       filter.and(new com.mybatisflex.core.query.QueryColumn("group_name").eq(groupName));
-    if (enabled != null)
+    }
+    if (enabled != null) {
       filter.and(new com.mybatisflex.core.query.QueryColumn("enabled").eq(enabled));
+    }
     return ApiResponse.ok(
         PageResult.from(
             entries.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
@@ -116,10 +121,13 @@ public class EntryController {
 
   private SystemEntry save(String kind, Long id, EntryRequest request) {
     SystemEntry entity = id == null ? new SystemEntry() : find(kind, id);
-    if (id != null) UserService.version(entity, request.version());
+    if (id != null) {
+      UserService.version(entity, request.version());
+    }
     if ("settings".equals(kind)) {
-      if (entity.isBuiltIn() && !entity.getCode().equals(request.code()))
+      if (entity.isBuiltIn() && !entity.getCode().equals(request.code())) {
         throw new BusinessException("内置参数编码不能修改");
+      }
       var definition = SettingService.SITE_KEYS.get(request.code());
       String type =
           request.valueType() != null
@@ -137,32 +145,44 @@ public class EntryController {
     if ("dictionaries".equals(kind)
         && id != null
         && "user.status".equals(entity.getCode())
-        && !entity.getCode().equals(request.code())) throw new BusinessException("内置账号状态字典编码不能修改");
+        && !entity.getCode().equals(request.code())) {
+      throw new BusinessException("内置账号状态字典编码不能修改");
+    }
     if (java.util.Set.of("categories", "tags").contains(kind)) {
-      if (request.name().length() > 32) throw new BusinessException("分类和标签名称最多 32 字");
+      if (request.name().length() > 32) {
+        throw new BusinessException("分类和标签名称最多 32 字");
+      }
     }
     if (request.parentId() != null) {
-      if (!Set.of("departments", "menus").contains(kind)) throw new BusinessException("此资源不支持层级关系");
+      if (!Set.of("departments", "menus").contains(kind)) {
+        throw new BusinessException("此资源不支持层级关系");
+      }
       SystemEntry parent = find(kind, request.parentId());
       Set<Long> visited = new HashSet<>();
       // 沿父链检查环，杜绝把父部门移动到自己的子部门之下。
       while (parent != null) {
-        if (Objects.equals(parent.getId(), id) || !visited.add(parent.getId()))
+        if (Objects.equals(parent.getId(), id) || !visited.add(parent.getId())) {
           throw new BusinessException("上级节点不能是当前节点或其下级");
+        }
         parent = parent.getParentId() == null ? null : find(kind, parent.getParentId());
       }
     }
     if ("menus".equals(kind)) {
       NavigationCatalog.validate(request.path(), request.permission(), request.icon());
-      if (request.parentId() != null) throw new BusinessException("菜单采用平铺分组，不配置上级菜单");
+      if (request.parentId() != null) {
+        throw new BusinessException("菜单采用平铺分组，不配置上级菜单");
+      }
       if (entries.findByKindOrderBySortOrderAscIdAsc("menus").stream()
           .anyMatch(
               entry ->
-                  !Objects.equals(entry.getId(), id) && request.path().equals(entry.getPath())))
+                  !Objects.equals(entry.getId(), id) && request.path().equals(entry.getPath()))) {
         throw new BusinessException("此页面已有菜单入口，请编辑原入口");
+      }
     }
     if (request.leaderId() != null) {
-      if (!"departments".equals(kind)) throw new BusinessException("只有部门可以指定负责人");
+      if (!"departments".equals(kind)) {
+        throw new BusinessException("只有部门可以指定负责人");
+      }
       users
           .findById(request.leaderId())
           .filter(SysUser::isEnabled)
@@ -171,7 +191,9 @@ public class EntryController {
     entity.setKind(kind);
     entity.setName(request.name());
     entity.setCode(request.code());
-    if (!"dictionaries".equals(kind)) entity.setValue(request.value());
+    if (!"dictionaries".equals(kind)) {
+      entity.setValue(request.value());
+    }
     entity.setDescription(request.description());
     entity.setParentId(request.parentId());
     entity.setLeaderId(request.leaderId());
@@ -189,37 +211,50 @@ public class EntryController {
   public ApiResponse<?> delete(@PathVariable String kind, @PathVariable Long id) {
     guard(kind, "delete");
     SystemEntry entry = find(kind, id);
-    if ("approvalcategories".equals(kind) && workflows.existsByCategoryId(id))
+    if ("approvalcategories".equals(kind) && workflows.existsByCategoryId(id)) {
       throw new BusinessException("分类仍被流程定义引用，请先调整关联");
+    }
     if ("settings".equals(kind)) {
-      if (entry.isBuiltIn() || SettingService.SITE_KEYS.containsKey(entry.getCode()))
+      if (entry.isBuiltIn() || SettingService.SITE_KEYS.containsKey(entry.getCode())) {
         throw new BusinessException("内置参数不能删除");
+      }
       settings.invalidateAfterCommit();
     }
-    if (dictionaryItems.existsByDictionaryId(id)) throw new BusinessException("字典仍有选项，请先清理字典项");
-    if ("posts".equals(kind) && users.countUsersByPost(id) > 0)
+    if (dictionaryItems.existsByDictionaryId(id)) {
+      throw new BusinessException("字典仍有选项，请先清理字典项");
+    }
+    if ("posts".equals(kind) && users.countUsersByPost(id) > 0) {
       throw new BusinessException("岗位仍被账号引用，请先调整关联");
-    if ("dictionaries".equals(kind) && "user.status".equals(entry.getCode()))
+    }
+    if ("dictionaries".equals(kind) && "user.status".equals(entry.getCode())) {
       throw new BusinessException("内置账号状态字典不能删除");
+    }
     if (("categories".equals(kind) && revisions.existsByCategoryId(id))
-        || ("tags".equals(kind) && revisions.existsByTagIdsContains(id)))
+        || ("tags".equals(kind) && revisions.existsByTagIdsContains(id))) {
       throw new BusinessException("内容修订仍引用此分类或标签，不能删除；可停用以阻止新增选择");
-    if (roles.existsByScopeDepartments_DepartmentId(id))
+    }
+    if (roles.existsByScopeDepartments_DepartmentId(id)) {
       throw new BusinessException("此部门仍被角色数据范围引用，请先调整授权");
+    }
     if (entries.existsByParentId(id)
         || users.existsByDepartmentId(id)
-        || notices.existsByDepartmentId(id)) throw new BusinessException("记录仍被子节点、用户或内容引用，请先调整关联");
+        || notices.existsByDepartmentId(id)) {
+      throw new BusinessException("记录仍被子节点、用户或内容引用，请先调整关联");
+    }
     entries.delete(entry);
     return ApiResponse.ok(null);
   }
 
   private boolean contentReferences(String kind, String name) {
-    if ("categories".equals(kind))
+    if ("categories".equals(kind)) {
       return notices.selectCountByQuery(
               com.mybatisflex.core.query.QueryWrapper.create()
                   .where(new com.mybatisflex.core.query.QueryColumn("category").eq(name)))
           > 0;
-    if ("tags".equals(kind)) return notices.countByTag(name) > 0;
+    }
+    if ("tags".equals(kind)) {
+      return notices.countByTag(name) > 0;
+    }
     return false;
   }
 }

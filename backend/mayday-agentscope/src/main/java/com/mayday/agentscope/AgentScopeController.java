@@ -1,7 +1,7 @@
 package com.mayday.agentscope;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.PageResult;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.web.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

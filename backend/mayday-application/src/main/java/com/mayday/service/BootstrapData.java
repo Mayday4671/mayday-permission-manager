@@ -1,6 +1,6 @@
 package com.mayday.service;
 
-import com.mayday.common.BusinessTime;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.content.ContentPublication;
 import com.mayday.content.ContentRevision;
 import com.mayday.content.Notice;
@@ -227,9 +227,10 @@ public class BootstrapData implements CommandLineRunner {
     dictionaryItem(status, "启用", "true", 0);
     dictionaryItem(status, "停用", "false", 1);
     int categoryOrder = 0;
-    for (String name : List.of("公告", "产品动态", "团队故事", "使用指南"))
+    for (String name : List.of("公告", "产品动态", "团队故事", "使用指南")) {
       entry(
           "categories", name, "category_" + categoryOrder, null, "初始内容分类，可按业务调整", categoryOrder++);
+    }
     entry("settings", "平台名称", "site.name", null, "对外展示名称，请在网站配置中调整", 0).setValue("Mayday");
   }
 
@@ -243,7 +244,9 @@ public class BootstrapData implements CommandLineRunner {
     menus.forEach(menu -> existingMenus.add(menu.getCode()));
     int order = menus.stream().mapToInt(SystemEntry::getSortOrder).max().orElse(-1) + 1;
     for (var page : NavigationCatalog.PAGES) {
-      if (existingMenus.contains(page.code())) continue;
+      if (existingMenus.contains(page.code())) {
+        continue;
+      }
       SystemEntry menu = entry("menus", page.name(), page.code(), null, "系统内置导航", order++);
       menu.setPath(page.path());
       menu.setPermission(page.permission());
@@ -327,7 +330,7 @@ public class BootstrapData implements CommandLineRunner {
     r.setRevisionNumber(1);
     r.setTitle(title);
     r.setSummary(summary);
-    r.setContent(com.mayday.common.RichText.plain(content, 50000));
+    r.setContent(com.mayday.common.util.RichText.plain(content, 50000));
     r.setCategoryId(
         entries.findByKindOrderBySortOrderAscIdAsc("categories").stream()
             .filter(e -> e.getName().equals(category))

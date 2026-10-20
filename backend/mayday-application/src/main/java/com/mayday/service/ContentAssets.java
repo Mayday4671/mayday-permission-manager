@@ -1,7 +1,7 @@
 package com.mayday.service;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.FileUsage;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.FileUsage;
 import com.mayday.content.mapper.ContentRevisionMapper;
 import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.model.StoredFile;
@@ -27,15 +27,21 @@ public class ContentAssets implements FileUsage {
   /** 在业务写事务中按固定顺序锁定附件，检查所有者和有效状态，阻止关联与回收之间的竞态。 */
   public void validate(Set<Long> attachmentIds, Long coverId) {
     Set<Long> ids = new HashSet<>(attachmentIds);
-    if (coverId != null) ids.add(coverId);
+    if (coverId != null) {
+      ids.add(coverId);
+    }
     // 与回收任务使用同一文件行锁；验证到业务提交期间，附件不能被另一个请求回收。
     for (Long identifier : ids.stream().sorted().toList()) {
       var file = files.lock(identifier).orElseThrow(() -> new BusinessException("文件已删除或不存在"));
       StoredFileContent.active(file);
-      if (!access.has("files:all") && !Objects.equals(file.getOwnerId(), access.current().getId()))
+      if (!access.has("files:all")
+          && !Objects.equals(file.getOwnerId(), access.current().getId())) {
         throw new AccessDeniedException("不能关联其他人的文件");
+      }
     }
-    if (coverId != null) imageType(coverId);
+    if (coverId != null) {
+      imageType(coverId);
+    }
   }
 
   /** 统一读取本地、对象存储或旧数据库正文的签名，封面格式不信任文件名或客户端声明。 */

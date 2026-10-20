@@ -24,16 +24,27 @@ public class LocalFileStorage implements FileStorage {
 
   private Path resolve(String key, boolean create) throws IOException {
     StorageKeys.validate(key);
-    if (create) Files.createDirectories(root);
-    if (Files.isSymbolicLink(root)) throw new IOException("存储根目录不能是符号链接");
+    if (create) {
+      Files.createDirectories(root);
+    }
+    if (Files.isSymbolicLink(root)) {
+      throw new IOException("存储根目录不能是符号链接");
+    }
     Path directory = root.resolve(key.substring(0, 2));
-    if (create) Files.createDirectories(directory);
-    if (Files.isSymbolicLink(directory)) throw new IOException("存储分片不能是符号链接");
+    if (create) {
+      Files.createDirectories(directory);
+    }
+    if (Files.isSymbolicLink(directory)) {
+      throw new IOException("存储分片不能是符号链接");
+    }
     Path target = root.resolve(key).normalize();
-    if (!target.startsWith(root) || Files.isSymbolicLink(target)) throw new IOException("存储路径无效");
+    if (!target.startsWith(root) || Files.isSymbolicLink(target)) {
+      throw new IOException("存储路径无效");
+    }
     if (Files.exists(directory, LinkOption.NOFOLLOW_LINKS)
-        && !directory.toRealPath().startsWith(root.toRealPath()))
+        && !directory.toRealPath().startsWith(root.toRealPath())) {
       throw new IOException("存储路径不在根目录内");
+    }
     return target;
   }
 
@@ -44,7 +55,9 @@ public class LocalFileStorage implements FileStorage {
     Path temporary = Files.createTempFile(destination.getParent(), ".upload-", ".tmp");
     try {
       long actual = Files.copy(content, temporary, StandardCopyOption.REPLACE_EXISTING);
-      if (actual != length) throw new IOException("文件正文长度与上传声明不一致");
+      if (actual != length) {
+        throw new IOException("文件正文长度与上传声明不一致");
+      }
       Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE);
     } finally {
       Files.deleteIfExists(temporary);

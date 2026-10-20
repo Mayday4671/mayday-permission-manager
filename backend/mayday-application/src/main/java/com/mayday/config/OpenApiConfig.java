@@ -1,6 +1,6 @@
 package com.mayday.config;
 
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.util.ModuleSwitches;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
@@ -40,7 +40,9 @@ public class OpenApiConfig {
       operation.setOperationId(
           handler.getBeanType().getSimpleName() + "_" + handler.getMethod().getName());
       PreAuthorize authorization = handler.getMethodAnnotation(PreAuthorize.class);
-      if (authorization != null) operation.addExtension("x-authorization", authorization.value());
+      if (authorization != null) {
+        operation.addExtension("x-authorization", authorization.value());
+      }
       return operation;
     };
   }
@@ -55,11 +57,14 @@ public class OpenApiConfig {
             .forEach(
                 (name, schema) -> {
                   io.swagger.v3.oas.models.media.Schema<?> responseSchema = schema;
-                  if (name.startsWith("ApiResponse"))
+                  if (name.startsWith("ApiResponse")) {
                     responseSchema.setRequired(List.of("success", "data", "message"));
+                  }
                 });
       }
-      if (api.getPaths() == null) return;
+      if (api.getPaths() == null) {
+        return;
+      }
       api.getPaths().entrySet().removeIf(entry -> !modules.pathEnabled(entry.getKey()));
       api.getPaths()
           .forEach(

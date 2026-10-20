@@ -1,6 +1,6 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.service.PortalStructureService;
 import com.mayday.service.PortalStructureService.ChannelDraft;
 import com.mayday.service.PortalStructureService.ChannelView;

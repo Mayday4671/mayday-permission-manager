@@ -1,8 +1,8 @@
 package com.mayday.operations.service;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.util.ModuleSwitches;
 import com.mayday.operations.MessagePublisher;
 import com.mayday.operations.cluster.DurableTasks;
 import com.mayday.operations.mapper.JobExecutionMapper;
@@ -30,6 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Service
 public class JobRunner {
+  private static final String TASK_TYPE = "SCHEDULER";
   private final ScheduledJobMapper jobs;
   private final JobExecutionMapper executions;
   private final MessagePublisher messages;
@@ -41,7 +42,6 @@ public class JobRunner {
   private final DurableTasks durable;
   private final JsonMapper json;
   private final Map<Long, DurableTasks.Lease> active = new ConcurrentHashMap<>();
-  private static final String TASK_TYPE = "SCHEDULER";
 
   public JobRunner(
       ScheduledJobMapper jobs,
@@ -66,10 +66,28 @@ public class JobRunner {
     Map<String, JobHandler> registry = new LinkedHashMap<>();
     for (JobHandler handler : registeredHandlers) {
       if (!handler.key().matches("[A-Z][A-Z0-9_]{0,63}")
-          || registry.putIfAbsent(handler.key(), handler) != null)
+          || registry.putIfAbsent(handler.key(), handler) != null) {
         throw new IllegalStateException("任务处理器名称无效或重复");
+      }
     }
     handlers = Map.copyOf(registry);
+  }
+
+  /** 验证六段Cron并取得下一次时间，不接受脚本、SQL或任意类名作为执行表达式。 */
+  public static LocalDateTime next(String cron) {
+    try {
+      LocalDateTime next = CronExpression.parse(cron).next(BusinessTime.now());
+      if (next == null) {
+        throw new IllegalArgumentException();
+      }
+      return next;
+    } catch (IllegalArgumentException exception) {
+      throw new BusinessException("请输入有效的六段 Cron 表达式，例如 0 */5 * * * *");
+    }
+  }
+
+  private static String summary(String result) {
+    return result == null ? "已完成" : result.substring(0, Math.min(1000, result.length()));
   }
 
   /** 页面候选来自实际注册 Bean，不维护第二份固定处理器列表。 */
@@ -79,20 +97,6 @@ public class JobRunner {
     return options;
   }
 
-  /** 验证六段Cron并取得下一次时间，不接受脚本、SQL或任意类名作为执行表达式。 */
-  public static LocalDateTime next(String cron) {
-    try {
-      LocalDateTime next = CronExpression.parse(cron).next(BusinessTime.now());
-      if (next == null) throw new IllegalArgumentException();
-      return next;
-    } catch (IllegalArgumentException exception) {
-      throw new BusinessException("请输入有效的六段 Cron 表达式，例如 0 */5 * * * *");
-    }
-  }
-
-  /** 冻结注册处理器及计划时间；配置编辑不能替换已经排队的工作正文。 */
-  public record Work(Long jobId, String name, String handler, String expectedDue, boolean manual) {}
-
   /** 先持久化稳定业务键再领取；进程在任何阶段停止都留下可恢复队列，不在业务回滚后重新发起同一期。 */
   public JobExecution run(Long id, boolean manual) {
     return run(id, manual, null);
@@ -100,9 +104,12 @@ public class JobRunner {
 
   /** 页面网络重试可提交稳定标识；同配置同标识的手动请求不会重复执行外部操作。 */
   public JobExecution run(Long id, boolean manual, String requestKey) {
-    if (requestKey != null && !requestKey.matches("[a-zA-Z0-9-]{16,64}"))
+    if (requestKey != null && !requestKey.matches("[a-zA-Z0-9-]{16,64}")) {
       throw new BusinessException("执行提交标识无效");
-    if (!modules.isEnabled("scheduler")) throw new BusinessException("调度模块未启用");
+    }
+    if (!modules.isEnabled("scheduler")) {
+      throw new BusinessException("调度模块未启用");
+    }
     Work work =
         isolatedTransaction()
             .execute(
@@ -111,7 +118,9 @@ public class JobRunner {
                   if (!manual
                       && (!job.isEnabled()
                           || job.getNextRunAt() == null
-                          || job.getNextRunAt().isAfter(BusinessTime.now()))) return null;
+                          || job.getNextRunAt().isAfter(BusinessTime.now()))) {
+                    return null;
+                  }
                   // 手动稳定键不绑定会随首次成功推进的计划时间，否则启用配置的网络重试会被误判为不同内容。
                   return new Work(
                       id,
@@ -120,7 +129,9 @@ public class JobRunner {
                       manual || job.getNextRunAt() == null ? "" : job.getNextRunAt().toString(),
                       manual);
                 });
-    if (work == null) return null;
+    if (work == null) {
+      return null;
+    }
     String key =
         manual
             ? id + ":manual:" + (requestKey == null ? UUID.randomUUID() : requestKey)
@@ -149,30 +160,38 @@ public class JobRunner {
 
   /** 定时扫描也恢复租约过期的手动任务；恢复沿用原业务键和冻结处理器，不产生第二份历史。 */
   public void recover() {
-    if (!modules.isEnabled("scheduler")) return;
+    if (!modules.isEnabled("scheduler")) {
+      return;
+    }
     for (var history : executions.findTop100ByStatusInOrderByIdAsc(List.of("RUNNING", "QUEUED"))) {
-      if (history.getTaskKey() == null) continue;
+      if (history.getTaskKey() == null) {
+        continue;
+      }
       durable.synchronizeTerminal(
           TASK_TYPE,
           history.getTaskKey(),
           terminal -> {
             var current = executions.lock(history.getId()).orElse(null);
-            if (current == null || !List.of("RUNNING", "QUEUED").contains(current.getStatus()))
+            if (current == null || !List.of("RUNNING", "QUEUED").contains(current.getStatus())) {
               return;
+            }
             current.setStatus(terminal);
             current.setResult("FAILED".equals(terminal) ? "恢复尝试已达上限，可明确重试" : "已取消");
             jobs.lock(current.getJobId())
                 .ifPresent(
                     job -> {
                       String dueKey = job.getId() + ":scheduled:" + job.getNextRunAt();
-                      if (current.getTaskKey().equals(dueKey))
+                      if (current.getTaskKey().equals(dueKey)) {
                         job.setNextRunAt(job.isEnabled() ? next(job.getCron()) : null);
+                      }
                     });
           });
     }
     for (int count = 0; count < 10; count++) {
       var lease = durable.claim(TASK_TYPE);
-      if (lease == null) return;
+      if (lease == null) {
+        return;
+      }
       execute(lease);
     }
   }
@@ -180,7 +199,9 @@ public class JobRunner {
   /** 心跳只维护本机实际执行的租约，DB 时钟与随机令牌决定所有权。 */
   @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 5000)
   public void renew() {
-    for (var lease : active.values()) durable.heartbeat(lease);
+    for (var lease : active.values()) {
+      durable.heartbeat(lease);
+    }
   }
 
   private JobExecution execute(DurableTasks.Lease lease) {
@@ -203,7 +224,9 @@ public class JobRunner {
           () -> {
             var job = jobs.lock(work.jobId()).orElseThrow(() -> new BusinessException("任务配置已删除"));
             var handler = handlers.get(work.handler());
-            if (handler == null) throw new BusinessException("处理器已移除，请重新配置任务");
+            if (handler == null) {
+              throw new BusinessException("处理器已移除，请重新配置任务");
+            }
             String result = handler.execute(new JobHandler.Context(lease.key(), lease.attempt()));
             var history = history(lease, work);
             history.setStatus("SUCCESS");
@@ -231,11 +254,14 @@ public class JobRunner {
             history.setResult("执行失败；业务事务已回滚，请查看服务器诊断记录");
             history.setDurationMs((System.nanoTime() - started) / 1000000);
             history.setAttempts(lease.attempt());
-            if (!"QUEUED".equals(nextState))
+            if (!"QUEUED".equals(nextState)) {
               jobs.lock(work.jobId()).ifPresent(job -> advance(job, work));
+            }
             failed[0] = executions.save(history);
           });
-      if (failed[0] != null && "FAILED".equals(failed[0].getStatus())) notifyFailure(failed[0]);
+      if (failed[0] != null && "FAILED".equals(failed[0].getStatus())) {
+        notifyFailure(failed[0]);
+      }
       return failed[0];
     } finally {
       active.remove(lease.id());
@@ -255,20 +281,18 @@ public class JobRunner {
             });
   }
 
-  private static String summary(String result) {
-    return result == null ? "已完成" : result.substring(0, Math.min(1000, result.length()));
-  }
-
   private void advance(com.mayday.operations.model.ScheduledJob job, Work work) {
     String currentDue = job.getNextRunAt() == null ? "" : job.getNextRunAt().toString();
-    if (work.manual() || Objects.equals(currentDue, work.expectedDue()))
+    if (work.manual() || Objects.equals(currentDue, work.expectedDue())) {
       job.setNextRunAt(job.isEnabled() ? next(job.getCron()) : null);
+    }
   }
 
   /** 任务编辑、删除检查真实队列历史；不允许页面把已运行处理器改成另一个处理器。 */
   public void requireIdle(Long jobId) {
-    if (executions.existsByJobIdAndStatusIn(jobId, List.of("RUNNING", "QUEUED")))
+    if (executions.existsByJobIdAndStatusIn(jobId, List.of("RUNNING", "QUEUED"))) {
       throw new BusinessException("任务正在执行或等待恢复，请先完成或取消执行");
+    }
   }
 
   /** 取消作废原租约；工作器下一次提交会回滚，不承诺撤销已发生的外部副作用。 */
@@ -285,7 +309,9 @@ public class JobRunner {
               current.setResult("已取消，未提交的业务结果已作废");
               jobs.lock(current.getJobId())
                   .ifPresent(job -> job.setNextRunAt(job.isEnabled() ? next(job.getCron()) : null));
-            })) throw new BusinessException("执行状态已变化，请刷新");
+            })) {
+      throw new BusinessException("执行状态已变化，请刷新");
+    }
     return executions.findById(executionId).orElseThrow();
   }
 
@@ -302,28 +328,38 @@ public class JobRunner {
               current.setStatus("QUEUED");
               current.setResult("等待恢复");
               current.setFailureNotifiedAt(null);
-            })) throw new BusinessException("执行状态已变化，请刷新");
+            })) {
+      throw new BusinessException("执行状态已变化，请刷新");
+    }
     return executions.findById(executionId).orElseThrow();
   }
 
   /** 每批最近一天最早100条未完成提醒，已投递项退出队列，稳定事件键及行锁防重复并避免旧记录饥饿。 */
   @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 30000, initialDelay = 30000)
   public void retryFailureNotifications() {
-    if (!modules.isEnabled("scheduler") || !modules.isEnabled("notifications")) return;
+    if (!modules.isEnabled("scheduler") || !modules.isEnabled("notifications")) {
+      return;
+    }
     for (JobExecution failed :
         executions.findTop100ByStatusAndFailureNotifiedAtIsNullAndCreatedAtAfterOrderByIdAsc(
-            "FAILED", BusinessTime.now().minusDays(1))) notifyFailure(failed);
+            "FAILED", BusinessTime.now().minusDays(1))) {
+      notifyFailure(failed);
+    }
   }
 
   /** 投递与执行结果分开提交，接收人失效或数据库暂不可用只影响提醒，并保留下一轮重试机会。 */
   private void notifyFailure(JobExecution execution) {
-    if (!modules.isEnabled("notifications")) return;
+    if (!modules.isEnabled("notifications")) {
+      return;
+    }
     try {
       isolatedTransaction()
           .executeWithoutResult(
               status -> {
                 var pending = executions.lock(execution.getId()).orElse(null);
-                if (pending == null || pending.getFailureNotifiedAt() != null) return;
+                if (pending == null || pending.getFailureNotifiedAt() != null) {
+                  return;
+                }
                 var job = jobs.findById(execution.getJobId()).orElse(null);
                 var recipient =
                     job == null || job.getAlertUserId() == null
@@ -357,4 +393,7 @@ public class JobRunner {
     transaction.setTimeout(30);
     return transaction;
   }
+
+  /** 冻结注册处理器及计划时间；配置编辑不能替换已经排队的工作正文。 */
+  public record Work(Long jobId, String name, String handler, String expectedDue, boolean manual) {}
 }

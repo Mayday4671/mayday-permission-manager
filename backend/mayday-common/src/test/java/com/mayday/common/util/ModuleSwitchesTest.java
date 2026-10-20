@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.util;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -46,7 +46,9 @@ class ModuleSwitchesTest {
           "/api/operations/messages/1/attachments/3",
           "/api/crawler/tasks/1/images/2",
           "/api/relay/start"
-        }) assertFalse(modules.pathEnabled(path), path);
+        }) {
+      assertFalse(modules.pathEnabled(path), path);
+    }
     assertFalse(modules.pathEnabled("/api/agentscope/conversations"));
     assertFalse(modules.permissionEnabled("requests:approve"));
     assertFalse(modules.permissionEnabled("notices:publish"));

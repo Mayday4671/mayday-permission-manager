@@ -1,9 +1,9 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.operations.OperationSupport;
 import com.mayday.operations.mapper.JobExecutionMapper;
 import com.mayday.operations.mapper.ScheduledJobMapper;
@@ -40,17 +40,6 @@ public class JobController {
   private final com.mayday.system.mapper.UserMapper users;
   private final com.mayday.operations.service.AlertRecipients alertRecipients;
 
-  /** 配置提交白名单，处理器名称来自注册Bean，Cron和接收人由服务验证；修改时版本必须与当前记录一致。 */
-  @Schema(name = "ScheduledJobEdit")
-  public record Edit(
-      @NotBlank @Size(max = 100) String name,
-      @NotBlank @Size(max = 64) String handler,
-      @NotBlank @Size(max = 100) String cron,
-      @Size(max = 500) String description,
-      boolean enabled,
-      Long alertUserId,
-      Long version) {}
-
   /** 新业务实现 JobHandler 后自动出现在候选中；不允许页面传任意类名或脚本。 */
   @GetMapping("/scheduler/handlers")
   public ApiResponse<java.util.Map<String, String>> handlers() {
@@ -78,8 +67,9 @@ public class JobController {
     com.mybatisflex.core.query.QueryWrapper filter =
         com.mybatisflex.core.query.QueryWrapper.create()
             .where(SearchPredicates.contains("name", keyword));
-    if (enabled != null)
+    if (enabled != null) {
       filter.and(new com.mybatisflex.core.query.QueryColumn("enabled").eq(enabled));
+    }
     return ApiResponse.ok(
         PageResult.from(jobs.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
@@ -101,13 +91,15 @@ public class JobController {
   }
 
   private ScheduledJob save(Long id, Edit req) {
-    if (!runner.handlerOptions().containsKey(req.handler()))
+    if (!runner.handlerOptions().containsKey(req.handler())) {
       throw new BusinessException("请选择已注册的处理器");
-    if (req.alertUserId() != null)
+    }
+    if (req.alertUserId() != null) {
       users
           .findById(req.alertUserId())
           .filter(user -> access.hasFor(user, "scheduler:view"))
           .orElseThrow(() -> new BusinessException("提醒接收人需具有调度查看权限"));
+    }
     var next = JobRunner.next(req.cron());
     var job =
         id == null
@@ -171,9 +163,22 @@ public class JobController {
     com.mybatisflex.core.query.QueryWrapper filter =
         com.mybatisflex.core.query.QueryWrapper.create()
             .where(SearchPredicates.contains("job_name", keyword));
-    if (jobId != null) filter.and(new com.mybatisflex.core.query.QueryColumn("job_id").eq(jobId));
+    if (jobId != null) {
+      filter.and(new com.mybatisflex.core.query.QueryColumn("job_id").eq(jobId));
+    }
     return ApiResponse.ok(
         PageResult.from(
             executions.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
+
+  /** 配置提交白名单，处理器名称来自注册Bean，Cron和接收人由服务验证；修改时版本必须与当前记录一致。 */
+  @Schema(name = "ScheduledJobEdit")
+  public record Edit(
+      @NotBlank @Size(max = 100) String name,
+      @NotBlank @Size(max = 64) String handler,
+      @NotBlank @Size(max = 100) String cron,
+      @Size(max = 500) String description,
+      boolean enabled,
+      Long alertUserId,
+      Long version) {}
 }

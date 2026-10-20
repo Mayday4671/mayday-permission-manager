@@ -1,8 +1,8 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.PageResult;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.content.mapper.NoticeMapper;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.AuditQueryService;
@@ -63,7 +63,7 @@ public class DashboardController {
                     .and(new com.mybatisflex.core.query.QueryColumn("published").eq(true)))
             : null);
     List<Map<String, Object>> trend = new ArrayList<>();
-    if (access.has("logs:view"))
+    if (access.has("logs:view")) {
       for (int dayOffset = 6; dayOffset >= 0; dayOffset--) {
         LocalDate date = BusinessTime.today().minusDays(dayOffset);
         trend.add(
@@ -82,6 +82,7 @@ public class DashboardController {
                                     new com.mybatisflex.core.query.QueryColumn("created_at")
                                         .lt(date.plusDays(1).atStartOfDay()))))));
       }
+    }
     result.put("trend", trend);
     result.put(
         "recentLogs",

@@ -1,6 +1,6 @@
 package com.mayday.crawler;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -18,18 +18,6 @@ import tools.jackson.databind.json.JsonMapper;
 /** 纯解析器：不发请求。页码模板、下一页和游标对列表与每篇详情复用相同逻辑。 */
 public final class PageExtractor {
   private static final JsonMapper JSON = JsonMapper.builder().build();
-
-  /** 同一页面的文章与去重链接结果；只输出通过任务域名规则检查的绝对地址。 */
-  public record Links(
-      String title,
-      List<String> images,
-      List<String> details,
-      List<String> pages,
-      ArticleExtractor.Text article) {
-    public Links(String title, List<String> images, List<String> details, List<String> pages) {
-      this(title, images, details, pages, null);
-    }
-  }
 
   private PageExtractor() {}
 
@@ -55,33 +43,47 @@ public final class PageExtractor {
         article = ArticleExtractor.json(json, rules.articleRule());
         title = article.title();
       }
-      if (!detail && rules.enterDetails())
+      if (!detail && rules.enterDetails()) {
         addJson(details, json, p.detailsPointer(), p.urlPointer(), base);
-      else addJson(images, json, p.imagesPointer(), p.urlPointer(), base);
-      if (p.mode() == CrawlRules.Mode.NEXT || p.mode() == CrawlRules.Mode.LINKS)
+      } else {
+        addJson(images, json, p.imagesPointer(), p.urlPointer(), base);
+      }
+      if (p.mode() == CrawlRules.Mode.NEXT || p.mode() == CrawlRules.Mode.LINKS) {
         addJson(pages, json, p.nextPointer(), "", base);
+      }
       if (p.mode() == CrawlRules.Mode.NEXT && pages.size() > 1) {
         String first = pages.iterator().next();
         pages.clear();
         pages.add(first);
       }
     } else {
-      if (!response.contentType().toLowerCase(Locale.ROOT).contains("html"))
+      if (!response.contentType().toLowerCase(Locale.ROOT).contains("html")) {
         throw new BusinessException("页面不是 HTML，请检查地址或选择 JSON 模式");
+      }
       // Jsoup 根据 BOM / meta 自动识别编码，兼容 UTF-8 与 GBK 旧站。
       Document doc = Jsoup.parse(new ByteArrayInputStream(response.body()), null, base.toString());
       title = doc.title();
-      if (collectArticle) article = ArticleExtractor.html(doc, rules.articleRule());
+      if (collectArticle) {
+        article = ArticleExtractor.html(doc, rules.articleRule());
+      }
       if (!detail && rules.enterDetails()) {
-        for (Element e : doc.select(rules.detailSelector())) add(details, base, e.attr("href"));
+        for (Element e : doc.select(rules.detailSelector())) {
+          add(details, base, e.attr("href"));
+        }
       } else {
         for (Element e : doc.select(rules.imageSelector())) {
           for (String attribute : rules.imageAttributes()) {
             String raw = e.attr(attribute);
-            if (raw.isBlank() || raw.startsWith("data:")) continue;
+            if (raw.isBlank() || raw.startsWith("data:")) {
+              continue;
+            }
             // srcset 选择描述符最大的候选，避免把缩略图与原图重复入库。
-            if (attribute.endsWith("srcset")) raw = largestSource(raw);
-            if (add(images, base, raw)) break;
+            if (attribute.endsWith("srcset")) {
+              raw = largestSource(raw);
+            }
+            if (add(images, base, raw)) {
+              break;
+            }
           }
         }
       }
@@ -89,13 +91,17 @@ public final class PageExtractor {
         for (Element e : doc.select(p.selector())) {
           if (e.hasClass("disabled")
               || e.hasAttr("disabled")
-              || "true".equals(e.attr("aria-disabled"))) continue;
+              || "true".equals(e.attr("aria-disabled"))) {
+            continue;
+          }
           add(pages, base, e.attr("href"));
-          if (p.mode() == CrawlRules.Mode.NEXT && !pages.isEmpty()) break;
+          if (p.mode() == CrawlRules.Mode.NEXT && !pages.isEmpty()) {
+            break;
+          }
         }
       }
     }
-    if (p.mode() == CrawlRules.Mode.TEMPLATE && ordinal + 1 < p.maxPages())
+    if (p.mode() == CrawlRules.Mode.TEMPLATE && ordinal + 1 < p.maxPages()) {
       add(
           pages,
           base,
@@ -104,12 +110,13 @@ public final class PageExtractor {
               URI.create(rootUrl),
               String.valueOf(p.start() + (ordinal + 1) * p.step()),
               ""));
+    }
     if (p.mode() == CrawlRules.Mode.CURSOR && ordinal + 1 < p.maxPages()) {
       JsonNode cursor = json.at(p.nextPointer());
       if (cursor.isValueNode()
           && !cursor.isNull()
           && !cursor.asText().isBlank()
-          && cursor.asText().length() <= 1000)
+          && cursor.asText().length() <= 1000) {
         add(
             pages,
             base,
@@ -118,8 +125,11 @@ public final class PageExtractor {
                 URI.create(rootUrl),
                 "",
                 URLEncoder.encode(cursor.asText(), StandardCharsets.UTF_8)));
+      }
     }
-    if (p.mode() == CrawlRules.Mode.SINGLE || ordinal + 1 >= p.maxPages()) pages.clear();
+    if (p.mode() == CrawlRules.Mode.SINGLE || ordinal + 1 >= p.maxPages()) {
+      pages.clear();
+    }
     return new Links(
         title.length() > 200 ? title.substring(0, 200) : title,
         checked(images, rules, true),
@@ -130,23 +140,36 @@ public final class PageExtractor {
 
   private static void addJson(
       Set<String> target, JsonNode root, String pointer, String urlPointer, URI base) {
-    if (pointer == null || pointer.isBlank()) return;
+    if (pointer == null || pointer.isBlank()) {
+      return;
+    }
     JsonNode selected = root.at(pointer);
     if (selected.isArray()) {
-      for (JsonNode node : selected) addNode(target, node, urlPointer, base);
-    } else addNode(target, selected, urlPointer, base);
+      for (JsonNode node : selected) {
+        addNode(target, node, urlPointer, base);
+      }
+    } else {
+      addNode(target, selected, urlPointer, base);
+    }
   }
 
   private static void addNode(Set<String> target, JsonNode node, String pointer, URI base) {
-    if (node.isObject() && pointer != null && !pointer.isBlank()) node = node.at(pointer);
-    if (node.isString()) add(target, base, node.asText());
+    if (node.isObject() && pointer != null && !pointer.isBlank()) {
+      node = node.at(pointer);
+    }
+    if (node.isString()) {
+      add(target, base, node.asText());
+    }
   }
 
   private static boolean add(Set<String> target, URI base, String value) {
-    if (value == null || value.isBlank() || target.size() >= 1000 || value.startsWith("#"))
+    if (value == null || value.isBlank() || target.size() >= 1000 || value.startsWith("#")) {
       return false;
+    }
     String resolved = WebAddress.resolve(base, value);
-    if (resolved == null) return false;
+    if (resolved == null) {
+      return false;
+    }
     target.add(resolved);
     return true;
   }
@@ -170,14 +193,17 @@ public final class PageExtractor {
     double largest = -1;
     for (String part : srcset.split(",")) {
       String[] bits = part.trim().split("\\s+");
-      if (bits.length == 0) continue;
+      if (bits.length == 0) {
+        continue;
+      }
       double score = 1;
-      if (bits.length > 1)
+      if (bits.length > 1) {
         try {
           score = Double.parseDouble(bits[1].replaceAll("[wx]$", ""));
         } catch (NumberFormatException ignored) {
           continue;
         }
+      }
       if (score > largest) {
         largest = score;
         selected = bits[0];
@@ -200,5 +226,17 @@ public final class PageExtractor {
         .replace("{origin}", root.getScheme() + "://" + root.getRawAuthority())
         .replace("{page}", page)
         .replace("{cursor}", cursor);
+  }
+
+  /** 同一页面的文章与去重链接结果；只输出通过任务域名规则检查的绝对地址。 */
+  public record Links(
+      String title,
+      List<String> images,
+      List<String> details,
+      List<String> pages,
+      ArticleExtractor.Text article) {
+    public Links(String title, List<String> images, List<String> details, List<String> pages) {
+      this(title, images, details, pages, null);
+    }
   }
 }

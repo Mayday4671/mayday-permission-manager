@@ -1,8 +1,8 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.operations.NotificationService;
 import com.mayday.operations.mapper.DeliveryMapper;
 import com.mayday.operations.mapper.NotificationMapper;
@@ -67,7 +67,9 @@ public class MessageController {
     access.require("notifications:view");
     QueryWrapper filter = service.manageable();
     QueryCondition displayState = NotificationService.state(status);
-    if (displayState != null) filter.and(displayState);
+    if (displayState != null) {
+      filter.and(displayState);
+    }
     filter.and(SearchPredicates.contains("title", keyword));
     return ApiResponse.ok(
         PageResult.of(

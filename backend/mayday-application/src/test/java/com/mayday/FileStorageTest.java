@@ -13,9 +13,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.FileUsage;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.util.FileUsage;
 import com.mayday.operations.mapper.FileDirectoryMapper;
 import com.mayday.operations.mapper.FilePayloadMapper;
 import com.mayday.operations.mapper.NotificationMapper;
@@ -55,6 +55,25 @@ import tools.jackson.databind.json.JsonMapper;
 /** 存储边界、旧数据兼容和文件所有者授权测试；目录唯一键和业务引用行锁另外走真实 MySQL 验收。 */
 class FileStorageTest {
   @TempDir Path temporary;
+
+  private static StoredFile file(Long id, Long ownerId) {
+    StoredFile file = new StoredFile();
+    file.setId(id);
+    file.setOwnerId(ownerId);
+    file.setName("proof.txt");
+    file.setContentType("application/octet-stream");
+    file.setSize(3);
+    return file;
+  }
+
+  private static FileDirectory directory(Long id, Long parentId, Long ownerId) {
+    FileDirectory directory = new FileDirectory();
+    directory.setId(id);
+    directory.setParentId(parentId);
+    directory.setOwnerId(ownerId);
+    directory.setVersion(0L);
+    return directory;
+  }
 
   private StorageSettings settings() {
     return new StorageSettings("LOCAL", temporary.toString(), 10, "", "us-east-1", "", "", "");
@@ -111,10 +130,11 @@ class FileStorageTest {
             "https://example.org/path",
             "https://example.org?token=secret",
             "https://example.org#secret",
-            "https://"))
+            "https://")) {
       assertThrows(
           IllegalArgumentException.class,
           () -> new StorageSettings("S3", ".", 10, endpoint, "region", "bucket", "key", "secret"));
+    }
   }
 
   @Test
@@ -264,31 +284,13 @@ class FileStorageTest {
               service.upload(
                   new MockMultipartFile("file", "proof.txt", "text/plain", new byte[] {1, 2}),
                   null));
-      for (var synchronization : TransactionSynchronizationManager.getSynchronizations())
+      for (var synchronization : TransactionSynchronizationManager.getSynchronizations()) {
         synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+      }
       verify(storage).delete(any());
     } finally {
       TransactionSynchronizationManager.clearSynchronization();
     }
-  }
-
-  private static StoredFile file(Long id, Long ownerId) {
-    StoredFile file = new StoredFile();
-    file.setId(id);
-    file.setOwnerId(ownerId);
-    file.setName("proof.txt");
-    file.setContentType("application/octet-stream");
-    file.setSize(3);
-    return file;
-  }
-
-  private static FileDirectory directory(Long id, Long parentId, Long ownerId) {
-    FileDirectory directory = new FileDirectory();
-    directory.setId(id);
-    directory.setParentId(parentId);
-    directory.setOwnerId(ownerId);
-    directory.setVersion(0L);
-    return directory;
   }
 
   /** 只模拟授权与仓库边界，不用测试绕过真实生产登录或修改日常数据库。 */

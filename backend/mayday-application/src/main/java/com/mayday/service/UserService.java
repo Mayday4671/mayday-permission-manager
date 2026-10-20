@@ -1,10 +1,10 @@
 package com.mayday.service;
 
 import com.mayday.agentscope.AgentScopeAccountCleanup;
-import com.mayday.common.BaseEntity;
-import com.mayday.common.BusinessException;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.BaseEntity;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
 import com.mayday.identity.mapper.ExternalIdentityMapper;
 import com.mayday.identity.mapper.IdentityChallengeMapper;
 import com.mayday.identity.mapper.MfaCredentialMapper;
@@ -58,6 +58,36 @@ public class UserService {
   private final MfaCredentialMapper mfaStore;
   private final ExternalIdentityMapper externalIdentities;
 
+  /** 审计白名单不包含姓名、电话、邮箱或密码摘要；角色编码排序后再比较，避免集合顺序噪声。 */
+  private static Map<String, Object> auditSnapshot(SysUser user) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("账号", user.getUsername());
+    snapshot.put("启用", user.isEnabled());
+    snapshot.put("部门ID", user.getDepartmentId());
+    snapshot.put("角色", user.getRoles().stream().map(SysRole::getCode).sorted().toList());
+    snapshot.put("岗位ID", user.getPostIds().stream().sorted().toList());
+    return snapshot;
+  }
+
+  /** 要求10至64字符且包含字母与数字，同时限制UTF-8编码不超过BCrypt的72字节，避免超长密码被静默截断。 */
+  public static void validatePassword(String password) {
+    if (password == null
+        || password.length() < 10
+        || password.length() > 64
+        || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72
+        || !password.matches(".*[A-Za-z].*")
+        || !password.matches(".*[0-9].*")) {
+      throw new BusinessException("密码需为 10–64 位，且同时包含字母和数字");
+    }
+  }
+
+  /** 更新前必须提交当前乐观锁版本；缺失或过期统一抛出冲突，禁止用最后一次提交覆盖其他人的修改。 */
+  public static void version(BaseEntity entity, Long version) {
+    if (version == null || !Objects.equals(entity.getVersion(), version)) {
+      throw new org.springframework.dao.OptimisticLockingFailureException("版本冲突");
+    }
+  }
+
   /** 将账号转换为页面DTO，部门失效显示未分配；邮箱和电话按当前操作者的独立字段读取权限脱敏。 */
   public UserView view(SysUser u) {
     String dept =
@@ -77,8 +107,12 @@ public class UserService {
         filter,
         SearchPredicates.contains("username", keyword),
         SearchPredicates.contains("nickname", keyword));
-    if (enabled != null) filter.and(new QueryColumn("enabled").eq(enabled));
-    if (departmentId != null) filter.and(new QueryColumn("department_id").eq(departmentId));
+    if (enabled != null) {
+      filter.and(new QueryColumn("enabled").eq(enabled));
+    }
+    if (departmentId != null) {
+      filter.and(new QueryColumn("department_id").eq(departmentId));
+    }
     return PageResult.from(
         users.paginate(PageResult.request(page, size), filter.orderBy("id desc")).map(this::view));
   }
@@ -88,8 +122,9 @@ public class UserService {
     SysUser u = users.findById(id).orElseThrow(() -> new BusinessException("用户不存在"));
     access.checkData("users", u.getId(), u.getDepartmentId());
     access.checkGrant(u.getRoles());
-    if ("admin".equals(u.getUsername()) && !access.admin())
+    if ("admin".equals(u.getUsername()) && !access.admin()) {
       throw new AccessDeniedException("不能操作超级管理员");
+    }
     return u;
   }
 
@@ -97,40 +132,51 @@ public class UserService {
   public UserView save(Long id, UserRequest req) {
     SysUser u = id == null ? new SysUser() : manageable(id);
     Map<String, Object> before = id == null ? Map.of() : auditSnapshot(u);
-    if (id != null) version(u, req.version());
-    if (id != null && !u.getUsername().equals(req.username()))
+    if (id != null) {
+      version(u, req.version());
+    }
+    if (id != null && !u.getUsername().equals(req.username())) {
       throw new BusinessException("用户名创建后不可修改");
+    }
     if (id != null
         && ("admin".equals(u.getUsername()) || id.equals(access.current().getId()))
-        && !req.enabled()) throw new BusinessException("不能停用当前账号或初始管理员");
+        && !req.enabled()) {
+      throw new BusinessException("不能停用当前账号或初始管理员");
+    }
     Set<Long> originalRoles = new HashSet<>();
     u.getRoles().forEach(r -> originalRoles.add(r.getId()));
     if (!originalRoles.equals(req.roleIds())) {
       access.require("users:assign");
       Set<SysRole> assigned = new HashSet<>(roles.findAllById(req.roleIds()));
       if (assigned.size() != req.roleIds().size()
-          || assigned.stream().anyMatch(r -> !r.isEnabled()))
+          || assigned.stream().anyMatch(r -> !r.isEnabled())) {
         throw new BusinessException("请选择有效角色");
+      }
       access.checkGrant(assigned);
       if ("admin".equals(u.getUsername())
-          && assigned.stream().noneMatch(r -> "admin".equals(r.getCode())))
+          && assigned.stream().noneMatch(r -> "admin".equals(r.getCode()))) {
         throw new BusinessException("初始管理员必须保留管理员角色");
-      if (Objects.equals(id, access.current().getId()))
+      }
+      if (Objects.equals(id, access.current().getId())) {
         throw new BusinessException("请由其他管理员调整您的角色");
+      }
       u.setRoles(assigned);
     }
     if (req.departmentId() != null) {
       SystemEntry department =
           entries.findById(req.departmentId()).orElseThrow(() -> new BusinessException("部门不存在"));
-      if (!"departments".equals(department.getKind()) || !department.isEnabled())
+      if (!"departments".equals(department.getKind()) || !department.isEnabled()) {
         throw new BusinessException("请选择有效部门");
+      }
     }
     if (!access.admin() && !Objects.equals(u.getDepartmentId(), req.departmentId())) {
       // 调整部门相当于调整部门范围授权，不允许普通用户管理员借此移动高权限资源。
       throw new AccessDeniedException("创建部门账号或调整所属部门需要超级管理员");
     }
     if (id == null) {
-      if (!"ALL".equals(access.scope("users"))) throw new AccessDeniedException("当前用户数据范围不允许创建账号");
+      if (!"ALL".equals(access.scope("users"))) {
+        throw new AccessDeniedException("当前用户数据范围不允许创建账号");
+      }
       validatePassword(req.password());
       u.setPasswordHash(encoder.encode(req.password()));
     }
@@ -138,20 +184,25 @@ public class UserService {
     if (req.postIds() != null) {
       var posts = entries.findAllById(req.postIds());
       if (posts.size() != req.postIds().size()
-          || posts.stream().anyMatch(p -> !p.getKind().equals("posts") || !p.isEnabled()))
+          || posts.stream().anyMatch(p -> !p.getKind().equals("posts") || !p.isEnabled())) {
         throw new BusinessException("请选择有效岗位");
+      }
       u.setPostIds(new HashSet<>(req.postIds()));
     }
     u.setNickname(req.nickname());
     u.setDepartmentId(req.departmentId());
     u.setEnabled(req.enabled());
     // 无查看权限的旧客户端可能回传 null，保持原值；不允许借普通编辑提交新的受限字段值。
-    if (contactPermission("email", "write")) u.setEmail(req.email());
-    else if (req.email() != null && !Objects.equals(req.email(), u.getEmail()))
+    if (contactPermission("email", "write")) {
+      u.setEmail(req.email());
+    } else if (req.email() != null && !Objects.equals(req.email(), u.getEmail())) {
       throw new AccessDeniedException("没有修改邮箱的权限");
-    if (contactPermission("phone", "write")) u.setPhone(req.phone());
-    else if (req.phone() != null && !Objects.equals(req.phone(), u.getPhone()))
+    }
+    if (contactPermission("phone", "write")) {
+      u.setPhone(req.phone());
+    } else if (req.phone() != null && !Objects.equals(req.phone(), u.getPhone())) {
       throw new AccessDeniedException("没有修改电话的权限");
+    }
     if (id != null && !req.enabled()) {
       tokens.revokeUser(id);
       // 停用必须同时撤销尚未完成的首因素证明，重新启用不能恢复原 MFA/OIDC 绑定挑战。
@@ -167,9 +218,12 @@ public class UserService {
   /** 检查目标数据范围和角色授权等级后删除账号，保护当前账号、初始管理员和部门负责人；同步撤销会话并记录安全审计。 */
   public void delete(Long id) {
     SysUser u = manageable(id);
-    if (entries.existsByLeaderId(id)) throw new BusinessException("此账号是部门负责人，请先调整部门负责人");
-    if ("admin".equals(u.getUsername()) || id.equals(access.current().getId()))
+    if (entries.existsByLeaderId(id)) {
+      throw new BusinessException("此账号是部门负责人，请先调整部门负责人");
+    }
+    if ("admin".equals(u.getUsername()) || id.equals(access.current().getId())) {
       throw new BusinessException("不能删除初始管理员或当前账号");
+    }
     tokens.revokeUser(id);
     changeAudit.record("用户", id, "删除账号", auditSnapshot(u), Map.of());
     // 通过既有数据范围、角色等级与保护账号检查后，精确清理该账号的身份材料；不删除其他业务历史。
@@ -186,12 +240,15 @@ public class UserService {
     Set<Long> ids = new HashSet<>();
     List<SysUser> selected = new ArrayList<>();
     for (var target : req.rows()) {
-      if (!ids.add(target.id())) throw new BusinessException("批量操作含重复账号");
+      if (!ids.add(target.id())) {
+        throw new BusinessException("批量操作含重复账号");
+      }
       var user = manageable(target.id());
       version(user, target.version());
       if (!req.enabled()
-          && ("admin".equals(user.getUsername()) || target.id().equals(access.current().getId())))
+          && ("admin".equals(user.getUsername()) || target.id().equals(access.current().getId()))) {
         throw new BusinessException("不能停用当前账号或初始管理员");
+      }
       selected.add(user);
     }
     for (var user : selected) {
@@ -217,35 +274,8 @@ public class UserService {
     changeAudit.record("用户", id, "重置登录凭据", Map.of("凭据状态", "原凭据"), Map.of("凭据状态", "已重置"));
   }
 
-  /** 审计白名单不包含姓名、电话、邮箱或密码摘要；角色编码排序后再比较，避免集合顺序噪声。 */
-  private static Map<String, Object> auditSnapshot(SysUser user) {
-    Map<String, Object> snapshot = new LinkedHashMap<>();
-    snapshot.put("账号", user.getUsername());
-    snapshot.put("启用", user.isEnabled());
-    snapshot.put("部门ID", user.getDepartmentId());
-    snapshot.put("角色", user.getRoles().stream().map(SysRole::getCode).sorted().toList());
-    snapshot.put("岗位ID", user.getPostIds().stream().sorted().toList());
-    return snapshot;
-  }
-
-  /** 要求10至64字符且包含字母与数字，同时限制UTF-8编码不超过BCrypt的72字节，避免超长密码被静默截断。 */
-  public static void validatePassword(String password) {
-    if (password == null
-        || password.length() < 10
-        || password.length() > 64
-        || password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72
-        || !password.matches(".*[A-Za-z].*")
-        || !password.matches(".*[0-9].*")) throw new BusinessException("密码需为 10–64 位，且同时包含字母和数字");
-  }
-
   /** 保留旧版整组联系方式授权的语义，同时允许新角色分别配置各字段读写。 */
   private boolean contactPermission(String field, String operation) {
     return access.has("users:sensitive") || access.has("users:" + field + "-" + operation);
-  }
-
-  /** 更新前必须提交当前乐观锁版本；缺失或过期统一抛出冲突，禁止用最后一次提交覆盖其他人的修改。 */
-  public static void version(BaseEntity entity, Long version) {
-    if (version == null || !Objects.equals(entity.getVersion(), version))
-      throw new org.springframework.dao.OptimisticLockingFailureException("版本冲突");
   }
 }

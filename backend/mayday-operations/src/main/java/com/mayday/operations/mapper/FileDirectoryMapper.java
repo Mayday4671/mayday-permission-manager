@@ -1,6 +1,6 @@
 package com.mayday.operations.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.operations.model.FileDirectory;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -37,7 +37,9 @@ public interface FileDirectoryMapper extends EntityMapper<FileDirectory> {
             .where(new QueryColumn("owner_id").eq(ownerId))
             .and(new QueryColumn("parent_id").eq(parentId))
             .and(new QueryColumn("name").eq(name));
-    if (id != null) filter.and(new QueryColumn("id").ne(id));
+    if (id != null) {
+      filter.and(new QueryColumn("id").ne(id));
+    }
     return selectCountByQuery(filter) > 0;
   }
 

@@ -1,7 +1,7 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.PageResult;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.service.UserService;
 import com.mayday.web.Contracts.ResetPasswordRequest;
 import com.mayday.web.Contracts.UserRequest;

@@ -35,34 +35,6 @@ import java.util.concurrent.TimeUnit;
 public final class UdpRelay implements AutoCloseable {
   private volatile Session session;
 
-  /** 读取最近发布的不可变统计，不进入网络线程；尚未启动时返回停止状态的空快照。 */
-  public RelaySnapshot snapshot() {
-    Session value = session;
-    return value == null ? RelaySnapshot.idle() : value.snapshot;
-  }
-
-  /** 串行启动单路转发，拒绝覆盖运行中的会话；监听开放前必须完成缓冲和发送通道校验。 */
-  public synchronized RelaySnapshot start(RelayConfig config) {
-    if (session != null && session.state.equals("RUNNING"))
-      throw new IllegalStateException("转发正在运行，请先停止");
-    if (session != null) session.stop();
-    Session next = new Session(config);
-    session = next;
-    next.start();
-    return next.snapshot;
-  }
-
-  /** 停止接收并等待已提交发送结果归账；保留最终快照供页面核对本次运行计数。 */
-  public synchronized RelaySnapshot stop() {
-    if (session != null) session.stop();
-    return snapshot();
-  }
-
-  @Override
-  public void close() {
-    stop();
-  }
-
   /**
    * 转发前统一处理 UDP 负载中的业务字段；后续其他字段的修改集中在此方法扩展。 当前规则：按负载第一个字节为第 1 字节，第 3、4 字节分别替换为 0x03、0x01。 这里处理的是
    * UDP 负载，不包含 IP 头或 UDP 头；其余字节和负载长度保持不变。
@@ -77,6 +49,39 @@ public final class UdpRelay implements AutoCloseable {
     int base = data.readerIndex();
     data.setByte(base + 2, 0x03);
     data.setByte(base + 3, 0x01);
+  }
+
+  /** 读取最近发布的不可变统计，不进入网络线程；尚未启动时返回停止状态的空快照。 */
+  public RelaySnapshot snapshot() {
+    Session value = session;
+    return value == null ? RelaySnapshot.idle() : value.snapshot;
+  }
+
+  /** 串行启动单路转发，拒绝覆盖运行中的会话；监听开放前必须完成缓冲和发送通道校验。 */
+  public synchronized RelaySnapshot start(RelayConfig config) {
+    if (session != null && session.state.equals("RUNNING")) {
+      throw new IllegalStateException("转发正在运行，请先停止");
+    }
+    if (session != null) {
+      session.stop();
+    }
+    Session next = new Session(config);
+    session = next;
+    next.start();
+    return next.snapshot;
+  }
+
+  /** 停止接收并等待已提交发送结果归账；保留最终快照供页面核对本次运行计数。 */
+  public synchronized RelaySnapshot stop() {
+    if (session != null) {
+      session.stop();
+    }
+    return snapshot();
+  }
+
+  @Override
+  public void close() {
+    stop();
   }
 
   /** 一次运行独占单个 EventLoop 和收发通道；可变计数只在该线程写入，外部只读快照。 */
@@ -114,12 +119,31 @@ public final class UdpRelay implements AutoCloseable {
 
     Session(RelayConfig config) {
       this.config = config;
-      if (config.transportMode().equals("EPOLL") && !Epoll.isAvailable())
+      if (config.transportMode().equals("EPOLL") && !Epoll.isAvailable()) {
         throw new IllegalArgumentException("当前平台 EPOLL 不可用，请选择 NIO 或 AUTO");
+      }
       epoll = !config.transportMode().equals("NIO") && Epoll.isAvailable();
       var factory = new DefaultThreadFactory("udp-relay", true);
       group = epoll ? new EpollEventLoopGroup(1, factory) : new NioEventLoopGroup(1, factory);
       loop = group.next();
+    }
+
+    static String message(Throwable error) {
+      if (error == null) {
+        return "发送失败";
+      }
+      String text = error.getMessage();
+      return (text == null ? error.getClass().getSimpleName() : text)
+          .substring(
+              0, Math.min(300, (text == null ? error.getClass().getSimpleName() : text).length()));
+    }
+
+    static String format(InetSocketAddress address) {
+      if (address == null) {
+        return "";
+      }
+      String ip = address.getAddress().getHostAddress();
+      return (ip.contains(":") ? "[" + ip + "]" : ip) + ":" + address.getPort();
     }
 
     Bootstrap bootstrap(boolean receiver) {
@@ -140,7 +164,9 @@ public final class UdpRelay implements AutoCloseable {
           .option(ChannelOption.SO_SNDBUF, config.sendBufferMiB() * 1024 * 1024)
           // 先绑定、校验实际缓冲，最后才启用接收，禁止缓冲被系统裁小后仍带病开流。
           .option(ChannelOption.AUTO_READ, false);
-      if (epoll) b.option(EpollChannelOption.SO_REUSEPORT, false);
+      if (epoll) {
+        b.option(EpollChannelOption.SO_REUSEPORT, false);
+      }
       if (receiver) {
         // 65536 可容纳完整 UDP 数据报，不能用常见的 2048 接收缓冲静默截断大包。
         var allocator = new FixedRecvByteBufAllocator(65536);
@@ -165,10 +191,15 @@ public final class UdpRelay implements AutoCloseable {
                 () -> {
                   ByteBuf[] buffers = new ByteBuf[64];
                   try {
-                    for (int i = 0; i < buffers.length; i++)
+                    for (int i = 0; i < buffers.length; i++) {
                       buffers[i] = PooledByteBufAllocator.DEFAULT.directBuffer(65536, 65536);
+                    }
                   } finally {
-                    for (ByteBuf buffer : buffers) if (buffer != null) buffer.release();
+                    for (ByteBuf buffer : buffers) {
+                      if (buffer != null) {
+                        buffer.release();
+                      }
+                    }
                   }
                 })
             .syncUninterruptibly();
@@ -216,7 +247,9 @@ public final class UdpRelay implements AutoCloseable {
                                         sendFailures++;
                                         lastError = message(future.cause());
                                       }
-                                      if (stopping && pending == 0) drained.complete(null);
+                                      if (stopping && pending == 0) {
+                                        drained.complete(null);
+                                      }
                                     });
                           }
 
@@ -242,13 +275,14 @@ public final class UdpRelay implements AutoCloseable {
           sendBuffer /= 2;
         }
         if (receiveBuffer < (long) config.receiveBufferMiB() * 1024 * 1024
-            || sendBuffer < (long) config.sendBufferMiB() * 1024 * 1024)
+            || sendBuffer < (long) config.sendBufferMiB() * 1024 * 1024) {
           throw new IllegalStateException(
               "系统收发缓冲不足：实际接收 "
                   + receiveBuffer
                   + "、发送 "
                   + sendBuffer
                   + " 字节；请先提高操作系统 rmem_max/wmem_max，再启动转发");
+        }
         drops = new LinuxUdpDrops(inbound.localAddress());
         state = "RUNNING";
         loop.submit(
@@ -269,7 +303,9 @@ public final class UdpRelay implements AutoCloseable {
     void publish(boolean running) {
       if (drops != null) {
         Long value = drops.read();
-        if (value != null) kernelDrops = value;
+        if (value != null) {
+          kernelDrops = value;
+        }
       }
       long now = System.nanoTime();
       double seconds = Math.max(0.001, (now - lastNanos) / 1e9);
@@ -315,15 +351,25 @@ public final class UdpRelay implements AutoCloseable {
     }
 
     void stop() {
-      if (group.isShuttingDown()) return;
+      if (group.isShuttingDown()) {
+        return;
+      }
       // 先停止接收，再等待已进入应用的写请求完成；停流时应先停止上游发包。
       loop.submit(
               () -> {
                 stopping = true;
-                if (drops != null) kernelDrops = drops.read();
-                if (inbound != null) inbound.close();
-                if (outbound != null) outbound.flush();
-                if (pending == 0) drained.complete(null);
+                if (drops != null) {
+                  kernelDrops = drops.read();
+                }
+                if (inbound != null) {
+                  inbound.close();
+                }
+                if (outbound != null) {
+                  outbound.flush();
+                }
+                if (pending == 0) {
+                  drained.complete(null);
+                }
               })
           .syncUninterruptibly();
       try {
@@ -331,30 +377,24 @@ public final class UdpRelay implements AutoCloseable {
       } catch (Exception e) {
         lastError = "停止等待超时，剩余发送将在关闭时计为失败";
       }
-      if (inbound != null) inbound.close().syncUninterruptibly();
-      if (outbound != null) outbound.close().syncUninterruptibly();
+      if (inbound != null) {
+        inbound.close().syncUninterruptibly();
+      }
+      if (outbound != null) {
+        outbound.close().syncUninterruptibly();
+      }
       loop.submit(
               () -> {
-                if (ticker != null) ticker.cancel(false);
-                if (!state.equals("FAILED")) state = "STOPPED";
+                if (ticker != null) {
+                  ticker.cancel(false);
+                }
+                if (!state.equals("FAILED")) {
+                  state = "STOPPED";
+                }
                 publish(false);
               })
           .syncUninterruptibly();
       group.shutdownGracefully(0, 3, TimeUnit.SECONDS).syncUninterruptibly();
-    }
-
-    static String message(Throwable error) {
-      if (error == null) return "发送失败";
-      String text = error.getMessage();
-      return (text == null ? error.getClass().getSimpleName() : text)
-          .substring(
-              0, Math.min(300, (text == null ? error.getClass().getSimpleName() : text).length()));
-    }
-
-    static String format(InetSocketAddress address) {
-      if (address == null) return "";
-      String ip = address.getAddress().getHostAddress();
-      return (ip.contains(":") ? "[" + ip + "]" : ip) + ":" + address.getPort();
     }
   }
 }

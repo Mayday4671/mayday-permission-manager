@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +47,9 @@ public class WorkflowJson {
 
   /** 执行快照只由服务器生成；损坏时拒绝继续，不能重新创建整个并行组造成重复待办。 */
   public WorkflowExecutionState execution(String json) {
-    if (json == null) return null;
+    if (json == null) {
+      return null;
+    }
     try {
       var state = mapper.readValue(json, WorkflowExecutionState.class);
       state.validate();

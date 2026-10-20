@@ -1,7 +1,7 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.PageResult;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.content.Notice;
 import com.mayday.content.mapper.ContentRevisionMapper;
 import com.mayday.content.mapper.NoticeMapper;
@@ -73,13 +73,14 @@ public class PublicController {
   @GetMapping("/taxonomy")
   public ApiResponse<?> taxonomy() {
     Map<String, Object> result = new LinkedHashMap<>();
-    for (String kind : List.of("categories", "tags"))
+    for (String kind : List.of("categories", "tags")) {
       result.put(
           kind,
           entries.findByKindOrderBySortOrderAscIdAsc(kind).stream()
               .filter(SystemEntry::isEnabled)
               .map(entry -> Map.of("id", entry.getId(), "name", entry.getName()))
               .toList());
+    }
     return ApiResponse.ok(result);
   }
 
@@ -115,7 +116,7 @@ public class PublicController {
     view.put("seoTitle", revision.getSeoTitle());
     view.put("seoKeywords", revision.getSeoKeywords());
     view.put("seoDescription", revision.getSeoDescription());
-    if (detail)
+    if (detail) {
       view.put(
           "attachments",
           assets.records(revision.getAttachmentIds()).stream()
@@ -131,11 +132,14 @@ public class PublicController {
                           "url",
                           "/api/public/articles/" + notice.getId() + "/files/" + file.getId()))
               .toList());
+    }
     return view;
   }
 
   private Map<String, Object> visibleArticle(Long id) {
-    if (id == null) return null;
+    if (id == null) {
+      return null;
+    }
     return java.util.Optional.ofNullable(
             notices.selectOneByQuery(
                 QueryWrapper.create()
@@ -220,16 +224,22 @@ public class PublicController {
         notices
             .publicArticles()
             .and(com.mayday.content.mapper.NoticeMapper.portalTitleContains(keyword));
-    if (categoryId != null)
+    if (categoryId != null) {
       articles.and(new com.mybatisflex.core.query.QueryColumn("lr.category_id").eq(categoryId));
-    if (channelId != null)
+    }
+    if (channelId != null) {
       articles.and(
           new com.mybatisflex.core.query.QueryColumn("lr.portal_channel_id").eq(channelId));
-    if (!category.isBlank())
+    }
+    if (!category.isBlank()) {
       articles.and(new com.mybatisflex.core.query.QueryColumn("ce.name").eq(category));
-    if (tagId != null) articles.and(com.mayday.content.mapper.NoticeMapper.taggedWith(tagId));
-    if (recommended != null)
+    }
+    if (tagId != null) {
+      articles.and(com.mayday.content.mapper.NoticeMapper.taggedWith(tagId));
+    }
+    if (recommended != null) {
       articles.and(new com.mybatisflex.core.query.QueryColumn("lr.recommended").eq(recommended));
+    }
     var articlePage =
         notices.paginateAs(
             Math.max(1, page),
@@ -252,10 +262,11 @@ public class PublicController {
                     .where(
                         ContentService.publiclyVisible()
                             .and(new com.mybatisflex.core.query.QueryColumn("id").eq(id)))));
-    if (found.isEmpty())
+    if (found.isEmpty()) {
       return ResponseEntity.status(404)
           .cacheControl(CacheControl.noStore())
           .body(ApiResponse.error("内容不存在或尚未发布"));
+    }
     return ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())
         .body(ApiResponse.ok(article(found.get(), true)));
@@ -272,10 +283,11 @@ public class PublicController {
                     .where(
                         ContentService.publiclyVisible()
                             .and(new com.mybatisflex.core.query.QueryColumn("id").eq(id)))));
-    if (found.isEmpty())
+    if (found.isEmpty()) {
       return ResponseEntity.status(404)
           .cacheControl(CacheControl.noStore())
           .body(ApiResponse.error("内容不存在或尚未发布"));
+    }
     notices.incrementViews(id);
     return ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())

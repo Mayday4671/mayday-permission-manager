@@ -55,7 +55,8 @@ public interface RealtimeMapper {
   /** 注册新连接；有效期固定 30 秒由心跳续期。 */
   default void insertConnection(String id, long userId) {
     Db.updateBySql(
-        "insert into sys_realtime_connection(id,user_id,expires_at) values(?,?,timestampadd(second,30,current_timestamp(3)))",
+        "insert into sys_realtime_connection(id,user_id,expires_at) values(?,?,timestampadd(second,30,current_timestamp"
+            + "(3)))",
         id,
         userId);
   }
@@ -63,7 +64,8 @@ public interface RealtimeMapper {
   /** 原连接过期不可迟到续命；影响行数即结果。 */
   default int renew(String id) {
     return Db.updateBySql(
-        "update sys_realtime_connection set expires_at=timestampadd(second,30,current_timestamp(3)) where id=? and expires_at>current_timestamp(3)",
+        "update sys_realtime_connection set expires_at=timestampadd(second,30,current_timestamp(3)) where id=? and "
+            + "expires_at>current_timestamp(3)",
         id);
   }
 

@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.exception;
 
 /** A concurrent or stale operation that the caller may retry after refreshing current state. */
 public class ConflictException extends RuntimeException {

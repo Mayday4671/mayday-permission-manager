@@ -1,6 +1,6 @@
 package com.mayday.operations.realtime;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.realtime.mapper.RealtimeMapper;
 import java.util.Collection;
 import java.util.List;
@@ -33,12 +33,16 @@ public class RealtimeJournal {
             .distinct()
             .sorted()
             .collect(Collectors.joining(","));
-    if (visible.isEmpty() || users.isEmpty()) return;
+    if (visible.isEmpty() || users.isEmpty()) {
+      return;
+    }
     transaction.executeWithoutResult(
         status -> {
           // 顺序守卫持有到业务提交，避免后分配的 ID 先提交、消费者跳过尚未提交的低 ID。
           store.lockEventGuard();
-          for (Long user : Set.copyOf(users)) store.appendEvent(user, visible);
+          for (Long user : Set.copyOf(users)) {
+            store.appendEvent(user, visible);
+          }
         });
   }
 
@@ -46,9 +50,6 @@ public class RealtimeJournal {
   public long latest() {
     return store.latest();
   }
-
-  /** 已提交的最小刷新提示；消费游标、接收账号及白名单主题，不包含业务正文。 */
-  public record Event(long id, long userId, Set<String> topics) {}
 
   /** 单批最多 200 条，每个实例独立游标；不得删掉其他实例尚在消费的最近记录。 */
   public List<Event> after(long cursor) {
@@ -69,7 +70,9 @@ public class RealtimeJournal {
           store.lockConnectionGuard();
           long total = store.countConnections();
           long own = store.countConnectionsOf(userId);
-          if (total >= 500 || own >= 4) throw new BusinessException("实时连接数量过多，请关闭重复打开的后台窗口");
+          if (total >= 500 || own >= 4) {
+            throw new BusinessException("实时连接数量过多，请关闭重复打开的后台窗口");
+          }
           store.insertConnection(id, userId);
         });
   }
@@ -89,4 +92,7 @@ public class RealtimeJournal {
   public void cleanup() {
     store.cleanup();
   }
+
+  /** 已提交的最小刷新提示；消费游标、接收账号及白名单主题，不包含业务正文。 */
+  public record Event(long id, long userId, Set<String> topics) {}
 }

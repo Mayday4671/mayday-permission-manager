@@ -1,5 +1,6 @@
-package com.mayday.common;
+package com.mayday.common.persistence;
 
+import com.mayday.common.util.BusinessTime;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.InsertListener;

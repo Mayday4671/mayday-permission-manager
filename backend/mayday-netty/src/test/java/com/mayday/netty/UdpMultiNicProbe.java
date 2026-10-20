@@ -25,7 +25,9 @@ public final class UdpMultiNicProbe {
   /** 显式启动隔离源端、转发或接收角色，按序号和源地址核对结果；校验失败退出，不在应用启动时执行。 */
   public static void main(String[] args) throws Exception {
     Map<String, String> options = new HashMap<>();
-    for (int i = 0; i < args.length; i += 2) options.put(args[i], args[i + 1]);
+    for (int i = 0; i < args.length; i += 2) {
+      options.put(args[i], args[i + 1]);
+    }
     String role = options.get("--role");
     Path out = Path.of(options.getOrDefault("--out", "/results"));
     Files.createDirectories(out);
@@ -33,8 +35,9 @@ public final class UdpMultiNicProbe {
     int size = Integer.parseInt(options.getOrDefault("--size", "1472"));
     int minSize = Integer.parseInt(options.getOrDefault("--min-size", String.valueOf(size)));
     int maxSize = Integer.parseInt(options.getOrDefault("--max-size", String.valueOf(size)));
-    if (seconds < 1 || seconds > 600 || size < 16 || size > 65507)
+    if (seconds < 1 || seconds > 600 || size < 16 || size > 65507) {
       throw new IllegalArgumentException("测试范围无效");
+    }
     switch (role) {
       case "relay" -> {
         String target = options.get("--target"), source = options.get("--source");
@@ -55,7 +58,9 @@ public final class UdpMultiNicProbe {
                 var trace = event.getStackTrace();
                 if (thread == null
                     || !thread.getJavaName().startsWith("udp-relay")
-                    || trace == null) return;
+                    || trace == null) {
+                  return;
+                }
                 String key =
                     trace.getFrames().stream()
                         .limit(6)
@@ -108,7 +113,9 @@ public final class UdpMultiNicProbe {
               || result.sendFailures() != 0
               || result.receiveErrors() != 0
               || result.kernelDrops() == null
-              || result.kernelDrops() != 0) throw new IllegalStateException("转发器丢包/错误检查失败");
+              || result.kernelDrops() != 0) {
+            throw new IllegalStateException("转发器丢包/错误检查失败");
+          }
         }
       }
       case "source" -> {
@@ -116,7 +123,9 @@ public final class UdpMultiNicProbe {
         privateAddress(target);
         int offset = Integer.parseInt(options.getOrDefault("--offset", "0"));
         double mbps = Double.parseDouble(options.getOrDefault("--mbps", "125"));
-        if (mbps < 1 || mbps > 500) throw new IllegalArgumentException("单源速率超限");
+        if (mbps < 1 || mbps > 500) {
+          throw new IllegalArgumentException("单源速率超限");
+        }
         var plan = ProbePacketPlan.create(offset, mbps, seconds, minSize, maxSize);
         int count = plan.count();
         long startAt = Long.parseLong(options.get("--start-at"));
@@ -124,21 +133,30 @@ public final class UdpMultiNicProbe {
           channel.setOption(StandardSocketOptions.SO_SNDBUF, 16 * 1024 * 1024);
           channel.connect(new InetSocketAddress(target, 19000));
           ByteBuffer packet = ByteBuffer.allocateDirect(maxSize);
-          for (int j = 0; j < maxSize; j++) packet.put((byte) (j * 31 + 7));
+          for (int j = 0; j < maxSize; j++) {
+            packet.put((byte) (j * 31 + 7));
+          }
           long delay = startAt - System.currentTimeMillis();
-          if (delay > 0) Thread.sleep(delay);
+          if (delay > 0) {
+            Thread.sleep(delay);
+          }
           long start = System.nanoTime(), sentBytes = 0;
           double interval = 8 * 1000.0 / mbps;
           for (int i = 0; i < count; i++) {
             int length = ProbePacketPlan.length(offset + (long) i, minSize, maxSize);
             long due = start + (long) (sentBytes * interval), remaining;
             while ((remaining = due - System.nanoTime()) > 0) {
-              if (remaining > 200_000) LockSupport.parkNanos(remaining - 100_000);
-              else Thread.onSpinWait();
+              if (remaining > 200_000) {
+                LockSupport.parkNanos(remaining - 100_000);
+              } else {
+                Thread.onSpinWait();
+              }
             }
             packet.clear().limit(length);
             packet.putLong(8, offset + (long) i);
-            if (channel.write(packet) != length) throw new IllegalStateException("源端未完整写入");
+            if (channel.write(packet) != length) {
+              throw new IllegalStateException("源端未完整写入");
+            }
             sentBytes += length;
           }
           double rate = sentBytes * 8.0 / ((System.nanoTime() - start) / 1e9) / 1e6;
@@ -158,8 +176,9 @@ public final class UdpMultiNicProbe {
           socket.setReceiveBufferSize(16 * 1024 * 1024);
           socket.setSoTimeout(200);
           socket.bind(new InetSocketAddress("0.0.0.0", 19001));
-          if (socket.getReceiveBufferSize() < 16 * 1024 * 1024)
+          if (socket.getReceiveBufferSize() < 16 * 1024 * 1024) {
             throw new IllegalStateException("接收器系统缓冲不足");
+          }
           Files.writeString(out.resolve("sink-ready"), "ready");
           byte[] data = new byte[65536];
           ByteBuffer decoded = ByteBuffer.wrap(data);
@@ -171,7 +190,9 @@ public final class UdpMultiNicProbe {
           while (received < count && System.nanoTime() < deadline) {
             long clock = System.nanoTime();
             if (clock >= nextControl) {
-              if (Files.exists(out.resolve("sink-stop"))) break;
+              if (Files.exists(out.resolve("sink-stop"))) {
+                break;
+              }
               nextControl = clock + 1_000_000_000L;
             }
             packet.setLength(data.length);
@@ -181,28 +202,39 @@ public final class UdpMultiNicProbe {
               continue;
             }
             long now = System.nanoTime();
-            if (first == 0) first = now;
+            if (first == 0) {
+              first = now;
+            }
             last = now;
             received++;
             if (!packet.getAddress().getHostAddress().equals(expectedSource)
-                || packet.getPort() != 19003) wrongSource++;
+                || packet.getPort() != 19003) {
+              wrongSource++;
+            }
             long seq = packet.getLength() >= 16 ? decoded.getLong(8) : -1;
             boolean valid =
                 seq >= 0
                     && seq < count
                     && packet.getLength() == ProbePacketPlan.length(seq, minSize, maxSize);
-            if (valid)
+            if (valid) {
               for (int j = 0; j < packet.getLength(); j++) {
-                if (j >= 8 && j < 16) continue;
+                if (j >= 8 && j < 16) {
+                  continue;
+                }
                 if (data[j] != (byte) (j == 2 ? 3 : j == 3 ? 1 : j * 31 + 7)) {
                   valid = false;
                   break;
                 }
               }
-            if (!valid) corrupt++;
-            else {
-              if (sequences.get((int) seq)) duplicate++;
-              else uniqueBytes += packet.getLength();
+            }
+            if (!valid) {
+              corrupt++;
+            } else {
+              if (sequences.get((int) seq)) {
+                duplicate++;
+              } else {
+                uniqueBytes += packet.getLength();
+              }
               sequences.set((int) seq);
             }
           }
@@ -233,7 +265,9 @@ public final class UdpMultiNicProbe {
             || duplicate != 0
             || corrupt != 0
             || wrongSource != 0
-            || rate < targetMbps * 0.995) throw new IllegalStateException("多网卡端点核对失败");
+            || rate < targetMbps * 0.995) {
+          throw new IllegalStateException("多网卡端点核对失败");
+        }
       }
       default -> throw new IllegalArgumentException("role 无效");
     }
@@ -241,11 +275,13 @@ public final class UdpMultiNicProbe {
 
   /** 限定数值 IPv4 与私网/回环地址，验收工具不通过 DNS 解析或向第三方地址发送流量。 */
   static void privateAddress(String ip) {
-    if (ip == null || !io.netty.util.NetUtil.isValidIpV4Address(ip))
+    if (ip == null || !io.netty.util.NetUtil.isValidIpV4Address(ip)) {
       throw new IllegalArgumentException("只允许数值 IPv4");
+    }
     InetAddress value = RelayConfig.address(ip);
-    if (!value.isSiteLocalAddress() && !value.isLoopbackAddress())
+    if (!value.isSiteLocalAddress() && !value.isLoopbackAddress()) {
       throw new IllegalArgumentException("验收工具只允许回环/私网");
+    }
   }
 
   /** 只序列化本工具固定 record 的标量字段，避免为验收工具引入 JSON/业务框架依赖。 */

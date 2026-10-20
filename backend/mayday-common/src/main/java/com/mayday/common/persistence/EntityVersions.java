@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.persistence;
 
 import java.util.Objects;
 import org.springframework.dao.OptimisticLockingFailureException;

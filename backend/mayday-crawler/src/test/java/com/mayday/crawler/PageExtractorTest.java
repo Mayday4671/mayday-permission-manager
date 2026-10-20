@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -56,10 +56,10 @@ class PageExtractorTest {
             html(
                 "https://example.com/list",
                 """
-                <title>图库</title><article><img data-src="/original.jpg" src="/small.jpg"><img src="/original.jpg">
-                <img src="http://evil.example/a.jpg"><img src="//cdn.example.com/ok.png"></article>
-                <a class="next disabled" href="/bad">下一页</a><a class="next" href="/list?page=2">下一页</a>
-                """),
+                  <title>图库</title><article><img data-src="/original.jpg" src="/small.jpg"><img src="/original.jpg">
+                  <img src="http://evil.example/a.jpg"><img src="//cdn.example.com/ok.png"></article>
+                  <a class="next disabled" href="/bad">下一页</a><a class="next" href="/list?page=2">下一页</a>
+                  """),
             simple(CrawlRules.Mode.NEXT),
             false,
             0,
@@ -218,7 +218,9 @@ class PageExtractorTest {
             "::ffff:127.0.0.1",
             "2001:db8::1",
             "2001::1",
-            "2002::1")) assertFalse(WebAddress.publicIp(InetAddress.getByName(ip)), ip);
+            "2002::1")) {
+      assertFalse(WebAddress.publicIp(InetAddress.getByName(ip)), ip);
+    }
     assertTrue(WebAddress.publicIp(InetAddress.getByName("8.8.8.8")));
     assertTrue(WebAddress.publicIp(InetAddress.getByName("2606:4700:4700::1111")));
     assertTrue(WebAddress.publicIp(InetAddress.getByName("2001:4860:4860::8888")));
@@ -229,8 +231,9 @@ class PageExtractorTest {
             "http://localhost/x",
             "https://a.example:8080/",
             "https://user:secret@example.com/",
-            "https://example.com\\@127.0.0.1/"))
+            "https://example.com\\@127.0.0.1/")) {
       assertThrows(BusinessException.class, () -> WebAddress.parse(url));
+    }
     assertThrows(UnknownHostException.class, () -> SafeWebFetcher.resolvePublic("127.1"));
     assertFalse(WebAddress.publicIp(InetAddress.getByName("3fff::1")));
     assertThrows(UnknownHostException.class, () -> SafeWebFetcher.resolvePublic("127.0.0.1"));
@@ -276,11 +279,11 @@ class PageExtractorTest {
             html(
                 "https://example.com/list",
                 """
-                <title>网页标题</title><meta name=author content=来源作者><h1>文章标题</h1><time datetime=2026-09-22></time>
-                <nav>顶部菜单</nav><div class=entry-content><p>第一段</p><p>第二段<br>换行</p>
-                <script>alert('secret')</script><iframe src=https://evil.example></iframe><form>表单</form><nav>正文导航</nav>
-                <div class=addtoany_share_save_container><div class=addtoany_header>分享带来好运：</div></div></div>
-                """),
+                  <title>网页标题</title><meta name=author content=来源作者><h1>文章标题</h1><time datetime=2026-09-22></time>
+                  <nav>顶部菜单</nav><div class=entry-content><p>第一段</p><p>第二段<br>换行</p>
+                  <script>alert('secret')</script><iframe src=https://evil.example></iframe><form>表单</form><nav>正文导航</nav>
+                  <div class=addtoany_share_save_container><div class=addtoany_header>分享带来好运：</div></div></div>
+                  """),
             simple(CrawlRules.Mode.SINGLE),
             false,
             0,

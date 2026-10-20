@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.mapper.FlowDecisionMapper;
 import com.mayday.operations.model.FlowDecision;
 import com.mayday.operations.model.FlowRequest;
@@ -29,8 +29,9 @@ public class WorkflowPrivateDrafts {
   /** 只识别旧版退回/撤回后 EDIT 覆盖。已有独立私人稿表示已提交列正确，不再重建；终止后的 CANCELLED 仍需兼容，因为管理员终止并不会使此前私人修改成为正式审批数据。 */
   List<FlowDecision> legacyPrivateEdits(FlowRequest request) {
     if (request.getPrivateDraft() != null
-        || !Set.of("RETURNED", "WITHDRAWN", "CANCELLED").contains(request.getStatus()))
+        || !Set.of("RETURNED", "WITHDRAWN", "CANCELLED").contains(request.getStatus())) {
       return List.of();
+    }
     var records =
         history.selectListByQuery(
             QueryWrapper.create()
@@ -60,7 +61,9 @@ public class WorkflowPrivateDrafts {
    */
   Map<String, Object> submittedValues(FlowRequest request, Spec spec) {
     var records = legacyPrivateEdits(request);
-    if (records.isEmpty()) return storedValues(request);
+    if (records.isEmpty()) {
+      return storedValues(request);
+    }
     var submitted =
         records.stream()
             .filter(
@@ -82,13 +85,17 @@ public class WorkflowPrivateDrafts {
       if (decision.getRunNumber() != request.getRunNumber()
           || "EDIT".equals(decision.getAction())
           || (submitted != null && decision.getId() <= submitted.getId())
-          || decision.getChangesJson() == null) continue;
+          || decision.getChangesJson() == null) {
+        continue;
+      }
       json.form(decision.getChangesJson())
           .forEach(
               (key, change) -> {
                 if (fields.contains(key)
                     && change instanceof Map<?, ?> values
-                    && values.containsKey("after")) result.put(key, values.get("after"));
+                    && values.containsKey("after")) {
+                  result.put(key, values.get("after"));
+                }
               });
     }
     return result;
@@ -96,16 +103,21 @@ public class WorkflowPrivateDrafts {
 
   /** 只供已核验原申请人的详情、继续编辑及附件下载；执行推进仍使用已提交列。 */
   Map<String, Object> editableValues(FlowRequest request) {
-    if (request.getPrivateDraft() == null) return storedValues(request);
+    if (request.getPrivateDraft() == null) {
+      return storedValues(request);
+    }
     var draft = json.form(request.getPrivateDraft());
-    if (!(draft.get("values") instanceof Map<?, ?>)) throw new BusinessException("私人稿损坏，请联系管理员恢复");
+    if (!(draft.get("values") instanceof Map<?, ?>)) {
+      throw new BusinessException("私人稿损坏，请联系管理员恢复");
+    }
     return json.form(json.write(draft.get("values")));
   }
 
   /** 新私人稿保留旧标题；旧列已被覆盖但没有历史标题快照时用安全编号代替。申请人可继续看到 自己保存的标题，审批人、管理者和站内通知都不能借标题读取尚未提交的内容。 */
   String title(FlowRequest request, boolean applicant) {
-    if (applicant && request.getPrivateDraft() != null)
+    if (applicant && request.getPrivateDraft() != null) {
       return (String) json.form(request.getPrivateDraft()).get("title");
+    }
     return !applicant && !legacyPrivateEdits(request).isEmpty()
         ? legacyTitle(request)
         : request.getTitle();

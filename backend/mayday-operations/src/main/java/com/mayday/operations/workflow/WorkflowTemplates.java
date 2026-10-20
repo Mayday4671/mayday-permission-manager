@@ -11,9 +11,6 @@ import java.util.Set;
 public final class WorkflowTemplates {
   private WorkflowTemplates() {}
 
-  /** 模板只有只读定义，无发布状态或授权身份，复制后必须按正常流程校验和发布。 */
-  public record Template(String key, String name, String description, Spec schema) {}
-
   /** 默认由发起人部门负责人审批，管理员可在设计器中更换审批来源、字段或分支。 */
   public static List<Template> all() {
     return List.of(
@@ -128,8 +125,11 @@ public final class WorkflowTemplates {
   private static Field field(String id, String label, String type, int width) {
     // 分开赋值保留非文本字段的 null，避免数值与 null 嵌套三元表达式触发隐式拆箱。
     Integer maxLength = null;
-    if ("TEXTAREA".equals(type)) maxLength = 2000;
-    else if ("TEXT".equals(type)) maxLength = 200;
+    if ("TEXTAREA".equals(type)) {
+      maxLength = 2000;
+    } else if ("TEXT".equals(type)) {
+      maxLength = 200;
+    }
     return new Field(id, label, type, true, width, null, null, maxLength, null);
   }
 
@@ -161,4 +161,7 @@ public final class WorkflowTemplates {
         description,
         new Spec(fields, List.of(review, end), "review", "ALL", Set.of(), false, false, true));
   }
+
+  /** 模板只有只读定义，无发布状态或授权身份，复制后必须按正常流程校验和发布。 */
+  public record Template(String key, String name, String description, Spec schema) {}
 }

@@ -1,6 +1,6 @@
 package com.mayday.relay.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.relay.RelaySettings;
 import org.apache.ibatis.annotations.Mapper;
 

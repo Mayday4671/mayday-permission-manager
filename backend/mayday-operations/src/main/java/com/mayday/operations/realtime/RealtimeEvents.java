@@ -13,7 +13,9 @@ public class RealtimeEvents {
 
   /** 收件账号来自服务端业务结果，不能直接使用未经授权的页面用户列表。 */
   public void changed(Collection<Long> recipientIds, String... topics) {
-    if (recipientIds.isEmpty()) return;
+    if (recipientIds.isEmpty()) {
+      return;
+    }
     journal.append(recipientIds, topics);
   }
 

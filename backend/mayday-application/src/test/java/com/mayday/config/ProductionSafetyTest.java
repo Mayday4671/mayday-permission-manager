@@ -60,7 +60,9 @@ class ProductionSafetyTest {
               assertThrows(
                   IllegalStateException.class,
                   () -> new ProductionSafety(env, users, encoder).afterPropertiesSet());
-          if (key.contains("password")) assertFalse(error.getMessage().contains(value));
+          if (key.contains("password")) {
+            assertFalse(error.getMessage().contains(value));
+          }
         });
   }
 

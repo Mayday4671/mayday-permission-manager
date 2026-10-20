@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.mapper.FlowVersionMapper;
 import com.mayday.operations.model.FlowRequest;
 import com.mayday.operations.workflow.WorkflowSchema.Node;
@@ -24,24 +24,17 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class WorkflowSubprocessRepair {
+  public static final String AUDIT_KEY = "__subprocessRepair";
+
   /** 保留键使用冒号分隔，合法节点编号不允许冒号，因此不会覆盖原有节点交接记录。 */
   private static final String PREFIX = "subprocess:";
 
-  public static final String AUDIT_KEY = "__subprocessRepair";
   private final WorkflowJson json;
   private final WorkflowDefinitions definitions;
   private final FlowVersionMapper versions;
   private final UserMapper users;
   private final EntryMapper entries;
   private final AccessPolicy access;
-
-  /** 版本和调用游标均来自打开弹窗时的服务端快照；客户端不能提交新子流程版本。 */
-  public record Repair(
-      @NotNull Long version,
-      @NotBlank @Size(max = 40) String tokenId,
-      @NotBlank @Size(max = 40) String childNodeId,
-      @NotNull @Size(min = 1, max = 100) List<@NotNull Long> targetUserIds,
-      @NotBlank @Size(max = 300) String reason) {}
 
   /** 页面入口只判断权限和状态；目录查询再核验人员范围，不在详情中泄露子流程人员目录。 */
   public boolean available(FlowRequest request) {
@@ -65,7 +58,9 @@ public class WorkflowSubprocessRepair {
     access.require("requests:manage");
     access.require("requests:reassign");
     access.require("users:view");
-    if (!available(request)) throw new BusinessException("没有可修复的待启动子流程调用");
+    if (!available(request)) {
+      throw new BusinessException("没有可修复的待启动子流程调用");
+    }
     var applicant = users.findById(request.getApplicantId()).orElseThrow();
     // 即使角色已无成员或部门负责人为空，也不能借空来源绕过管理人员的数据范围。
     access.checkData("users", applicant.getId(), applicant.getDepartmentId());
@@ -82,8 +77,12 @@ public class WorkflowSubprocessRepair {
 
   /** 原来源保留停用账号用于范围检查和审计，绝不因账号失效而换用最新发布人员。 */
   private List<Long> source(FlowRequest request, Node node, Map<String, List<Long>> overrides) {
-    if (overrides.containsKey(node.id())) return overrides.get(node.id());
-    if ("USERS".equals(node.source())) return node.assigneeIds();
+    if (overrides.containsKey(node.id())) {
+      return overrides.get(node.id());
+    }
+    if ("USERS".equals(node.source())) {
+      return node.assigneeIds();
+    }
     if ("DEPARTMENT_LEADER".equals(node.source())) {
       var applicant = users.findById(request.getApplicantId()).orElseThrow();
       return java.util.Optional.ofNullable(applicant.getDepartmentId())
@@ -105,10 +104,13 @@ public class WorkflowSubprocessRepair {
               Map<String, Object> option = new LinkedHashMap<>();
               var person = users.findById(id).orElse(null);
               if (person == null) {
-                if (!originalSource) throw new BusinessException("新处理人员不存在");
+                if (!originalSource) {
+                  throw new BusinessException("新处理人员不存在");
+                }
                 // JSON 中的固定来源只有编号，删除后无法证明所属部门；只有全用户范围可以处理未知来源。
-                if (!"ALL".equals(access.scope("users")))
+                if (!"ALL".equals(access.scope("users"))) {
                   throw new AccessDeniedException("已删除来源人员须由全用户范围管理员修复");
+                }
                 option.put("value", id);
                 option.put("label", "已删除账号 #" + id);
                 return option;
@@ -166,39 +168,50 @@ public class WorkflowSubprocessRepair {
   public Map<String, Object> apply(FlowRequest request, Repair input) {
     require(request);
     var token = json.execution(request.getExecutionState()).require(input.tokenId());
-    if (!eligible(request, token)) throw new BusinessException("该调用已不再等待启动修复");
+    if (!eligible(request, token)) {
+      throw new BusinessException("该调用已不再等待启动修复");
+    }
     var caller = json.spec(request.getSchemaSnapshot()).node(token.getNodeId());
     var child = bound(caller);
     var node = child.node(input.childNodeId());
-    if (!java.util.Set.of("APPROVAL", "COPY").contains(node.type()))
+    if (!java.util.Set.of("APPROVAL", "COPY").contains(node.type())) {
       throw new BusinessException("只能修复子流程审批或抄送节点人员");
+    }
     boolean approval = "APPROVAL".equals(node.type());
     var overrides = overrides(request, caller.id());
     var before = source(request, node, overrides);
     var original = scopedPeople(before, true);
     var targets = input.targetUserIds();
-    if (targets.stream().distinct().count() != targets.size())
+    if (targets.stream().distinct().count() != targets.size()) {
       throw new BusinessException("审批人不能重复选择");
+    }
     var after = scopedPeople(targets, false);
     for (Long id : targets) {
       var target = users.findById(id).orElseThrow();
       if (!target.isEnabled()
           || !access.hasFor(target, "requests:view")
-          || (approval && !access.hasFor(target, "requests:approve")))
+          || (approval && !access.hasFor(target, "requests:approve"))) {
         throw new BusinessException(approval ? "新审批人须启用并拥有申请查看和审批权限" : "新抄送人须启用并拥有申请查看权限");
+      }
       if (approval
           && !Boolean.TRUE.equals(child.allowSelfApproval())
-          && Objects.equals(id, request.getApplicantId()))
+          && Objects.equals(id, request.getApplicantId())) {
         throw new BusinessException("子流程不允许申请人自我审批");
+      }
     }
-    if (approval && !Boolean.TRUE.equals(child.allowRepeatApproval()))
-      for (Node other : child.nodes())
+    if (approval && !Boolean.TRUE.equals(child.allowRepeatApproval())) {
+      for (Node other : child.nodes()) {
         if ("APPROVAL".equals(other.type())
             && !other.id().equals(node.id())
             && definitions.shareApprovalPath(child, node.id(), other.id())
-            && source(request, other, overrides).stream().anyMatch(targets::contains))
+            && source(request, other, overrides).stream().anyMatch(targets::contains)) {
           throw new BusinessException("子流程共同路径不能指定重复审批人");
-    if (before.equals(targets)) throw new BusinessException("审批人员没有变化");
+        }
+      }
+    }
+    if (before.equals(targets)) {
+      throw new BusinessException("审批人员没有变化");
+    }
     var stored = new LinkedHashMap<>(json.assignees(request.getAssignmentOverrides()));
     stored.put(PREFIX + caller.id() + ":" + node.id(), List.copyOf(targets));
     request.setAssignmentOverrides(json.write(stored));
@@ -222,25 +235,42 @@ public class WorkflowSubprocessRepair {
     json.assignees(request.getAssignmentOverrides())
         .forEach(
             (key, people) -> {
-              if (key.startsWith(prefix)) result.put(key.substring(prefix.length()), people);
+              if (key.startsWith(prefix)) {
+                result.put(key.substring(prefix.length()), people);
+              }
             });
     return result;
   }
 
   /** 审计读取也逐一核对当前管理员的用户范围；后续缩小范围后不能继续看到旧修复人员。 */
   public Object auditView(Object value) {
-    if (!(value instanceof Map<?, ?> audit)) return null;
+    if (!(value instanceof Map<?, ?> audit)) {
+      return null;
+    }
     for (String side : List.of("before", "after")) {
-      if (!(audit.get(side) instanceof List<?> people)) return null;
+      if (!(audit.get(side) instanceof List<?> people)) {
+        return null;
+      }
       for (Object item : people) {
-        if (!(item instanceof Map<?, ?> person) || !(person.get("value") instanceof Number id))
+        if (!(item instanceof Map<?, ?> person) || !(person.get("value") instanceof Number id)) {
           return null;
+        }
         var user = users.findById(id.longValue()).orElse(null);
         if (user == null
             ? !"ALL".equals(access.scope("users"))
-            : !access.contains("users", user.getId(), user.getDepartmentId())) return null;
+            : !access.contains("users", user.getId(), user.getDepartmentId())) {
+          return null;
+        }
       }
     }
     return audit;
   }
+
+  /** 版本和调用游标均来自打开弹窗时的服务端快照；客户端不能提交新子流程版本。 */
+  public record Repair(
+      @NotNull Long version,
+      @NotBlank @Size(max = 40) String tokenId,
+      @NotBlank @Size(max = 40) String childNodeId,
+      @NotNull @Size(min = 1, max = 100) List<@NotNull Long> targetUserIds,
+      @NotBlank @Size(max = 300) String reason) {}
 }

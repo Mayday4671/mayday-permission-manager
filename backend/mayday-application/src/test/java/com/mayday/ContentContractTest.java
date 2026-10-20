@@ -3,7 +3,7 @@ package com.mayday;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import com.mayday.common.RichText;
+import com.mayday.common.util.RichText;
 import com.mayday.web.ContentContracts;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;

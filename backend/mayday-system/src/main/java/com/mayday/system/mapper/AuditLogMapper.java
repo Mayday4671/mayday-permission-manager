@@ -1,6 +1,6 @@
 package com.mayday.system.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.system.model.AuditLog;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -39,7 +39,9 @@ public interface AuditLogMapper extends EntityMapper<AuditLog> {
             .and(new QueryColumn("created_at").ge(start))
             .and(new QueryColumn("created_at").lt(end))
             .and(success ? new QueryColumn("status").lt(400) : new QueryColumn("status").ge(400));
-    if (success) query.and(new QueryColumn("username").in(knownUsers));
+    if (success) {
+      query.and(new QueryColumn("username").in(knownUsers));
+    }
     return com.mybatisflex.core.row.Db.selectObject(query);
   }
 }

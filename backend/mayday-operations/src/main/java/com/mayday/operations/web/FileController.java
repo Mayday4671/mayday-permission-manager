@@ -1,7 +1,7 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.PageResult;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.operations.model.FileDirectory;
 import com.mayday.operations.model.StoredFile;
 import com.mayday.operations.storage.FileCenterService;
@@ -40,22 +40,6 @@ public class FileController {
   private final StoredFileContent content;
   private final StorageSettings settings;
   private final AccessPolicy access;
-
-  /** 上传上限以服务端部署配置为准，前端不需要得知磁盘路径或对象存储地址。 */
-  public record StorageInfo(String provider, long maximumBytes, List<String> extensions) {}
-
-  /** 目录编辑请求；父目录零值表示根目录，更新必须携带版本以检测并发编辑。 */
-  public record DirectoryEdit(
-      @NotBlank @Size(max = 100) String name, @PositiveOrZero Long parentId, Long version) {}
-
-  /** 同批文件必须全部通过授权与状态检查，单次最多一百条，目录参数仅用于移动。 */
-  public record BatchEdit(
-      @NotBlank String action,
-      @NotNull @Size(min = 1, max = 100) List<@NotNull @Positive Long> ids,
-      @PositiveOrZero Long directoryId) {}
-
-  /** 返回已通过整批原子校验的记录数；永久清理实际完成状态由回收站列表查询。 */
-  public record BatchResult(int count) {}
 
   /** 分页查询已授权文件，支持目录和回收状态；不序列化底层存储键或正文。 */
   @GetMapping
@@ -155,4 +139,20 @@ public class FileController {
     return ApiResponse.ok(
         new BatchResult(service.batch(request.action(), request.ids(), request.directoryId())));
   }
+
+  /** 上传上限以服务端部署配置为准，前端不需要得知磁盘路径或对象存储地址。 */
+  public record StorageInfo(String provider, long maximumBytes, List<String> extensions) {}
+
+  /** 目录编辑请求；父目录零值表示根目录，更新必须携带版本以检测并发编辑。 */
+  public record DirectoryEdit(
+      @NotBlank @Size(max = 100) String name, @PositiveOrZero Long parentId, Long version) {}
+
+  /** 同批文件必须全部通过授权与状态检查，单次最多一百条，目录参数仅用于移动。 */
+  public record BatchEdit(
+      @NotBlank String action,
+      @NotNull @Size(min = 1, max = 100) List<@NotNull @Positive Long> ids,
+      @PositiveOrZero Long directoryId) {}
+
+  /** 返回已通过整批原子校验的记录数；永久清理实际完成状态由回收站列表查询。 */
+  public record BatchResult(int count) {}
 }

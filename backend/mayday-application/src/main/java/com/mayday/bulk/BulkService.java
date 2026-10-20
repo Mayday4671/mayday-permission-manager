@@ -1,8 +1,8 @@
 package com.mayday.bulk;
 
 import com.mayday.bulk.mapper.BulkJobMapper;
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.operations.cluster.DurableTasks;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.mapper.UserMapper;
@@ -41,6 +41,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class BulkService {
   private static final List<String> ACTIVE = List.of("QUEUED", "RUNNING");
   private static final int MAX_EXPORT_ROWS = 100000;
+  private static final String TASK_TYPE = "BULK_EXPORT";
   private final BulkJobMapper jobs;
   private final UserMapper users;
   private final AccessPolicy access;
@@ -52,12 +53,6 @@ public class BulkService {
   private final DurableTasks durable;
   private final BulkResultStore results;
   private final Map<Long, DurableTasks.Lease> running = new ConcurrentHashMap<>();
-  private static final String TASK_TYPE = "BULK_EXPORT";
-
-  /** API 节点可关闭本机工作器，由其他实例领取同一持久队列；不关闭作业控制及下载授权。 */
-  @Value("${mayday.bulk.workers-enabled:true}")
-  private boolean workersEnabled = true;
-
   private final ThreadPoolExecutor worker =
       new ThreadPoolExecutor(
           2,
@@ -71,6 +66,10 @@ public class BulkService {
             return thread;
           },
           new ThreadPoolExecutor.AbortPolicy());
+
+  /** API 节点可关闭本机工作器，由其他实例领取同一持久队列；不关闭作业控制及下载授权。 */
+  @Value("${mayday.bulk.workers-enabled:true}")
+  private boolean workersEnabled = true;
 
   public BulkService(
       BulkJobMapper jobs,
@@ -126,8 +125,9 @@ public class BulkService {
 
   /** 锁定创建人串行化幂等检查；导入成功标记和账号写入同事务提交，失败不留下半批账号。 */
   public BulkContracts.ImportResult commit(String resource, byte[] bytes, String idempotencyKey) {
-    if (idempotencyKey == null || !idempotencyKey.matches("[a-zA-Z0-9-]{16,64}"))
+    if (idempotencyKey == null || !idempotencyKey.matches("[a-zA-Z0-9-]{16,64}")) {
       throw new BusinessException("缺少有效的提交标识，请重新打开导入弹窗");
+    }
     BulkResourceAdapter adapter = adapter(resource);
     adapter.requireImport();
     CsvCodec.Document document = CsvCodec.parse(bytes);
@@ -140,8 +140,9 @@ public class BulkService {
             BulkJob job = previous.get();
             if (!"IMPORT".equals(job.getKind())
                 || !resource.equals(job.getResource())
-                || !identity.matchesInput(bytes, job.getInputChecksum()))
+                || !identity.matchesInput(bytes, job.getInputChecksum())) {
               throw new BusinessException("提交标识已用于其他导入，请重新预览");
+            }
             return new BulkContracts.ImportResult(job.getId(), job.getProcessedRows());
           }
           int imported = adapter.commit(document);
@@ -161,12 +162,15 @@ public class BulkService {
   public BulkContracts.JobView export(
       String resource, BulkContracts.ExportFilter filter, String requestKey) {
     String idempotencyKey = requestKey == null ? UUID.randomUUID().toString() : requestKey;
-    if (!idempotencyKey.matches("[a-zA-Z0-9-]{16,64}")) throw new BusinessException("导出提交标识无效");
+    if (!idempotencyKey.matches("[a-zA-Z0-9-]{16,64}")) {
+      throw new BusinessException("导出提交标识无效");
+    }
     BulkResourceAdapter adapter = adapter(resource);
     adapter.requireExport();
     if (filter.keyword() != null && filter.keyword().length() > 200
-        || filter.departmentId() != null && filter.departmentId() <= 0)
+        || filter.departmentId() != null && filter.departmentId() <= 0) {
       throw new BusinessException("导出筛选不合法");
+    }
     Long ownerId = access.current().getId();
     BulkJob job =
         transactions.execute(
@@ -177,12 +181,14 @@ public class BulkService {
                 var found = previous.get();
                 if (!"EXPORT".equals(found.getKind())
                     || !resource.equals(found.getResource())
-                    || !json.writeValueAsString(filter).equals(found.getQueryJson()))
+                    || !json.writeValueAsString(filter).equals(found.getQueryJson())) {
                   throw new BusinessException("提交标识已用于其他导出");
+                }
                 return found;
               }
-              if (jobs.countByOwnerIdAndKindAndStatusIn(ownerId, "EXPORT", ACTIVE) >= 2)
+              if (jobs.countByOwnerIdAndKindAndStatusIn(ownerId, "EXPORT", ACTIVE) >= 2) {
                 throw new BusinessException("已有两个导出任务执行中，请稍后重试");
+              }
               BulkJob created = newJob(ownerId, resource);
               created.setQueryJson(json.writeValueAsString(filter));
               created.setIdempotencyKey(idempotencyKey);
@@ -208,10 +214,13 @@ public class BulkService {
   /** 下载前重新比对当前授权指纹；仅成功导出可读取，临时文件丢失时必须重新生成。 */
   public FileSystemResource download(Long id) {
     BulkJob job = owned(id, true);
-    if (!"EXPORT".equals(job.getKind()) || !"SUCCEEDED".equals(job.getStatus()))
+    if (!"EXPORT".equals(job.getKind()) || !"SUCCEEDED".equals(job.getStatus())) {
       throw new BusinessException("任务尚未完成");
+    }
     Path file = result(job.getResultKey(), false);
-    if (!results.restore(job.getId(), file)) throw new BusinessException("导出正文不可用，请重新创建任务");
+    if (!results.restore(job.getId(), file)) {
+      throw new BusinessException("导出正文不可用，请重新创建任务");
+    }
     return results.resource(file);
   }
 
@@ -223,13 +232,17 @@ public class BulkService {
 
   private BulkJob owned(Long id, boolean strict) {
     BulkJob job = jobs.findById(id).orElseThrow(() -> new BusinessException("作业不存在"));
-    if (!Objects.equals(job.getOwnerId(), access.current().getId()))
+    if (!Objects.equals(job.getOwnerId(), access.current().getId())) {
       throw new AccessDeniedException("只能访问自己的批量作业");
-    if (job.getExpiresAt().isBefore(BusinessTime.now())) throw new BusinessException("作业已过期，请重新执行");
+    }
+    if (job.getExpiresAt().isBefore(BusinessTime.now())) {
+      throw new BusinessException("作业已过期，请重新执行");
+    }
     if ("EXPORT".equals(job.getKind())) {
       adapter(job.getResource()).requireExport();
-      if (strict && !identity.signature().equals(job.getPermissionSignature()))
+      if (strict && !identity.signature().equals(job.getPermissionSignature())) {
         throw new AccessDeniedException("当前权限或数据范围已变化，请重新导出");
+      }
     }
     return job;
   }
@@ -245,19 +258,24 @@ public class BulkService {
 
   private BulkResourceAdapter adapter(String resource) {
     BulkResourceAdapter adapter = adapters.get(resource);
-    if (adapter == null) throw new BusinessException("该资源不支持批量数据操作");
+    if (adapter == null) {
+      throw new BusinessException("该资源不支持批量数据操作");
+    }
     return adapter;
   }
 
   /** 短扫描只提交已持久化作业；每实例最多两个执行线程，重启后的过期租约重新生成单份正文。 */
   @Scheduled(fixedDelayString = "${mayday.bulk.poll-ms:1000}", initialDelay = 3000)
   public synchronized void dispatch() {
-    if (!workersEnabled || worker.isShutdown() || running.size() >= 2) return;
+    if (!workersEnabled || worker.isShutdown() || running.size() >= 2) {
+      return;
+    }
     // 修复“业务作业已提交、排队之前崩溃”的窄窗口；稳定业务键保证重复协调不创建第二份队列。
     for (BulkJob job : jobs.findTop100ByKindAndStatusInOrderByIdAsc("EXPORT", ACTIVE)) {
       String key = String.valueOf(job.getId());
-      if (durable.state(TASK_TYPE, key) == null) durable.enqueue(TASK_TYPE, key, key, 3);
-      else
+      if (durable.state(TASK_TYPE, key) == null) {
+        durable.enqueue(TASK_TYPE, key, key, 3);
+      } else {
         durable.synchronizeTerminal(
             TASK_TYPE,
             key,
@@ -271,10 +289,13 @@ public class BulkService {
                                 "FAILED".equals(terminal) ? "自动恢复重试已达上限，可手动重试" : "已取消");
                           }
                         }));
+      }
     }
     while (running.size() < 2) {
       var lease = durable.claim(TASK_TYPE);
-      if (lease == null) return;
+      if (lease == null) {
+        return;
+      }
       running.put(lease.id(), lease);
       try {
         worker.execute(() -> execute(lease));
@@ -289,7 +310,9 @@ public class BulkService {
   /** 独立心跳不会等待文件或分页工作；取消/失效后不延长租约，旧线程下一次检查会退出。 */
   @Scheduled(fixedDelay = 5000)
   public void renewLeases() {
-    for (var lease : running.values()) durable.heartbeat(lease);
+    for (var lease : running.values()) {
+      durable.heartbeat(lease);
+    }
   }
 
   private void execute(DurableTasks.Lease lease) {
@@ -318,19 +341,27 @@ public class BulkService {
                 }));
         update(lease, id, "RUNNING", 0, 0);
         for (int page = 1; ; page++) {
-          if (Thread.currentThread().isInterrupted() || !durable.heartbeat(lease))
+          if (Thread.currentThread().isInterrupted() || !durable.heartbeat(lease)) {
             throw new DurableTasks.LostLease();
+          }
           int currentPage = page;
           var batch = asOwner(job, () -> adapter.exportPage(filter, currentPage));
-          if (batch.total() > MAX_EXPORT_ROWS || processed + batch.rows().size() > MAX_EXPORT_ROWS)
+          if (batch.total() > MAX_EXPORT_ROWS
+              || processed + batch.rows().size() > MAX_EXPORT_ROWS) {
             throw new BusinessException("单次最多导出 100000 条，请缩小筛选范围");
-          for (List<String> row : batch.rows()) CsvCodec.writeRow(output, row);
+          }
+          for (List<String> row : batch.rows()) {
+            CsvCodec.writeRow(output, row);
+          }
           processed += batch.rows().size();
           output.flush();
-          if (Files.size(temporary) > 32L * 1024 * 1024)
+          if (Files.size(temporary) > 32L * 1024 * 1024) {
             throw new BusinessException("单份导出最大 32 MB，请缩小筛选范围");
+          }
           update(lease, id, "RUNNING", processed, batch.total());
-          if (batch.rows().isEmpty() || processed >= batch.total()) break;
+          if (batch.rows().isEmpty() || processed >= batch.total()) {
+            break;
+          }
         }
       }
       int finalProcessed = processed;
@@ -345,7 +376,9 @@ public class BulkService {
                 });
             results.save(id, temporary);
             var current = jobs.lock(id).orElseThrow(DurableTasks.LostLease::new);
-            if ("CANCELLED".equals(current.getStatus())) throw new DurableTasks.LostLease();
+            if ("CANCELLED".equals(current.getStatus())) {
+              throw new DurableTasks.LostLease();
+            }
             current.setStatus("SUCCEEDED");
             current.setFailure(null);
             current.setProcessedRows(finalProcessed);
@@ -384,8 +417,9 @@ public class BulkService {
   /** 本人取消立即撤销租约；后台线程不再允许发布成功正文，已成功作业不可假装取消。 */
   public BulkContracts.JobView cancel(Long id) {
     BulkJob job = owned(id, false);
-    if (!"EXPORT".equals(job.getKind()) || !ACTIVE.contains(job.getStatus()))
+    if (!"EXPORT".equals(job.getKind()) || !ACTIVE.contains(job.getStatus())) {
       throw new BusinessException("作业当前不能取消");
+    }
     if (!durable.cancel(
         TASK_TYPE,
         String.valueOf(id),
@@ -393,11 +427,14 @@ public class BulkService {
             jobs.lock(id)
                 .ifPresent(
                     current -> {
-                      if (!ACTIVE.contains(current.getStatus()))
+                      if (!ACTIVE.contains(current.getStatus())) {
                         throw new BusinessException("作业状态已变化，请刷新");
+                      }
                       current.setStatus("CANCELLED");
                       current.setFailure("已取消");
-                    }))) throw new BusinessException("作业状态已变化，请刷新");
+                    }))) {
+      throw new BusinessException("作业状态已变化，请刷新");
+    }
     return view(id);
   }
 
@@ -405,26 +442,31 @@ public class BulkService {
   public BulkContracts.JobView retry(Long id) {
     BulkJob job = owned(id, true);
     if (!"EXPORT".equals(job.getKind())
-        || !List.of("FAILED", "CANCELLED").contains(job.getStatus()))
+        || !List.of("FAILED", "CANCELLED").contains(job.getStatus())) {
       throw new BusinessException("作业当前不能重试");
+    }
     if (!durable.retry(
         TASK_TYPE,
         String.valueOf(id),
         () -> {
           users.lockById(job.getOwnerId()).orElseThrow();
-          if (jobs.countByOwnerIdAndKindAndStatusIn(job.getOwnerId(), "EXPORT", ACTIVE) >= 2)
+          if (jobs.countByOwnerIdAndKindAndStatusIn(job.getOwnerId(), "EXPORT", ACTIVE) >= 2) {
             throw new BusinessException("已有两个导出任务执行中");
+          }
           jobs.lock(id)
               .ifPresent(
                   current -> {
-                    if (!List.of("FAILED", "CANCELLED").contains(current.getStatus()))
+                    if (!List.of("FAILED", "CANCELLED").contains(current.getStatus())) {
                       throw new BusinessException("作业状态已变化，请刷新");
+                    }
                     current.setStatus("QUEUED");
                     current.setFailure(null);
                     current.setProcessedRows(0);
                     current.setTotalRows(0);
                   });
-        })) throw new BusinessException("任务状态已变化，请刷新");
+        })) {
+      throw new BusinessException("任务状态已变化，请刷新");
+    }
     return view(id);
   }
 
@@ -441,8 +483,9 @@ public class BulkService {
               new UsernamePasswordAuthenticationToken(owner, null, List.of()));
           SecurityContextHolder.setContext(context);
           try {
-            if (!job.getPermissionSignature().equals(identity.signature()))
+            if (!job.getPermissionSignature().equals(identity.signature())) {
               throw new AccessDeniedException("权限或数据范围已变化，请重新导出");
+            }
             return work.get();
           } finally {
             SecurityContextHolder.clearContext();
@@ -469,14 +512,20 @@ public class BulkService {
 
   /** 存储键只由服务端 UUID 生成，文件名解析不能接受路径分隔符或客户端指定路径。 */
   private Path result(String key, boolean temporary) {
-    if (key == null || !key.matches("[a-f0-9-]{36}")) throw new BusinessException("导出文件标识异常");
+    if (key == null || !key.matches("[a-f0-9-]{36}")) {
+      throw new BusinessException("导出文件标识异常");
+    }
     Path path = spool.resolve(key + (temporary ? ".part" : ".csv")).normalize();
-    if (!path.startsWith(spool)) throw new BusinessException("导出路径异常");
+    if (!path.startsWith(spool)) {
+      throw new BusinessException("导出路径异常");
+    }
     return path;
   }
 
   private void deleteResult(BulkJob job) {
-    if (job.getResultKey() == null) return;
+    if (job.getResultKey() == null) {
+      return;
+    }
     try {
       Files.deleteIfExists(result(job.getResultKey(), true));
       Files.deleteIfExists(result(job.getResultKey(), false));
@@ -494,7 +543,9 @@ public class BulkService {
             deleteResult(job);
             if (job.getResultKey() == null
                 || !Files.exists(result(job.getResultKey(), false))
-                    && !Files.exists(result(job.getResultKey(), true))) jobs.delete(job);
+                    && !Files.exists(result(job.getResultKey(), true))) {
+              jobs.delete(job);
+            }
           }
         });
   }

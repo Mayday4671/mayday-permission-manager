@@ -1,7 +1,7 @@
 package com.mayday.operations.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.mayday.common.BaseEntity;
+import com.mayday.common.persistence.BaseEntity;
 import com.mybatisflex.annotation.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;

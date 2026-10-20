@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessTime;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.operations.mapper.FlowRequestMapper;
 import com.mayday.operations.mapper.FlowTaskMapper;
 import com.mayday.operations.model.FlowTask;
@@ -25,15 +25,22 @@ public class WorkflowReminders {
   @Transactional
   public void timeout(Long taskId) {
     FlowTask candidate = tasks.findById(taskId).orElse(null);
-    if (candidate == null) return;
+    if (candidate == null) {
+      return;
+    }
     var rootCandidate = requests.findById(candidate.getRequestId()).orElse(null);
-    if (rootCandidate != null && rootCandidate.getRootRequestId() != null)
+    if (rootCandidate != null && rootCandidate.getRootRequestId() != null) {
       requests.lockById(rootCandidate.getRootRequestId());
+    }
     var request = requests.lockById(candidate.getRequestId()).orElse(null);
-    if (request == null || !"PENDING".equals(request.getStatus())) return;
+    if (request == null || !"PENDING".equals(request.getStatus())) {
+      return;
+    }
     // 第一次读可能早于等待行锁；拿锁后重新读取，确保读到前一个决策事务提交后的任务状态。
     candidate = tasks.findById(taskId).orElse(null);
-    if (candidate == null) return;
+    if (candidate == null) {
+      return;
+    }
     LocalDateTime now = BusinessTime.now();
     if (!"PENDING".equals(candidate.getStatus())
         || (candidate.getExecutionTokenId() == null
@@ -41,7 +48,9 @@ public class WorkflowReminders {
             : !orchestrator.current(request, candidate))
         || candidate.getDueAt() == null
         || candidate.getDueAt().isAfter(now)
-        || candidate.getTimeoutNotifiedAt() != null) return;
+        || candidate.getTimeoutNotifiedAt() != null) {
+      return;
+    }
     events.enqueue(
         request,
         candidate.getAssigneeId(),

@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessTime;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.operations.MessagePublisher;
 import com.mayday.operations.mapper.BusinessEventMapper;
 import com.mayday.operations.mapper.NotificationMapper;
@@ -25,7 +25,9 @@ public class WorkflowEvents {
   /** 调用方必须处于业务事务；事件键稳定且唯一，事件不存储敏感表单值。 */
   @Transactional(propagation = Propagation.MANDATORY)
   public void enqueue(FlowRequest request, Long recipientId, String key, String text) {
-    if (events.existsByEventKey(key)) return;
+    if (events.existsByEventKey(key)) {
+      return;
+    }
     var event = new BusinessEvent();
     event.setRequestId(request.getId());
     event.setRecipientId(recipientId);
@@ -44,7 +46,9 @@ public class WorkflowEvents {
     var event = events.lockById(id).orElse(null);
     if (event == null
         || !"PENDING".equals(event.getStatus())
-        || event.getNextAttemptAt().isAfter(BusinessTime.now())) return;
+        || event.getNextAttemptAt().isAfter(BusinessTime.now())) {
+      return;
+    }
     if (notifications.findByEventKey(event.getEventKey()).isPresent()) {
       event.setStatus("DELIVERED");
       return;
@@ -72,7 +76,9 @@ public class WorkflowEvents {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void failed(Long id) {
     var event = events.lockById(id).orElse(null);
-    if (event == null || !"PENDING".equals(event.getStatus())) return;
+    if (event == null || !"PENDING".equals(event.getStatus())) {
+      return;
+    }
     event.setAttempts(Math.min(event.getAttempts() + 1, 10000));
     event.setNextAttemptAt(
         BusinessTime.now().plusSeconds(Math.min(3600, 1L << Math.min(12, event.getAttempts()))));

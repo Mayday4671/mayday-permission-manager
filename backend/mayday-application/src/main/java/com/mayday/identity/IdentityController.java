@@ -1,6 +1,6 @@
 package com.mayday.identity;
 
-import com.mayday.common.ApiResponse;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.web.Contracts.LoginView;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,34 +34,10 @@ public class IdentityController {
 
   private final Environment environment;
 
-  /** 敏感身份变更必须当场证明本地密码，已开通 MFA 时同时提交一次性因素。 */
-  public record Proof(@NotBlank @Size(max = 72) String password, @Size(max = 64) String factor) {}
-
-  /** 管理恢复不能省略理由，目标范围和账号授权等级由服务端再次检查。 */
-  public record Recovery(
-      @NotBlank @Size(max = 72) String password,
-      @Size(max = 64) String factor,
-      @NotBlank @Size(max = 300) String reason) {}
-
-  /** 首因素已通过的短期挑战，不接受用户 ID、角色或启用标记。 */
-  public record Verify(
-      @NotBlank @Size(max = 64) String challengeId, @NotBlank @Size(max = 64) String factor) {}
-
-  /** 提供方只允许部署注册标识，任意 callback URL/issuer 不能由页面传入。 */
-  public record Start(@NotBlank @Size(max = 32) String providerId) {}
-
-  /** 绑定以当前会话固定本人，显式再次校验本地密码和现有 MFA。 */
-  public record Bind(
-      @NotBlank @Size(max = 32) String providerId,
-      @NotBlank @Size(max = 72) String password,
-      @Size(max = 64) String factor) {}
-
-  /** 授权回调只接收短期 code/state；服务端同时要求 HttpOnly 浏览器关联，绝不接受企业角色。 */
-  public record Callback(
-      @NotBlank @Size(max = 64) String state, @NotBlank @Size(max = 4096) String code) {}
-
-  /** 对外授权 URL 不包含浏览器关联秘密，cookie 由服务端写入。 */
-  public record Authorization(String authorizationUrl) {}
+  private static String bearer(HttpServletRequest request) {
+    String value = request.getHeader(HttpHeaders.AUTHORIZATION);
+    return value != null && value.startsWith("Bearer ") ? value.substring(7) : null;
+  }
 
   /** 匿名只能读取已启用名称，不返回客户端密钥、企业内网地址或本地账号映射。 */
   @GetMapping("/providers")
@@ -203,8 +179,32 @@ public class IdentityController {
         .build();
   }
 
-  private static String bearer(HttpServletRequest request) {
-    String value = request.getHeader(HttpHeaders.AUTHORIZATION);
-    return value != null && value.startsWith("Bearer ") ? value.substring(7) : null;
-  }
+  /** 敏感身份变更必须当场证明本地密码，已开通 MFA 时同时提交一次性因素。 */
+  public record Proof(@NotBlank @Size(max = 72) String password, @Size(max = 64) String factor) {}
+
+  /** 管理恢复不能省略理由，目标范围和账号授权等级由服务端再次检查。 */
+  public record Recovery(
+      @NotBlank @Size(max = 72) String password,
+      @Size(max = 64) String factor,
+      @NotBlank @Size(max = 300) String reason) {}
+
+  /** 首因素已通过的短期挑战，不接受用户 ID、角色或启用标记。 */
+  public record Verify(
+      @NotBlank @Size(max = 64) String challengeId, @NotBlank @Size(max = 64) String factor) {}
+
+  /** 提供方只允许部署注册标识，任意 callback URL/issuer 不能由页面传入。 */
+  public record Start(@NotBlank @Size(max = 32) String providerId) {}
+
+  /** 绑定以当前会话固定本人，显式再次校验本地密码和现有 MFA。 */
+  public record Bind(
+      @NotBlank @Size(max = 32) String providerId,
+      @NotBlank @Size(max = 72) String password,
+      @Size(max = 64) String factor) {}
+
+  /** 授权回调只接收短期 code/state；服务端同时要求 HttpOnly 浏览器关联，绝不接受企业角色。 */
+  public record Callback(
+      @NotBlank @Size(max = 64) String state, @NotBlank @Size(max = 4096) String code) {}
+
+  /** 对外授权 URL 不包含浏览器关联秘密，cookie 由服务端写入。 */
+  public record Authorization(String authorizationUrl) {}
 }

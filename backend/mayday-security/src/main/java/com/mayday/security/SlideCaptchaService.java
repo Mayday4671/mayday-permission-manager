@@ -1,6 +1,6 @@
 package com.mayday.security;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.GradientPaint;
@@ -44,26 +44,6 @@ public class SlideCaptchaService {
   private final Clock clock;
   private final SecurityState state;
 
-  /** 服务端挑战答案及绑定上下文；目标横坐标只留在服务器数据库，不包含在任何公开响应。 */
-  private record Challenge(String username, String source, int x, long issuedAt) {}
-
-  /** 通过拼图后的短期一次性凭证；仍绑定用户名与来源，不能代替密码登录或跨账号使用。 */
-  private record Proof(String username, String source, long expiresAt) {}
-
-  /** 仅下发背景、拼图栅格和必要尺寸；纵坐标可公开，目标横坐标与图形矢量描述绝不返回。 */
-  public record Puzzle(
-      String challengeId,
-      String background,
-      String piece,
-      int width,
-      int height,
-      int pieceSize,
-      int y,
-      int expiresIn) {}
-
-  /** 登录前仅能消费一次的短期证明；页面应按 expiresIn 秒重新验证，不能持久化为登录会话。 */
-  public record Verification(String captchaToken, int expiresIn) {}
-
   /** Spring 只装配数据库共享状态，不存在生产内存回退或关闭验证码的配置入口。 */
   @Autowired
   public SlideCaptchaService(SecurityStateStore state) {
@@ -77,10 +57,6 @@ public class SlideCaptchaService {
     this.state = state;
   }
 
-  private long now() {
-    return clock == null ? state.now() : clock.millis();
-  }
-
   private static String encode(String value) {
     return Base64.getUrlEncoder()
         .withoutPadding()
@@ -89,6 +65,20 @@ public class SlideCaptchaService {
 
   private static String decode(String value) {
     return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+  }
+
+  private static String png(BufferedImage image) {
+    try {
+      ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+      ImageIO.write(image, "png", bytes);
+      return "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes.toByteArray());
+    } catch (IOException error) {
+      throw new IllegalStateException("无法生成登录验证图片", error);
+    }
+  }
+
+  private long now() {
+    return clock == null ? state.now() : clock.millis();
   }
 
   private String nonce() {
@@ -137,7 +127,9 @@ public class SlideCaptchaService {
         || elapsedMs < 300
         || elapsedMs > CHALLENGE_TTL
         || now - challenge.issuedAt() < elapsedMs - 150
-        || now - challenge.issuedAt() < 300) throw new BusinessException(INVALID);
+        || now - challenge.issuedAt() < 300) {
+      throw new BusinessException(INVALID);
+    }
     String token = nonce();
     state.proof(
         token,
@@ -158,7 +150,9 @@ public class SlideCaptchaService {
     if (proof == null
         || now() >= proof.expiresAt()
         || !proof.username().equals(username)
-        || !proof.source().equals(source)) throw new BusinessException("请先完成滑动验证");
+        || !proof.source().equals(source)) {
+      throw new BusinessException("请先完成滑动验证");
+    }
   }
 
   /** 无外部图片请求，也不使用字体；每次生成不同几何纹理，并裁出真实拼图块。 */
@@ -177,11 +171,12 @@ public class SlideCaptchaService {
       int pointX = random.nextInt(WIDTH),
           pointY = random.nextInt(HEIGHT),
           size = 16 + random.nextInt(64);
-      if (index % 2 == 0)
+      if (index % 2 == 0) {
         backgroundGraphics.fillOval(pointX - size / 2, pointY - size / 2, size, size);
-      else
+      } else {
         backgroundGraphics.fillRoundRect(
             pointX - size / 2, pointY - size / 2, size, size / 2, 6, 6);
+      }
     }
     Area shape = new Area(new RoundRectangle2D.Double(5, 10, 38, 33, 5, 5));
     shape.add(new Area(new Ellipse2D.Double(17, 2, 14, 16)));
@@ -208,13 +203,23 @@ public class SlideCaptchaService {
     return new String[] {png(background), png(piece)};
   }
 
-  private static String png(BufferedImage image) {
-    try {
-      ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-      ImageIO.write(image, "png", bytes);
-      return "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes.toByteArray());
-    } catch (IOException error) {
-      throw new IllegalStateException("无法生成登录验证图片", error);
-    }
-  }
+  /** 服务端挑战答案及绑定上下文；目标横坐标只留在服务器数据库，不包含在任何公开响应。 */
+  private record Challenge(String username, String source, int x, long issuedAt) {}
+
+  /** 通过拼图后的短期一次性凭证；仍绑定用户名与来源，不能代替密码登录或跨账号使用。 */
+  private record Proof(String username, String source, long expiresAt) {}
+
+  /** 仅下发背景、拼图栅格和必要尺寸；纵坐标可公开，目标横坐标与图形矢量描述绝不返回。 */
+  public record Puzzle(
+      String challengeId,
+      String background,
+      String piece,
+      int width,
+      int height,
+      int pieceSize,
+      int y,
+      int expiresIn) {}
+
+  /** 登录前仅能消费一次的短期证明；页面应按 expiresIn 秒重新验证，不能持久化为登录会话。 */
+  public record Verification(String captchaToken, int expiresIn) {}
 }

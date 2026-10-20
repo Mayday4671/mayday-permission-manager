@@ -1,6 +1,6 @@
 package com.mayday.system.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.system.model.ChangeAudit;
 import org.apache.ibatis.annotations.Mapper;
 

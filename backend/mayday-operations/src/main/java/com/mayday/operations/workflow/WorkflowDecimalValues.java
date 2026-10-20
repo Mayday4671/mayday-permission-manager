@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.workflow.WorkflowSchema.Field;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -21,9 +21,11 @@ public final class WorkflowDecimalValues {
   /** 当前值与提交历史共用此边界；只转换已经存在的字段，不增加任何未授权值。 */
   public static Map<String, Object> view(List<Field> fields, Map<String, Object> values) {
     Map<String, Object> result = new LinkedHashMap<>();
-    for (Field field : fields)
-      if (values.containsKey(field.id()))
+    for (Field field : fields) {
+      if (values.containsKey(field.id())) {
         result.put(field.id(), value(field, values.get(field.id())));
+      }
+    }
     return result;
   }
 
@@ -32,17 +34,24 @@ public final class WorkflowDecimalValues {
     Map<String, Object> result = new LinkedHashMap<>();
     for (Field field : fields) {
       Object change = changes.get(field.id());
-      if (!(change instanceof Map<?, ?> sides)) continue;
+      if (!(change instanceof Map<?, ?> sides)) {
+        continue;
+      }
       Map<String, Object> converted = new LinkedHashMap<>();
-      for (String side : List.of("before", "after"))
-        if (sides.containsKey(side)) converted.put(side, value(field, sides.get(side)));
+      for (String side : List.of("before", "after")) {
+        if (sides.containsKey(side)) {
+          converted.put(side, value(field, sides.get(side)));
+        }
+      }
       result.put(field.id(), converted);
     }
     return result;
   }
 
   private static Object value(Field field, Object raw) {
-    if (raw == null) return null;
+    if (raw == null) {
+      return null;
+    }
     if (DECIMAL_TYPES.contains(field.type())) {
       try {
         // 兼容旧 JSON 的整数和字符串；调用者仍必须先通过实例访问与字段权限校验。
@@ -58,11 +67,15 @@ public final class WorkflowDecimalValues {
     if ("DETAILS".equals(field.type()) && raw instanceof List<?> rows) {
       List<Map<String, Object>> result = new ArrayList<>();
       for (Object row : rows) {
-        if (!(row instanceof Map<?, ?> columns)) throw new BusinessException("审批明细快照无法读取，请联系管理员");
+        if (!(row instanceof Map<?, ?> columns)) {
+          throw new BusinessException("审批明细快照无法读取，请联系管理员");
+        }
         Map<String, Object> cells = new LinkedHashMap<>();
-        for (Field column : field.columns())
-          if (columns.containsKey(column.id()))
+        for (Field column : field.columns()) {
+          if (columns.containsKey(column.id())) {
             cells.put(column.id(), value(column, columns.get(column.id())));
+          }
+        }
         result.add(cells);
       }
       return result;

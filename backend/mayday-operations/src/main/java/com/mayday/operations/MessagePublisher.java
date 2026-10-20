@@ -1,8 +1,8 @@
 package com.mayday.operations;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.RichText;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.util.RichText;
 import com.mayday.operations.mapper.DeliveryMapper;
 import com.mayday.operations.mapper.NotificationMapper;
 import com.mayday.operations.model.Delivery;
@@ -44,12 +44,15 @@ public class MessagePublisher {
         || senderName == null
         || senderName.length() > 64
         || targetType == null
-        || targetType.length() > 24) throw new BusinessException("消息参数不完整或超过最大长度");
+        || targetType.length() > 24) {
+      throw new BusinessException("消息参数不完整或超过最大长度");
+    }
     var user = users.lockById(recipientId).orElseThrow(() -> new BusinessException("消息接收账号不存在"));
     var previous = notifications.findByEventKey(eventKey).orElse(null);
     if (previous != null) {
-      if (!previous.getRecipientIds().equals(Set.of(recipientId)))
+      if (!previous.getRecipientIds().equals(Set.of(recipientId))) {
         throw new BusinessException("消息事件键已被其他接收者使用");
+      }
       return previous.getId();
     }
     Notification notification = new Notification();

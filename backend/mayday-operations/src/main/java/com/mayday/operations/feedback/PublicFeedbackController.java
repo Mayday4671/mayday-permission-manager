@@ -1,6 +1,6 @@
 package com.mayday.operations.feedback;
 
-import com.mayday.common.ApiResponse;
+import com.mayday.common.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -18,9 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicFeedbackController {
   private final FeedbackService service;
 
-  /** 查询码只通过POST正文传递，长度限制先于查询；不会要求客户填写后台账号或反馈ID。 */
-  public record Track(@NotBlank @Size(max = 48) String receipt) {}
-
   /** 对真实连接地址限频后接收客户反馈，响应只含查询码和创建时间；不信任可伪造的客户端代理头。 */
   @PostMapping
   public ApiResponse<FeedbackService.Receipt> submit(
@@ -36,4 +33,7 @@ public class PublicFeedbackController {
     service.limit(request.getRemoteAddr(), false);
     return ApiResponse.ok(service.track(body.receipt()));
   }
+
+  /** 查询码只通过POST正文传递，长度限制先于查询；不会要求客户填写后台账号或反馈ID。 */
+  public record Track(@NotBlank @Size(max = 48) String receipt) {}
 }

@@ -1,9 +1,9 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.ConflictException;
-import com.mayday.common.ServiceUnavailableException;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.exception.ConflictException;
+import com.mayday.common.exception.ServiceUnavailableException;
+import com.mayday.common.web.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -102,7 +102,7 @@ public class ApiExceptionHandler {
 
   /** 静态资源与不存在的 API 路径统一返回 404，不能被兜底异常处理误报为服务器故障。 */
   @ExceptionHandler({
-    com.mayday.common.ResourceNotFoundException.class,
+    com.mayday.common.exception.ResourceNotFoundException.class,
     org.springframework.web.servlet.resource.NoResourceFoundException.class,
     org.springframework.web.servlet.NoHandlerFoundException.class
   })

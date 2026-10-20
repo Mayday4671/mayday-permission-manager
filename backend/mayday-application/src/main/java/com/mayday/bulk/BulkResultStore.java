@@ -33,8 +33,9 @@ public class BulkResultStore {
   public void save(long jobId, Path source) {
     try (InputStream input = Files.newInputStream(source)) {
       long size = Files.size(source);
-      if (size > 32L * 1024 * 1024)
-        throw new com.mayday.common.BusinessException("单份导出最大 32 MB，请缩小筛选范围");
+      if (size > 32L * 1024 * 1024) {
+        throw new com.mayday.common.exception.BusinessException("单份导出最大 32 MB，请缩小筛选范围");
+      }
       results.upsert(jobId, input.readAllBytes());
     } catch (IOException failure) {
       throw new IllegalStateException("导出正文提交失败", failure);
@@ -46,8 +47,9 @@ public class BulkResultStore {
     // 固定条带锁没有按作业增长的内存表；等待者锁内复查，避免Windows覆盖正在被读取的完整文件。
     synchronized (cacheLocks[stripe(target)]) {
       if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-        if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS))
+        if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
           throw new IllegalStateException("导出缓存类型异常");
+        }
         return true;
       }
       return restoreMissing(jobId, target);
@@ -59,8 +61,9 @@ public class BulkResultStore {
     int index = stripe(target);
     synchronized (cacheLocks[index]) {
       try {
-        if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS))
+        if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
           throw new IllegalStateException("导出缓存类型异常");
+        }
         long now = results.nowMillis();
         Files.setLastModifiedTime(target, FileTime.fromMillis(now));
       } catch (IOException failure) {
@@ -79,7 +82,9 @@ public class BulkResultStore {
             @Override
             public void close() throws IOException {
               synchronized (cacheLocks[index]) {
-                if (closed) return;
+                if (closed) {
+                  return;
+                }
                 closed = true;
                 try {
                   super.close();
@@ -99,13 +104,17 @@ public class BulkResultStore {
       throws IOException {
     int index = stripe(target);
     synchronized (cacheLocks[index]) {
-      if (readers[index] != 0) return false;
+      if (readers[index] != 0) {
+        return false;
+      }
       var current =
           Files.readAttributes(target, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
       if (!current.isRegularFile()
           || current.isSymbolicLink()
           || !java.util.Objects.equals(current.fileKey(), expectedFileKey)
-          || current.lastModifiedTime().toMillis() >= cutoff) return false;
+          || current.lastModifiedTime().toMillis() >= cutoff) {
+        return false;
+      }
       return Files.deleteIfExists(target);
     }
   }
@@ -117,7 +126,9 @@ public class BulkResultStore {
   /** 只在作业缓存锁内写缺失结果；先写完整临时文件，再发布不可变缓存供并发下载读取。 */
   private boolean restoreMissing(long jobId, Path target) {
     var content = results.load(jobId);
-    if (content.isEmpty()) return false;
+    if (content.isEmpty()) {
+      return false;
+    }
     Path temporary = null;
     try {
       // 完整写入唯一临时文件后才发布目标，避免另一个下载请求把半写缓存误认为完整文件。
@@ -134,12 +145,13 @@ public class BulkResultStore {
     } catch (IOException failure) {
       throw new IllegalStateException("导出下载缓存创建失败", failure);
     } finally {
-      if (temporary != null)
+      if (temporary != null) {
         try {
           Files.deleteIfExists(temporary);
         } catch (IOException ignored) {
           /* 仅清理本次下载创建的临时文件。 */
         }
+      }
     }
   }
 }

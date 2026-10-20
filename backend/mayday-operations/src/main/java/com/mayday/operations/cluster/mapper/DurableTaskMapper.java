@@ -20,7 +20,8 @@ public interface DurableTaskMapper {
   /** 幂等入队：同键已存在时忽略插入，再锁定现有行校验内容一致。 */
   default void enqueue(String type, String key, String payload, int maxAttempts, long now) {
     Db.updateBySql(
-        "insert ignore into sys_durable_task(task_type,business_key,payload,status,attempts,max_attempts,next_attempt_at,created_at,updated_at) values(?,?,?,'QUEUED',0,?,?,?,?)",
+        "insert ignore into sys_durable_task(task_type,business_key,payload,status,attempts,max_attempts,"
+            + "next_attempt_at,created_at,updated_at) values(?,?,?,'QUEUED',0,?,?,?,?)",
         type,
         key,
         payload,
@@ -62,7 +63,8 @@ public interface DurableTaskMapper {
   /** 达到重试上限直接终态失败，租约清空。 */
   default void markFailedByCap(long id, long now) {
     Db.updateBySql(
-        "update sys_durable_task set status='FAILED',last_error='任务重试次数已达上限',lease_token=null,lease_until=null,updated_at=? where id=?",
+        "update sys_durable_task set status='FAILED',last_error='任务重试次数已达上限',lease_token=null,lease_until=null,"
+            + "updated_at=? where id=?",
         now,
         id);
   }
@@ -71,7 +73,8 @@ public interface DurableTaskMapper {
   default void markRunning(
       long id, int attempt, String instance, String token, long leaseUntil, long now) {
     Db.updateBySql(
-        "update sys_durable_task set status='RUNNING',attempts=?,lease_owner=?,lease_token=?,lease_until=?,heartbeat_at=?,updated_at=? where id=?",
+        "update sys_durable_task set status='RUNNING',attempts=?,lease_owner=?,lease_token=?,lease_until=?,"
+            + "heartbeat_at=?,updated_at=? where id=?",
         attempt,
         instance,
         token,
@@ -84,7 +87,8 @@ public interface DurableTaskMapper {
   /** 心跳只延长仍有效的原租约；影响行数即结果。 */
   default int heartbeat(long id, String token, long leaseUntil, long now) {
     return Db.updateBySql(
-        "update sys_durable_task set lease_until=?,heartbeat_at=?,updated_at=? where id=? and status='RUNNING' and lease_token=? and lease_until>?",
+        "update sys_durable_task set lease_until=?,heartbeat_at=?,updated_at=? where id=? and status='RUNNING' and "
+            + "lease_token=? and lease_until>?",
         leaseUntil,
         now,
         now,
@@ -108,7 +112,8 @@ public interface DurableTaskMapper {
   /** 完成即清租约；旧令牌不能再改状态。 */
   default void markSucceeded(long id, long now) {
     Db.updateBySql(
-        "update sys_durable_task set status='SUCCEEDED',lease_token=null,lease_until=null,last_error=null,updated_at=? where id=?",
+        "update sys_durable_task set status='SUCCEEDED',lease_token=null,lease_until=null,last_error=null,updated_at=? "
+            + "where id=?",
         now,
         id);
   }
@@ -116,7 +121,8 @@ public interface DurableTaskMapper {
   /** 失败或重排；退避上限 60 秒、指数叠加由调用方计算。 */
   default void markOutcome(long id, String status, String error, long nextAttemptAt, long now) {
     Db.updateBySql(
-        "update sys_durable_task set status=?,lease_token=null,lease_until=null,last_error=?,next_attempt_at=?,updated_at=? where id=?",
+        "update sys_durable_task set status=?,lease_token=null,lease_until=null,last_error=?,next_attempt_at=?,"
+            + "updated_at=? where id=?",
         status,
         error,
         nextAttemptAt,
@@ -127,7 +133,8 @@ public interface DurableTaskMapper {
   /** 取消仍在排队或运行的作业；影响行数决定业务回执。 */
   default int cancelQueuedOrRunning(String type, String key, long now) {
     return Db.updateBySql(
-        "update sys_durable_task set status='CANCELLED',lease_token=null,lease_until=null,updated_at=? where task_type=? and business_key=? and status in ('QUEUED','RUNNING')",
+        "update sys_durable_task set status='CANCELLED',lease_token=null,lease_until=null,updated_at=? where "
+            + "task_type=? and business_key=? and status in ('QUEUED','RUNNING')",
         now,
         type,
         key);
@@ -136,7 +143,8 @@ public interface DurableTaskMapper {
   /** 从终态恢复重试；尝试次数清零但保留作业身份。 */
   default int retryFailed(String type, String key, long now) {
     return Db.updateBySql(
-        "update sys_durable_task set status='QUEUED',attempts=0,last_error=null,next_attempt_at=?,updated_at=? where task_type=? and business_key=? and status in ('FAILED','CANCELLED')",
+        "update sys_durable_task set status='QUEUED',attempts=0,last_error=null,next_attempt_at=?,updated_at=? where "
+            + "task_type=? and business_key=? and status in ('FAILED','CANCELLED')",
         now,
         now,
         type,
@@ -156,7 +164,9 @@ public interface DurableTaskMapper {
     return ((Number)
             Db.selectObject(
                 "select count(*) from sys_durable_task where task_type='BULK_EXPORT' and"
-                    + " lease_token=? and status='RUNNING' and lease_until>cast(unix_timestamp(current_timestamp(3))*1000 as unsigned)",
+                    + " lease_token=? and status='RUNNING' and lease_until>cast(unix_timestamp(current_timestamp(3))*1000"
+                    + " as "
+                    + "unsigned)",
                 leaseToken))
         .longValue();
   }

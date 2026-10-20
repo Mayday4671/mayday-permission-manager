@@ -1,18 +1,12 @@
 package com.mayday.security;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
 
 /** 仅测试源码中的共享状态替身；生产模块不包含它，真实多实例检查仍必须连接 MySQL。 */
 final class TestSecurityState implements SecurityState {
-  /** 测试一次性条目；与可推进时钟共同验证先消费和有效期，不属于生产存储。 */
-  private record Entry(String kind, String subject, String value, long expiry) {}
-
-  /** 测试固定窗口只保存次数及结束时间，后续失败不延长原窗口。 */
-  private record Window(int count, long expiry) {}
-
   private final Clock clock;
   private final Map<String, Entry> entries = new HashMap<>();
   private final Map<String, Window> rates = new HashMap<>();
@@ -44,7 +38,9 @@ final class TestSecurityState implements SecurityState {
   public synchronized void reserveChallenge(String source) {
     prune();
     var rate = rates.get("captcha:" + source);
-    if (rate != null && rate.count() >= 120) throw new BusinessException("验证请求过于频繁，请稍后再试");
+    if (rate != null && rate.count() >= 120) {
+      throw new BusinessException("验证请求过于频繁，请稍后再试");
+    }
     increment("captcha:" + source, 60000);
   }
 
@@ -90,4 +86,10 @@ final class TestSecurityState implements SecurityState {
   public synchronized void succeeded(String account) {
     rates.remove("account:" + account);
   }
+
+  /** 测试一次性条目；与可推进时钟共同验证先消费和有效期，不属于生产存储。 */
+  private record Entry(String kind, String subject, String value, long expiry) {}
+
+  /** 测试固定窗口只保存次数及结束时间，后续失败不延长原窗口。 */
+  private record Window(int count, long expiry) {}
 }

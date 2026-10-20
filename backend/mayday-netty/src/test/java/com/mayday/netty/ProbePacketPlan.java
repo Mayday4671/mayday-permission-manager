@@ -6,7 +6,9 @@ package com.mayday.netty;
 record ProbePacketPlan(int offset, int count, long bytes, int minSize, int maxSize) {
   /** 用固定散列从序号推导包长，源端和接收端可独立重建计划，重复运行不会随机改变验收条件。 */
   static int length(long sequence, int min, int max) {
-    if (min == max) return min;
+    if (min == max) {
+      return min;
+    }
     int value = (int) sequence + 0x9e3779b9;
     value ^= value >>> 16;
     value *= 0x85ebca6b;
@@ -25,16 +27,21 @@ record ProbePacketPlan(int offset, int count, long bytes, int minSize, int maxSi
         || mbps < 1
         || mbps > 1000
         || seconds < 1
-        || seconds > 600) throw new IllegalArgumentException("变长测试范围无效");
+        || seconds > 600) {
+      throw new IllegalArgumentException("变长测试范围无效");
+    }
     long budget = (long) (mbps * 1e6 / 8 * seconds), bytes = 0;
     int count = 0;
     while (true) {
       int next = length((long) offset + count, min, max);
-      if (bytes + next > budget) break;
+      if (bytes + next > budget) {
+        break;
+      }
       bytes += next;
       count++;
-      if (count > 20_000_000 || offset + (long) count > Integer.MAX_VALUE)
+      if (count > 20_000_000 || offset + (long) count > Integer.MAX_VALUE) {
         throw new IllegalArgumentException("单轮序号范围过大");
+      }
     }
     return new ProbePacketPlan(offset, count, bytes, min, max);
   }

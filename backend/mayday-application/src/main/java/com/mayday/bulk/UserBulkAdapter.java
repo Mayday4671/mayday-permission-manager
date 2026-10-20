@@ -1,6 +1,6 @@
 package com.mayday.bulk;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.UserService;
 import com.mayday.system.mapper.EntryMapper;
@@ -58,7 +58,9 @@ public class UserBulkAdapter implements BulkResourceAdapter {
   public void requireImport() {
     access.require("users:import");
     access.require("users:create");
-    if (!"ALL".equals(access.scope("users"))) throw new AccessDeniedException("当前用户数据范围不允许导入账号");
+    if (!"ALL".equals(access.scope("users"))) {
+      throw new AccessDeniedException("当前用户数据范围不允许导入账号");
+    }
   }
 
   @Override
@@ -71,10 +73,18 @@ public class UserBulkAdapter implements BulkResourceAdapter {
   @Override
   public List<String> templateHeaders() {
     List<String> headers = new ArrayList<>(List.of("username", "nickname", "password", "enabled"));
-    if (contact("email", "write")) headers.add("email");
-    if (contact("phone", "write")) headers.add("phone");
-    if (access.admin()) headers.add("departmentId");
-    if (access.has("users:assign")) headers.add("roleIds");
+    if (contact("email", "write")) {
+      headers.add("email");
+    }
+    if (contact("phone", "write")) {
+      headers.add("phone");
+    }
+    if (access.admin()) {
+      headers.add("departmentId");
+    }
+    if (access.has("users:assign")) {
+      headers.add("roleIds");
+    }
     headers.add("postIds");
     return headers;
   }
@@ -83,8 +93,9 @@ public class UserBulkAdapter implements BulkResourceAdapter {
   public BulkContracts.ImportPreview preview(CsvCodec.Document document) {
     requireImport();
     if (!HEADERS.containsAll(document.headers())
-        || !document.headers().containsAll(List.of("username", "nickname", "password")))
+        || !document.headers().containsAll(List.of("username", "nickname", "password"))) {
       throw new BusinessException("请使用用户导入模板，必须包含 username、nickname、password 标题");
+    }
     List<BulkContracts.ImportRow> result = new ArrayList<>();
     Set<String> usernames = new HashSet<>();
     int validRows = 0;
@@ -94,7 +105,9 @@ public class UserBulkAdapter implements BulkResourceAdapter {
       // 预览不返回初始密码，错误报告也不能带回该字段原文。
       Map<String, String> safe = new LinkedHashMap<>(values);
       safe.put("password", values.getOrDefault("password", "").isBlank() ? "未提供" : "已提供");
-      if (errors.isEmpty()) validRows++;
+      if (errors.isEmpty()) {
+        validRows++;
+      }
       result.add(
           new BulkContracts.ImportRow(document.rowNumbers().get(index), safe, List.copyOf(errors)));
     }
@@ -105,16 +118,24 @@ public class UserBulkAdapter implements BulkResourceAdapter {
   @Override
   public int commit(CsvCodec.Document document) {
     BulkContracts.ImportPreview preview = preview(document);
-    if (preview.validRows() != preview.totalRows()) throw new BusinessException("导入包含错误，请先修正全部错误行");
-    for (List<String> row : document.rows()) userService.save(null, request(values(document, row)));
+    if (preview.validRows() != preview.totalRows()) {
+      throw new BusinessException("导入包含错误，请先修正全部错误行");
+    }
+    for (List<String> row : document.rows()) {
+      userService.save(null, request(values(document, row)));
+    }
     return document.rows().size();
   }
 
   @Override
   public List<String> exportHeaders() {
     List<String> headers = new ArrayList<>(List.of("用户名", "姓名", "部门", "角色"));
-    if (contact("email", "read")) headers.add("邮箱");
-    if (contact("phone", "read")) headers.add("电话");
+    if (contact("email", "read")) {
+      headers.add("邮箱");
+    }
+    if (contact("phone", "read")) {
+      headers.add("电话");
+    }
     headers.add("状态");
     return headers;
   }
@@ -136,8 +157,12 @@ public class UserBulkAdapter implements BulkResourceAdapter {
                               user.nickname(),
                               user.departmentName(),
                               String.join("、", user.roleNames())));
-                  if (contact("email", "read")) cells.add(user.email());
-                  if (contact("phone", "read")) cells.add(user.phone());
+                  if (contact("email", "read")) {
+                    cells.add(user.email());
+                  }
+                  if (contact("phone", "read")) {
+                    cells.add(user.phone());
+                  }
                   cells.add(user.enabled() ? "启用" : "停用");
                   return cells;
                 })
@@ -165,37 +190,53 @@ public class UserBulkAdapter implements BulkResourceAdapter {
     } catch (BusinessException exception) {
       errors.add(exception.getMessage());
     }
-    if (!usernames.add(request.username())) errors.add("文件内用户名重复");
-    if (users.findByUsername(request.username()).isPresent()) errors.add("用户名已存在");
+    if (!usernames.add(request.username())) {
+      errors.add("文件内用户名重复");
+    }
+    if (users.findByUsername(request.username()).isPresent()) {
+      errors.add("用户名已存在");
+    }
     if (!request.roleIds().isEmpty()) {
-      if (!access.has("users:assign")) errors.add("没有分配角色的权限");
-      else {
+      if (!access.has("users:assign")) {
+        errors.add("没有分配角色的权限");
+      } else {
         List<SysRole> assigned = roles.findAllById(request.roleIds());
         if (assigned.size() != request.roleIds().size()
-            || assigned.stream().anyMatch(role -> !role.isEnabled())) errors.add("角色不存在或已停用");
-        else
+            || assigned.stream().anyMatch(role -> !role.isEnabled())) {
+          errors.add("角色不存在或已停用");
+        } else {
           try {
             access.checkGrant(assigned);
           } catch (AccessDeniedException exception) {
             errors.add("角色超出当前账号的委托权限");
           }
+        }
       }
     }
     if (request.departmentId() != null) {
-      if (!access.admin()) errors.add("创建部门账号需要超级管理员");
-      else if (entries
+      if (!access.admin()) {
+        errors.add("创建部门账号需要超级管理员");
+      } else if (entries
           .findById(request.departmentId())
           .filter(entry -> "departments".equals(entry.getKind()) && entry.isEnabled())
-          .isEmpty()) errors.add("部门不存在或已停用");
+          .isEmpty()) {
+        errors.add("部门不存在或已停用");
+      }
     }
     if (!request.postIds().isEmpty()) {
       List<SystemEntry> posts = entries.findAllById(request.postIds());
       if (posts.size() != request.postIds().size()
-          || posts.stream().anyMatch(post -> !"posts".equals(post.getKind()) || !post.isEnabled()))
+          || posts.stream()
+              .anyMatch(post -> !"posts".equals(post.getKind()) || !post.isEnabled())) {
         errors.add("岗位不存在或已停用");
+      }
     }
-    if (request.email() != null && !contact("email", "write")) errors.add("没有修改邮箱的权限");
-    if (request.phone() != null && !contact("phone", "write")) errors.add("没有修改电话的权限");
+    if (request.email() != null && !contact("email", "write")) {
+      errors.add("没有修改邮箱的权限");
+    }
+    if (request.phone() != null && !contact("phone", "write")) {
+      errors.add("没有修改电话的权限");
+    }
     return errors;
   }
 
@@ -211,9 +252,12 @@ public class UserBulkAdapter implements BulkResourceAdapter {
 
   private UserRequest request(Map<String, String> values) {
     String enabled = values.getOrDefault("enabled", "true");
-    if (enabled.isBlank()) enabled = "true";
-    if (!Set.of("true", "false").contains(enabled))
+    if (enabled.isBlank()) {
+      enabled = "true";
+    }
+    if (!Set.of("true", "false").contains(enabled)) {
       throw new BusinessException("enabled 只能填写 true 或 false");
+    }
     return new UserRequest(
         values.get("username"),
         values.get("nickname"),
@@ -228,10 +272,14 @@ public class UserBulkAdapter implements BulkResourceAdapter {
   }
 
   private Long identifier(String value) {
-    if (value == null || value.isBlank()) return null;
+    if (value == null || value.isBlank()) {
+      return null;
+    }
     try {
       long id = Long.parseLong(value);
-      if (id <= 0) throw new NumberFormatException();
+      if (id <= 0) {
+        throw new NumberFormatException();
+      }
       return id;
     } catch (NumberFormatException exception) {
       throw new BusinessException("部门、角色和岗位 ID 必须为正整数，多项用分号分隔");
@@ -239,12 +287,18 @@ public class UserBulkAdapter implements BulkResourceAdapter {
   }
 
   private Set<Long> identifiers(String value) {
-    if (value == null || value.isBlank()) return Set.of();
-    if (value.split(";", -1).length > 50) throw new BusinessException("角色或岗位最多填写 50 项");
+    if (value == null || value.isBlank()) {
+      return Set.of();
+    }
+    if (value.split(";", -1).length > 50) {
+      throw new BusinessException("角色或岗位最多填写 50 项");
+    }
     Set<Long> result = new HashSet<>();
     for (String item : value.split(";", -1)) {
       Long id = identifier(item.trim());
-      if (id == null || !result.add(id)) throw new BusinessException("角色或岗位 ID 不能为空或重复");
+      if (id == null || !result.add(id)) {
+        throw new BusinessException("角色或岗位 ID 不能为空或重复");
+      }
     }
     return result;
   }

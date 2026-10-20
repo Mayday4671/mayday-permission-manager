@@ -14,8 +14,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.crawler.CrawlArticles;
 import com.mayday.crawler.CrawlController;
 import com.mayday.crawler.CrawlRules;
@@ -68,13 +68,11 @@ import org.springframework.transaction.support.TransactionTemplate;
       "mayday.seed-demo-data=false"
     })
 class CrawlerIntegrationTest {
-  @DynamicPropertySource
-  static void database(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", () -> System.getenv("CRAWLER_TEST_DB_URL"));
-    registry.add("spring.datasource.username", () -> "mayday_test");
-    registry.add("spring.datasource.password", () -> System.getenv("CRAWLER_TEST_DB_PASSWORD"));
-  }
-
+  static final String ROOT = "https://fixture.example/list";
+  final byte[] png =
+      Base64.getDecoder()
+          .decode(
+              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=");
   @Autowired CrawlStore store;
   @Autowired CrawlWorker worker;
   @Autowired CrawlController controller;
@@ -92,11 +90,13 @@ class CrawlerIntegrationTest {
   SysUser owner;
   SysRole role;
   TransactionTemplate tx;
-  final byte[] png =
-      Base64.getDecoder()
-          .decode(
-              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=");
-  static final String ROOT = "https://fixture.example/list";
+
+  @DynamicPropertySource
+  static void database(DynamicPropertyRegistry registry) {
+    registry.add("spring.datasource.url", () -> System.getenv("CRAWLER_TEST_DB_URL"));
+    registry.add("spring.datasource.username", () -> "mayday_test");
+    registry.add("spring.datasource.password", () -> System.getenv("CRAWLER_TEST_DB_PASSWORD"));
+  }
 
   @BeforeEach
   void prepare() throws Exception {
@@ -128,7 +128,9 @@ class CrawlerIntegrationTest {
             call -> {
               String url = call.getArgument(0);
               boolean image = call.getArgument(2);
-              if (image) return new WebFetcher.Response(URI.create(url), "image/png", png);
+              if (image) {
+                return new WebFetcher.Response(URI.create(url), "image/png", png);
+              }
               String html =
                   switch (url) {
                     case ROOT ->
@@ -164,8 +166,12 @@ class CrawlerIntegrationTest {
           payloads.deleteByQuery(com.mybatisflex.core.query.QueryWrapper.create());
           files.deleteByQuery(com.mybatisflex.core.query.QueryWrapper.create());
         });
-    if (owner != null) users.deleteById(owner.getId());
-    if (role != null) roles.deleteById(role.getId());
+    if (owner != null) {
+      users.deleteById(owner.getId());
+    }
+    if (role != null) {
+      roles.deleteById(role.getId());
+    }
     SecurityContextHolder.clearContext();
   }
 
@@ -213,7 +219,9 @@ class CrawlerIntegrationTest {
       due(id);
       worker.tick();
       if (Set.of("COMPLETED", "PARTIAL", "PAUSED", "LIMITED")
-          .contains(tasks.findById(id).orElseThrow().getStatus())) return;
+          .contains(tasks.findById(id).orElseThrow().getStatus())) {
+        return;
+      }
     }
     fail("队列未在上限内结束");
   }
@@ -402,7 +410,8 @@ class CrawlerIntegrationTest {
         BusinessException.class, () -> store.start(task.getId(), archived.getVersion(), true));
     assertThrows(BusinessException.class, () -> store.stop(task.getId(), archived.getVersion()));
     assertThrows(BusinessException.class, () -> store.delete(task.getId()));
-    var listed = (com.mayday.common.PageResult<?>) controller.list("", null, 1, 100).data();
+    var listed =
+        (com.mayday.common.persistence.PageResult<?>) controller.list("", null, 1, 100).data();
     assertEquals(1, listed.total(), "配置列表只剩另一条空配置，不包含已归档的配置");
     login(stranger);
     assertEquals(0, articleStore.list(null, "", 1, 24).total());

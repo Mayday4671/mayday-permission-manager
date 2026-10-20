@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.mapper.UserMapper;
@@ -29,11 +29,15 @@ public class WorkflowSimulation {
 
   private List<Map<String, Object>> path(
       Spec spec, Map<String, Object> form, SysUser applicant, int depth) {
-    if (depth > 4) throw new BusinessException("模拟子流程超过安全上限");
+    if (depth > 4) {
+      throw new BusinessException("模拟子流程超过安全上限");
+    }
     var people = definitions.resolve(spec, applicant);
     for (var user :
-        users.findAllById(people.values().stream().flatMap(Collection::stream).distinct().toList()))
+        users.findAllById(
+            people.values().stream().flatMap(Collection::stream).distinct().toList())) {
       access.checkData("users", user.getId(), user.getDepartmentId());
+    }
     List<Map<String, Object>> result = new ArrayList<>();
     walk(spec, spec.startNodeId(), null, form, applicant, people, result, depth, null);
     return result;
@@ -51,7 +55,9 @@ public class WorkflowSimulation {
       String branch) {
     String next = first;
     for (int hops = 0; hops <= spec.nodes().size(); hops++) {
-      if (next.equals(stop)) return;
+      if (next.equals(stop)) {
+        return;
+      }
       var node = spec.node(next);
       Map<String, Object> row = new LinkedHashMap<>();
       row.put("id", node.id());
@@ -64,10 +70,12 @@ public class WorkflowSimulation {
               .map(user -> Map.of("id", user.getId(), "name", user.getNickname()))
               .toList());
       result.add(row);
-      if ("END".equals(node.type())) return;
+      if ("END".equals(node.type())) {
+        return;
+      }
       if ("PARALLEL".equals(node.type())) {
         int index = 0;
-        for (String root : node.branches())
+        for (String root : node.branches()) {
           walk(
               spec,
               root,
@@ -78,6 +86,7 @@ public class WorkflowSimulation {
               result,
               depth,
               node.name() + " · 支路" + ++index);
+        }
         next = node.next();
       } else if ("SUBPROCESS".equals(node.type())) {
         var version = definitions.subprocessVersion(node.subprocess().versionId());
@@ -96,7 +105,9 @@ public class WorkflowSimulation {
         form.clear();
         form.putAll(recomputed);
         next = node.next();
-      } else next = WorkflowSchema.next(node, form);
+      } else {
+        next = WorkflowSchema.next(node, form);
+      }
     }
     throw new BusinessException("模拟路径未能正常结束");
   }

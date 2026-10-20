@@ -1,8 +1,8 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.FileUsage;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.util.FileUsage;
 import com.mayday.operations.OperationSupport;
 import com.mayday.operations.mapper.FlowDecisionMapper;
 import com.mayday.operations.mapper.FlowRequestMapper;
@@ -68,60 +68,6 @@ public class WorkflowEngine implements FileUsage {
   private final RealtimeEvents realtime;
   private final List<WorkflowBusiness> businesses;
 
-  /** 提交只接受已发布版本编号，人员、节点和账号身份由服务端解析并冻结。 */
-  @Schema(name = "WorkflowSubmission")
-  public record Submit(
-      @NotNull Long definitionId,
-      @NotNull Long versionId,
-      @NotBlank @Size(max = 160) String title,
-      @tools.jackson.databind.annotation.JsonDeserialize(
-              using = WorkflowFormValuesDeserializer.class)
-          Map<String, Object> values,
-      Long businessId,
-      Long businessRevisionId,
-      Long businessVersion) {}
-
-  /** 所有决定携带申请版本；转交/加签仅目标账号有效，其他动作不能通过额外属性改写身份。 */
-  public record Action(
-      @NotNull Long version,
-      @NotBlank
-          @Pattern(regexp = "APPROVE|REJECT|RETURN|WITHDRAW|TERMINATE|COMMENT|TRANSFER|ADD_SIGN")
-          String action,
-      @Size(max = 500) String comment,
-      Long taskId,
-      Long targetUserId,
-      @tools.jackson.databind.annotation.JsonDeserialize(
-              using = WorkflowFormValuesDeserializer.class)
-          Map<String, Object> values,
-      @Size(max = 40) String targetNodeId) {
-    /** 兼容已有业务扩展调用；未选择退回目标时表示退回申请人。 */
-    public Action(
-        Long version,
-        String action,
-        String comment,
-        Long taskId,
-        Long targetUserId,
-        Map<String, Object> values) {
-      this(version, action, comment, taskId, targetUserId, values, null);
-    }
-  }
-
-  /** 编辑和重提始终由原申请人完成，不能改变流程、身份和业务关联。 */
-  public record Edit(
-      @NotNull Long version,
-      @NotBlank @Size(max = 160) String title,
-      @tools.jackson.databind.annotation.JsonDeserialize(
-              using = WorkflowFormValuesDeserializer.class)
-          Map<String, Object> values,
-      Long businessVersion) {}
-
-  /** 人员交接必须明确原人、新人和原因；只替换在途任务及实例人员快照，不修改发布定义。 */
-  public record Handover(
-      @NotNull Long version,
-      @NotNull Long fromUserId,
-      @NotNull Long targetUserId,
-      @NotBlank @Size(max = 300) String reason) {}
-
   private WorkflowBusiness business(String type) {
     return businesses.stream()
         .filter(b -> b.type().equals(type))
@@ -175,29 +121,38 @@ public class WorkflowEngine implements FileUsage {
     access.require("requests:view");
     if (lock) {
       var candidate = requests.findById(id).orElseThrow(() -> new BusinessException("审批申请不存在"));
-      if (candidate.getRootRequestId() != null && !candidate.getRootRequestId().equals(id))
+      if (candidate.getRootRequestId() != null && !candidate.getRootRequestId().equals(id)) {
         requests
             .lockById(candidate.getRootRequestId())
             .orElseThrow(() -> new BusinessException("根申请不存在"));
+      }
     }
     var request =
         (lock ? requests.lockById(id) : requests.findById(id))
             .orElseThrow(() -> new BusinessException("审批申请不存在"));
     // MyBatis-Flex 无持久化上下文，锁定后的读取即数据库最新提交，无需再显式刷新。
     if ("DRAFT".equals(request.getStatus())
-        && !Objects.equals(request.getApplicantId(), access.current().getId()))
+        && !Objects.equals(request.getApplicantId(), access.current().getId())) {
       throw new AccessDeniedException("申请草稿只对本人可见");
-    if (!participant(request)) throw new AccessDeniedException("不在此审批的参与范围");
+    }
+    if (!participant(request)) {
+      throw new AccessDeniedException("不在此审批的参与范围");
+    }
     return request;
   }
 
   /** 待办在 SQL 中按当前账号任务过滤；全量管理需独立权限，不能分页后再在浏览器裁剪。查询条件由仓储统一构建。 */
   public com.mybatisflex.core.query.QueryWrapper filter(String keyword, String box) {
     access.require("requests:view");
-    if (!Set.of("mine", "drafts", "copies", "todo", "done", "participated", "all").contains(box))
+    if (!Set.of("mine", "drafts", "copies", "todo", "done", "participated", "all").contains(box)) {
       throw new BusinessException("未知审批筛选");
-    if (box.equals("all")) access.require("requests:manage");
-    if (box.equals("todo") || box.equals("done")) access.require("requests:approve");
+    }
+    if (box.equals("all")) {
+      access.require("requests:manage");
+    }
+    if (box.equals("todo") || box.equals("done")) {
+      access.require("requests:approve");
+    }
     return requests.listFilter(keyword, box, access.current().getId());
   }
 
@@ -238,8 +193,9 @@ public class WorkflowEngine implements FileUsage {
         request.getCurrentNodeId() == null
             ? null
             : schema(request).node(request.getCurrentNodeId()).name());
-    if (request.getExecutionState() != null)
+    if (request.getExecutionState() != null) {
       out.put("currentNodeName", orchestrator.currentNames(request));
+    }
     return out;
   }
 
@@ -270,23 +226,26 @@ public class WorkflowEngine implements FileUsage {
     out.put("tasks", requestTasks);
     out.put("files", files.findAllById(visibleFileIds(spec, currentValues, readable)));
     Map<String, String> labels = new LinkedHashMap<>();
-    for (Field f : spec.fields())
+    for (Field f : spec.fields()) {
       if (visible.get(f.id()) != null) {
-        if (f.type().equals("USER"))
+        if (f.type().equals("USER")) {
           labels.put(
               f.id(),
               users
                   .findById(WorkflowSchema.positiveId(visible.get(f.id()), f.label()))
                   .map(SysUser::getNickname)
                   .orElse("已删除人员"));
-        if (f.type().equals("DEPARTMENT"))
+        }
+        if (f.type().equals("DEPARTMENT")) {
           labels.put(
               f.id(),
               entries
                   .findById(WorkflowSchema.positiveId(visible.get(f.id()), f.label()))
                   .map(SystemEntry::getName)
                   .orElse("已删除部门"));
+        }
       }
+    }
     out.put("valueLabels", labels);
     out.put(
         "history",
@@ -356,8 +315,9 @@ public class WorkflowEngine implements FileUsage {
       json.assignees(request.getResolvedAssignees())
           .forEach(
               (assignmentNode, ids) -> {
-                if (Set.of("APPROVAL", "COPY").contains(spec.node(assignmentNode).type()))
+                if (Set.of("APPROVAL", "COPY").contains(spec.node(assignmentNode).type())) {
                   assigned.addAll(ids);
+                }
               });
       requestTasks.stream()
           .filter(
@@ -478,10 +438,11 @@ public class WorkflowEngine implements FileUsage {
     // 人员修复不是表单值。单独返回给有修复权的管理员，不能混进可读字段或泄露给普通参与人。
     if (access.has("requests:manage")
         && access.has("requests:reassign")
-        && access.has("users:view"))
+        && access.has("users:view")) {
       out.put(
           "subprocessRepair",
           subprocessRepair.auditView(changes.get(WorkflowSubprocessRepair.AUDIT_KEY)));
+    }
     changes.keySet().retainAll(allowed);
     out.put("changes", WorkflowDecimalValues.changes(spec.fields(), changes));
     Map<String, Object> submitted =
@@ -506,15 +467,18 @@ public class WorkflowEngine implements FileUsage {
   private Set<String> readable(
       FlowRequest request, Spec schema, List<FlowTask> requestTasks, int runNumber) {
     if (access.has("requests:manage")
-        || Objects.equals(request.getApplicantId(), access.current().getId()))
+        || Objects.equals(request.getApplicantId(), access.current().getId())) {
       return new LinkedHashSet<>(schema.fields().stream().map(Field::id).toList());
+    }
     Set<String> result = new LinkedHashSet<>();
-    for (var task : requestTasks)
+    for (var task : requestTasks) {
       if (task.getActivatedAt() != null
           && task.getRunNumber() == runNumber
           && (task.getAssigneeId().equals(access.current().getId())
-              || delegations.ownedBy(task.getDelegationId(), access.current().getId())))
+              || delegations.ownedBy(task.getDelegationId(), access.current().getId()))) {
         result.addAll(schema.node(task.getNodeId()).readable());
+      }
+    }
     return result;
   }
 
@@ -553,14 +517,17 @@ public class WorkflowEngine implements FileUsage {
     access.require("requests:view");
     access.require("requests:create");
     var definition = definitions.find(input.definitionId(), true);
-    if (!definition.isEnabled() || definition.getPublishedVersionId() == null)
+    if (!definition.isEnabled() || definition.getPublishedVersionId() == null) {
       throw new BusinessException("流程尚未发布或已停用");
-    if (!Objects.equals(definition.getPublishedVersionId(), input.versionId()))
+    }
+    if (!Objects.equals(definition.getPublishedVersionId(), input.versionId())) {
       throw new org.springframework.dao.OptimisticLockingFailureException("流程发布版本已变化，请重新打开申请");
+    }
     var published = versions.findById(input.versionId()).orElseThrow();
     var spec = json.spec(published.getSchemaJson());
-    if (!definitions.canStart(spec, access.current()))
+    if (!definitions.canStart(spec, access.current())) {
       throw new AccessDeniedException("当前账号不在流程发起范围");
+    }
     var form = WorkflowSchema.form(spec, input.values(), !draft);
     validateAssociations(spec, form, Map.of());
     var request = new FlowRequest();
@@ -581,14 +548,16 @@ public class WorkflowEngine implements FileUsage {
     request.setBusinessId(input.businessId());
     request.setBusinessRevisionId(input.businessRevisionId());
     request.setAttachmentIds(fileIds(spec, form));
-    if (draft && !"GENERAL".equals(request.getBusinessType()))
+    if (draft && !"GENERAL".equals(request.getBusinessType())) {
       business(request.getBusinessType()).validateDraft(request, input.businessVersion());
+    }
     requests.save(request);
-    if (!draft && !"GENERAL".equals(request.getBusinessType()))
+    if (!draft && !"GENERAL".equals(request.getBusinessType())) {
       business(request.getBusinessType()).submitted(request, input.businessVersion());
-    else if ("GENERAL".equals(request.getBusinessType())
-        && (input.businessId() != null || input.businessRevisionId() != null))
+    } else if ("GENERAL".equals(request.getBusinessType())
+        && (input.businessId() != null || input.businessRevisionId() != null)) {
       throw new BusinessException("通用审批不能冒用业务关联");
+    }
     if (!draft) {
       request.setResolvedAssignees(
           json.write(definitions.resolveStoredSnapshot(request.getId(), access.current())));
@@ -609,12 +578,14 @@ public class WorkflowEngine implements FileUsage {
     OperationSupport.version(request, input.version());
     if (!Objects.equals(request.getApplicantId(), access.current().getId())
         || request.getParentRequestId() != null
-        || !Set.of("DRAFT", "RETURNED", "WITHDRAWN").contains(request.getStatus()))
+        || !Set.of("DRAFT", "RETURNED", "WITHDRAWN").contains(request.getStatus())) {
       throw new AccessDeniedException("只有申请人能修改未提交、已退回或已撤回的申请");
+    }
     Spec spec = schema(request);
     // 业务草稿及退回修改每次保存都重新检查所属数据和版本，不能沿用首次创建时的授权。
-    if (!submit && !"GENERAL".equals(request.getBusinessType()))
+    if (!submit && !"GENERAL".equals(request.getBusinessType())) {
       business(request.getBusinessType()).validateDraft(request, input.businessVersion());
+    }
     Map<String, Object> old = editableValues(request);
     var form = WorkflowSchema.form(spec, input.values(), submit);
     validateAssociations(spec, form, old);
@@ -637,13 +608,15 @@ public class WorkflowEngine implements FileUsage {
     request.setUpdatedAt(BusinessTime.now());
     if (submit) {
       var definition = definitions.find(request.getDefinitionId(), true);
-      if (!definition.isEnabled() || definition.getPublishedVersionId() == null)
+      if (!definition.isEnabled() || definition.getPublishedVersionId() == null) {
         throw new BusinessException("流程已停用，不能重新提交");
+      }
       var current =
           json.spec(
               versions.findById(definition.getPublishedVersionId()).orElseThrow().getSchemaJson());
-      if (!definitions.canStart(current, access.current()))
+      if (!definitions.canStart(current, access.current())) {
         throw new AccessDeniedException("当前发起范围已撤销");
+      }
       request.setResolvedAssignees(
           json.write(definitions.resolveStoredSnapshot(request.getId(), access.current())));
       request.setRunNumber(request.getRunNumber() + 1);
@@ -652,11 +625,13 @@ public class WorkflowEngine implements FileUsage {
       request.setCompletedAt(null);
       request.setLastRemindedAt(null);
       request.setSubmittedAt(BusinessTime.now());
-      if (request.getSubmittedFormData() == null)
+      if (request.getSubmittedFormData() == null) {
         request.setSubmittedFormData(request.getFormData());
+      }
       request.setStatus("PENDING");
-      if (!"GENERAL".equals(request.getBusinessType()))
+      if (!"GENERAL".equals(request.getBusinessType())) {
         business(request.getBusinessType()).submitted(request, input.businessVersion());
+      }
       record(request, request.getRunNumber() == 1 ? "SUBMIT" : "RESUBMIT", null, "提交申请", null);
       advance(request, spec.startNodeId());
     } else {
@@ -682,11 +657,13 @@ public class WorkflowEngine implements FileUsage {
     // 在遍历字段前统一按编号锁定所有新附件，避免不同字段顺序造成锁顺序反转。
     Set<Long> additions = new HashSet<>();
     for (Field field : spec.fields()) {
-      if (!"FILES".equals(field.type()) || !(values.get(field.id()) instanceof List<?> selected))
+      if (!"FILES".equals(field.type()) || !(values.get(field.id()) instanceof List<?> selected)) {
         continue;
+      }
       Set<Long> previous = new HashSet<>();
-      if (old.get(field.id()) instanceof List<?> original)
+      if (old.get(field.id()) instanceof List<?> original) {
         original.forEach(value -> previous.add(WorkflowSchema.positiveId(value, field.label())));
+      }
       selected.stream()
           .map(value -> WorkflowSchema.positiveId(value, field.label()))
           .filter(fileId -> !previous.contains(fileId))
@@ -700,7 +677,9 @@ public class WorkflowEngine implements FileUsage {
     }
     for (Field field : spec.fields()) {
       Object value = values.get(field.id());
-      if (value == null || Objects.equals(value, old.get(field.id()))) continue;
+      if (value == null || Objects.equals(value, old.get(field.id()))) {
+        continue;
+      }
       if ("USER".equals(field.type())) {
         access.require("users:view");
         var user =
@@ -710,22 +689,30 @@ public class WorkflowEngine implements FileUsage {
                 .orElseThrow(() -> new BusinessException("表单引用的人员无效"));
         access.checkData("users", user.getId(), user.getDepartmentId());
       }
-      if ("DEPARTMENT".equals(field.type()))
+      if ("DEPARTMENT".equals(field.type())) {
         entries
             .findById(WorkflowSchema.positiveId(value, field.label()))
             .filter(e -> e.isEnabled() && e.getKind().equals("departments"))
             .orElseThrow(() -> new BusinessException("表单引用的部门无效"));
+      }
       if ("FILES".equals(field.type())) {
         Set<Long> previous = new HashSet<>();
-        if (old.get(field.id()) instanceof List<?> list)
+        if (old.get(field.id()) instanceof List<?> list) {
           list.forEach(v -> previous.add(WorkflowSchema.positiveId(v, field.label())));
+        }
         for (Object id : (List<?>) value) {
           Long fid = WorkflowSchema.positiveId(id, field.label());
-          if (previous.contains(fid)) continue;
+          if (previous.contains(fid)) {
+            continue;
+          }
           var file = lockedFiles.get(fid);
-          if (file == null) throw new BusinessException("新增附件未通过关联校验");
+          if (file == null) {
+            throw new BusinessException("新增附件未通过关联校验");
+          }
           if (!Objects.equals(file.getOwnerId(), access.current().getId())
-              && !access.has("files:all")) throw new AccessDeniedException("不能关联其他人上传的附件");
+              && !access.has("files:all")) {
+            throw new AccessDeniedException("不能关联其他人上传的附件");
+          }
         }
       }
     }
@@ -733,9 +720,11 @@ public class WorkflowEngine implements FileUsage {
 
   Set<Long> fileIds(Spec spec, Map<String, Object> values) {
     Set<Long> result = new HashSet<>();
-    for (Field field : spec.fields())
-      if ("FILES".equals(field.type()) && values.get(field.id()) instanceof List<?> list)
+    for (Field field : spec.fields()) {
+      if ("FILES".equals(field.type()) && values.get(field.id()) instanceof List<?> list) {
         list.forEach(id -> result.add(WorkflowSchema.positiveId(id, field.label())));
+      }
+    }
     return result;
   }
 
@@ -744,8 +733,9 @@ public class WorkflowEngine implements FileUsage {
     var request = accessible(requestId, false);
     var schema = schema(request);
     var requestTasks = tasks.findByRequestIdOrderByIdAsc(requestId);
-    if (!readableFileIds(request, schema, requestTasks).contains(fileId))
+    if (!readableFileIds(request, schema, requestTasks).contains(fileId)) {
       throw new AccessDeniedException("当前节点无权读取此附件");
+    }
   }
 
   /** 按可读字段收集当前与历次提交的文件，保留历史凭证但不让附件编号绕过字段权限。 */
@@ -778,17 +768,23 @@ public class WorkflowEngine implements FileUsage {
   private Set<Long> historyFileIds(
       FlowRequest request, FlowDecision decision, Spec spec, Set<String> readable) {
     if ("EDIT".equals(decision.getAction())
-        && !Objects.equals(request.getApplicantId(), access.current().getId())) return Set.of();
+        && !Objects.equals(request.getApplicantId(), access.current().getId())) {
+      return Set.of();
+    }
     Set<Long> result = new HashSet<>();
     List<Map<String, Object>> snapshots = new ArrayList<>();
-    if (decision.getFormSnapshot() != null) snapshots.add(json.form(decision.getFormSnapshot()));
+    if (decision.getFormSnapshot() != null) {
+      snapshots.add(json.form(decision.getFormSnapshot()));
+    }
     if (decision.getChangesJson() != null) {
       json.form(decision.getChangesJson())
           .forEach(
               (key, change) -> {
                 if (change instanceof Map<?, ?> map) {
                   for (String side : List.of("before", "after")) {
-                    if (map.get(side) != null) snapshots.add(Map.of(key, map.get(side)));
+                    if (map.get(side) != null) {
+                      snapshots.add(Map.of(key, map.get(side)));
+                    }
                   }
                 }
               });
@@ -831,7 +827,9 @@ public class WorkflowEngine implements FileUsage {
         continue;
       }
       List<Long> ids = assignments.get(node.id());
-      if (ids == null || ids.isEmpty()) throw new BusinessException("节点缺少审批人快照");
+      if (ids == null || ids.isEmpty()) {
+        throw new BusinessException("节点缺少审批人快照");
+      }
       request.setNodeVisit(request.getNodeVisit() + 1);
       int index = 0;
       for (Long id : ids) {
@@ -861,7 +859,9 @@ public class WorkflowEngine implements FileUsage {
                 ? null
                 : BusinessTime.now().plusMinutes(node.timeoutMinutes()));
         tasks.save(task);
-        if (!"WAITING".equals(task.getStatus())) activate(request, task);
+        if (!"WAITING".equals(task.getStatus())) {
+          activate(request, task);
+        }
       }
       if ("COPY".equals(node.type())) {
         next = node.next();
@@ -895,13 +895,15 @@ public class WorkflowEngine implements FileUsage {
     request.setCompletedAt("RETURNED".equals(status) ? null : BusinessTime.now());
     request.setCurrentNodeId(null);
     request.setCurrentApproverId(null);
-    for (var task : tasks.findByRequestIdOrderByIdAsc(request.getId()))
+    for (var task : tasks.findByRequestIdOrderByIdAsc(request.getId())) {
       if (Set.of("PENDING", "WAITING").contains(task.getStatus())) {
         task.setStatus("CANCELLED");
         tasks.save(task);
       }
-    if (!request.getBusinessType().equals("GENERAL") && (active || !"CANCELLED".equals(status)))
+    }
+    if (!request.getBusinessType().equals("GENERAL") && (active || !"CANCELLED".equals(status))) {
       business(request.getBusinessType()).completed(request);
+    }
     String label =
         switch (status) {
           case "APPROVED" -> "审批已通过";
@@ -949,8 +951,9 @@ public class WorkflowEngine implements FileUsage {
                 task.setDelegationId(delegation.getId());
                 task.setAssignmentNote(
                     "临时委托：" + delegation.getOwnerName() + " → " + delegation.getTargetName());
-                if (!request.getApproverIds().contains(original.getId()))
+                if (!request.getApproverIds().contains(original.getId())) {
                   request.getApproverIds().add(original.getId());
+                }
                 record(
                     request,
                     "DELEGATE",
@@ -968,9 +971,12 @@ public class WorkflowEngine implements FileUsage {
                         candidate,
                         "COPY".equals(task.getKind()) ? "requests:view" : "requests:approve"))
             .orElseThrow(() -> new BusinessException("处理人权限已失效，请撤回或由管理员终止"));
-    if (task.getActivatedAt() == null) task.setActivatedAt(BusinessTime.now());
-    if (!request.getApproverIds().contains(user.getId()))
+    if (task.getActivatedAt() == null) {
+      task.setActivatedAt(BusinessTime.now());
+    }
+    if (!request.getApproverIds().contains(user.getId())) {
       request.getApproverIds().add(user.getId());
+    }
     events.enqueue(
         request,
         user.getId(),
@@ -982,11 +988,15 @@ public class WorkflowEngine implements FileUsage {
   private String replacementProblem(
       FlowRequest request, String nodeId, Long targetId, Long excludingTask) {
     var spec = schema(request);
-    if (!Boolean.TRUE.equals(spec.allowSelfApproval()) && targetId.equals(request.getApplicantId()))
+    if (!Boolean.TRUE.equals(spec.allowSelfApproval())
+        && targetId.equals(request.getApplicantId())) {
       return "流程不允许申请人自审";
+    }
     if (json.assignees(request.getResolvedAssignees())
         .getOrDefault(nodeId, List.of())
-        .contains(targetId)) return "接收人已被当前节点指定";
+        .contains(targetId)) {
+      return "接收人已被当前节点指定";
+    }
     if (!Boolean.TRUE.equals(spec.allowRepeatApproval())
         && json.assignees(request.getResolvedAssignees()).entrySet().stream()
             .anyMatch(
@@ -994,21 +1004,27 @@ public class WorkflowEngine implements FileUsage {
                     !e.getKey().equals(nodeId)
                         && "APPROVAL".equals(spec.node(e.getKey()).type())
                         && e.getValue().contains(targetId)
-                        && definitions.shareApprovalPath(spec, nodeId, e.getKey())))
+                        && definitions.shareApprovalPath(spec, nodeId, e.getKey()))) {
       return "同一路径已指定该审批人";
+    }
     for (var existing : tasks.findByRequestIdOrderByIdAsc(request.getId())) {
       if (Objects.equals(existing.getId(), excludingTask)
           || !"PENDING".equals(request.getStatus())
           || !"APPROVAL".equals(existing.getKind())
           || existing.getRunNumber() != request.getRunNumber()
-          || !existing.getAssigneeId().equals(targetId)) continue;
+          || !existing.getAssigneeId().equals(targetId)) {
+        continue;
+      }
       if (existing.getNodeVisit() == request.getNodeVisit()
-          && Set.of("PENDING", "WAITING", "APPROVED").contains(existing.getStatus()))
+          && Set.of("PENDING", "WAITING", "APPROVED").contains(existing.getStatus())) {
         return "接收人已参与当前节点";
+      }
       if (!Boolean.TRUE.equals(spec.allowRepeatApproval())
           && "APPROVED".equals(existing.getStatus())
           && path(request).contains(existing.getNodeId())
-          && !nodeId.equals(existing.getNodeId())) return "接收人已办理同一路径的前置节点";
+          && !nodeId.equals(existing.getNodeId())) {
+        return "接收人已办理同一路径的前置节点";
+      }
     }
     return null;
   }
@@ -1021,17 +1037,23 @@ public class WorkflowEngine implements FileUsage {
     access.require("users:view");
     var request = accessible(id, true);
     OperationSupport.version(request, input.version());
-    if (!Set.of("PENDING", "RETURNED", "WITHDRAWN").contains(request.getStatus()))
+    if (!Set.of("PENDING", "RETURNED", "WITHDRAWN").contains(request.getStatus())) {
       throw new BusinessException("只能交接在途、退回或撤回的申请");
-    if (input.fromUserId().equals(input.targetUserId())) throw new BusinessException("交接前后不能是同一人");
+    }
+    if (input.fromUserId().equals(input.targetUserId())) {
+      throw new BusinessException("交接前后不能是同一人");
+    }
     var source = users.findById(input.fromUserId()).orElse(null);
     Long sourceId = input.fromUserId();
     String sourceName = source == null ? "已删除账号 #" + sourceId : source.getNickname();
     // 删除后的冻结编号没有可靠部门归属，只允许全用户范围修复；已知账号仍逐条检查原部门。
     if (source == null) {
-      if (!"ALL".equals(access.scope("users")))
+      if (!"ALL".equals(access.scope("users"))) {
         throw new AccessDeniedException("已删除来源须由全用户范围管理员交接");
-    } else access.checkData("users", sourceId, source.getDepartmentId());
+      }
+    } else {
+      access.checkData("users", sourceId, source.getDepartmentId());
+    }
     var target =
         users
             .findById(input.targetUserId())
@@ -1053,15 +1075,20 @@ public class WorkflowEngine implements FileUsage {
     var overrides = new LinkedHashMap<>(json.assignees(request.getAssignmentOverrides()));
     assignments.forEach(
         (node, ids) -> {
-          if (Set.of("APPROVAL", "COPY").contains(spec.node(node).type()) && ids.contains(sourceId))
+          if (Set.of("APPROVAL", "COPY").contains(spec.node(node).type())
+              && ids.contains(sourceId)) {
             changedNodes.add(node);
+          }
         });
     pending.forEach(t -> changedNodes.add(t.getNodeId()));
-    if (changedNodes.isEmpty()) throw new BusinessException("原人员在此申请没有待办或节点人员配置");
+    if (changedNodes.isEmpty()) {
+      throw new BusinessException("原人员在此申请没有待办或节点人员配置");
+    }
     for (String node : changedNodes) {
       boolean approval = "APPROVAL".equals(spec.node(node).type());
-      if (approval && !access.hasFor(target, "requests:approve"))
+      if (approval && !access.hasFor(target, "requests:approve")) {
         throw new BusinessException("审批交接接收人须拥有审批权限");
+      }
       String invalid =
           approval
               ? replacementProblem(
@@ -1074,10 +1101,13 @@ public class WorkflowEngine implements FileUsage {
                       .findFirst()
                       .orElse(null))
               : null;
-      if (invalid != null) throw new BusinessException(invalid);
+      if (invalid != null) {
+        throw new BusinessException(invalid);
+      }
       var assigned = assignments.getOrDefault(node, List.of());
-      if (assigned.contains(sourceId) && assigned.contains(target.getId()))
+      if (assigned.contains(sourceId) && assigned.contains(target.getId())) {
         throw new BusinessException("接收人已被当前节点指定");
+      }
       Set<Long> oldIds = new HashSet<>();
       oldIds.add(sourceId);
       pending.stream()
@@ -1086,14 +1116,17 @@ public class WorkflowEngine implements FileUsage {
       var replacementIds =
           assigned.stream().map(user -> oldIds.contains(user) ? target.getId() : user).toList();
       assignments.put(node, replacementIds);
-      if (!assigned.equals(replacementIds)) overrides.put(node, replacementIds);
+      if (!assigned.equals(replacementIds)) {
+        overrides.put(node, replacementIds);
+      }
     }
     request.setResolvedAssignees(json.write(assignments));
     request.setAssignmentOverrides(json.write(overrides));
     for (var old : pending) {
       FlowTask replacement;
-      if ("WAITING".equals(old.getStatus())) replacement = old;
-      else {
+      if ("WAITING".equals(old.getStatus())) {
+        replacement = old;
+      } else {
         old.setStatus("TRANSFERRED");
         old.setDecidedAt(BusinessTime.now());
         replacement = new FlowTask();
@@ -1117,7 +1150,9 @@ public class WorkflowEngine implements FileUsage {
       replacement.setDelegationId(null);
       replacement.setAssignmentNote("人员交接：" + input.reason().trim());
       tasks.save(replacement);
-      if ("PENDING".equals(replacement.getStatus())) activate(request, replacement);
+      if ("PENDING".equals(replacement.getStatus())) {
+        activate(request, replacement);
+      }
     }
     request.setCurrentApproverId(
         tasks.findByRequestIdOrderByIdAsc(id).stream()
@@ -1142,8 +1177,9 @@ public class WorkflowEngine implements FileUsage {
     access.require("requests:manage");
     var request = accessible(id, true);
     OperationSupport.version(request, version);
-    if (reason == null || reason.isBlank() || reason.length() > 300)
+    if (reason == null || reason.isBlank() || reason.length() > 300) {
       throw new BusinessException("请输入 1 至 300 字恢复说明");
+    }
     orchestrator.recover(request, reason.trim(), this);
     return detail(id);
   }
@@ -1174,16 +1210,22 @@ public class WorkflowEngine implements FileUsage {
   }
 
   private List<String> path(FlowRequest request) {
-    if (request.getActivePath() == null) return new ArrayList<>();
+    if (request.getActivePath() == null) {
+      return new ArrayList<>();
+    }
     Object nodes = json.form(request.getActivePath()).get("nodes");
-    if (!(nodes instanceof List<?> list)) throw new BusinessException("流程运行路径无效");
+    if (!(nodes instanceof List<?> list)) {
+      throw new BusinessException("流程运行路径无效");
+    }
     return new ArrayList<>(list.stream().map(Object::toString).toList());
   }
 
   /** 只可退回当前有效路径的已办理节点；被退回废弃的分支不会继续出现在目标列表。 */
   private List<String> returnTargets(FlowRequest request) {
     List<String> trail = path(request);
-    if (trail.isEmpty()) return List.of();
+    if (trail.isEmpty()) {
+      return List.of();
+    }
     return trail.subList(0, trail.size() - 1).stream().distinct().toList();
   }
 
@@ -1238,8 +1280,9 @@ public class WorkflowEngine implements FileUsage {
     var request = accessible(id, true);
     OperationSupport.version(request, version);
     if (!"DRAFT".equals(request.getStatus())
-        || !Objects.equals(request.getApplicantId(), access.current().getId()))
+        || !Objects.equals(request.getApplicantId(), access.current().getId())) {
       throw new AccessDeniedException("只能删除本人未提交的草稿");
+    }
     history.deleteByQuery(
         com.mybatisflex.core.query.QueryWrapper.create()
             .where(new com.mybatisflex.core.query.QueryColumn("request_id").eq(id)));
@@ -1269,8 +1312,9 @@ public class WorkflowEngine implements FileUsage {
     decision.setAction(action);
     decision.setRunNumber(request.getRunNumber());
     decision.setNodeVisit(request.getNodeVisit());
-    if (Set.of("SUBMIT", "RESUBMIT").contains(action))
+    if (Set.of("SUBMIT", "RESUBMIT").contains(action)) {
       decision.setFormSnapshot(request.getFormData());
+    }
     decision.setComment(comment);
     if (node != null) {
       decision.setNodeId(node.id());
@@ -1288,16 +1332,20 @@ public class WorkflowEngine implements FileUsage {
   public Map<String, Object> act(Long id, Action input) {
     var request = accessible(id, true);
     OperationSupport.version(request, input.version());
-    if (input.targetNodeId() != null && !"RETURN".equals(input.action()))
+    if (input.targetNodeId() != null && !"RETURN".equals(input.action())) {
       throw new BusinessException("只有退回可指定目标节点");
+    }
     if (input.action().equals("TERMINATE")) {
       access.require("requests:manage");
-      if (!Set.of("PENDING", "RETURNED", "WITHDRAWN").contains(request.getStatus()))
+      if (!Set.of("PENDING", "RETURNED", "WITHDRAWN").contains(request.getStatus())) {
         throw new BusinessException("申请已结束或尚未提交");
-      if (input.comment() == null || input.comment().isBlank())
+      }
+      if (input.comment() == null || input.comment().isBlank()) {
         throw new BusinessException("请输入终止原因");
-      if (input.values() != null && !input.values().isEmpty())
+      }
+      if (input.values() != null && !input.values().isEmpty()) {
         throw new BusinessException("终止不能修改表单");
+      }
       finish(request, "CANCELLED");
       record(request, "TERMINATE", null, input.comment(), null);
       requests.save(request);
@@ -1305,7 +1353,9 @@ public class WorkflowEngine implements FileUsage {
       refreshParticipants(request);
       return detail(id);
     }
-    if (!request.getStatus().equals("PENDING")) throw new BusinessException("申请不在审批中");
+    if (!request.getStatus().equals("PENDING")) {
+      throw new BusinessException("申请不在审批中");
+    }
     var spec = schema(request);
     String action = input.action();
     Long userId = access.current().getId();
@@ -1313,18 +1363,22 @@ public class WorkflowEngine implements FileUsage {
       access.require("requests:create");
       if (request.getParentRequestId() != null
           || !Objects.equals(request.getApplicantId(), userId)
-          || Boolean.FALSE.equals(spec.allowWithdraw()))
+          || Boolean.FALSE.equals(spec.allowWithdraw())) {
         throw new AccessDeniedException("当前申请不允许你撤回");
-      if (input.values() != null && !input.values().isEmpty())
+      }
+      if (input.values() != null && !input.values().isEmpty()) {
         throw new BusinessException("撤回不能修改表单");
+      }
       finish(request, "WITHDRAWN");
       record(request, action, null, input.comment(), null);
     } else if (action.equals("COMMENT") && Objects.equals(request.getApplicantId(), userId)) {
       access.require("requests:create");
-      if (input.comment() == null || input.comment().isBlank())
+      if (input.comment() == null || input.comment().isBlank()) {
         throw new BusinessException("请输入评论");
-      if (input.values() != null && !input.values().isEmpty())
+      }
+      if (input.values() != null && !input.values().isEmpty()) {
         throw new BusinessException("评论不能修改表单");
+      }
       record(request, action, null, input.comment(), null);
       request.setUpdatedAt(BusinessTime.now());
     } else {
@@ -1337,20 +1391,25 @@ public class WorkflowEngine implements FileUsage {
               .findFirst()
               .orElseThrow(() -> new AccessDeniedException("不是当前待办处理人"));
       Node node = spec.node(task.getNodeId());
-      if (!node.actions().contains(action)) throw new AccessDeniedException("当前节点不允许此操作");
-      if (!Boolean.TRUE.equals(spec.allowSelfApproval()) && userId.equals(request.getApplicantId()))
+      if (!node.actions().contains(action)) {
+        throw new AccessDeniedException("当前节点不允许此操作");
+      }
+      if (!Boolean.TRUE.equals(spec.allowSelfApproval())
+          && userId.equals(request.getApplicantId())) {
         throw new AccessDeniedException("流程不允许自我审批");
+      }
       Map<String, Object> changes = new LinkedHashMap<>();
       if (input.values() != null && !input.values().isEmpty()) {
         if (!Set.of("APPROVE", "REJECT").contains(action)
-            || !node.writable().containsAll(input.values().keySet()))
+            || !node.writable().containsAll(input.values().keySet())) {
           throw new AccessDeniedException("包含不可写字段");
+        }
         var old = values(request);
         var candidate = new LinkedHashMap<>(old);
         candidate.putAll(input.values());
         var form = WorkflowSchema.form(spec, candidate);
         // 计算结果和源字段一起记入历史；展示历史时仍按查看人的可读范围裁剪。
-        for (String key : form.keySet())
+        for (String key : form.keySet()) {
           if ((input.values().containsKey(key)
                   || spec.fields().stream()
                       .anyMatch(
@@ -1361,6 +1420,7 @@ public class WorkflowEngine implements FileUsage {
             change.put("after", form.get(key));
             changes.put(key, change);
           }
+        }
         validateAssociations(spec, form, old);
         request.setFormData(json.write(form));
         request.getAttachmentIds().addAll(fileIds(spec, form));
@@ -1368,22 +1428,26 @@ public class WorkflowEngine implements FileUsage {
       SysUser target = null;
       switch (action) {
         case "COMMENT" -> {
-          if (input.comment() == null || input.comment().isBlank())
+          if (input.comment() == null || input.comment().isBlank()) {
             throw new BusinessException("请输入评论");
+          }
         }
         case "REJECT" -> {
-          if (input.comment() == null || input.comment().isBlank())
+          if (input.comment() == null || input.comment().isBlank()) {
             throw new BusinessException("请输入驳回原因");
+          }
           task.setStatus("REJECTED");
           task.setDecidedAt(BusinessTime.now());
           finish(request, "REJECTED");
         }
         case "RETURN" -> {
-          if (input.comment() == null || input.comment().isBlank())
+          if (input.comment() == null || input.comment().isBlank()) {
             throw new BusinessException("请输入退回原因");
+          }
           if (input.targetNodeId() != null
-              && !returnTargets(request, task).contains(input.targetNodeId()))
+              && !returnTargets(request, task).contains(input.targetNodeId())) {
             throw new BusinessException("只能退回当前实际路径中已办理的审批节点");
+          }
           task.setStatus("RETURNED");
           task.setDecidedAt(BusinessTime.now());
           if (task.getExecutionTokenId() != null) {
@@ -1397,8 +1461,9 @@ public class WorkflowEngine implements FileUsage {
                     pending.setStatus("CANCELLED");
                     tasks.save(pending);
                   });
-          if (input.targetNodeId() == null) finish(request, "RETURNED");
-          else {
+          if (input.targetNodeId() == null) {
+            finish(request, "RETURNED");
+          } else {
             var trail = path(request);
             request.setActivePath(
                 json.write(Map.of("nodes", trail.subList(0, trail.indexOf(input.targetNodeId())))));
@@ -1448,12 +1513,17 @@ public class WorkflowEngine implements FileUsage {
                       t.setStatus("CANCELLED");
                       tasks.save(t);
                     });
-            if (task.getExecutionTokenId() == null) advance(request, node.next());
-            else orchestrator.approved(request, task, node.next(), this);
+            if (task.getExecutionTokenId() == null) {
+              advance(request, node.next());
+            } else {
+              orchestrator.approved(request, task, node.next(), this);
+            }
           }
         }
         case "TRANSFER", "ADD_SIGN" -> {
-          if (input.targetUserId() == null) throw new BusinessException("请选择接收人");
+          if (input.targetUserId() == null) {
+            throw new BusinessException("请选择接收人");
+          }
           target =
               users
                   .findById(input.targetUserId())
@@ -1463,13 +1533,16 @@ public class WorkflowEngine implements FileUsage {
           access.checkData("users", target.getId(), target.getDepartmentId());
           if (target.getId().equals(userId)
               || (!Boolean.TRUE.equals(spec.allowSelfApproval())
-                  && target.getId().equals(request.getApplicantId())))
+                  && target.getId().equals(request.getApplicantId()))) {
             throw new BusinessException("不能转给自己或不允许自审的申请人");
+          }
           Long targetId = target.getId();
           if (!Boolean.TRUE.equals(spec.allowRepeatApproval())
               && json.assignees(request.getResolvedAssignees()).entrySet().stream()
-                  .anyMatch(e -> !e.getKey().equals(node.id()) && e.getValue().contains(targetId)))
+                  .anyMatch(
+                      e -> !e.getKey().equals(node.id()) && e.getValue().contains(targetId))) {
             throw new BusinessException("接收人已被其他节点指定，流程不允许重复审批");
+          }
           if (current.stream()
               .anyMatch(
                   t ->
@@ -1479,8 +1552,9 @@ public class WorkflowEngine implements FileUsage {
                               || (!Boolean.TRUE.equals(spec.allowRepeatApproval())
                                   && t.getRunNumber() == request.getRunNumber()
                                   && path(request).contains(t.getNodeId())
-                                  && t.getStatus().equals("APPROVED")))))
+                                  && t.getStatus().equals("APPROVED"))))) {
             throw new BusinessException("接收人已参与当前节点或不允许重复审批");
+          }
           var added = new FlowTask();
           added.setRequestId(id);
           added.setNodeId(node.id());
@@ -1510,7 +1584,9 @@ public class WorkflowEngine implements FileUsage {
             task.setStatus("TRANSFERRED");
             task.setDecidedAt(BusinessTime.now());
           }
-          if (!request.getApproverIds().contains(targetId)) request.getApproverIds().add(targetId);
+          if (!request.getApproverIds().contains(targetId)) {
+            request.getApproverIds().add(targetId);
+          }
           events.enqueue(
               request,
               targetId,
@@ -1519,7 +1595,9 @@ public class WorkflowEngine implements FileUsage {
         }
         default -> throw new BusinessException("不支持的审批动作");
       }
-      if (!input.action().equals("COMMENT")) tasks.save(task);
+      if (!input.action().equals("COMMENT")) {
+        tasks.save(task);
+      }
       var decision = record(request, action, node, input.comment(), target);
       decision.setNodeVisit(task.getNodeVisit());
       decision.setTargetNodeId(input.targetNodeId());
@@ -1535,8 +1613,9 @@ public class WorkflowEngine implements FileUsage {
 
   /** JSON 重读可能把 BigDecimal 变成整数/浮点表示；数值相同不制造假的表单变更记录。 */
   private boolean sameFormValue(Object before, Object after) {
-    if (before instanceof Number && after instanceof Number)
+    if (before instanceof Number && after instanceof Number) {
       return new BigDecimal(before.toString()).compareTo(new BigDecimal(after.toString())) == 0;
+    }
     return Objects.equals(before, after);
   }
 
@@ -1553,32 +1632,94 @@ public class WorkflowEngine implements FileUsage {
     access.require("requests:remind");
     FlowRequest request = accessible(id, true);
     if (!Objects.equals(request.getApplicantId(), access.current().getId())
-        && !access.has("requests:manage")) throw new AccessDeniedException("只有申请人或审批管理员可以催办");
+        && !access.has("requests:manage")) {
+      throw new AccessDeniedException("只有申请人或审批管理员可以催办");
+    }
     OperationSupport.version(request, version);
-    if (!"PENDING".equals(request.getStatus())) throw new BusinessException("已结束申请不能催办");
+    if (!"PENDING".equals(request.getStatus())) {
+      throw new BusinessException("已结束申请不能催办");
+    }
     LocalDateTime now = BusinessTime.now();
     if (request.getLastRemindedAt() != null
-        && request.getLastRemindedAt().isAfter(now.minusMinutes(30)))
+        && request.getLastRemindedAt().isAfter(now.minusMinutes(30))) {
       throw new BusinessException("每项申请 30 分钟内只能催办一次");
+    }
     var pending =
         tasks.findByRequestIdOrderByIdAsc(id).stream()
             .filter(task -> currentApprovalTask(request, task))
             .map(FlowTask::getAssigneeId)
             .distinct()
             .toList();
-    if (pending.isEmpty()) throw new BusinessException("当前没有可催办的待办");
+    if (pending.isEmpty()) {
+      throw new BusinessException("当前没有可催办的待办");
+    }
     // 同一人可承办多个并行节点，只发一条申请级提醒；委托任务只通知真实接收人，不通知来源人。
     // 根申请锁、打开版本和申请级冷却共同保护重复请求；轮次与锁内时间构成稳定的本次事件键。
-    for (Long recipientId : pending)
+    for (Long recipientId : pending) {
       events.enqueue(
           request,
           recipientId,
           "reminder:" + id + ":" + request.getRunNumber() + ":" + recipientId + ":" + now,
           request.getApplicantName() + "提醒你处理审批");
+    }
     request.setLastRemindedAt(now);
     record(request, "REMIND", null, "催办全部当前审批待办", null);
     requests.save(request);
     refreshParticipants(request);
     return detail(id);
   }
+
+  /** 提交只接受已发布版本编号，人员、节点和账号身份由服务端解析并冻结。 */
+  @Schema(name = "WorkflowSubmission")
+  public record Submit(
+      @NotNull Long definitionId,
+      @NotNull Long versionId,
+      @NotBlank @Size(max = 160) String title,
+      @tools.jackson.databind.annotation.JsonDeserialize(
+              using = WorkflowFormValuesDeserializer.class)
+          Map<String, Object> values,
+      Long businessId,
+      Long businessRevisionId,
+      Long businessVersion) {}
+
+  /** 所有决定携带申请版本；转交/加签仅目标账号有效，其他动作不能通过额外属性改写身份。 */
+  public record Action(
+      @NotNull Long version,
+      @NotBlank
+          @Pattern(regexp = "APPROVE|REJECT|RETURN|WITHDRAW|TERMINATE|COMMENT|TRANSFER|ADD_SIGN")
+          String action,
+      @Size(max = 500) String comment,
+      Long taskId,
+      Long targetUserId,
+      @tools.jackson.databind.annotation.JsonDeserialize(
+              using = WorkflowFormValuesDeserializer.class)
+          Map<String, Object> values,
+      @Size(max = 40) String targetNodeId) {
+    /** 兼容已有业务扩展调用；未选择退回目标时表示退回申请人。 */
+    public Action(
+        Long version,
+        String action,
+        String comment,
+        Long taskId,
+        Long targetUserId,
+        Map<String, Object> values) {
+      this(version, action, comment, taskId, targetUserId, values, null);
+    }
+  }
+
+  /** 编辑和重提始终由原申请人完成，不能改变流程、身份和业务关联。 */
+  public record Edit(
+      @NotNull Long version,
+      @NotBlank @Size(max = 160) String title,
+      @tools.jackson.databind.annotation.JsonDeserialize(
+              using = WorkflowFormValuesDeserializer.class)
+          Map<String, Object> values,
+      Long businessVersion) {}
+
+  /** 人员交接必须明确原人、新人和原因；只替换在途任务及实例人员快照，不修改发布定义。 */
+  public record Handover(
+      @NotNull Long version,
+      @NotNull Long fromUserId,
+      @NotNull Long targetUserId,
+      @NotBlank @Size(max = 300) String reason) {}
 }

@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.util;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -49,7 +49,9 @@ public class ModuleSwitches {
 
   /** 门户依赖内容，审批依赖站内消息；关闭依赖时同时关闭消费模块，不产生孤立入口。 */
   public boolean isEnabled(String module) {
-    if (!KEYS.contains(module)) throw new IllegalArgumentException("未知模块：" + module);
+    if (!KEYS.contains(module)) {
+      throw new IllegalArgumentException("未知模块：" + module);
+    }
     boolean configured = enabled.getOrDefault(module, defaultEnabled(module));
     return configured
         && switch (module) {
@@ -78,7 +80,9 @@ public class ModuleSwitches {
   /** 权限目录保留完整注册项；仅在请求授权时过滤关闭模块，不能用超级管理员绕过。 */
   public boolean permissionEnabled(String permission) {
     // 配置页必须在智能体模块关闭时仍可访问，便于管理员先完成模型配置。
-    if ("agentscope:configure".equals(permission)) return true;
+    if ("agentscope:configure".equals(permission)) {
+      return true;
+    }
     String resource = permission.split(":", 2)[0];
     String module =
         switch (resource) {

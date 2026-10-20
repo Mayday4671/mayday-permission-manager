@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.workflow.WorkflowSchema.Field;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -24,13 +24,6 @@ public final class WorkflowCalculations {
 
   private WorkflowCalculations() {}
 
-  /** operands 保存稳定字段 ID；明细汇总的 column 保存该明细局部列 ID。 scale 是 0–6 位小数，统一四舍五入；日期天数包含起止两天，不代表工作日或假期日历。 */
-  public record Formula(String operation, List<String> operands, String column, Integer scale) {
-    public Formula {
-      operands = operands == null ? List.of() : List.copyOf(operands);
-    }
-  }
-
   /** 草稿同样拒绝失效引用和循环计算，避免保存一个无法试填或发布的表单。 */
   public static void validate(List<Field> fields) {
     Map<String, Field> catalog = new LinkedHashMap<>();
@@ -52,8 +45,9 @@ public final class WorkflowCalculations {
               && new HashSet<>(formula.operands()).size() == formula.operands().size(),
           "计算需要 1 至 10 个不重复字段");
       require(catalog.keySet().containsAll(formula.operands()), field.label() + "引用的计算字段已不存在");
-      if (Set.of("SUBTRACT", "DIVIDE").contains(formula.operation()))
+      if (Set.of("SUBTRACT", "DIVIDE").contains(formula.operation())) {
         require(formula.operands().size() == 2, "减法和除法需要两个字段，选择顺序决定运算顺序");
+      }
       if ("DETAIL_SUM".equals(formula.operation())) {
         require(formula.operands().size() == 1, "明细汇总只能选择一个明细表");
         Field source = catalog.get(formula.operands().getFirst());
@@ -79,15 +73,20 @@ public final class WorkflowCalculations {
       require("DETAIL_SUM".equals(formula.operation()) || formula.column() == null, "只有明细汇总可以设置列");
     }
     Set<String> done = new HashSet<>();
-    for (Field field : fields) checkDependencies(field, catalog, new HashSet<>(), done);
+    for (Field field : fields) {
+      checkDependencies(field, catalog, new HashSet<>(), done);
+    }
   }
 
   private static void checkDependencies(
       Field field, Map<String, Field> catalog, Set<String> visiting, Set<String> done) {
-    if (!"CALCULATED".equals(field.type()) || done.contains(field.id())) return;
+    if (!"CALCULATED".equals(field.type()) || done.contains(field.id())) {
+      return;
+    }
     require(visiting.add(field.id()), "计算字段存在循环引用：" + field.label());
-    for (String id : field.formula().operands())
+    for (String id : field.formula().operands()) {
       checkDependencies(catalog.get(id), catalog, visiting, done);
+    }
     visiting.remove(field.id());
     done.add(field.id());
   }
@@ -100,7 +99,9 @@ public final class WorkflowCalculations {
     fields.forEach(field -> catalog.put(field.id(), field));
     Map<String, Object> result = new LinkedHashMap<>(values);
     Set<String> done = new HashSet<>();
-    for (Field field : fields) compute(field, catalog, result, done, required);
+    for (Field field : fields) {
+      compute(field, catalog, result, done, required);
+    }
     return result;
   }
 
@@ -110,9 +111,13 @@ public final class WorkflowCalculations {
       Map<String, Object> values,
       Set<String> done,
       boolean required) {
-    if (!"CALCULATED".equals(field.type()) || !done.add(field.id())) return;
+    if (!"CALCULATED".equals(field.type()) || !done.add(field.id())) {
+      return;
+    }
     Formula formula = field.formula();
-    for (String id : formula.operands()) compute(catalog.get(id), catalog, values, done, required);
+    for (String id : formula.operands()) {
+      compute(catalog.get(id), catalog, values, done, required);
+    }
     BigDecimal result = null;
     if (formula.operands().stream().allMatch(id -> values.get(id) != null)) {
       if ("DATE_DAYS".equals(formula.operation())) {
@@ -171,6 +176,15 @@ public final class WorkflowCalculations {
   }
 
   private static void require(boolean valid, String message) {
-    if (!valid) throw new BusinessException(message);
+    if (!valid) {
+      throw new BusinessException(message);
+    }
+  }
+
+  /** operands 保存稳定字段 ID；明细汇总的 column 保存该明细局部列 ID。 scale 是 0–6 位小数，统一四舍五入；日期天数包含起止两天，不代表工作日或假期日历。 */
+  public record Formula(String operation, List<String> operands, String column, Integer scale) {
+    public Formula {
+      operands = operands == null ? List.of() : List.copyOf(operands);
+    }
   }
 }

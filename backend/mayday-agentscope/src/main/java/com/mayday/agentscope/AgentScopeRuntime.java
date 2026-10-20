@@ -1,6 +1,6 @@
 package com.mayday.agentscope;
 
-import com.mayday.common.ServiceUnavailableException;
+import com.mayday.common.exception.ServiceUnavailableException;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.message.AssistantMessage;
 import io.agentscope.core.message.Msg;
@@ -32,7 +32,9 @@ public class AgentScopeRuntime {
   public String reply(
       Long ownerId, String sessionId, List<AgentScopeMessage> history, String prompt) {
     AgentScopeOptions options = configuration.current();
-    if (!options.modelReady()) throw new ServiceUnavailableException("智能体尚未配置模型服务，请联系系统管理员");
+    if (!options.modelReady()) {
+      throw new ServiceUnavailableException("智能体尚未配置模型服务，请联系系统管理员");
+    }
     String userId = ownerId.toString();
     RuntimeContext context = RuntimeContext.builder().userId(userId).sessionId(sessionId).build();
     try (HarnessAgent agent = buildAgent(options)) {
@@ -43,8 +45,9 @@ public class AgentScopeRuntime {
           agent
               .call(transcript, context)
               .block(Duration.ofSeconds(options.requestTimeoutSeconds()));
-      if (answer == null || answer.getTextContent() == null || answer.getTextContent().isBlank())
+      if (answer == null || answer.getTextContent() == null || answer.getTextContent().isBlank()) {
         throw new ServiceUnavailableException("智能体暂时没有生成可显示的回复，请稍后重试");
+      }
       return answer.getTextContent();
     } catch (ServiceUnavailableException exception) {
       clearState(userId, sessionId);
@@ -100,9 +103,11 @@ public class AgentScopeRuntime {
   private List<Msg> toTranscript(List<AgentScopeMessage> history) {
     List<Msg> transcript = new ArrayList<>(history.size());
     for (AgentScopeMessage message : history) {
-      if ("USER".equals(message.getRole())) transcript.add(new UserMessage(message.getContent()));
-      else if ("ASSISTANT".equals(message.getRole()))
+      if ("USER".equals(message.getRole())) {
+        transcript.add(new UserMessage(message.getContent()));
+      } else if ("ASSISTANT".equals(message.getRole())) {
         transcript.add(new AssistantMessage(message.getContent()));
+      }
     }
     return transcript;
   }

@@ -1,6 +1,6 @@
 package com.mayday.service;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -37,20 +37,22 @@ public class PortalThemePolicy {
           "errorColor");
   private final JsonMapper json;
 
-  /** 公开响应始终返回完整、已规范化的配置；调用方无需拼接 CSS，也不接收存储中的任意额外键。 */
-  public record Theme(
-      String mode,
-      String primaryColor,
-      int borderRadius,
-      boolean compact,
-      String menuStyle,
-      String background,
-      String surfaceStyle,
-      String contentWidth,
-      String chartPalette,
-      String successColor,
-      String warningColor,
-      String errorColor) {}
+  private static String enumField(
+      Map<?, ?> fields, String key, String fallback, Set<String> options) {
+    Object value = fields.containsKey(key) ? fields.get(key) : fallback;
+    if (!(value instanceof String text) || !options.contains(text)) {
+      throw new IllegalArgumentException();
+    }
+    return text;
+  }
+
+  private static String colorField(Map<?, ?> fields, String key, String fallback) {
+    Object value = fields.containsKey(key) ? fields.get(key) : fallback;
+    if (!(value instanceof String text) || !text.matches("#[0-9a-fA-F]{6}")) {
+      throw new IllegalArgumentException();
+    }
+    return text.toLowerCase(Locale.ROOT);
+  }
 
   /** 严格解析后台提交的前台主题；枚举、颜色与范围均验证，旧版缺省扩展字段自动补齐，显式非法值拒绝保存。 */
   public Theme parse(String text) {
@@ -61,12 +63,15 @@ public class PortalThemePolicy {
               .readValue(text);
       if (!(value instanceof Map<?, ?> fields)
           || !FIELDS.containsAll(fields.keySet())
-          || !fields.keySet().containsAll(REQUIRED_FIELDS)) throw new IllegalArgumentException();
+          || !fields.keySet().containsAll(REQUIRED_FIELDS)) {
+        throw new IllegalArgumentException();
+      }
       if (!(fields.get("borderRadius") instanceof Integer radius)
           || radius < 0
           || radius > 16
-          || !(fields.get("compact") instanceof Boolean compact))
+          || !(fields.get("compact") instanceof Boolean compact)) {
         throw new IllegalArgumentException();
+      }
       return new Theme(
           enumField(fields, "mode", null, Set.of("light", "dark", "system")),
           colorField(fields, "primaryColor", null),
@@ -85,21 +90,6 @@ public class PortalThemePolicy {
     }
   }
 
-  private static String enumField(
-      Map<?, ?> fields, String key, String fallback, Set<String> options) {
-    Object value = fields.containsKey(key) ? fields.get(key) : fallback;
-    if (!(value instanceof String text) || !options.contains(text))
-      throw new IllegalArgumentException();
-    return text;
-  }
-
-  private static String colorField(Map<?, ?> fields, String key, String fallback) {
-    Object value = fields.containsKey(key) ? fields.get(key) : fallback;
-    if (!(value instanceof String text) || !text.matches("#[0-9a-fA-F]{6}"))
-      throw new IllegalArgumentException();
-    return text.toLowerCase(Locale.ROOT);
-  }
-
   /** 历史异常配置仅影响外观；公开页面使用安全默认值继续提供服务，不暴露非法存储值。 */
   public Theme forPublic(String text) {
     try {
@@ -108,4 +98,19 @@ public class PortalThemePolicy {
       return parse(DEFAULT_JSON);
     }
   }
+
+  /** 公开响应始终返回完整、已规范化的配置；调用方无需拼接 CSS，也不接收存储中的任意额外键。 */
+  public record Theme(
+      String mode,
+      String primaryColor,
+      int borderRadius,
+      boolean compact,
+      String menuStyle,
+      String background,
+      String surfaceStyle,
+      String contentWidth,
+      String chartPalette,
+      String successColor,
+      String warningColor,
+      String errorColor) {}
 }

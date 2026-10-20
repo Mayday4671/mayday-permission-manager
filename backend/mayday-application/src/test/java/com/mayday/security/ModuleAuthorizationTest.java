@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.util.ModuleSwitches;
 import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SysUser;

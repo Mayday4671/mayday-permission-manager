@@ -1,6 +1,6 @@
 package com.mayday.workorders.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.workorders.WorkOrder;
 import org.apache.ibatis.annotations.Mapper;
 

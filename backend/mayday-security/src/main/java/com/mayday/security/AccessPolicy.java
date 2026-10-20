@@ -1,6 +1,6 @@
 package com.mayday.security;
 
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.util.ModuleSwitches;
 import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.DepartmentGrant;
 import com.mayday.system.model.SysRole;
@@ -43,10 +43,11 @@ public class AccessPolicy {
 
   /** 合并当前有效角色权限，并排除未知权限和关闭模块，确保旧数据库授权不能绕过服务端注册目录。 */
   public Set<String> permissions() {
-    if (admin())
+    if (admin()) {
       return PermissionCatalog.ALL.stream()
           .filter(modules::permissionEnabled)
           .collect(Collectors.toUnmodifiableSet());
+    }
     Set<String> result = new HashSet<>();
     current().getRoles().stream()
         .filter(SysRole::isEnabled)
@@ -64,12 +65,16 @@ public class AccessPolicy {
 
   /** 动作权限不足时立即返回拒绝访问；业务服务可用于保护不经过控制器的方法调用。 */
   public void require(String permission) {
-    if (!has(permission)) throw new AccessDeniedException("没有此操作的权限");
+    if (!has(permission)) {
+      throw new AccessDeniedException("没有此操作的权限");
+    }
   }
 
   /** 返回供界面摘要使用的范围名称；CUSTOM 与其他范围的并集不能靠该名称直接判定记录可见性。 */
   public String scope(String resource) {
-    if (admin()) return "ALL";
+    if (admin()) {
+      return "ALL";
+    }
     // 该值只用于界面摘要与 ALL 判断。实际授权必须使用下面按记录计算的并集。
     return current().getRoles().stream()
         .filter(SysRole::isEnabled)
@@ -78,9 +83,6 @@ public class AccessPolicy {
         .max(Comparator.comparingInt(PermissionCatalog.SCOPES::indexOf))
         .orElse("SELF");
   }
-
-  /** 动作权限与有效角色筛选后的实际行级并集；指定部门保持集合语义，不转换成范围等级。 */
-  private record EffectiveScope(boolean all, boolean self, Set<Long> departments) {}
 
   /**
    * 按资源合并每个有效角色的授权集合。CUSTOM 不是“大于部门”的等级，不能用大小比较替代。 只有拥有本资源查看权限的角色才参与；CUSTOM 只包含明确选择的部门，不自动带上本人。
@@ -91,14 +93,19 @@ public class AccessPolicy {
   }
 
   private EffectiveScope effectiveScope(SysUser user, String resource) {
-    if (!user.isEnabled()) return new EffectiveScope(false, false, Set.of());
+    if (!user.isEnabled()) {
+      return new EffectiveScope(false, false, Set.of());
+    }
     if (user.getRoles().stream()
-        .anyMatch(role -> role.isEnabled() && "admin".equals(role.getCode())))
+        .anyMatch(role -> role.isEnabled() && "admin".equals(role.getCode()))) {
       return new EffectiveScope(true, true, Set.of());
+    }
     boolean self = false;
     Set<Long> departmentIds = new HashSet<>();
     for (SysRole role : user.getRoles()) {
-      if (!role.isEnabled() || !role.getPermissions().contains(resource + ":view")) continue;
+      if (!role.isEnabled() || !role.getPermissions().contains(resource + ":view")) {
+        continue;
+      }
       switch (role.getDataScopes().getOrDefault(resource, "SELF")) {
         case "ALL":
           return new EffectiveScope(true, true, Set.of());
@@ -130,15 +137,20 @@ public class AccessPolicy {
 
   private Set<Long> departments(String scope, Long departmentId) {
     Set<Long> ids = new HashSet<>();
-    if (departmentId == null) return ids;
+    if (departmentId == null) {
+      return ids;
+    }
     ids.add(departmentId);
     if ("DEPARTMENT_TREE".equals(scope)) {
       List<SystemEntry> all = entries.findByKindOrderBySortOrderAscIdAsc("departments");
       boolean changed;
       do {
         changed = false;
-        for (SystemEntry entry : all)
-          if (ids.contains(entry.getParentId())) changed |= ids.add(entry.getId());
+        for (SystemEntry entry : all) {
+          if (ids.contains(entry.getParentId())) {
+            changed |= ids.add(entry.getId());
+          }
+        }
       } while (changed);
     }
     return ids;
@@ -179,7 +191,9 @@ public class AccessPolicy {
 
   /** 在已校验动作权限后拒绝范围外的单条读写，防止猜测主键绕过列表上的 SQL 过滤。 */
   public void checkData(String resource, Long ownerId, Long departmentId) {
-    if (!contains(resource, ownerId, departmentId)) throw new AccessDeniedException("该数据不在您的授权范围内");
+    if (!contains(resource, ownerId, departmentId)) {
+      throw new AccessDeniedException("该数据不在您的授权范围内");
+    }
   }
 
   /** 把同一行级并集放进 SQL 查询和计数；调用方传数据库列名，实体表必须具备约定的所有者列及 department_id 列。 */
@@ -192,28 +206,40 @@ public class AccessPolicy {
   /** 行级并集的条件形态，供联查或子查询组合；全部范围返回 null 表示不限制。 */
   public QueryCondition scopeCondition(String resource, String ownerColumn) {
     EffectiveScope scope = effectiveScope(resource);
-    if (scope.all()) return null;
+    if (scope.all()) {
+      return null;
+    }
     QueryCondition self = scope.self() ? new QueryColumn(ownerColumn).eq(current().getId()) : null;
     QueryCondition departments =
         scope.departments().isEmpty()
             ? null
             : new QueryColumn("department_id").in(scope.departments());
-    if (self != null && departments != null) return self.or(departments);
+    if (self != null && departments != null) {
+      return self.or(departments);
+    }
     return self != null ? self : departments;
   }
 
   /** 只能委托自己已拥有的权限和数据范围。角色管理权不等于授予超级管理员的权力。 */
   public void checkGrant(Collection<SysRole> roles) {
     for (SysRole role : roles) {
-      if (admin()) continue;
-      if ("admin".equals(role.getCode()) || !permissions().containsAll(role.getPermissions()))
+      if (admin()) {
+        continue;
+      }
+      if ("admin".equals(role.getCode()) || !permissions().containsAll(role.getPermissions())) {
         throw new AccessDeniedException("不能管理或授予超出自身权限的角色");
+      }
       role.getDataScopes()
           .forEach(
               (resource, scope) -> {
                 // 部门范围依赖受让人所在部门，因此非管理员只能委托本人范围；否则可能跨部门扩大可见数据。
-                if (!"SELF".equals(scope)) throw new AccessDeniedException("跨人员的数据范围授权仅允许超级管理员操作");
+                if (!"SELF".equals(scope)) {
+                  throw new AccessDeniedException("跨人员的数据范围授权仅允许超级管理员操作");
+                }
               });
     }
   }
+
+  /** 动作权限与有效角色筛选后的实际行级并集；指定部门保持集合语义，不转换成范围等级。 */
+  private record EffectiveScope(boolean all, boolean self, Set<Long> departments) {}
 }

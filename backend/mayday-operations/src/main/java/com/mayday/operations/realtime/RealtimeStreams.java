@@ -1,6 +1,6 @@
 package com.mayday.operations.realtime;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.security.AccessPolicy;
 import com.mayday.security.TokenService;
 import com.mayday.system.model.SysUser;
@@ -24,17 +24,15 @@ public class RealtimeStreams {
   private final TokenService tokens;
   private final AccessPolicy access;
   private final RealtimeJournal journal;
-  private long cursor;
   private final Map<String, Connection> connections = new ConcurrentHashMap<>();
-
-  /** 连接仅在进程内保存原令牌用于重新核验，不序列化、不记录日志、不传回客户端。 */
-  private record Connection(String id, Long userId, String token, SseEmitter emitter) {}
+  private long cursor;
 
   /** 主令牌只从 Authorization 头取得，不接受 URL 参数或匿名订阅。 */
   public synchronized SseEmitter open(String token) {
     SysUser user = tokens.authenticate(token).orElseThrow(() -> new BusinessException("会话已失效"));
-    if (!authorized(user))
+    if (!authorized(user)) {
       throw new org.springframework.security.access.AccessDeniedException("没有消息或审批查看权限");
+    }
     SseEmitter emitter = new SseEmitter(CONNECTION_TIMEOUT_MS);
     String id = UUID.randomUUID().toString();
     journal.register(id, user.getId());
@@ -80,7 +78,9 @@ public class RealtimeStreams {
                         ? access.hasFor(user, "messages:view")
                         : "requests".equals(topic) && access.hasFor(user, "requests:view"))
             .collect(java.util.stream.Collectors.toUnmodifiableSet());
-    if ("changed".equals(event) && visibleTopics.isEmpty()) return;
+    if ("changed".equals(event) && visibleTopics.isEmpty()) {
+      return;
+    }
     try {
       connection
           .emitter()
@@ -123,8 +123,11 @@ public class RealtimeStreams {
         .forEach(
             connection -> {
               try {
-                if (journal.renew(connection.id())) safelySend(connection, "heartbeat", Set.of());
-                else close(connection);
+                if (journal.renew(connection.id())) {
+                  safelySend(connection, "heartbeat", Set.of());
+                } else {
+                  close(connection);
+                }
               } catch (RuntimeException unavailable) {
                 close(connection);
               }
@@ -145,4 +148,7 @@ public class RealtimeStreams {
       close(connection);
     }
   }
+
+  /** 连接仅在进程内保存原令牌用于重新核验，不序列化、不记录日志、不传回客户端。 */
+  private record Connection(String id, Long userId, String token, SseEmitter emitter) {}
 }

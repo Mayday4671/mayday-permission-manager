@@ -1,9 +1,9 @@
 package com.mayday.workorders;
 
-import com.mayday.common.EntityVersions;
-import com.mayday.common.PageResult;
-import com.mayday.common.ResourceNotFoundException;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.ResourceNotFoundException;
+import com.mayday.common.persistence.EntityVersions;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.workorders.WorkOrderContracts.WorkOrderRequest;
 import com.mayday.workorders.WorkOrderContracts.WorkOrderView;
@@ -30,8 +30,12 @@ public class WorkOrderService {
     QueryWrapper filter = access.filter("workorders", "owner_id");
     QueryCondition keywordMatch =
         keyword == null ? null : SearchPredicates.contains("title", keyword);
-    if (keywordMatch != null) filter.and(keywordMatch);
-    if (enabled != null) filter.and(new QueryColumn("enabled").eq(enabled));
+    if (keywordMatch != null) {
+      filter.and(keywordMatch);
+    }
+    if (enabled != null) {
+      filter.and(new QueryColumn("enabled").eq(enabled));
+    }
     return PageResult.of(
         repository.paginate(
             PageResult.request(page, size), filter.orderBy(new QueryColumn("id").desc())),

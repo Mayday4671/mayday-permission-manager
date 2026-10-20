@@ -11,8 +11,11 @@ import org.apache.ibatis.annotations.Mapper;
 public interface FilePayloadMapper extends BaseMapper<FilePayload> {
   /** 主键由文件元信息决定：不存在则带主键插入，存在则整行覆盖。 */
   default FilePayload save(FilePayload payload) {
-    if (selectOneById(payload.getId()) == null) insertWithPk(payload, false);
-    else update(payload, false);
+    if (selectOneById(payload.getId()) == null) {
+      insertWithPk(payload, false);
+    } else {
+      update(payload, false);
+    }
     return payload;
   }
 

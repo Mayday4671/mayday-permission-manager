@@ -1,6 +1,6 @@
 package com.mayday.identity;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.identity.mapper.ExternalIdentityMapper;
 import com.mayday.identity.mapper.IdentityChallengeMapper;
 import com.mayday.identity.mapper.MfaCredentialMapper;
@@ -45,11 +45,17 @@ public class MfaService {
   private final ExternalIdentityMapper externalIdentities;
   private final IdentityChallengeMapper challengeStore;
 
-  /** 个人中心只显示启用状态与剩余恢复码数；不返回已保存的共享密钥或散列。 */
-  public record Status(boolean available, boolean enabled, long recoveryCodesRemaining) {}
+  private static String string(Map<String, Object> row, String key) {
+    return (String) row.get(key);
+  }
 
-  /** 待开通密钥仅此次返回供认证器扫码，必须再提交真实验证码才成为已开通凭据。 */
-  public record Enrollment(String challengeId, String secret, String provisioningUri) {}
+  private static String encode(String value) {
+    return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+  }
+
+  private static BusinessException invalid() {
+    return new BusinessException("身份验证已过期或无效，请重新开始");
+  }
 
   /** 当前账号的多因素摘要；部署关闭开通不绕过已开通账号的登录验证。 */
   public Status status(Long userId) {
@@ -70,9 +76,13 @@ public class MfaService {
   public LoginView loginAfterPrimary(
       SysUser verified, String ip, String device, String externalBindingId) {
     SysUser account = current(verified.getId());
-    if (!account.getPasswordHash().equals(verified.getPasswordHash())) throw invalid();
+    if (!account.getPasswordHash().equals(verified.getPasswordHash())) {
+      throw invalid();
+    }
     Map<String, Object> credential = credential(account.getId());
-    if (credential == null) return new LoginView(tokens.issue(account, ip, device));
+    if (credential == null) {
+      return new LoginView(tokens.issue(account, ip, device));
+    }
     requireAllowed(account.getId(), ip);
     String challenge =
         challenges.create(
@@ -97,16 +107,22 @@ public class MfaService {
     Map<String, Object> credential = credential(account.getId());
     if (credential == null
         || !TokenService.hash(account.getPasswordHash()).equals(challenge.credentialHash())
-        || !string(credential, "revision").equals(challenge.credentialRevision())) throw invalid();
+        || !string(credential, "revision").equals(challenge.credentialRevision())) {
+      throw invalid();
+    }
     String externalBindingId = null;
     if (challenge.payloadCipher() != null) {
       externalBindingId =
           secrets.decrypt(challenge.payloadCipher(), "mfa-binding:" + account.getId());
       var binding = externalIdentities.lockBinding(externalBindingId, account.getId());
-      if (binding.isEmpty()) throw invalid();
+      if (binding.isEmpty()) {
+        throw invalid();
+      }
       var provider = properties.provider(string(binding.getFirst(), "provider_id"));
       if (!TokenService.hash(provider.getIssuer())
-          .equals(string(binding.getFirst(), "issuer_hash"))) throw invalid();
+          .equals(string(binding.getFirst(), "issuer_hash"))) {
+        throw invalid();
+      }
     }
     try {
       requireAllowed(account.getId(), ip);
@@ -118,8 +134,9 @@ public class MfaService {
     }
     challenges.consume(challenge);
     succeeded(account.getId(), ip);
-    if (externalBindingId != null)
+    if (externalBindingId != null) {
       externalIdentities.touchLogin(externalBindingId, sessionClock.instant());
+    }
     return new LoginView(tokens.issue(account, ip, device));
   }
 
@@ -150,9 +167,13 @@ public class MfaService {
   /** 开通只允许当前未启用账号；待确认秘密有独立短期挑战，重开弹窗不会保存为启用状态。 */
   @Transactional
   public Enrollment enroll(Long userId, String password, String ip) {
-    if (!properties.isMfaEnabled()) throw new BusinessException("多因素认证开通未启用，请联系管理员配置");
+    if (!properties.isMfaEnabled()) {
+      throw new BusinessException("多因素认证开通未启用，请联系管理员配置");
+    }
     SysUser account = reauthenticate(userId, password, null, ip);
-    if (credential(userId) != null) throw new BusinessException("多因素认证已开通，不能重复开通");
+    if (credential(userId) != null) {
+      throw new BusinessException("多因素认证已开通，不能重复开通");
+    }
     String secret = Totp.newSecret();
     String challenge =
         challenges.create(
@@ -183,7 +204,9 @@ public class MfaService {
     SysUser account = current(userId);
     if (!userId.equals(challenge.userId())
         || !TokenService.hash(account.getPasswordHash()).equals(challenge.credentialHash())
-        || credential(userId) != null) throw invalid();
+        || credential(userId) != null) {
+      throw invalid();
+    }
     requireAllowed(userId, ip);
     String secret = secrets.decrypt(challenge.payloadCipher(), "mfa-enroll:" + userId);
     long step = Totp.verify(secret, factor, sessionClock.instant(), -1);
@@ -208,7 +231,9 @@ public class MfaService {
   public List<String> regenerate(Long userId, String password, String factor, String ip) {
     reauthenticate(userId, password, factor, ip);
     var credential = credential(userId);
-    if (credential == null) throw new BusinessException("尚未开通多因素认证");
+    if (credential == null) {
+      throw new BusinessException("尚未开通多因素认证");
+    }
     var result = newRecovery(userId, string(credential, "revision"));
     tokens.revokeUser(userId);
     changeAudit.record("用户", userId, "重新生成恢复码", Map.of("恢复码", "旧组"), Map.of("恢复码", "已轮换"));
@@ -219,7 +244,9 @@ public class MfaService {
   @Transactional
   public void disable(Long userId, String password, String factor, String ip) {
     reauthenticate(userId, password, factor, ip);
-    if (credential(userId) == null) throw new BusinessException("尚未开通多因素认证");
+    if (credential(userId) == null) {
+      throw new BusinessException("尚未开通多因素认证");
+    }
     mfaStore.deleteByUser(userId);
     challengeStore.deleteByUser(userId);
     tokens.revokeUser(userId);
@@ -234,14 +261,18 @@ public class MfaService {
     access.require("users:reset");
     Long actorId = access.current().getId();
     // 按账号 ID 升序锁定双方，两个管理员互相恢复不会形成相反锁序；取锁后再检查目标当前角色和范围。
-    for (Long id : java.util.stream.Stream.of(actorId, userId).distinct().sorted().toList())
+    for (Long id : java.util.stream.Stream.of(actorId, userId).distinct().sorted().toList()) {
       users.lockById(id).orElseThrow(MfaService::invalid);
+    }
     var actor = users.findById(actorId).filter(SysUser::isEnabled).orElseThrow(MfaService::invalid);
-    if (!access.hasFor(actor, "users:view") || !access.hasFor(actor, "users:reset"))
+    if (!access.hasFor(actor, "users:view") || !access.hasFor(actor, "users:reset")) {
       throw new org.springframework.security.access.AccessDeniedException("没有此操作的权限");
+    }
     userService.manageable(userId);
     reauthenticate(access.current().getId(), password, factor, ip);
-    if (credential(userId) == null) throw new BusinessException("该账号尚未开通多因素认证");
+    if (credential(userId) == null) {
+      throw new BusinessException("该账号尚未开通多因素认证");
+    }
     mfaStore.deleteByUser(userId);
     challengeStore.deleteByUser(userId);
     tokens.revokeUser(userId);
@@ -283,7 +314,9 @@ public class MfaService {
               userId,
               string(credential, "revision"),
               sessionClock.instant())
-          == 1) return;
+          == 1) {
+        return;
+      }
     } else {
       long step =
           Totp.verify(
@@ -291,7 +324,9 @@ public class MfaService {
               normalized,
               sessionClock.instant(),
               ((Number) credential.get("last_step")).longValue());
-      if (step >= 0 && mfaStore.advanceStep(userId, step) == 1) return;
+      if (step >= 0 && mfaStore.advanceStep(userId, step) == 1) {
+        return;
+      }
     }
     throw new BusinessException("身份验证码不正确或已使用");
   }
@@ -307,8 +342,9 @@ public class MfaService {
 
   private void requireAllowed(Long userId, String ip) {
     if (!throttle.allowed("mfa:" + ip, userId.toString())
-        || !throttle.allowed("mfa-user:" + userId, userId.toString()))
+        || !throttle.allowed("mfa-user:" + userId, userId.toString())) {
       throw new BusinessException("身份验证尝试过多，请 15 分钟后重试");
+    }
   }
 
   private void failed(Long userId, String ip) {
@@ -321,15 +357,9 @@ public class MfaService {
     throttle.succeeded("mfa-user:" + userId, userId.toString());
   }
 
-  private static String string(Map<String, Object> row, String key) {
-    return (String) row.get(key);
-  }
+  /** 个人中心只显示启用状态与剩余恢复码数；不返回已保存的共享密钥或散列。 */
+  public record Status(boolean available, boolean enabled, long recoveryCodesRemaining) {}
 
-  private static String encode(String value) {
-    return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
-  }
-
-  private static BusinessException invalid() {
-    return new BusinessException("身份验证已过期或无效，请重新开始");
-  }
+  /** 待开通密钥仅此次返回供认证器扫码，必须再提交真实验证码才成为已开通凭据。 */
+  public record Enrollment(String challengeId, String secret, String provisioningUri) {}
 }

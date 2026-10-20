@@ -1,10 +1,10 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.operations.mapper.BusinessEventMapper;
 import com.mayday.operations.mapper.FlowDefinitionMapper;
 import com.mayday.operations.mapper.FlowRequestMapper;
@@ -55,24 +55,6 @@ public class WorkflowController {
   private final WorkflowSimulation simulation;
   private final BusinessEventMapper events;
   private final com.mayday.system.mapper.RoleMapper roles;
-
-  /** 发布或催办携带乐观版本，过期页面不能改变当前流程/申请状态。 */
-  @Schema(name = "WorkflowVersionRequest")
-  public record Version(@NotNull Long version) {}
-
-  /** 失败恢复必须携带当前申请版本和人工说明，保留管理员修复审计。 */
-  public record Recovery(
-      @NotNull Long version,
-      @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 300)
-          String reason) {}
-
-  /** 模拟参数只用于校验与路径展示，不生成申请、待办或通知事件。 */
-  public record Simulation(
-      @NotNull WorkflowSchema.Spec schema,
-      Long applicantId,
-      @tools.jackson.databind.annotation.JsonDeserialize(
-              using = WorkflowFormValuesDeserializer.class)
-          Map<String, Object> values) {}
 
   /** 模板没有持久化状态，用户选择后通过正常新建流程接口保存为自己的草稿。 */
   @GetMapping("/workflows/templates")
@@ -155,10 +137,12 @@ public class WorkflowController {
     var filter =
         com.mybatisflex.core.query.QueryWrapper.create()
             .where(SearchPredicates.contains("name", keyword));
-    if (enabled != null)
+    if (enabled != null) {
       filter.and(new com.mybatisflex.core.query.QueryColumn("enabled").eq(enabled));
-    if (categoryId != null)
+    }
+    if (categoryId != null) {
       filter.and(new com.mybatisflex.core.query.QueryColumn("category_id").eq(categoryId));
+    }
     return ApiResponse.ok(
         PageResult.from(
             definitions
@@ -243,8 +227,10 @@ public class WorkflowController {
     // 模拟模型来自客户端：USERS、ROLES、部门负责人三种来源解析后都要核对范围。
     // 不能仅校验发起人，也不能静默省略无权查看的审批人，造成路径预览与实际运行结果不同。
     for (var user :
-        users.findAllById(people.values().stream().flatMap(Collection::stream).distinct().toList()))
+        users.findAllById(
+            people.values().stream().flatMap(Collection::stream).distinct().toList())) {
       access.checkData("users", user.getId(), user.getDepartmentId());
+    }
     var values = WorkflowSchema.form(body.schema(), body.values());
     return ApiResponse.ok(
         Map.of("valid", true, "path", simulation.path(body.schema(), values, applicant)));
@@ -261,9 +247,13 @@ public class WorkflowController {
     if (status != null
         && !java.util.Set.of(
                 "DRAFT", "PENDING", "RETURNED", "APPROVED", "REJECTED", "WITHDRAWN", "CANCELLED")
-            .contains(status)) throw new BusinessException("未知申请状态");
+            .contains(status)) {
+      throw new BusinessException("未知申请状态");
+    }
     var filter = engine.filter(keyword, box);
-    if (status != null) filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
+    if (status != null) {
+      filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
+    }
     return ApiResponse.ok(
         PageResult.of(requests.paginate(PageResult.request(page, size), filter), engine::summary));
   }
@@ -394,4 +384,22 @@ public class WorkflowController {
         .forEach(e -> e.setNextAttemptAt(BusinessTime.now()));
     return ApiResponse.ok(null);
   }
+
+  /** 发布或催办携带乐观版本，过期页面不能改变当前流程/申请状态。 */
+  @Schema(name = "WorkflowVersionRequest")
+  public record Version(@NotNull Long version) {}
+
+  /** 失败恢复必须携带当前申请版本和人工说明，保留管理员修复审计。 */
+  public record Recovery(
+      @NotNull Long version,
+      @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 300)
+          String reason) {}
+
+  /** 模拟参数只用于校验与路径展示，不生成申请、待办或通知事件。 */
+  public record Simulation(
+      @NotNull WorkflowSchema.Spec schema,
+      Long applicantId,
+      @tools.jackson.databind.annotation.JsonDeserialize(
+              using = WorkflowFormValuesDeserializer.class)
+          Map<String, Object> values) {}
 }

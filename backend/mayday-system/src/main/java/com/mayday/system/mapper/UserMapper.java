@@ -1,6 +1,6 @@
 package com.mayday.system.mapper;
 
-import com.mayday.common.EntityMapper;
+import com.mayday.common.persistence.EntityMapper;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SysUser;
 import com.mybatisflex.core.mybatis.Mappers;
@@ -21,6 +21,14 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface UserMapper extends EntityMapper<SysUser> {
+  /** 岗位成员主键子查询。 */
+  private static QueryWrapper selectPostMemberIds(Long postId) {
+    return QueryWrapper.create()
+        .select(new QueryColumn("user_id"))
+        .from("sys_user_post")
+        .where(new QueryColumn("post_id").eq(postId));
+  }
+
   /** 登录按唯一用户名载入账号；不区分账号不存在、停用或密码错误向匿名用户暴露身份信息。 */
   default Optional<SysUser> findByUsername(String username) {
     SysUser user =
@@ -77,8 +85,9 @@ public interface UserMapper extends EntityMapper<SysUser> {
             .map(row -> row.getLong("role_id"))
             .toList();
     Set<SysRole> roles = new HashSet<>();
-    if (!roleIds.isEmpty())
+    if (!roleIds.isEmpty()) {
       roleEntityMapper.selectListByIds(roleIds).forEach(r -> roles.add(roleEntityMapper.load(r)));
+    }
     user.setRoles(roles);
     Set<Long> posts = new HashSet<>();
     for (Row row :
@@ -103,7 +112,9 @@ public interface UserMapper extends EntityMapper<SysUser> {
 
   /** 按多个角色解析启用成员；角色集合来自已校验的角色配置。 */
   default java.util.List<SysUser> membersOfRoles(java.util.Collection<Long> roleIds) {
-    if (roleIds == null || roleIds.isEmpty()) return java.util.List.of();
+    if (roleIds == null || roleIds.isEmpty()) {
+      return java.util.List.of();
+    }
     return selectListByQuery(
         QueryWrapper.create()
             .where(new QueryColumn("enabled").eq(true))
@@ -114,14 +125,6 @@ public interface UserMapper extends EntityMapper<SysUser> {
   default long countUsersByPost(Long postId) {
     return selectCountByQuery(
         QueryWrapper.create().where(new QueryColumn("id").in(selectPostMemberIds(postId))));
-  }
-
-  /** 岗位成员主键子查询。 */
-  private static QueryWrapper selectPostMemberIds(Long postId) {
-    return QueryWrapper.create()
-        .select(new QueryColumn("user_id"))
-        .from("sys_user_post")
-        .where(new QueryColumn("post_id").eq(postId));
   }
 
   /** 角色成员主键子查询；供通知等跨模块按角色限定账号范围。 */

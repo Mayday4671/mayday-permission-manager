@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.util;
 
 import java.time.Clock;
 import java.time.LocalDate;

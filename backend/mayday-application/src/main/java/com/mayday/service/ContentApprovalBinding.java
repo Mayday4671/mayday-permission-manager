@@ -1,6 +1,6 @@
 package com.mayday.service;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.content.Notice;
 import com.mayday.content.mapper.ContentRevisionMapper;
 import com.mayday.content.mapper.NoticeMapper;
@@ -47,17 +47,22 @@ public class ContentApprovalBinding implements WorkflowBusiness {
   /** 草稿与正式送审共用同一锁内校验，禁止仅凭业务 ID 读取未授权文章。 */
   private Notice eligible(FlowRequest request, Long businessVersion) {
     access.require("notices:update");
-    if (request.getBusinessId() == null || request.getBusinessRevisionId() == null)
+    if (request.getBusinessId() == null || request.getBusinessRevisionId() == null) {
       throw new BusinessException("请选择内容及送审修订");
+    }
     var n = content.managed(request.getBusinessId(), true);
     UserService.version(n, businessVersion);
     if (n.getDeletedAt() != null
-        || !Objects.equals(n.getDraftRevisionId(), request.getBusinessRevisionId()))
+        || !Objects.equals(n.getDraftRevisionId(), request.getBusinessRevisionId())) {
       throw new BusinessException("内容已删除或修订已变化，请重新选择");
+    }
     var r = content.revision(request.getBusinessRevisionId(), n.getId());
-    if (Set.of("PENDING", "APPROVED").contains(r.getApprovalStatus()))
+    if (Set.of("PENDING", "APPROVED").contains(r.getApprovalStatus())) {
       throw new BusinessException("此修订已经在审核中或已通过，请勿重复提交");
-    if (n.getScheduledPublishAt() != null) throw new BusinessException("请先取消上线排期再送审");
+    }
+    if (n.getScheduledPublishAt() != null) {
+      throw new BusinessException("请先取消上线排期再送审");
+    }
     return n;
   }
 
@@ -71,12 +76,14 @@ public class ContentApprovalBinding implements WorkflowBusiness {
         revisions
             .findById(request.getBusinessRevisionId())
             .orElseThrow(() -> new BusinessException("审核关联修订不存在"));
-    if (!Objects.equals(r.getApprovalRequestId(), request.getId()))
+    if (!Objects.equals(r.getApprovalRequestId(), request.getId())) {
       throw new BusinessException("该修订已经重新送审，不能处理旧申请");
+    }
     r.setApprovalStatus(request.getStatus());
     // 后续新稿和回收站状态不受旧修订审核结果影响；保存新稿必须重新申请。
-    if (n.getDeletedAt() == null && Objects.equals(n.getDraftRevisionId(), r.getId()))
+    if (n.getDeletedAt() == null && Objects.equals(n.getDraftRevisionId(), r.getId())) {
       n.setDraftStatus(request.getStatus().equals("APPROVED") ? "APPROVED" : "DRAFT");
+    }
   }
 
   @Override

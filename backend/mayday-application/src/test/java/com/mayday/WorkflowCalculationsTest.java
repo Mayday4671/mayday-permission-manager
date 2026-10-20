@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.workflow.WorkflowCalculations;
 import com.mayday.operations.workflow.WorkflowCalculations.Formula;
 import com.mayday.operations.workflow.WorkflowSchema;

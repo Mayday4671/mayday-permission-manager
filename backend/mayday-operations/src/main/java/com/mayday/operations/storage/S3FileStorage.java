@@ -50,7 +50,9 @@ public class S3FileStorage implements FileStorage {
                           .apiCallTimeout(Duration.ofSeconds(45))
                           .apiCallAttemptTimeout(Duration.ofSeconds(35)))
               .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
-      if (!settings.endpoint().isBlank()) builder.endpointOverride(URI.create(settings.endpoint()));
+      if (!settings.endpoint().isBlank()) {
+        builder.endpointOverride(URI.create(settings.endpoint()));
+      }
       client = builder.build();
     }
     return client;
@@ -94,6 +96,8 @@ public class S3FileStorage implements FileStorage {
   /** 应用停止时释放已创建的 SDK 客户端；未使用 S3 的部署不会为关闭操作新建连接。 */
   @PreDestroy
   public synchronized void close() {
-    if (client != null) client.close();
+    if (client != null) {
+      client.close();
+    }
   }
 }

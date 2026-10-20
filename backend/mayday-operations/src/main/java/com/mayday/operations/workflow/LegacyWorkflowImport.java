@@ -30,13 +30,15 @@ public class LegacyWorkflowImport implements CommandLineRunner {
   private final EntryMapper entries;
   private final UserMapper users;
   private final WorkflowJson json;
-  private final com.mayday.common.ModuleSwitches modules;
+  private final com.mayday.common.util.ModuleSwitches modules;
 
   @Override
   @Transactional
   public void run(String... args) {
-    if (!modules.isEnabled("approvals")) return;
-    for (var definition : definitions.findAll())
+    if (!modules.isEnabled("approvals")) {
+      return;
+    }
+    for (var definition : definitions.findAll()) {
       if (definition.getDraftSchema() == null) {
         var schema = WorkflowDefinitions.legacy(definition.getApproverIds());
         var publishedVersion = new FlowVersion();
@@ -47,11 +49,13 @@ public class LegacyWorkflowImport implements CommandLineRunner {
         versions.save(publishedVersion);
         definition.setDraftSchema(publishedVersion.getSchemaJson());
         definition.setPublishedVersionId(publishedVersion.getId());
-        if (definition.getCategoryId() == null)
+        if (definition.getCategoryId() == null) {
           definition.setCategoryId(
               entries.findByKindOrderBySortOrderAscIdAsc("approvalcategories").getFirst().getId());
+        }
       }
-    for (var request : requests.findAll())
+    }
+    for (var request : requests.findAll()) {
       if (request.getSchemaSnapshot() == null) {
         var ids = new ArrayList<>(request.getApproverIds());
         var schema = WorkflowDefinitions.legacy(ids);
@@ -59,19 +63,26 @@ public class LegacyWorkflowImport implements CommandLineRunner {
         request.setFormData(json.write(Map.of("content", request.getContent())));
         request.setSubmittedFormData(request.getFormData());
         Map<String, List<Long>> resolved = new LinkedHashMap<>();
-        for (var node : schema.nodes())
-          if (node.type().equals("APPROVAL")) resolved.put(node.id(), node.assigneeIds());
+        for (var node : schema.nodes()) {
+          if (node.type().equals("APPROVAL")) {
+            resolved.put(node.id(), node.assigneeIds());
+          }
+        }
         request.setResolvedAssignees(json.write(resolved));
         definitions
             .findById(request.getDefinitionId())
             .ifPresent(
                 definition -> request.setDefinitionVersionId(definition.getPublishedVersionId()));
-        if (request.getStatus().equals("PENDING"))
+        if (request.getStatus().equals("PENDING")) {
           request.setCurrentNodeId("step" + request.getCurrentStep());
-        else request.setCompletedAt(request.getUpdatedAt());
+        } else {
+          request.setCompletedAt(request.getUpdatedAt());
+        }
         request.setApproverIds(new ArrayList<>());
         for (int index = 0; index < ids.size(); index++) {
-          if (request.getStatus().equals("PENDING") && index > request.getCurrentStep()) break;
+          if (request.getStatus().equals("PENDING") && index > request.getCurrentStep()) {
+            break;
+          }
           Long userId = ids.get(index);
           var task = new FlowTask();
           task.setRequestId(request.getId());
@@ -89,11 +100,15 @@ public class LegacyWorkflowImport implements CommandLineRunner {
                     default -> "CANCELLED";
                   });
           // 旧申请仅有 currentStep 的可靠实际到达证据；未来取消节点不得因迁移获得字段读取权。
-          if ("APPROVED".equals(request.getStatus()) || index <= request.getCurrentStep())
+          if ("APPROVED".equals(request.getStatus()) || index <= request.getCurrentStep()) {
             task.setActivatedAt(request.getUpdatedAt());
+          }
           tasks.save(task);
-          if (!request.getApproverIds().contains(userId)) request.getApproverIds().add(userId);
+          if (!request.getApproverIds().contains(userId)) {
+            request.getApproverIds().add(userId);
+          }
         }
       }
+    }
   }
 }

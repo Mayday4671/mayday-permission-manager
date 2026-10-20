@@ -1,6 +1,6 @@
 package com.mayday.identity;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.identity.mapper.IdentityChallengeMapper;
 import com.mayday.security.TokenService;
 import java.security.SecureRandom;
@@ -31,20 +31,33 @@ public class IdentityStore {
     isolated.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
 
-  /** 挑战的封闭状态；密码/MFA 代际和会话绑定只作服务端校验，不序列化到公开响应。 */
-  public record Challenge(
-      String hash,
-      String purpose,
-      Long userId,
-      String sourceHash,
-      String browserHash,
-      String sessionHash,
-      String credentialHash,
-      String credentialRevision,
-      String payloadCipher,
-      Instant expiresAt,
-      Instant consumedAt,
-      int failedAttempts) {}
+  /** 256 位随机 URL 安全凭证；用于挑战、浏览器关联和 PKCE，不作长期业务标识。 */
+  public static String random() {
+    byte[] bytes = new byte[32];
+    new SecureRandom().nextBytes(bytes);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+  }
+
+  private static Instant toInstant(Object value) {
+    if (value instanceof Instant instant) {
+      return instant;
+    }
+    if (value instanceof java.time.LocalDateTime time) {
+      return time.atZone(java.time.ZoneOffset.UTC).toInstant();
+    }
+    if (value instanceof Timestamp stamp) {
+      return stamp.toInstant();
+    }
+    throw new IllegalStateException("不支持的时间列类型: " + value.getClass());
+  }
+
+  private static String digest(String value) {
+    return value == null ? null : TokenService.hash(value);
+  }
+
+  private static BusinessException invalid() {
+    return new BusinessException("身份验证已过期或无效，请重新开始");
+  }
 
   /** 创建 5 分钟挑战；显式绑定已有密码/MFA/会话，来源只存摘要，过期记录分批清理。 */
   public String create(
@@ -56,8 +69,9 @@ public class IdentityStore {
       String credentialHash,
       String credentialRevision,
       String payloadCipher) {
-    if (!List.of("MFA_LOGIN", "MFA_ENROLL", "OIDC_LOGIN", "OIDC_BIND").contains(purpose))
+    if (!List.of("MFA_LOGIN", "MFA_ENROLL", "OIDC_LOGIN", "OIDC_BIND").contains(purpose)) {
       throw new IllegalArgumentException("身份挑战用途不受支持");
+    }
     String token = random();
     Instant now = clock.instant();
     challenges.purgeExpired(now.minusSeconds(86400));
@@ -81,7 +95,9 @@ public class IdentityStore {
 
   /** 载入尚未消费的挑战；格式、用途、到期、来源错误统一拒绝，避免匿名枚举本地账号。 */
   public Challenge read(String token, String purpose, String source) {
-    if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) throw invalid();
+    if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) {
+      throw invalid();
+    }
     return challenges.find(TokenService.hash(token)).stream()
         .map(this::map)
         .filter(row -> row != null)
@@ -98,7 +114,9 @@ public class IdentityStore {
 
   /** 正式证明成功后只允许一个调用消费；与外层业务事务一起提交，不能重复签发登录会话。 */
   public void consume(Challenge challenge) {
-    if (challenges.consume(challenge.hash, clock.instant()) != 1) throw invalid();
+    if (challenges.consume(challenge.hash, clock.instant()) != 1) {
+      throw invalid();
+    }
   }
 
   /** OIDC code 交换前消费并独立提交；外部网络失败不能让同一 state/code 再次进入交换。 */
@@ -109,13 +127,6 @@ public class IdentityStore {
   /** 失败证明不因上层业务异常回滚计数；第 5 次失败后旧挑战不能继续猜测。 */
   public void failed(Challenge challenge) {
     isolated.executeWithoutResult(status -> challenges.fail(challenge.hash));
-  }
-
-  /** 256 位随机 URL 安全凭证；用于挑战、浏览器关联和 PKCE，不作长期业务标识。 */
-  public static String random() {
-    byte[] bytes = new byte[32];
-    new SecureRandom().nextBytes(bytes);
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 
   /** 行值到挑战快照；时间列由驱动以 java.time 类型返回，空值表示尚未消费。 */
@@ -138,19 +149,18 @@ public class IdentityStore {
         row.getInt("failed_attempts"));
   }
 
-  private static Instant toInstant(Object value) {
-    if (value instanceof Instant instant) return instant;
-    if (value instanceof java.time.LocalDateTime time)
-      return time.atZone(java.time.ZoneOffset.UTC).toInstant();
-    if (value instanceof Timestamp stamp) return stamp.toInstant();
-    throw new IllegalStateException("不支持的时间列类型: " + value.getClass());
-  }
-
-  private static String digest(String value) {
-    return value == null ? null : TokenService.hash(value);
-  }
-
-  private static BusinessException invalid() {
-    return new BusinessException("身份验证已过期或无效，请重新开始");
-  }
+  /** 挑战的封闭状态；密码/MFA 代际和会话绑定只作服务端校验，不序列化到公开响应。 */
+  public record Challenge(
+      String hash,
+      String purpose,
+      Long userId,
+      String sourceHash,
+      String browserHash,
+      String sessionHash,
+      String credentialHash,
+      String credentialRevision,
+      String payloadCipher,
+      Instant expiresAt,
+      Instant consumedAt,
+      int failedAttempts) {}
 }

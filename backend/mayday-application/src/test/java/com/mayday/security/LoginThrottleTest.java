@@ -31,7 +31,9 @@ class LoginThrottleTest {
   @Test
   void sourceLimitBlocksRotatingUsernames() {
     LoginThrottle limiter = new LoginThrottle(new TestSecurityState(java.time.Clock.systemUTC()));
-    for (int i = 0; i < 100; i++) limiter.failed("127.0.0.1", "user" + i);
+    for (int i = 0; i < 100; i++) {
+      limiter.failed("127.0.0.1", "user" + i);
+    }
     assertFalse(limiter.allowed("127.0.0.1", "next"));
     assertTrue(limiter.allowed("127.0.0.2", "next"));
   }

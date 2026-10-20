@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.mayday.agentscope.mapper.AgentScopeConversationMapper;
 import com.mayday.agentscope.mapper.AgentScopeMessageMapper;
-import com.mayday.common.ConflictException;
+import com.mayday.common.exception.ConflictException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +34,30 @@ class AgentScopeConversationCoordinatorTest {
   @Mock private AgentScopeSettings settings;
 
   @InjectMocks private AgentScopeConversationCoordinator coordinator;
+
+  /** Creates a minimum persisted conversation with the request lease owned by another call. */
+  private static AgentScopeConversation conversation(String requestId, String leaseToken) {
+    AgentScopeConversation conversation = new AgentScopeConversation();
+    conversation.setId(CONVERSATION_ID);
+    conversation.setOwnerId(OWNER_ID);
+    conversation.setSessionId(UUID.randomUUID().toString());
+    conversation.setTitle("已有会话");
+    conversation.setProcessingRequestId(requestId);
+    conversation.setProcessingToken(leaseToken);
+    return conversation;
+  }
+
+  /** Creates a user turn used to exercise idempotent retry handling. */
+  private static AgentScopeMessage userMessage(String requestId, String content, String status) {
+    AgentScopeMessage message = new AgentScopeMessage();
+    message.setId(1L);
+    message.setConversationId(CONVERSATION_ID);
+    message.setTurnToken(requestId);
+    message.setRole("USER");
+    message.setContent(content);
+    message.setStatus(status);
+    return message;
+  }
 
   /** An expired retry receives a fresh lease token distinct from its idempotency key. */
   @Test
@@ -94,29 +118,5 @@ class AgentScopeConversationCoordinatorTest {
     verify(messages, never())
         .findByConversationIdAndTurnTokenAndRole(any(), anyString(), anyString());
     verify(conversations, never()).releaseProcessing(any(), any(), anyString());
-  }
-
-  /** Creates a minimum persisted conversation with the request lease owned by another call. */
-  private static AgentScopeConversation conversation(String requestId, String leaseToken) {
-    AgentScopeConversation conversation = new AgentScopeConversation();
-    conversation.setId(CONVERSATION_ID);
-    conversation.setOwnerId(OWNER_ID);
-    conversation.setSessionId(UUID.randomUUID().toString());
-    conversation.setTitle("已有会话");
-    conversation.setProcessingRequestId(requestId);
-    conversation.setProcessingToken(leaseToken);
-    return conversation;
-  }
-
-  /** Creates a user turn used to exercise idempotent retry handling. */
-  private static AgentScopeMessage userMessage(String requestId, String content, String status) {
-    AgentScopeMessage message = new AgentScopeMessage();
-    message.setId(1L);
-    message.setConversationId(CONVERSATION_ID);
-    message.setTurnToken(requestId);
-    message.setRole("USER");
-    message.setContent(content);
-    message.setStatus(status);
-    return message;
   }
 }

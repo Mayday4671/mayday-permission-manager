@@ -1,6 +1,6 @@
 package com.mayday.operations.service;
 
-import com.mayday.common.BusinessTime;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.operations.mapper.ScheduledJobMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -12,15 +12,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 @EnableScheduling
 @RequiredArgsConstructor
 public class JobSchedule {
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(JobSchedule.class);
   private final ScheduledJobMapper jobs;
   private final JobRunner runner;
-  private final com.mayday.common.ModuleSwitches modules;
-  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(JobSchedule.class);
+  private final com.mayday.common.util.ModuleSwitches modules;
 
   /** 扫描当前到期配置，执行器在行锁内重新校验时间和开关；单配置失败记录后继续其他配置，不在扫描方法开启长事务。 */
   @Scheduled(fixedDelay = 10000)
   public void tick() {
-    if (!modules.isEnabled("scheduler")) return;
+    if (!modules.isEnabled("scheduler")) {
+      return;
+    }
     runner.recover();
     for (var job : jobs.findByEnabledTrueAndNextRunAtLessThanEqual(BusinessTime.now())) {
       try {

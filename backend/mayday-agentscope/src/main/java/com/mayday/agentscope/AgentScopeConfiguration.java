@@ -1,6 +1,6 @@
 package com.mayday.agentscope;
 
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.util.ModuleSwitches;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.extensions.jdbc.dialect.AbstractJdbcDialect;
 import io.agentscope.extensions.jdbc.state.JdbcAgentStateStore;

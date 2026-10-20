@@ -28,10 +28,12 @@ public class StorageSettings {
       @Value("${MAYDAY_STORAGE_S3_ACCESS_KEY:}") String accessKey,
       @Value("${MAYDAY_STORAGE_S3_SECRET_KEY:}") String secretKey) {
     this.provider = provider.strip().toUpperCase(Locale.ROOT);
-    if (!this.provider.equals("LOCAL") && !this.provider.equals("S3"))
+    if (!this.provider.equals("LOCAL") && !this.provider.equals("S3")) {
       throw new IllegalArgumentException("MAYDAY_STORAGE_MODE 只支持 LOCAL 或 S3");
-    if (maximumMegabytes < 1 || maximumMegabytes > 100)
+    }
+    if (maximumMegabytes < 1 || maximumMegabytes > 100) {
       throw new IllegalArgumentException("MAYDAY_STORAGE_MAX_MB 须在 1 到 100 之间");
+    }
     this.localRoot = Path.of(localRoot).toAbsolutePath().normalize();
     this.maximumBytes = maximumMegabytes * 1024L * 1024L;
     this.endpoint = endpoint.strip();
@@ -39,7 +41,9 @@ public class StorageSettings {
     this.bucket = bucket.strip();
     this.accessKey = accessKey;
     this.secretKey = secretKey;
-    if (this.provider.equals("S3")) validateS3();
+    if (this.provider.equals("S3")) {
+      validateS3();
+    }
   }
 
   /** 返回新上传使用的存储模式；已有文件仍依据自身持久化的提供方读取。 */
@@ -84,8 +88,9 @@ public class StorageSettings {
 
   /** 切换模式后读取旧 S3 文件时也重新校验，缺少凭据须明确失败而不能写入其他存储。 */
   public void validateS3() {
-    if (region.isBlank() || bucket.isBlank() || accessKey.isBlank() || secretKey.isBlank())
+    if (region.isBlank() || bucket.isBlank() || accessKey.isBlank() || secretKey.isBlank()) {
       throw new IllegalArgumentException("S3 存储缺少区域、存储桶或环境凭据");
+    }
     if (!endpoint.isBlank()) {
       URI uri = URI.create(endpoint);
       if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme()))
@@ -93,8 +98,9 @@ public class StorageSettings {
           || uri.getUserInfo() != null
           || uri.getQuery() != null
           || uri.getFragment() != null
-          || !(uri.getPath().isEmpty() || uri.getPath().equals("/")))
+          || !(uri.getPath().isEmpty() || uri.getPath().equals("/"))) {
         throw new IllegalArgumentException("S3 地址须为无凭据、无路径和查询参数的 HTTP(S) 服务地址");
+      }
     }
   }
 }

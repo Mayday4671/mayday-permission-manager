@@ -2,10 +2,10 @@ package com.mayday.agentscope;
 
 import com.mayday.agentscope.mapper.AgentScopeConversationMapper;
 import com.mayday.agentscope.mapper.AgentScopeMessageMapper;
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.ConflictException;
-import com.mayday.common.ResourceNotFoundException;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.exception.ConflictException;
+import com.mayday.common.exception.ResourceNotFoundException;
+import com.mayday.common.util.BusinessTime;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +30,16 @@ public class AgentScopeConversationCoordinator {
   private final AgentScopeConversationMapper conversations;
   private final AgentScopeMessageMapper messages;
   private final AgentScopeSettings settings;
+
+  /** Maps internal status fields to a narrowly scoped public response. */
+  public static AgentScopeDtos.MessageView view(AgentScopeMessage message) {
+    return new AgentScopeDtos.MessageView(
+        message.getId(),
+        message.getRole(),
+        message.getContent(),
+        message.getStatus(),
+        message.getCreatedAt());
+  }
 
   /**
    * Creates a random, owner-bound empty session; client input cannot choose the AgentScope state
@@ -62,8 +72,9 @@ public class AgentScopeConversationCoordinator {
               .orElseThrow(() -> new ConflictException("该请求已完成，但回复记录暂不可用，请刷新会话"));
       return TurnStart.completed(conversation, previous.get(), assistant);
     }
-    if (previous.isPresent() && !previous.get().getContent().equals(content))
+    if (previous.isPresent() && !previous.get().getContent().equals(content)) {
       throw new BusinessException("重试消息内容与原请求不同，请重新发送");
+    }
 
     LocalDateTime now = BusinessTime.now();
     LocalDateTime expiredAt = now.minusSeconds(settings.getRequestTimeoutSeconds() + 60L);
@@ -71,10 +82,12 @@ public class AgentScopeConversationCoordinator {
     String expiredRequestId = conversation.getProcessingRequestId();
     if (conversations.claimProcessing(
             conversationId, ownerId, leaseToken, requestId, now, expiredAt)
-        == 0) throw new ConflictException("当前会话已有一条消息正在处理，请稍后重试");
+        == 0) {
+      throw new ConflictException("当前会话已有一条消息正在处理，请稍后重试");
+    }
 
     conversation = ownedConversation(ownerId, conversationId);
-    if (expiredRequestId != null && !expiredRequestId.equals(requestId))
+    if (expiredRequestId != null && !expiredRequestId.equals(requestId)) {
       messages
           .findByConversationIdAndTurnTokenAndRole(conversationId, expiredRequestId, USER)
           .filter(message -> PROCESSING.equals(message.getStatus()))
@@ -83,6 +96,7 @@ public class AgentScopeConversationCoordinator {
                 staleMessage.setStatus(FAILED);
                 messages.save(staleMessage);
               });
+    }
     AgentScopeMessage userMessage =
         previous
             .map(
@@ -95,12 +109,13 @@ public class AgentScopeConversationCoordinator {
                   return messages.save(retry);
                 })
             .orElseGet(() -> saveUserMessage(conversationId, requestId, content));
-    if ("新会话".equals(conversation.getTitle()))
+    if ("新会话".equals(conversation.getTitle())) {
       conversation.setTitle(
           content
               .strip()
               .replaceAll("\\s+", " ")
               .substring(0, Math.min(60, content.strip().replaceAll("\\s+", " ").length())));
+    }
     conversations.save(conversation);
 
     List<AgentScopeMessage> history =
@@ -118,13 +133,16 @@ public class AgentScopeConversationCoordinator {
       Long ownerId, Long conversationId, String requestId, String leaseToken, String answer) {
     AgentScopeConversation conversation = ownedConversation(ownerId, conversationId);
     if (!leaseToken.equals(conversation.getProcessingToken())
-        || !requestId.equals(conversation.getProcessingRequestId()))
+        || !requestId.equals(conversation.getProcessingRequestId())) {
       throw new ConflictException("会话处理租约已更新，旧请求结果已丢弃");
+    }
     AgentScopeMessage userMessage =
         messages
             .findByConversationIdAndTurnTokenAndRole(conversationId, requestId, USER)
             .orElseThrow(() -> new ConflictException("找不到正在处理的用户消息"));
-    if (!PROCESSING.equals(userMessage.getStatus())) throw new ConflictException("用户消息状态已变化，请刷新会话");
+    if (!PROCESSING.equals(userMessage.getStatus())) {
+      throw new ConflictException("用户消息状态已变化，请刷新会话");
+    }
     userMessage.setStatus(COMPLETE);
     messages.save(userMessage);
 
@@ -148,7 +166,9 @@ public class AgentScopeConversationCoordinator {
   public void failTurn(Long ownerId, Long conversationId, String requestId, String leaseToken) {
     AgentScopeConversation conversation = ownedConversation(ownerId, conversationId);
     if (!leaseToken.equals(conversation.getProcessingToken())
-        || !requestId.equals(conversation.getProcessingRequestId())) return;
+        || !requestId.equals(conversation.getProcessingRequestId())) {
+      return;
+    }
     messages
         .findByConversationIdAndTurnTokenAndRole(conversationId, requestId, USER)
         .filter(message -> PROCESSING.equals(message.getStatus()))
@@ -174,8 +194,9 @@ public class AgentScopeConversationCoordinator {
         && conversation.getProcessingStartedAt() != null
         && conversation
             .getProcessingStartedAt()
-            .isAfter(BusinessTime.now().minusSeconds(settings.getRequestTimeoutSeconds() + 60L)))
+            .isAfter(BusinessTime.now().minusSeconds(settings.getRequestTimeoutSeconds() + 60L))) {
       throw new ConflictException("会话正在处理消息，完成后再删除");
+    }
     return conversation;
   }
 
@@ -188,16 +209,6 @@ public class AgentScopeConversationCoordinator {
     return conversations
         .findByIdAndOwnerId(conversationId, ownerId)
         .orElseThrow(() -> new ResourceNotFoundException("会话不存在"));
-  }
-
-  /** Maps internal status fields to a narrowly scoped public response. */
-  public static AgentScopeDtos.MessageView view(AgentScopeMessage message) {
-    return new AgentScopeDtos.MessageView(
-        message.getId(),
-        message.getRole(),
-        message.getContent(),
-        message.getStatus(),
-        message.getCreatedAt());
   }
 
   private AgentScopeMessage saveUserMessage(Long conversationId, String requestId, String content) {

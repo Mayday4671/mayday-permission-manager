@@ -1,6 +1,6 @@
 package com.mayday.identity;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.crypto.ECDSAVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
@@ -49,6 +49,44 @@ public class OidcClient {
     clock = sessionClock;
   }
 
+  /** S256 仅散列 ASCII verifier，不使用 plain 降级；值始终是独立随机的 43 字符。 */
+  public static String pkce(String verifier) {
+    try {
+      return Base64.getUrlEncoder()
+          .withoutPadding()
+          .encodeToString(
+              MessageDigest.getInstance("SHA-256")
+                  .digest(verifier.getBytes(StandardCharsets.US_ASCII)));
+    } catch (java.security.NoSuchAlgorithmException failure) {
+      throw new IllegalStateException("PKCE 算法不可用");
+    }
+  }
+
+  private static String halfHash(String token) throws Exception {
+    return Base64.getUrlEncoder()
+        .withoutPadding()
+        .encodeToString(
+            java.util.Arrays.copyOf(
+                MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.US_ASCII)),
+                16));
+  }
+
+  private static boolean constant(String expected, String actual) {
+    return expected != null
+        && actual != null
+        && MessageDigest.isEqual(
+            expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static String encode(String value) {
+    return URLEncoder.encode(value, StandardCharsets.UTF_8);
+  }
+
+  private static BusinessException rejected() {
+    return new BusinessException("企业身份验证失败，请重新登录或联系管理员检查提供方配置");
+  }
+
   /** 只构建预注册授权地址与固定回调；浏览器不能传入 redirect_uri、scope 或权限映射。 */
   public String authorization(
       IdentityProperties.Provider provider, String state, String nonce, String verifier) {
@@ -84,13 +122,13 @@ public class OidcClient {
               .timeout(Duration.ofSeconds(10))
               .header("Content-Type", "application/x-www-form-urlencoded")
               .header("Accept", "application/json");
-      if ("client_secret_post".equals(provider.getClientAuthentication()))
+      if ("client_secret_post".equals(provider.getClientAuthentication())) {
         body +=
             "&client_id="
                 + encode(provider.getClientId())
                 + "&client_secret="
                 + encode(provider.getClientSecret());
-      else
+      } else {
         request.header(
             "Authorization",
             "Basic "
@@ -98,12 +136,14 @@ public class OidcClient {
                     .encodeToString(
                         (encode(provider.getClientId()) + ":" + encode(provider.getClientSecret()))
                             .getBytes(StandardCharsets.US_ASCII)));
+      }
       Map<String, Object> response =
           json.readValue(
               fetch(request.POST(HttpRequest.BodyPublishers.ofString(body)).build()),
               new TypeReference<>() {});
-      if (!(response.get("id_token") instanceof String idToken) || idToken.length() > 32000)
+      if (!(response.get("id_token") instanceof String idToken) || idToken.length() > 32000) {
         throw rejected();
+      }
       String accessToken = response.get("access_token") instanceof String value ? value : null;
       String keys =
           fetch(
@@ -137,22 +177,32 @@ public class OidcClient {
           || token.getHeader().getX509CertURL() != null
           || token.getHeader().getJWK() != null
           || (token.getHeader().getCriticalParams() != null
-              && !token.getHeader().getCriticalParams().isEmpty())) throw rejected();
+              && !token.getHeader().getCriticalParams().isEmpty())) {
+        throw rejected();
+      }
       boolean verified = false;
       for (JWK key : keys.getKeys()) {
         if (key.isPrivate()
             || (key.getKeyUse() != null && !KeyUse.SIGNATURE.equals(key.getKeyUse()))
             || (key.getAlgorithm() != null && !algorithm.equals(key.getAlgorithm()))
             || (token.getHeader().getKeyID() != null
-                && !token.getHeader().getKeyID().equals(key.getKeyID()))) continue;
-        if (JWSAlgorithm.RS256.equals(algorithm) && key instanceof RSAKey rsa && rsa.size() >= 2048)
+                && !token.getHeader().getKeyID().equals(key.getKeyID()))) {
+          continue;
+        }
+        if (JWSAlgorithm.RS256.equals(algorithm)
+            && key instanceof RSAKey rsa
+            && rsa.size() >= 2048) {
           verified |= token.verify(new RSASSAVerifier(rsa));
+        }
         if (JWSAlgorithm.ES256.equals(algorithm)
             && key instanceof ECKey ec
-            && com.nimbusds.jose.jwk.Curve.P_256.equals(ec.getCurve()))
+            && com.nimbusds.jose.jwk.Curve.P_256.equals(ec.getCurve())) {
           verified |= token.verify(new ECDSAVerifier(ec));
+        }
       }
-      if (!verified) throw rejected();
+      if (!verified) {
+        throw rejected();
+      }
       JWTClaimsSet claims = token.getJWTClaimsSet();
       Instant now = clock.instant();
       if (!provider.getIssuer().equals(claims.getIssuer())
@@ -168,29 +218,20 @@ public class OidcClient {
           || claims.getIssueTime().toInstant().isBefore(now.minusSeconds(86400))
           || (claims.getNotBeforeTime() != null
               && claims.getNotBeforeTime().toInstant().isAfter(now.plusSeconds(30)))
-          || !constant(nonce, claims.getStringClaim("nonce"))) throw rejected();
+          || !constant(nonce, claims.getStringClaim("nonce"))) {
+        throw rejected();
+      }
       String azp = claims.getStringClaim("azp");
-      if ((claims.getAudience().size() > 1 || azp != null) && !provider.getClientId().equals(azp))
+      if ((claims.getAudience().size() > 1 || azp != null) && !provider.getClientId().equals(azp)) {
         throw rejected();
+      }
       String atHash = claims.getStringClaim("at_hash");
-      if (atHash != null && (accessToken == null || !constant(atHash, halfHash(accessToken))))
+      if (atHash != null && (accessToken == null || !constant(atHash, halfHash(accessToken)))) {
         throw rejected();
+      }
       return claims.getSubject();
     } catch (Exception failure) {
       throw rejected();
-    }
-  }
-
-  /** S256 仅散列 ASCII verifier，不使用 plain 降级；值始终是独立随机的 43 字符。 */
-  public static String pkce(String verifier) {
-    try {
-      return Base64.getUrlEncoder()
-          .withoutPadding()
-          .encodeToString(
-              MessageDigest.getInstance("SHA-256")
-                  .digest(verifier.getBytes(StandardCharsets.US_ASCII)));
-    } catch (java.security.NoSuchAlgorithmException failure) {
-      throw new IllegalStateException("PKCE 算法不可用");
     }
   }
 
@@ -198,10 +239,14 @@ public class OidcClient {
     var pending = http.sendAsync(request, info -> new LimitedBody());
     try {
       HttpResponse<byte[]> response = pending.get(12, TimeUnit.SECONDS);
-      if (response.statusCode() != 200) throw rejected();
+      if (response.statusCode() != 200) {
+        throw rejected();
+      }
       return new String(response.body(), StandardCharsets.UTF_8);
     } finally {
-      if (!pending.isDone()) pending.cancel(true);
+      if (!pending.isDone()) {
+        pending.cancel(true);
+      }
     }
   }
 
@@ -247,30 +292,5 @@ public class OidcClient {
     public void onComplete() {
       completed.complete(output.toByteArray());
     }
-  }
-
-  private static String halfHash(String token) throws Exception {
-    return Base64.getUrlEncoder()
-        .withoutPadding()
-        .encodeToString(
-            java.util.Arrays.copyOf(
-                MessageDigest.getInstance("SHA-256")
-                    .digest(token.getBytes(StandardCharsets.US_ASCII)),
-                16));
-  }
-
-  private static boolean constant(String expected, String actual) {
-    return expected != null
-        && actual != null
-        && MessageDigest.isEqual(
-            expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));
-  }
-
-  private static String encode(String value) {
-    return URLEncoder.encode(value, StandardCharsets.UTF_8);
-  }
-
-  private static BusinessException rejected() {
-    return new BusinessException("企业身份验证失败，请重新登录或联系管理员检查提供方配置");
   }
 }

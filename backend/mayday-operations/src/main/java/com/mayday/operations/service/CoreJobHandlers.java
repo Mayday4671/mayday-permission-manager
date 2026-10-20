@@ -46,7 +46,9 @@ public class CoreJobHandlers {
       @Override
       public String execute() {
         try (var connection = dataSource.getConnection()) {
-          if (!connection.isValid(3)) throw new IllegalStateException("数据库连接检查失败");
+          if (!connection.isValid(3)) {
+            throw new IllegalStateException("数据库连接检查失败");
+          }
           return "数据库连接正常";
         } catch (java.sql.SQLException exception) {
           throw new IllegalStateException("数据库连接检查失败", exception);

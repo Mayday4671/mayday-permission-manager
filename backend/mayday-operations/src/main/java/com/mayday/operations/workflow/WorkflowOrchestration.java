@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.workflow.WorkflowSchema.Node;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import java.util.ArrayList;
@@ -21,12 +21,17 @@ public final class WorkflowOrchestration {
 
   /** 返回真实运行出口；PARALLEL.next 保存专属汇合点，不是绕过全部支路的默认路线。 */
   public static List<String> exits(Node node) {
-    if ("END".equals(node.type())) return List.of();
-    if ("PARALLEL".equals(node.type())) return node.branches();
+    if ("END".equals(node.type())) {
+      return List.of();
+    }
+    if ("PARALLEL".equals(node.type())) {
+      return node.branches();
+    }
     List<String> result = new ArrayList<>();
     result.add(node.next());
-    if ("CONDITION".equals(node.type()))
+    if ("CONDITION".equals(node.type())) {
       node.conditions().forEach(condition -> result.add(condition.next()));
+    }
     return result;
   }
 
@@ -71,14 +76,18 @@ public final class WorkflowOrchestration {
         members.add(branchMembers);
       }
       // 专属节点只能由该并行组的支路进入；嵌套组的入口与成员都属于外层组，因此合法。
-      for (Node source : spec.nodes())
-        for (String target : exits(source))
+      for (Node source : spec.nodes()) {
+        for (String target : exits(source)) {
           if ((all.contains(target) || join.id().equals(target))
               && !source.id().equals(fork.id())
-              && !all.contains(source.id())) throw new BusinessException("并行组不能从组外直接进入支路或汇合节点");
-      for (int left = 0; left < members.size(); left++)
-        for (int right = left + 1; right < members.size(); right++)
-          for (String leftId : members.get(left))
+              && !all.contains(source.id())) {
+            throw new BusinessException("并行组不能从组外直接进入支路或汇合节点");
+          }
+        }
+      }
+      for (int left = 0; left < members.size(); left++) {
+        for (int right = left + 1; right < members.size(); right++) {
+          for (String leftId : members.get(left)) {
             for (String rightId : members.get(right)) {
               Node first = nodes.get(leftId), second = nodes.get(rightId);
               if (!Boolean.TRUE.equals(spec.allowRepeatApproval())
@@ -86,9 +95,13 @@ public final class WorkflowOrchestration {
                   && "APPROVAL".equals(second.type())
                   && "USERS".equals(first.source())
                   && "USERS".equals(second.source())
-                  && first.assigneeIds().stream().anyMatch(second.assigneeIds()::contains))
+                  && first.assigneeIds().stream().anyMatch(second.assigneeIds()::contains)) {
                 throw new BusinessException("同时执行的并行支路包含同一审批人，请调整人员或允许重复审批");
+              }
             }
+          }
+        }
+      }
     }
     for (Node node : spec.nodes()) {
       require(!"JOIN".equals(node.type()) || ownedJoins.contains(node.id()), "汇合节点缺少所属并行组");
@@ -105,17 +118,23 @@ public final class WorkflowOrchestration {
             node.readable().containsAll(node.subprocess().inputs().values()), "子流程输入只能引用当前节点可读字段");
         require(
             node.writable().containsAll(node.subprocess().outputs().keySet()), "子流程输出只能写入当前节点可写字段");
-      } else require(node.subprocess() == null, "只有子流程节点可以绑定子流程版本");
+      } else {
+        require(node.subprocess() == null, "只有子流程节点可以绑定子流程版本");
+      }
     }
   }
 
   /** 任何条件路线都必须到达专属汇合点；遇到结束节点立即拒绝，不能只检查存在一条路径。 */
   private static void collect(Map<String, Node> nodes, String id, String join, Set<String> result) {
-    if (join.equals(id) || result.contains(id)) return;
+    if (join.equals(id) || result.contains(id)) {
+      return;
+    }
     Node node = nodes.get(id);
     require(node != null && !"END".equals(node.type()), "并行支路提前结束，必须先到达汇合节点");
     result.add(id);
-    for (String target : exits(node)) collect(nodes, target, join, result);
+    for (String target : exits(node)) {
+      collect(nodes, target, join, result);
+    }
   }
 
   /** 运行期人员替换也要限制不同并行支路中的重复人员，不能借委托绕过发布保护。 */
@@ -123,7 +142,9 @@ public final class WorkflowOrchestration {
     Map<String, Node> nodes = new LinkedHashMap<>();
     spec.nodes().forEach(node -> nodes.put(node.id(), node));
     for (Node fork : spec.nodes()) {
-      if (!"PARALLEL".equals(fork.type())) continue;
+      if (!"PARALLEL".equals(fork.type())) {
+        continue;
+      }
       List<Set<String>> branches = new ArrayList<>();
       for (String root : fork.branches()) {
         Set<String> member = new HashSet<>();
@@ -132,15 +153,23 @@ public final class WorkflowOrchestration {
       }
       int a = -1, b = -1;
       for (int index = 0; index < branches.size(); index++) {
-        if (branches.get(index).contains(first)) a = index;
-        if (branches.get(index).contains(second)) b = index;
+        if (branches.get(index).contains(first)) {
+          a = index;
+        }
+        if (branches.get(index).contains(second)) {
+          b = index;
+        }
       }
-      if (a >= 0 && b >= 0 && a != b) return true;
+      if (a >= 0 && b >= 0 && a != b) {
+        return true;
+      }
     }
     return false;
   }
 
   private static void require(boolean valid, String message) {
-    if (!valid) throw new BusinessException(message);
+    if (!valid) {
+      throw new BusinessException(message);
+    }
   }
 }

@@ -1,6 +1,6 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.storage.StoredFileContent;
 import com.mayday.operations.workflow.WorkflowEngine;

@@ -36,14 +36,19 @@ public class FilePurgeWorker {
         transactions.executeWithoutResult(
             status -> {
               var file = files.lock(candidate.getId()).orElse(null);
-              if (file == null || file.getPurgeRequestedAt() == null || file.getDeletedAt() == null)
+              if (file == null
+                  || file.getPurgeRequestedAt() == null
+                  || file.getDeletedAt() == null) {
                 return;
+              }
               try {
                 if ("MYSQL".equals(file.getStorageProvider())) {
                   payloads.deleteById(file.getId());
                 } else {
                   FileStorage storage = content.storage(file.getStorageProvider());
-                  if (file.getThumbnailKey() != null) storage.delete(file.getThumbnailKey());
+                  if (file.getThumbnailKey() != null) {
+                    storage.delete(file.getThumbnailKey());
+                  }
                   storage.delete(file.getStorageKey());
                 }
                 files.delete(file);

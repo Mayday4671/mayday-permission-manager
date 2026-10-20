@@ -24,10 +24,12 @@ public class RealtimeController {
   @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   public ResponseEntity<SseEmitter> stream(
       @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-    if (!access.has("messages:view") && !access.has("requests:view"))
+    if (!access.has("messages:view") && !access.has("requests:view")) {
       throw new org.springframework.security.access.AccessDeniedException("没有消息或审批查看权限");
-    if (!authorization.startsWith("Bearer "))
+    }
+    if (!authorization.startsWith("Bearer ")) {
       throw new org.springframework.security.access.AccessDeniedException("请使用会话令牌认证");
+    }
     return ResponseEntity.ok()
         .header(HttpHeaders.CACHE_CONTROL, "no-store")
         .header("X-Accel-Buffering", "no")

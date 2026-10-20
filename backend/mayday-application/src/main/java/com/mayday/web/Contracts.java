@@ -19,6 +19,15 @@ import java.util.Set;
 public final class Contracts {
   private Contracts() {}
 
+  /** 数据范围的封闭枚举；多个角色合并后的实际范围由服务端 AccessPolicy 计算。 */
+  public enum DataScope {
+    SELF,
+    DEPARTMENT,
+    DEPARTMENT_TREE,
+    CUSTOM,
+    ALL
+  }
+
   /** 登录输入包含一次性滑块凭证；密码只参与校验，不能进入响应、持久化明文或审计正文。 */
   public record LoginRequest(
       @NotBlank @Size(max = 64) String username,
@@ -30,15 +39,6 @@ public final class Contracts {
     public LoginView(String token) {
       this(token, false, null);
     }
-  }
-
-  /** 数据范围的封闭枚举；多个角色合并后的实际范围由服务端 AccessPolicy 计算。 */
-  public enum DataScope {
-    SELF,
-    DEPARTMENT,
-    DEPARTMENT_TREE,
-    CUSTOM,
-    ALL
   }
 
   /** 会话响应采用明确 DTO，客户端类型与当前服务端字段保持一致。 */

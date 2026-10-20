@@ -1,6 +1,6 @@
 package com.mayday.service;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.SystemEntry;
 import java.math.BigDecimal;
@@ -20,13 +20,6 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 @RequiredArgsConstructor
 public class SettingService {
-  private final EntryMapper entries;
-  private final JsonMapper json;
-  private final PortalThemePolicy portalTheme;
-
-  /** 内置站点参数的类型、长度和默认值约束；用于保存校验与公开响应白名单，不能由客户端动态扩展。 */
-  public record Definition(String key, String label, String type, int maxLength, String fallback) {}
-
   public static final List<Definition> SITE_FIELDS =
       List.of(
           new Definition("site.name", "站点名称", "TEXT", 40, "Mayday"),
@@ -48,36 +41,53 @@ public class SettingService {
     SITE_KEYS = Collections.unmodifiableMap(keys);
   }
 
+  private final EntryMapper entries;
+  private final JsonMapper json;
+  private final PortalThemePolicy portalTheme;
+
   /** 保存前按参数类型验证值；内置键不可换类型，前台主题拒绝任意CSS及未知字段，错误不会写入缓存或数据库。 */
   public void validate(String code, String value, String type) {
-    if ("content.requireApproval".equals(code) && !"BOOLEAN".equals(type))
+    if ("content.requireApproval".equals(code) && !"BOOLEAN".equals(type)) {
       throw new BusinessException("内容审核参数必须使用 BOOLEAN 类型");
+    }
     String text = Objects.toString(value, "");
     var definition = SITE_KEYS.get(code);
     if (definition != null) {
-      if (!definition.type().equals(type)) throw new BusinessException("内置参数类型不能改变");
-      if (text.length() > definition.maxLength())
+      if (!definition.type().equals(type)) {
+        throw new BusinessException("内置参数类型不能改变");
+      }
+      if (text.length() > definition.maxLength()) {
         throw new BusinessException(definition.label() + "最多 " + definition.maxLength() + " 字");
-      if (code.equals("site.name") && text.isBlank()) throw new BusinessException("站点名称不能为空");
+      }
+      if (code.equals("site.name") && text.isBlank()) {
+        throw new BusinessException("站点名称不能为空");
+      }
     }
-    if (PortalThemePolicy.KEY.equals(code)) portalTheme.parse(text);
+    if (PortalThemePolicy.KEY.equals(code)) {
+      portalTheme.parse(text);
+    }
     try {
       switch (type) {
         case "TEXT" -> {}
         case "NUMBER" -> new BigDecimal(text);
         case "BOOLEAN" -> {
-          if (!Set.of("true", "false").contains(text)) throw new IllegalArgumentException();
+          if (!Set.of("true", "false").contains(text)) {
+            throw new IllegalArgumentException();
+          }
         }
         case "JSON" -> {
           if (text.isBlank()
               || json.reader()
                       .with(tools.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                       .readTree(text)
-                  == null) throw new IllegalArgumentException();
+                  == null) {
+            throw new IllegalArgumentException();
+          }
         }
         case "EMAIL" -> {
-          if (!text.isBlank() && !text.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))
+          if (!text.isBlank() && !text.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
             throw new IllegalArgumentException();
+          }
         }
         default -> throw new IllegalArgumentException();
       }
@@ -115,7 +125,7 @@ public class SettingService {
 
   /** 仅在参数事务提交后失效缓存，回滚保持原快照；非事务调用立即清除，避免提前读旧值再缓存。 */
   public void invalidateAfterCommit() {
-    if (TransactionSynchronizationManager.isSynchronizationActive())
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
       TransactionSynchronizationManager.registerSynchronization(
           new TransactionSynchronization() {
             @Override
@@ -123,6 +133,11 @@ public class SettingService {
               clearCache();
             }
           });
-    else clearCache();
+    } else {
+      clearCache();
+    }
   }
+
+  /** 内置站点参数的类型、长度和默认值约束；用于保存校验与公开响应白名单，不能由客户端动态扩展。 */
+  public record Definition(String key, String label, String type, int maxLength, String fallback) {}
 }

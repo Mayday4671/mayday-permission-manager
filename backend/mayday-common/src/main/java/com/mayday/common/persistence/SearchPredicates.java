@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.persistence;
 
 import com.mybatisflex.core.query.QueryCondition;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -49,7 +49,9 @@ public final class SearchPredicates {
   public static QueryWrapper anyOf(QueryWrapper wrapper, QueryCondition... conditions) {
     QueryCondition merged = null;
     for (QueryCondition condition : conditions) {
-      if (condition == null) continue;
+      if (condition == null) {
+        continue;
+      }
       merged = merged == null ? condition : merged.or(condition);
     }
     return merged == null ? wrapper : wrapper.and(merged);

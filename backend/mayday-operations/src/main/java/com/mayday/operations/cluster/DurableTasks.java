@@ -1,6 +1,6 @@
 package com.mayday.operations.cluster;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.cluster.mapper.DurableTaskMapper;
 import com.mybatisflex.core.row.Row;
 import java.util.Objects;
@@ -30,17 +30,15 @@ public class DurableTasks {
       DurableTaskMapper queue,
       PlatformTransactionManager manager,
       @Value("${mayday.tasks.lease-seconds:90}") int leaseSeconds) {
-    if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalStateException("任务租约须为 15–300 秒");
+    if (leaseSeconds < 15 || leaseSeconds > 300) {
+      throw new IllegalStateException("任务租约须为 15–300 秒");
+    }
     this.queue = queue;
     leaseMillis = leaseSeconds * 1000L;
     transaction = new TransactionTemplate(manager);
     transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     transaction.setTimeout(30);
   }
-
-  /** 领取快照只能由服务端生成；token 是写入隔离凭据，绝不返回到普通任务接口。 */
-  public record Lease(
-      long id, String type, String key, String payload, String token, int attempt) {}
 
   private long now() {
     return queue.nowMillis();
@@ -54,14 +52,17 @@ public class DurableTasks {
         || payload == null
         || payload.length() > 10000
         || maxAttempts < 1
-        || maxAttempts > 10) throw new BusinessException("后台任务参数无效");
+        || maxAttempts > 10) {
+      throw new BusinessException("后台任务参数无效");
+    }
     return transaction.execute(
         status -> {
           long now = now();
           queue.enqueue(type, key, payload, maxAttempts, now);
           Row existing = queue.lockByKey(type, key);
-          if (!Objects.equals(existing.getString("payload"), payload))
+          if (!Objects.equals(existing.getString("payload"), payload)) {
             throw new BusinessException("任务标识已用于不同内容");
+          }
           return existing.getLong("id");
         });
   }
@@ -77,7 +78,9 @@ public class DurableTasks {
         status -> {
           long now = now();
           Row claimed = queue.claimRow(type, key, now);
-          if (claimed == null) return null;
+          if (claimed == null) {
+            return null;
+          }
           Lease lease =
               new Lease(
                   claimed.getLong("id"),
@@ -106,9 +109,13 @@ public class DurableTasks {
   public <T> T fenced(Lease lease, Supplier<T> work) {
     return transaction.execute(
         status -> {
-          if (!validLocked(lease)) throw new LostLease();
+          if (!validLocked(lease)) {
+            throw new LostLease();
+          }
           T result = work.get();
-          if (!validLocked(lease)) throw new LostLease();
+          if (!validLocked(lease)) {
+            throw new LostLease();
+          }
           return result;
         });
   }
@@ -126,9 +133,13 @@ public class DurableTasks {
   public <T> T finish(Lease lease, Supplier<T> work) {
     return transaction.execute(
         status -> {
-          if (!validLocked(lease)) throw new LostLease();
+          if (!validLocked(lease)) {
+            throw new LostLease();
+          }
           T result = work.get();
-          if (!validLocked(lease)) throw new LostLease();
+          if (!validLocked(lease)) {
+            throw new LostLease();
+          }
           queue.markSucceeded(lease.id(), now());
           return result;
         });
@@ -143,7 +154,9 @@ public class DurableTasks {
   public void failed(Lease lease, String explanation, boolean retryable, Consumer<String> update) {
     transaction.executeWithoutResult(
         status -> {
-          if (!validLocked(lease)) return;
+          if (!validLocked(lease)) {
+            return;
+          }
           int max = queue.maxAttempts(lease.id());
           String next = retryable && lease.attempt() < max ? "QUEUED" : "FAILED";
           queue.markOutcome(
@@ -166,7 +179,9 @@ public class DurableTasks {
     return transaction.execute(
         status -> {
           int changed = queue.cancelQueuedOrRunning(type, key, now());
-          if (changed == 1) update.run();
+          if (changed == 1) {
+            update.run();
+          }
           return changed == 1;
         });
   }
@@ -181,7 +196,9 @@ public class DurableTasks {
     return transaction.execute(
         status -> {
           int changed = queue.retryFailed(type, key, now());
-          if (changed == 1) update.run();
+          if (changed == 1) {
+            update.run();
+          }
           return changed == 1;
         });
   }
@@ -191,8 +208,10 @@ public class DurableTasks {
     transaction.executeWithoutResult(
         status -> {
           Row locked = queue.lockStatus(type, key);
-          if (locked != null && Set.of("FAILED", "CANCELLED").contains(locked.getString("status")))
+          if (locked != null
+              && Set.of("FAILED", "CANCELLED").contains(locked.getString("status"))) {
             update.accept(locked.getString("status"));
+          }
         });
   }
 
@@ -209,6 +228,10 @@ public class DurableTasks {
           return view.get();
         });
   }
+
+  /** 领取快照只能由服务端生成；token 是写入隔离凭据，绝不返回到普通任务接口。 */
+  public record Lease(
+      long id, String type, String key, String payload, String token, int attempt) {}
 
   /** 原租约失效是正常竞争结果，调用方丢弃自己的临时输出，不能标失败覆盖新工作器。 */
   public static final class LostLease extends RuntimeException {

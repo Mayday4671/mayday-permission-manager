@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,13 +38,6 @@ class FlexPersistenceContractTest {
     String sql = wrapper.toSQL();
     assertEquals(true, sql.toLowerCase().contains("escape '!'"), sql);
     assertEquals(true, sql.contains("a!%b!_c!!"), sql);
-  }
-
-  /** RawQueryCondition 为公共 API；可见包装只为保持断言阅读性。 */
-  private static final class VisibleRaw extends com.mybatisflex.core.query.RawQueryCondition {
-    VisibleRaw(String content, Object... params) {
-      super(content, params);
-    }
   }
 
   @Test
@@ -103,5 +96,12 @@ class FlexPersistenceContractTest {
     EntityMapper<ContractSampleEntity> repository = mock(EntityMapper.class);
     Mockito.when(repository.findById(1L)).thenReturn(Optional.of(new ContractSampleEntity()));
     assertEquals(true, repository.findById(1L).isPresent());
+  }
+
+  /** RawQueryCondition 为公共 API；可见包装只为保持断言阅读性。 */
+  private static final class VisibleRaw extends com.mybatisflex.core.query.RawQueryCondition {
+    VisibleRaw(String content, Object... params) {
+      super(content, params);
+    }
   }
 }

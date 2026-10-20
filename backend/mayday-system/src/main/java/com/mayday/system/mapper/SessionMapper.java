@@ -76,7 +76,9 @@ public interface SessionMapper extends BaseMapper<LoginSession> {
 
   /** 按主键集合读取账号展示名；跨表联查由调用方组装。 */
   default java.util.List<com.mybatisflex.core.row.Row> userSnapshots(java.util.List<Long> userIds) {
-    if (userIds.isEmpty()) return java.util.List.of();
+    if (userIds.isEmpty()) {
+      return java.util.List.of();
+    }
     return com.mybatisflex.core.row.Db.selectListByQuery(
         "sys_user",
         com.mybatisflex.core.query.QueryWrapper.create()

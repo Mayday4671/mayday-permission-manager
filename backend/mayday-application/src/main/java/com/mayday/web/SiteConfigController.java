@@ -1,7 +1,7 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.SettingService;
 import com.mayday.service.UserService;
@@ -28,9 +28,6 @@ public class SiteConfigController {
   private final AccessPolicy access;
   private final SettingService settings;
 
-  /** 单个站点键的输入值及其原版本；创建用空版本，现存配置必须按读取版本更新。 */
-  public record Value(@Size(max = 500) String value, Long version) {}
-
   /** 配置维护视图仅向 settings:view 用户返回注册站点字段、当前版本及公开预览。 */
   @GetMapping
   public ApiResponse<?> get() {
@@ -52,12 +49,15 @@ public class SiteConfigController {
   @Transactional
   public ApiResponse<?> update(@Valid @RequestBody Map<String, @Valid Value> values) {
     access.require("settings:update");
-    if (!SettingService.SITE_KEYS.keySet().containsAll(values.keySet()))
+    if (!SettingService.SITE_KEYS.keySet().containsAll(values.keySet())) {
       throw new BusinessException("未知站点配置");
+    }
     var storedEntries = entries.findByKindOrderBySortOrderAscIdAsc("settings");
     values.forEach(
         (code, value) -> {
-          if (value == null) throw new BusinessException("配置值不能为空");
+          if (value == null) {
+            throw new BusinessException("配置值不能为空");
+          }
           var definition = SettingService.SITE_KEYS.get(code);
           settings.validate(code, value.value(), definition.type());
           var entry =
@@ -66,13 +66,16 @@ public class SiteConfigController {
                   .findFirst()
                   .orElse(null);
           if (entry == null) {
-            if (value.version() != null)
+            if (value.version() != null) {
               throw new org.springframework.dao.OptimisticLockingFailureException("配置已删除");
+            }
             entry = new SystemEntry();
             entry.setKind("settings");
             entry.setCode(code);
             entry.setName(definition.label());
-          } else UserService.version(entry, value.version());
+          } else {
+            UserService.version(entry, value.version());
+          }
           entry.setGroupName("网站");
           entry.setValueType(definition.type());
           entry.setBuiltIn(true);
@@ -91,4 +94,7 @@ public class SiteConfigController {
     settings.clearCache();
     return ApiResponse.ok(null);
   }
+
+  /** 单个站点键的输入值及其原版本；创建用空版本，现存配置必须按读取版本更新。 */
+  public record Value(@Size(max = 500) String value, Long version) {}
 }

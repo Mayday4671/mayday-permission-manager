@@ -1,8 +1,8 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.mapper.AuditLogMapper;
 import com.mayday.system.mapper.UserMapper;
@@ -45,7 +45,9 @@ public class UserStatisticsController {
   public ApiResponse<?> statistics(@RequestParam(defaultValue = "7") int days) {
     access.require("userstats:view");
     access.require("users:view");
-    if (!Set.of(7, 30, 90).contains(days)) throw new BusinessException("统计窗口仅支持 7、30 或 90 天");
+    if (!Set.of(7, 30, 90).contains(days)) {
+      throw new BusinessException("统计窗口仅支持 7、30 或 90 天");
+    }
     var start = BusinessTime.today().minusDays(days - 1).atStartOfDay();
     var end = BusinessTime.today().plusDays(1).atStartOfDay();
     Map<String, Object> result = new LinkedHashMap<>();

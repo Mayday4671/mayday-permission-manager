@@ -19,6 +19,15 @@ public class BulkIdentity {
   private final AccessPolicy access;
   private final PasswordEncoder fingerprints;
 
+  /** SHA-256 用于非凭据授权指纹；输入文件的结果只能在内存传给带盐慢哈希，不能直接落库。 */
+  public static String digest(byte[] bytes) {
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("运行环境缺少 SHA-256", exception);
+    }
+  }
+
   /** 对有效角色、字段权限、范围和部门树作稳定指纹，下载旧结果时必须再次一致。 */
   public String signature() {
     SysUser user = access.current();
@@ -62,14 +71,5 @@ public class BulkIdentity {
   /** 重试文件需通过原带盐慢哈希比对，同一幂等键不能用于内容不同的提交。 */
   public boolean matchesInput(byte[] bytes, String encoded) {
     return encoded != null && fingerprints.matches(digest(bytes), encoded);
-  }
-
-  /** SHA-256 用于非凭据授权指纹；输入文件的结果只能在内存传给带盐慢哈希，不能直接落库。 */
-  public static String digest(byte[] bytes) {
-    try {
-      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-    } catch (NoSuchAlgorithmException exception) {
-      throw new IllegalStateException("运行环境缺少 SHA-256", exception);
-    }
   }
 }

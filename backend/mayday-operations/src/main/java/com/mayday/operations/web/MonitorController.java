@@ -1,6 +1,6 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.ApiResponse;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.operations.monitor.MonitorService;
 import com.mayday.security.AccessPolicy;
 import jakarta.validation.Valid;

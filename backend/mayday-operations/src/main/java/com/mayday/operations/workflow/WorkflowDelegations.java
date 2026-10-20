@@ -1,8 +1,8 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.PageResult;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.operations.OperationSupport;
 import com.mayday.operations.mapper.FlowDefinitionMapper;
 import com.mayday.operations.mapper.FlowDelegationMapper;
@@ -35,14 +35,6 @@ public class WorkflowDelegations {
   private final AccessPolicy access;
   private final WorkflowJson json;
 
-  /** 身份由当前会话取得，客户端只能选择接收人、时段、流程范围与原因。 */
-  public record Create(
-      @NotNull Long targetId,
-      @NotNull LocalDateTime startsAt,
-      @NotNull LocalDateTime endsAt,
-      @Size(max = 50) Set<Long> definitionIds,
-      @NotBlank @Size(max = 500) String reason) {}
-
   /** 创建审批委托需要独立权限；查看权限不能创建委托或改变待办归属。 */
   private void requireOwner() {
     access.require("requests:delegate");
@@ -73,7 +65,9 @@ public class WorkflowDelegations {
   /** 本人创建或收到的委托由 SQL 分页，不接受任意用户编号读取他人安排。 */
   public PageResult<Map<String, Object>> list(String box, int page, int size) {
     requireOwner();
-    if (!Set.of("mine", "received").contains(box)) throw new BusinessException("未知委托列表");
+    if (!Set.of("mine", "received").contains(box)) {
+      throw new BusinessException("未知委托列表");
+    }
     String column = box.equals("mine") ? "owner_id" : "target_id";
     return PageResult.from(
         delegations
@@ -93,33 +87,42 @@ public class WorkflowDelegations {
     requireOwner();
     access.require("users:view");
     Long ownerId = access.current().getId();
-    if (ownerId.equals(input.targetId())) throw new BusinessException("不能委托给自己");
+    if (ownerId.equals(input.targetId())) {
+      throw new BusinessException("不能委托给自己");
+    }
     LocalDateTime now = BusinessTime.now();
     if (input.startsAt().isBefore(now.minusMinutes(1))
         || !input.endsAt().isAfter(input.startsAt())
         || Duration.between(input.startsAt(), input.endsAt()).compareTo(Duration.ofDays(90)) > 0
-        || input.startsAt().isAfter(now.plusDays(90)))
+        || input.startsAt().isAfter(now.plusDays(90))) {
       throw new BusinessException("委托时段必须尚未开始，最长90天，开始时间不超过90天后");
-    for (Long id : List.of(ownerId, input.targetId()).stream().sorted().toList())
+    }
+    for (Long id : List.of(ownerId, input.targetId()).stream().sorted().toList()) {
       users.lockById(id).orElseThrow(() -> new BusinessException("委托账号不存在"));
+    }
     var target =
         users
             .findById(input.targetId())
             .filter(u -> access.hasFor(u, "requests:approve") && access.hasFor(u, "requests:view"))
             .orElseThrow(() -> new BusinessException("接收人须启用并有审批及申请查看权限"));
     access.checkData("users", target.getId(), target.getDepartmentId());
-    if (!delegations.overlapping(ownerId, input.startsAt(), input.endsAt()).isEmpty())
+    if (!delegations.overlapping(ownerId, input.startsAt(), input.endsAt()).isEmpty()) {
       throw new BusinessException("当前时段已有委托或接收安排，不能重复或转委托");
+    }
     if (delegations.overlapping(target.getId(), input.startsAt(), input.endsAt()).stream()
-        .anyMatch(d -> d.getOwnerId().equals(target.getId())))
+        .anyMatch(d -> d.getOwnerId().equals(target.getId()))) {
       throw new BusinessException("接收人在此时段已委托他人，不能建立委托链");
+    }
     Set<Long> ids = input.definitionIds() == null ? Set.of() : input.definitionIds();
-    for (Long id : ids)
+    for (Long id : ids) {
       if (id == null
           || definitions
               .findById(id)
               .filter(d -> d.isEnabled() && d.getPublishedVersionId() != null)
-              .isEmpty()) throw new BusinessException("委托范围只能选择已发布且启用的流程");
+              .isEmpty()) {
+        throw new BusinessException("委托范围只能选择已发布且启用的流程");
+      }
+    }
     var delegation = new FlowDelegation();
     delegation.setOwnerId(ownerId);
     delegation.setOwnerName(access.current().getNickname());
@@ -138,10 +141,13 @@ public class WorkflowDelegations {
     requireOwner();
     users.lockById(access.current().getId()).orElseThrow();
     var delegation = delegations.findById(id).orElseThrow(() -> new BusinessException("委托不存在"));
-    if (!delegation.getOwnerId().equals(access.current().getId()))
+    if (!delegation.getOwnerId().equals(access.current().getId())) {
       throw new AccessDeniedException("只能撤销本人创建的委托");
+    }
     OperationSupport.version(delegation, version);
-    if (delegation.getRevokedAt() != null) throw new BusinessException("委托已撤销");
+    if (delegation.getRevokedAt() != null) {
+      throw new BusinessException("委托已撤销");
+    }
     delegation.setRevokedAt(BusinessTime.now());
     delegations.save(delegation);
     return view(delegation);
@@ -156,7 +162,9 @@ public class WorkflowDelegations {
                 access.hasFor(u, "requests:delegate")
                     && access.hasFor(u, "requests:approve")
                     && access.hasFor(u, "requests:view"))
-        .isEmpty()) return Optional.empty();
+        .isEmpty()) {
+      return Optional.empty();
+    }
     return delegations.effective(ownerId, BusinessTime.now()).stream()
         .filter(d -> scopeIds(d).isEmpty() || scopeIds(d).contains(definitionId))
         .filter(
@@ -173,7 +181,9 @@ public class WorkflowDelegations {
 
   private List<Long> scopeIds(FlowDelegation delegation) {
     Object value = json.form(delegation.getDefinitionIdsJson()).get("ids");
-    if (!(value instanceof List<?> list)) throw new BusinessException("委托范围存储损坏");
+    if (!(value instanceof List<?> list)) {
+      throw new BusinessException("委托范围存储损坏");
+    }
     return list.stream().map(v -> WorkflowSchema.positiveId(v, "委托流程")).toList();
   }
 
@@ -201,4 +211,12 @@ public class WorkflowDelegations {
                 : delegation.getStartsAt().isAfter(now) ? "SCHEDULED" : "ACTIVE");
     return out;
   }
+
+  /** 身份由当前会话取得，客户端只能选择接收人、时段、流程范围与原因。 */
+  public record Create(
+      @NotNull Long targetId,
+      @NotNull LocalDateTime startsAt,
+      @NotNull LocalDateTime endsAt,
+      @Size(max = 50) Set<Long> definitionIds,
+      @NotBlank @Size(max = 500) String reason) {}
 }

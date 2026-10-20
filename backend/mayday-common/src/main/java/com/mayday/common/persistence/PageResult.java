@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.persistence;
 
 import com.mybatisflex.core.paginate.Page;
 import java.util.List;

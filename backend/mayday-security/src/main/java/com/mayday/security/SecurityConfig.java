@@ -1,6 +1,6 @@
 package com.mayday.security;
 
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.util.ModuleSwitches;
 import com.mayday.system.mapper.AuditLogMapper;
 import com.mayday.system.model.AuditLog;
 import com.mayday.system.model.SysUser;
@@ -36,6 +36,14 @@ public class SecurityConfig {
   private final TokenService tokens;
   private final AuditLogMapper audits;
   private final ModuleSwitches modules;
+
+  /** 过滤器尚未进入 MVC 时返回固定、已脱敏的认证失败消息，不输出异常或会话凭证。 */
+  private static void json(HttpServletResponse response, int status, String message)
+      throws IOException {
+    response.setStatus(status);
+    response.setContentType("application/json;charset=UTF-8");
+    response.getWriter().write("{\"success\":false,\"data\":null,\"message\":\"" + message + "\"}");
+  }
 
   /** 密码仅使用成本 12 的 BCrypt；原密码只在登录或设置密码的请求中短暂使用。 */
   @Bean
@@ -111,7 +119,7 @@ public class SecurityConfig {
                 }
                 String authorizationHeader = request.getHeader("Authorization");
                 // 仅接受请求头中的不透明令牌，URL 查询参数和 Cookie 均不参与身份恢复。
-                if (authorizationHeader != null && authorizationHeader.startsWith("Bearer "))
+                if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
                   tokens
                       .authenticate(authorizationHeader.substring(7))
                       .ifPresent(
@@ -120,6 +128,7 @@ public class SecurityConfig {
                                   .setAuthentication(
                                       new UsernamePasswordAuthenticationToken(
                                           user, null, List.of())));
+                }
                 String username =
                     SecurityContextHolder.getContext().getAuthentication() == null
                         ? "anonymous"
@@ -155,13 +164,5 @@ public class SecurityConfig {
             },
             UsernamePasswordAuthenticationFilter.class)
         .build();
-  }
-
-  /** 过滤器尚未进入 MVC 时返回固定、已脱敏的认证失败消息，不输出异常或会话凭证。 */
-  private static void json(HttpServletResponse response, int status, String message)
-      throws IOException {
-    response.setStatus(status);
-    response.setContentType("application/json;charset=UTF-8");
-    response.getWriter().write("{\"success\":false,\"data\":null,\"message\":\"" + message + "\"}");
   }
 }

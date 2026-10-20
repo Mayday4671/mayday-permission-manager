@@ -1,9 +1,9 @@
 package com.mayday.crawler;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.crawler.mapper.CrawlItemMapper;
 import com.mayday.crawler.mapper.CrawlTaskMapper;
 import com.mayday.operations.mapper.FilePayloadMapper;
@@ -50,15 +50,6 @@ public class CrawlController {
   private final CrawlArticles articles;
   private final Semaphore previews = new Semaphore(2);
 
-  /** 配置请求不接受所有者或执行状态，服务端从当前身份建立所有者并验证完整采集规则。 */
-  @Schema(name = "CrawlerConfigEdit")
-  public record Edit(
-      @NotBlank @Size(max = 100) String name, @NotNull CrawlRules rules, Long version) {}
-
-  /** 操作携带最近读取的版本，避免浏览器旧页面覆盖另一位管理员已执行的状态变化。 */
-  @Schema(name = "CrawlerConfigVersion")
-  public record Version(@NotNull Long version) {}
-
   /** 配置列表排除已归档记录，在 SQL 先限制所有者，再执行关键词、状态与分页统计。 */
   @GetMapping
   @Transactional(readOnly = true)
@@ -71,11 +62,14 @@ public class CrawlController {
     var filter =
         com.mybatisflex.core.query.QueryWrapper.create()
             .where(new com.mybatisflex.core.query.QueryColumn("archived").eq(false));
-    if (!access.has("crawler:all"))
+    if (!access.has("crawler:all")) {
       filter.and(
           new com.mybatisflex.core.query.QueryColumn("owner_id").eq(access.current().getId()));
+    }
     filter.and(SearchPredicates.contains("name", keyword));
-    if (status != null) filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
+    if (status != null) {
+      filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
+    }
     return ApiResponse.ok(
         PageResult.from(tasks.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
@@ -137,8 +131,12 @@ public class CrawlController {
     var filter =
         com.mybatisflex.core.query.QueryWrapper.create()
             .where(new com.mybatisflex.core.query.QueryColumn("task_id").eq(id));
-    if (kind != null) filter.and(new com.mybatisflex.core.query.QueryColumn("kind").eq(kind));
-    if (status != null) filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
+    if (kind != null) {
+      filter.and(new com.mybatisflex.core.query.QueryColumn("kind").eq(kind));
+    }
+    if (status != null) {
+      filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
+    }
     return ApiResponse.ok(
         PageResult.from(items.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
@@ -149,7 +147,9 @@ public class CrawlController {
     access.require("crawler:view");
     access.require("crawler:run");
     rules.validate();
-    if (!previews.tryAcquire()) throw new BusinessException("规则预览正在处理其他请求，请稍后重试");
+    if (!previews.tryAcquire()) {
+      throw new BusinessException("规则预览正在处理其他请求，请稍后重试");
+    }
     try {
       var response = fetcher.fetch(rules.entryUrl(), rules, false);
       var result = PageExtractor.extract(response, rules, false, 0, rules.entryUrl());
@@ -234,4 +234,13 @@ public class CrawlController {
                 .orElseThrow(() -> new BusinessException("文件正文不存在"))
                 .getData());
   }
+
+  /** 配置请求不接受所有者或执行状态，服务端从当前身份建立所有者并验证完整采集规则。 */
+  @Schema(name = "CrawlerConfigEdit")
+  public record Edit(
+      @NotBlank @Size(max = 100) String name, @NotNull CrawlRules rules, Long version) {}
+
+  /** 操作携带最近读取的版本，避免浏览器旧页面覆盖另一位管理员已执行的状态变化。 */
+  @Schema(name = "CrawlerConfigVersion")
+  public record Version(@NotNull Long version) {}
 }

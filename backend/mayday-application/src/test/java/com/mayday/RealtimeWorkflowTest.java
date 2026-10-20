@@ -13,8 +13,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.operations.MessagePublisher;
 import com.mayday.operations.mapper.DeliveryMapper;
 import com.mayday.operations.mapper.FlowRequestMapper;
@@ -40,14 +40,47 @@ import org.springframework.security.access.AccessDeniedException;
 
 /** 覆盖模板可运行性、超时边界、SSE 当前权限与连接配额；真实投递及行锁另外走数据库验收。 */
 class RealtimeWorkflowTest {
+  /** 测试共享登记契约而不重新引入生产本机配额；实际跨实例配额由双 Java 专项验证。 */
+  private static com.mayday.operations.realtime.RealtimeJournal journal() {
+    var journal = mock(com.mayday.operations.realtime.RealtimeJournal.class);
+    var connections = new java.util.HashMap<String, Long>();
+    org.mockito.Mockito.doAnswer(
+            call -> {
+              String id = call.getArgument(0);
+              Long user = call.getArgument(1);
+              if (connections.values().stream().filter(user::equals).count() >= 4) {
+                throw new BusinessException("实时连接数量过多");
+              }
+              connections.put(id, user);
+              return null;
+            })
+        .when(journal)
+        .register(anyString(), anyLong());
+    org.mockito.Mockito.doAnswer(
+            call -> {
+              connections.remove(call.getArgument(0));
+              return null;
+            })
+        .when(journal)
+        .remove(anyString());
+    when(journal.renew(anyString())).thenReturn(true);
+    return journal;
+  }
+
   @Test
   void templatesAreValidAndTimeoutIsBounded() {
     for (var template : WorkflowTemplates.all()) {
       WorkflowSchema.validate(template.schema());
       for (var field : template.schema().fields()) {
-        if ("DATE".equals(field.type())) assertNull(field.maxLength());
-        if ("TEXT".equals(field.type())) assertEquals(200, field.maxLength());
-        if ("TEXTAREA".equals(field.type())) assertEquals(2000, field.maxLength());
+        if ("DATE".equals(field.type())) {
+          assertNull(field.maxLength());
+        }
+        if ("TEXT".equals(field.type())) {
+          assertEquals(200, field.maxLength());
+        }
+        if ("TEXTAREA".equals(field.type())) {
+          assertEquals(2000, field.maxLength());
+        }
       }
       assertEquals(1440, template.schema().nodes().getFirst().timeoutMinutes());
       var original = template.schema().nodes().getFirst();
@@ -106,7 +139,9 @@ class RealtimeWorkflowTest {
     when(access.hasFor(first, "messages:view")).thenReturn(true);
     when(access.hasFor(second, "messages:view")).thenReturn(true);
     RealtimeStreams streams = new RealtimeStreams(tokens, access, journal());
-    for (int count = 0; count < 4; count++) streams.open("first");
+    for (int count = 0; count < 4; count++) {
+      streams.open("first");
+    }
     assertThrows(BusinessException.class, () -> streams.open("first"));
     streams.open("second");
     when(tokens.authenticate("first")).thenReturn(Optional.empty());
@@ -176,31 +211,5 @@ class RealtimeWorkflowTest {
     user.setId(id);
     user.setEnabled(true);
     return user;
-  }
-
-  /** 测试共享登记契约而不重新引入生产本机配额；实际跨实例配额由双 Java 专项验证。 */
-  private static com.mayday.operations.realtime.RealtimeJournal journal() {
-    var journal = mock(com.mayday.operations.realtime.RealtimeJournal.class);
-    var connections = new java.util.HashMap<String, Long>();
-    org.mockito.Mockito.doAnswer(
-            call -> {
-              String id = call.getArgument(0);
-              Long user = call.getArgument(1);
-              if (connections.values().stream().filter(user::equals).count() >= 4)
-                throw new BusinessException("实时连接数量过多");
-              connections.put(id, user);
-              return null;
-            })
-        .when(journal)
-        .register(anyString(), anyLong());
-    org.mockito.Mockito.doAnswer(
-            call -> {
-              connections.remove(call.getArgument(0));
-              return null;
-            })
-        .when(journal)
-        .remove(anyString());
-    when(journal.renew(anyString())).thenReturn(true);
-    return journal;
   }
 }

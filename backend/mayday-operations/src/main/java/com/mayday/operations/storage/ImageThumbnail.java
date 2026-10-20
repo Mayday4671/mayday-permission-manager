@@ -1,6 +1,6 @@
 package com.mayday.operations.storage;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -19,17 +19,22 @@ public final class ImageThumbnail {
 
   /** 解码前限制像素数并降采样生成最长三百二十像素 PNG；无 WebP 解码器时由原图降级展示。 */
   public static byte[] create(InputStream input, String contentType) throws IOException {
-    if ("image/webp".equals(contentType)) return null;
+    if ("image/webp".equals(contentType)) {
+      return null;
+    }
     try (ImageInputStream imageStream = ImageIO.createImageInputStream(input)) {
       var readers = ImageIO.getImageReaders(imageStream);
-      if (!readers.hasNext()) throw new BusinessException("图片格式无效");
+      if (!readers.hasNext()) {
+        throw new BusinessException("图片格式无效");
+      }
       ImageReader reader = readers.next();
       try {
         reader.setInput(imageStream, true, true);
         int width = reader.getWidth(0);
         int height = reader.getHeight(0);
-        if (width <= 0 || height <= 0 || (long) width * height > MAXIMUM_PIXELS)
+        if (width <= 0 || height <= 0 || (long) width * height > MAXIMUM_PIXELS) {
           throw new BusinessException("图片像素总数不能超过 2000 万");
+        }
         // 在解码阶段抽样，缩略图生成不需要将完整大图载入堆内存。
         int sampling = Math.max(1, Math.min(width, height) / 640);
         var parameters = reader.getDefaultReadParam();

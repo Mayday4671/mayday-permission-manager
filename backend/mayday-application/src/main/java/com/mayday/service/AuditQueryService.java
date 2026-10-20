@@ -1,9 +1,9 @@
 package com.mayday.service;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
+import com.mayday.common.util.BusinessTime;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.mapper.AuditLogMapper;
 import com.mayday.system.model.AuditLog;
@@ -22,15 +22,15 @@ public class AuditQueryService {
   private final AuditLogMapper audits;
   private final AccessPolicy access;
 
-  private String resource(boolean loginOnly) {
-    return loginOnly ? "loginlogs" : "logs";
-  }
-
   /** 工作台等聚合入口复用日志分类条件，避免摘要接口绕过两类日志的独立授权。 */
   public static QueryCondition kind(boolean loginOnly) {
     return loginOnly
         ? new QueryColumn("path").eq("/api/auth/login")
         : new QueryColumn("path").ne("/api/auth/login");
+  }
+
+  private String resource(boolean loginOnly) {
+    return loginOnly ? "loginlogs" : "logs";
   }
 
   /** 按日期、结果和关键字分页查询当前授权的日志分类；导出同时要求该分类的查看与导出权限，每页最多100条。 */
@@ -45,8 +45,12 @@ public class AuditQueryService {
       int size,
       boolean exporting) {
     access.require(resource(loginOnly) + ":view");
-    if (exporting) access.require(resource(loginOnly) + ":export");
-    if (from != null && to != null && from.isAfter(to)) throw new BusinessException("开始日期不能晚于结束日期");
+    if (exporting) {
+      access.require(resource(loginOnly) + ":export");
+    }
+    if (from != null && to != null && from.isAfter(to)) {
+      throw new BusinessException("开始日期不能晚于结束日期");
+    }
     QueryWrapper filter =
         QueryWrapper.create()
             .where(
@@ -55,10 +59,15 @@ public class AuditQueryService {
                         SearchPredicates.contains("username", keyword)
                             .or(SearchPredicates.contains("path", keyword))
                             .or(SearchPredicates.contains("ip", keyword))));
-    if (success != null)
+    if (success != null) {
       filter.and(success ? new QueryColumn("status").lt(400) : new QueryColumn("status").ge(400));
-    if (from != null) filter.and(new QueryColumn("created_at").ge(from.atStartOfDay()));
-    if (to != null) filter.and(new QueryColumn("created_at").lt(to.plusDays(1).atStartOfDay()));
+    }
+    if (from != null) {
+      filter.and(new QueryColumn("created_at").ge(from.atStartOfDay()));
+    }
+    if (to != null) {
+      filter.and(new QueryColumn("created_at").lt(to.plusDays(1).atStartOfDay()));
+    }
     return PageResult.from(
         audits.paginate(
             PageResult.request(page, exporting ? 100 : size), filter.orderBy("id desc")));
@@ -78,8 +87,9 @@ public class AuditQueryService {
   @Transactional
   public long clean(boolean loginOnly, LocalDate before) {
     access.require(resource(loginOnly) + ":delete");
-    if (before == null || before.isAfter(BusinessTime.today().minusDays(30)))
+    if (before == null || before.isAfter(BusinessTime.today().minusDays(30))) {
       throw new BusinessException("至少保留最近 30 天的日志");
+    }
     return audits.deleteByQuery(
         QueryWrapper.create()
             .where(kind(loginOnly).and(new QueryColumn("created_at").lt(before.atStartOfDay()))));

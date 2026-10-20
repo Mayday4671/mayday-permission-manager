@@ -1,6 +1,6 @@
 package com.mayday.agentscope;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
@@ -33,6 +33,13 @@ public class AgentScopeSecretCipher {
     this.encryptionKey = encryptionKey;
   }
 
+  private static Cipher cipher(int mode, byte[] iv, byte[] key) throws GeneralSecurityException {
+    Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+    cipher.init(mode, new SecretKeySpec(key, "AES"), new GCMParameterSpec(TAG_LENGTH_BITS, iv));
+    cipher.updateAAD(ASSOCIATED_DATA);
+    return cipher;
+  }
+
   /** Encrypts a secret without returning cryptographic failure details to callers. */
   public String encrypt(String secret) {
     byte[] key = decodeKeyForWrite();
@@ -54,9 +61,13 @@ public class AgentScopeSecretCipher {
   public String decrypt(String encryptedValue) {
     try {
       String[] parts = encryptedValue.split("\\.", -1);
-      if (parts.length != 3 || !"v1".equals(parts[0])) throw new IllegalArgumentException();
+      if (parts.length != 3 || !"v1".equals(parts[0])) {
+        throw new IllegalArgumentException();
+      }
       byte[] iv = Base64.getDecoder().decode(parts[1]);
-      if (iv.length != IV_LENGTH) throw new IllegalArgumentException();
+      if (iv.length != IV_LENGTH) {
+        throw new IllegalArgumentException();
+      }
       byte[] key = decodeKeyForRead();
       byte[] plaintext =
           cipher(Cipher.DECRYPT_MODE, iv, key).doFinal(Base64.getDecoder().decode(parts[2]));
@@ -69,25 +80,21 @@ public class AgentScopeSecretCipher {
 
   private byte[] decodeKeyForWrite() {
     byte[] key = decodeKeyForRead();
-    if (key == null)
+    if (key == null) {
       throw new BusinessException("保存模型密钥前，请由部署人员配置 MAYDAY_IDENTITY_ENCRYPTION_KEY 并重启服务");
+    }
     return key;
   }
 
   private byte[] decodeKeyForRead() {
     try {
       byte[] key = Base64.getDecoder().decode(encryptionKey);
-      if (key.length == 32) return key;
+      if (key.length == 32) {
+        return key;
+      }
     } catch (IllegalArgumentException ignored) {
       // The caller receives a deployment-oriented message without key material or parser details.
     }
     return null;
-  }
-
-  private static Cipher cipher(int mode, byte[] iv, byte[] key) throws GeneralSecurityException {
-    Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-    cipher.init(mode, new SecretKeySpec(key, "AES"), new GCMParameterSpec(TAG_LENGTH_BITS, iv));
-    cipher.updateAAD(ASSOCIATED_DATA);
-    return cipher;
   }
 }

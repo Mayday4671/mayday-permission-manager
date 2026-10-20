@@ -1,6 +1,6 @@
 package com.mayday.operations.storage;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.mapper.FilePayloadMapper;
 import com.mayday.operations.model.StoredFile;
 import java.io.ByteArrayInputStream;
@@ -28,37 +28,10 @@ public class StoredFileContent {
     this.storages = List.copyOf(storages);
   }
 
-  /** 按文件持久化的提供方路由，部署切换新上传模式后仍能读取之前存储的文件。 */
-  public FileStorage storage(String provider) {
-    return storages.stream()
-        .filter(storage -> storage.provider().equals(provider))
-        .findFirst()
-        .orElseThrow(() -> new BusinessException("此文件的存储实现未启用"));
-  }
-
-  /** 调用者负责关闭流；MYSQL 兼容层仅加载当前文件，不影响文件列表查询。 */
-  public InputStream open(StoredFile file) throws IOException {
-    active(file);
-    if ("MYSQL".equals(file.getStorageProvider()))
-      return new ByteArrayInputStream(
-          java.util.Optional.ofNullable(payloads.selectOneById(file.getId()))
-              .orElseThrow(() -> new BusinessException("文件正文不存在"))
-              .getData());
-    return storage(file.getStorageProvider()).open(file.getStorageKey());
-  }
-
   /** 在下载或业务关联前拒绝回收和清理中的文件，避免让不可用附件进入新业务记录。 */
   public static void active(StoredFile file) {
-    if (file.getDeletedAt() != null || file.getPurgeRequestedAt() != null)
+    if (file.getDeletedAt() != null || file.getPurgeRequestedAt() != null) {
       throw new BusinessException("文件已回收，请先恢复后再使用");
-  }
-
-  /** 仅识别允许内联的栅格图片，原始文件扩展名或客户端 MIME 不能决定预览类型。 */
-  public String imageType(StoredFile file) {
-    try (InputStream input = open(file)) {
-      return imageType(input.readNBytes(12));
-    } catch (IOException exception) {
-      throw new BusinessException("读取图片失败，请稍后重试");
     }
   }
 
@@ -72,11 +45,15 @@ public class StoredFileContent {
         && bytes[4] == 13
         && bytes[5] == 10
         && bytes[6] == 26
-        && bytes[7] == 10) return "image/png";
+        && bytes[7] == 10) {
+      return "image/png";
+    }
     if (bytes.length >= 3
         && bytes[0] == (byte) 0xff
         && bytes[1] == (byte) 0xd8
-        && bytes[2] == (byte) 0xff) return "image/jpeg";
+        && bytes[2] == (byte) 0xff) {
+      return "image/jpeg";
+    }
     if (bytes.length >= 12
         && bytes[0] == 'R'
         && bytes[1] == 'I'
@@ -85,8 +62,39 @@ public class StoredFileContent {
         && bytes[8] == 'W'
         && bytes[9] == 'E'
         && bytes[10] == 'B'
-        && bytes[11] == 'P') return "image/webp";
+        && bytes[11] == 'P') {
+      return "image/webp";
+    }
     throw new BusinessException("仅支持有效 PNG、JPEG 或 WebP 图片预览");
+  }
+
+  /** 按文件持久化的提供方路由，部署切换新上传模式后仍能读取之前存储的文件。 */
+  public FileStorage storage(String provider) {
+    return storages.stream()
+        .filter(storage -> storage.provider().equals(provider))
+        .findFirst()
+        .orElseThrow(() -> new BusinessException("此文件的存储实现未启用"));
+  }
+
+  /** 调用者负责关闭流；MYSQL 兼容层仅加载当前文件，不影响文件列表查询。 */
+  public InputStream open(StoredFile file) throws IOException {
+    active(file);
+    if ("MYSQL".equals(file.getStorageProvider())) {
+      return new ByteArrayInputStream(
+          java.util.Optional.ofNullable(payloads.selectOneById(file.getId()))
+              .orElseThrow(() -> new BusinessException("文件正文不存在"))
+              .getData());
+    }
+    return storage(file.getStorageProvider()).open(file.getStorageKey());
+  }
+
+  /** 仅识别允许内联的栅格图片，原始文件扩展名或客户端 MIME 不能决定预览类型。 */
+  public String imageType(StoredFile file) {
+    try (InputStream input = open(file)) {
+      return imageType(input.readNBytes(12));
+    } catch (IOException exception) {
+      throw new BusinessException("读取图片失败，请稍后重试");
+    }
   }
 
   /** 下载走流式响应并禁止嗅探；图片预览采用已核实的 MIME，其他格式始终作为附件下载。 */
@@ -109,7 +117,9 @@ public class StoredFileContent {
                   HttpHeaders.CONTENT_DISPOSITION,
                   disposition.filename(file.getName(), StandardCharsets.UTF_8).build().toString())
               .contentType(MediaType.parseMediaType(useThumbnail ? "image/png" : contentType));
-      if (!useThumbnail) response.contentLength(file.getSize());
+      if (!useThumbnail) {
+        response.contentLength(file.getSize());
+      }
       // Spring 会在写出响应后关闭流，不能在此处提前使用 try-with-resources。
       return response.body(new InputStreamResource(stream));
     } catch (IOException exception) {

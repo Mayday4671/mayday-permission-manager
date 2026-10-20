@@ -21,9 +21,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.mayday.common.BusinessException;
-import com.mayday.common.BusinessTime;
-import com.mayday.common.ModuleSwitches;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.util.BusinessTime;
+import com.mayday.common.util.ModuleSwitches;
 import com.mayday.operations.MessagePublisher;
 import com.mayday.operations.mapper.JobExecutionMapper;
 import com.mayday.operations.mapper.ScheduledJobMapper;
@@ -62,6 +62,59 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** 平台通用能力的失败边界；HTTP 权限、持久化结果与版本冲突由独立 MySQL 验收补充。 */
 class GeneralPlatformTest {
+  /** 只模拟事务管理器回调次序；真实提交和回滚另外由数据库环境验证，不能据此声称跨实例语义。 */
+  private static PlatformTransactionManager transactions() {
+    PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    when(transactions.getTransaction(any()))
+        .thenAnswer(invocation -> new SimpleTransactionStatus());
+    return transactions;
+  }
+
+  /** 此替身仅验证业务事务与失败历史隔离；共享领取、故障和旧租约拒绝由真实双实例专项验证。 */
+  private static com.mayday.operations.cluster.DurableTasks durable(
+      PlatformTransactionManager manager) {
+    var tasks = mock(com.mayday.operations.cluster.DurableTasks.class);
+    var payload = new java.util.concurrent.atomic.AtomicReference<String>();
+    when(tasks.enqueue(anyString(), anyString(), anyString(), anyInt()))
+        .thenAnswer(
+            call -> {
+              payload.set(call.getArgument(2));
+              return 1L;
+            });
+    when(tasks.claim(anyString(), anyString()))
+        .thenAnswer(
+            call ->
+                new com.mayday.operations.cluster.DurableTasks.Lease(
+                    1L, call.getArgument(0), call.getArgument(1), payload.get(), "test-lease", 1));
+    var transaction = new TransactionTemplate(manager);
+    transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    when(tasks.inspect(anyString(), anyString(), any()))
+        .thenAnswer(
+            call ->
+                transaction.execute(
+                    status -> ((java.util.function.Supplier<?>) call.getArgument(2)).get()));
+    when(tasks.fenced(any(), any()))
+        .thenAnswer(
+            call ->
+                transaction.execute(
+                    status -> ((java.util.function.Supplier<?>) call.getArgument(1)).get()));
+    when(tasks.finish(any(), any()))
+        .thenAnswer(
+            call ->
+                transaction.execute(
+                    status -> ((java.util.function.Supplier<?>) call.getArgument(1)).get()));
+    org.mockito.Mockito.doAnswer(
+            call -> {
+              transaction.executeWithoutResult(
+                  status ->
+                      ((java.util.function.Consumer<String>) call.getArgument(3)).accept("FAILED"));
+              return null;
+            })
+        .when(tasks)
+        .failed(any(), anyString(), anyBoolean(), any());
+    return tasks;
+  }
+
   /** 审计差异排序稳定，未改字段不制造噪声，返回列表不能被后续代码修改。 */
   @Test
   void changeAuditDifferencesAreStableAndDoNotKeepUnchangedFields() {
@@ -204,7 +257,9 @@ class GeneralPlatformTest {
               JobExecution saved = invocation.getArgument(0);
               saved.setId(72L);
               when(executions.lock(72L)).thenReturn(Optional.of(saved));
-              if ("FAILED".equals(saved.getStatus())) transactions.stageFailure(saved.getId());
+              if ("FAILED".equals(saved.getStatus())) {
+                transactions.stageFailure(saved.getId());
+              }
               return saved;
             });
     JobRunner runner =
@@ -303,7 +358,9 @@ class GeneralPlatformTest {
       PlatformTransactionManager transactions = transactions();
       ScheduledJob job = new ScheduledJob();
       job.setId(1L);
-      if (!"NONE".equals(recipientState)) job.setAlertUserId(2L);
+      if (!"NONE".equals(recipientState)) {
+        job.setAlertUserId(2L);
+      }
       JobExecution failure = new JobExecution();
       failure.setId(74L);
       failure.setJobId(1L);
@@ -456,9 +513,9 @@ class GeneralPlatformTest {
 
   /** 用 Spring 真实传播规则模拟提交与回滚，只暂存失败记录编号，不冒充数据库或跨节点验收。 */
   private static final class TransactionProbe extends AbstractPlatformTransactionManager {
-    private TransactionUnit current;
     private final Set<Long> committedFailures = new HashSet<>();
     private final List<Integer> propagations = new ArrayList<>();
+    private TransactionUnit current;
 
     private void stageFailure(Long id) {
       assertNotNull(current, "失败记录必须在事务中保存");
@@ -494,7 +551,9 @@ class GeneralPlatformTest {
     @Override
     protected void doResume(Object transaction, Object suspendedResources) {
       current = (TransactionUnit) suspendedResources;
-      if (transaction != null) ((TransactionHolder) transaction).unit = current;
+      if (transaction != null) {
+        ((TransactionHolder) transaction).unit = current;
+      }
     }
 
     @Override
@@ -521,9 +580,9 @@ class GeneralPlatformTest {
 
   /** 独立事务中的暂存证据与回滚标记，提交后才进入测试的持久结果集合。 */
   private static final class TransactionUnit {
+    private final Set<Long> pendingFailures = new HashSet<>();
     private boolean active = true;
     private boolean rollbackOnly;
-    private final Set<Long> pendingFailures = new HashSet<>();
   }
 
   /** 持有当前事务资源，让 Spring 能判断 REQUIRED 加入和 REQUIRES_NEW 挂起的差别。 */
@@ -541,58 +600,5 @@ class GeneralPlatformTest {
 
     @Override
     public void flush() {}
-  }
-
-  /** 只模拟事务管理器回调次序；真实提交和回滚另外由数据库环境验证，不能据此声称跨实例语义。 */
-  private static PlatformTransactionManager transactions() {
-    PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
-    when(transactions.getTransaction(any()))
-        .thenAnswer(invocation -> new SimpleTransactionStatus());
-    return transactions;
-  }
-
-  /** 此替身仅验证业务事务与失败历史隔离；共享领取、故障和旧租约拒绝由真实双实例专项验证。 */
-  private static com.mayday.operations.cluster.DurableTasks durable(
-      PlatformTransactionManager manager) {
-    var tasks = mock(com.mayday.operations.cluster.DurableTasks.class);
-    var payload = new java.util.concurrent.atomic.AtomicReference<String>();
-    when(tasks.enqueue(anyString(), anyString(), anyString(), anyInt()))
-        .thenAnswer(
-            call -> {
-              payload.set(call.getArgument(2));
-              return 1L;
-            });
-    when(tasks.claim(anyString(), anyString()))
-        .thenAnswer(
-            call ->
-                new com.mayday.operations.cluster.DurableTasks.Lease(
-                    1L, call.getArgument(0), call.getArgument(1), payload.get(), "test-lease", 1));
-    var transaction = new TransactionTemplate(manager);
-    transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-    when(tasks.inspect(anyString(), anyString(), any()))
-        .thenAnswer(
-            call ->
-                transaction.execute(
-                    status -> ((java.util.function.Supplier<?>) call.getArgument(2)).get()));
-    when(tasks.fenced(any(), any()))
-        .thenAnswer(
-            call ->
-                transaction.execute(
-                    status -> ((java.util.function.Supplier<?>) call.getArgument(1)).get()));
-    when(tasks.finish(any(), any()))
-        .thenAnswer(
-            call ->
-                transaction.execute(
-                    status -> ((java.util.function.Supplier<?>) call.getArgument(1)).get()));
-    org.mockito.Mockito.doAnswer(
-            call -> {
-              transaction.executeWithoutResult(
-                  status ->
-                      ((java.util.function.Consumer<String>) call.getArgument(3)).accept("FAILED"));
-              return null;
-            })
-        .when(tasks)
-        .failed(any(), anyString(), anyBoolean(), any());
-    return tasks;
   }
 }

@@ -1,8 +1,8 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.PageResult;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.UserService;
 import com.mayday.system.mapper.DictionaryItemMapper;
@@ -43,18 +43,6 @@ public class DictionaryController {
   private final DictionaryItemMapper items;
   private final AccessPolicy access;
 
-  /** 字典选项可编辑字段；颜色只允许主题支持的标识，更新必须携带原 version。 */
-  @Schema(name = "DictionaryItemEdit")
-  public record Edit(
-      @NotBlank @Size(max = 100) String label,
-      @NotBlank @Size(max = 100) String value,
-      @Pattern(
-              regexp = "default|success|warning|error|processing|blue|purple|cyan|green|orange|red")
-          String color,
-      @Min(0) @Max(9999) int sortOrder,
-      boolean enabled,
-      Long version) {}
-
   private SystemEntry type(Long id) {
     return entries
         .findById(id)
@@ -80,11 +68,13 @@ public class DictionaryController {
     access.require("dictionaries:view");
     type(typeId);
     var filter = QueryWrapper.create().where(new QueryColumn("dictionary_id").eq(typeId));
-    com.mayday.common.SearchPredicates.anyOf(
+    com.mayday.common.persistence.SearchPredicates.anyOf(
         filter,
-        com.mayday.common.SearchPredicates.contains("label", keyword),
-        com.mayday.common.SearchPredicates.contains("value", keyword));
-    if (enabled != null) filter.and(new QueryColumn("enabled").eq(enabled));
+        com.mayday.common.persistence.SearchPredicates.contains("label", keyword),
+        com.mayday.common.persistence.SearchPredicates.contains("value", keyword));
+    if (enabled != null) {
+      filter.and(new QueryColumn("enabled").eq(enabled));
+    }
     return ApiResponse.ok(
         PageResult.from(
             items.paginate(
@@ -111,11 +101,14 @@ public class DictionaryController {
   private DictionaryItem save(Long typeId, Long id, Edit request) {
     var dictionary = type(typeId);
     var item = id == null ? new DictionaryItem() : find(typeId, id);
-    if (id != null) UserService.version(item, request.version());
+    if (id != null) {
+      UserService.version(item, request.version());
+    }
     // 内置业务字典的值是契约，标签可以改，但不能将 true 改成任意字符串后破坏账号状态含义。
     if ("user.status".equals(dictionary.getCode())
-        && !Set.of("true", "false").contains(request.value()))
+        && !Set.of("true", "false").contains(request.value())) {
       throw new BusinessException("账号状态字典值仅支持 true 或 false");
+    }
     item.setDictionaryId(typeId);
     item.setLabel(request.label().trim());
     item.setValue(request.value().trim());
@@ -131,7 +124,9 @@ public class DictionaryController {
   public ApiResponse<?> delete(@PathVariable Long typeId, @PathVariable Long id) {
     access.require("dictionaries:delete");
     var dictionary = type(typeId);
-    if ("user.status".equals(dictionary.getCode())) throw new BusinessException("内置账号状态项可停用，不能删除");
+    if ("user.status".equals(dictionary.getCode())) {
+      throw new BusinessException("内置账号状态项可停用，不能删除");
+    }
     items.delete(find(typeId, id));
     return ApiResponse.ok(null);
   }
@@ -162,4 +157,16 @@ public class DictionaryController {
                         .toList())
             .orElse(List.of()));
   }
+
+  /** 字典选项可编辑字段；颜色只允许主题支持的标识，更新必须携带原 version。 */
+  @Schema(name = "DictionaryItemEdit")
+  public record Edit(
+      @NotBlank @Size(max = 100) String label,
+      @NotBlank @Size(max = 100) String value,
+      @Pattern(
+              regexp = "default|success|warning|error|processing|blue|purple|cyan|green|orange|red")
+          String color,
+      @Min(0) @Max(9999) int sortOrder,
+      boolean enabled,
+      Long version) {}
 }

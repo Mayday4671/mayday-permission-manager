@@ -1,6 +1,6 @@
 package com.mayday.crawler;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.URI;
@@ -57,14 +57,23 @@ public class SafeWebFetcher implements WebFetcher {
       lookup = DNS.submit(() -> InetAddress.getAllByName(host));
       addresses = lookup.get(8, TimeUnit.SECONDS);
     } catch (Exception e) {
-      if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
       throw new UnknownHostException("域名解析失败或超时");
     } finally {
-      if (lookup != null && !lookup.isDone()) lookup.cancel(true);
+      if (lookup != null && !lookup.isDone()) {
+        lookup.cancel(true);
+      }
     }
-    if (addresses.length == 0) throw new UnknownHostException("域名没有可用地址");
-    for (InetAddress address : addresses)
-      if (!WebAddress.publicIp(address)) throw new UnknownHostException("禁止访问非公网地址");
+    if (addresses.length == 0) {
+      throw new UnknownHostException("域名没有可用地址");
+    }
+    for (InetAddress address : addresses) {
+      if (!WebAddress.publicIp(address)) {
+        throw new UnknownHostException("禁止访问非公网地址");
+      }
+    }
     return addresses;
   }
 
@@ -114,7 +123,9 @@ public class SafeWebFetcher implements WebFetcher {
             "Accept",
             image ? "image/png,image/jpeg,image/webp,image/gif" : "text/html,application/json");
         long remaining = deadline - System.nanoTime();
-        if (remaining <= 0) throw new BusinessException("请求超时");
+        if (remaining <= 0) {
+          throw new BusinessException("请求超时");
+        }
         var cancel = DEADLINES.schedule(request::cancel, remaining, TimeUnit.NANOSECONDS);
         URI requested = url;
         try {
@@ -125,22 +136,32 @@ public class SafeWebFetcher implements WebFetcher {
                     int status = response.getCode();
                     if (status >= 300 && status < 400) {
                       var location = response.getFirstHeader("Location");
-                      if (location == null) throw new BusinessException("重定向缺少目标地址");
+                      if (location == null) {
+                        throw new BusinessException("重定向缺少目标地址");
+                      }
                       return new FetchResult(
                           WebAddress.allowed(
                               WebAddress.resolve(requested, location.getValue()), rules, image),
                           null);
                     }
-                    if (status != 200) throw new BusinessException("网站返回 HTTP " + status);
+                    if (status != 200) {
+                      throw new BusinessException("网站返回 HTTP " + status);
+                    }
                     var entity = response.getEntity();
-                    if (entity == null) throw new BusinessException("网站没有返回内容");
+                    if (entity == null) {
+                      throw new BusinessException("网站没有返回内容");
+                    }
                     int max = image ? 8 * 1024 * 1024 : 2 * 1024 * 1024;
-                    if (entity.getContentLength() > max) throw new BusinessException("响应超过大小限制");
+                    if (entity.getContentLength() > max) {
+                      throw new BusinessException("响应超过大小限制");
+                    }
                     byte[] bytes;
                     try (InputStream in = entity.getContent()) {
                       bytes = in.readNBytes(max + 1);
                     }
-                    if (bytes.length > max) throw new BusinessException("响应超过大小限制");
+                    if (bytes.length > max) {
+                      throw new BusinessException("响应超过大小限制");
+                    }
                     return new FetchResult(
                         null,
                         new Response(
@@ -148,7 +169,9 @@ public class SafeWebFetcher implements WebFetcher {
                             entity.getContentType() == null ? "" : entity.getContentType(),
                             bytes));
                   });
-          if (result.response != null) return result.response;
+          if (result.response != null) {
+            return result.response;
+          }
           url = result.redirect;
         } finally {
           cancel.cancel(false);

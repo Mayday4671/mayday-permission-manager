@@ -1,8 +1,8 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.content.mapper.ContentPublicationMapper;
 import com.mayday.content.mapper.NoticeMapper;
 import com.mayday.security.AccessPolicy;
@@ -63,15 +63,20 @@ public class NoticeController {
         visibleOnly
             ? com.mayday.content.mapper.NoticeMapper.liveTitleContains(keyword)
             : SearchPredicates.contains("title", keyword));
-    if (published != null)
+    if (published != null) {
       filter.and(new com.mybatisflex.core.query.QueryColumn("published").eq(published));
-    if (status != null && !status.isBlank())
+    }
+    if (status != null && !status.isBlank()) {
       filter.and(new com.mybatisflex.core.query.QueryColumn("draft_status").eq(status));
-    if (visibleOnly) filter.and(ContentService.publiclyVisible());
-    if (categoryId != null || portalChannelId != null || portalTemplate != null)
+    }
+    if (visibleOnly) {
+      filter.and(ContentService.publiclyVisible());
+    }
+    if (categoryId != null || portalChannelId != null || portalTemplate != null) {
       filter.and(
           com.mayday.content.mapper.NoticeMapper.revisionPointerFilter(
               visibleOnly, categoryId, portalChannelId, portalTemplate));
+    }
     return ApiResponse.ok(
         PageResult.from(
             notices

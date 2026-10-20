@@ -1,9 +1,9 @@
 package com.mayday.web;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.BusinessException;
-import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.persistence.SearchPredicates;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.NavigationCatalog;
 import com.mayday.system.mapper.EntryMapper;
@@ -33,7 +33,7 @@ public class LookupController {
   private final RoleMapper roles;
   private final UserMapper users;
   private final AccessPolicy access;
-  private final com.mayday.common.ModuleSwitches modules;
+  private final com.mayday.common.util.ModuleSwitches modules;
 
   /** 选择器遵守同一用户数据范围，永不因下拉框泄露范围外账号或联系方式。 */
   @GetMapping("/options/{kind}")
@@ -60,12 +60,16 @@ public class LookupController {
                           "label",
                           user.getNickname() + " · " + user.getUsername()))));
     }
-    if (!Set.of("categories", "tags", "approvalcategories").contains(kind))
+    if (!Set.of("categories", "tags", "approvalcategories").contains(kind)) {
       throw new BusinessException("未知选项类型");
+    }
     if ("approvalcategories".equals(kind)) {
-      if (!access.has("workflows:view") && !access.has("requests:create"))
+      if (!access.has("workflows:view") && !access.has("requests:create")) {
         access.require("approvalcategories:view");
-    } else if (!access.has("notices:view")) access.require(kind + ":view");
+      }
+    } else if (!access.has("notices:view")) {
+      access.require(kind + ":view");
+    }
     var found =
         entries.paginate(
             PageResult.request(page, size),
@@ -101,7 +105,7 @@ public class LookupController {
     if (access.has("users:view")
         || access.has("departments:view")
         || access.has("requests:create")
-        || access.has("workflows:view"))
+        || access.has("workflows:view")) {
       departments =
           entries.findByKindOrderBySortOrderAscIdAsc("departments").stream()
               .map(
@@ -114,7 +118,8 @@ public class LookupController {
                     return option;
                   })
               .toList();
-    if (access.has("users:assign") || access.has("roles:view"))
+    }
+    if (access.has("users:assign") || access.has("roles:view")) {
       roleOptions =
           roles.findAll().stream()
               .filter(SysRole::isEnabled)
@@ -131,6 +136,7 @@ public class LookupController {
                   role ->
                       Map.of("id", role.getId(), "name", role.getName(), "code", role.getCode()))
               .toList();
+    }
     var posts =
         access.has("users:view") || access.has("posts:view")
             ? entries.findByKindOrderBySortOrderAscIdAsc("posts").stream()

@@ -22,7 +22,9 @@ public class IdentitySecrets {
   /** 加密密钥必须是 Base64 编码的 32 字节独立随机值；错误仅指出配置名称，不输出内容。 */
   public static void validateKey(String value) {
     try {
-      if (Base64.getDecoder().decode(value).length != 32) throw new IllegalArgumentException();
+      if (Base64.getDecoder().decode(value).length != 32) {
+        throw new IllegalArgumentException();
+      }
     } catch (IllegalArgumentException invalid) {
       throw new IllegalStateException("MAYDAY_IDENTITY_ENCRYPTION_KEY 必须配置 32 字节随机密钥的 Base64 编码");
     }
@@ -47,9 +49,13 @@ public class IdentitySecrets {
   public String decrypt(String value, String purpose) {
     try {
       String[] parts = value.split("\\.", -1);
-      if (parts.length != 2) throw new IllegalArgumentException();
+      if (parts.length != 2) {
+        throw new IllegalArgumentException();
+      }
       byte[] iv = Base64.getDecoder().decode(parts[0]);
-      if (iv.length != 12) throw new IllegalArgumentException();
+      if (iv.length != 12) {
+        throw new IllegalArgumentException();
+      }
       return new String(
           cipher(Cipher.DECRYPT_MODE, iv, purpose).doFinal(Base64.getDecoder().decode(parts[1])),
           StandardCharsets.UTF_8);

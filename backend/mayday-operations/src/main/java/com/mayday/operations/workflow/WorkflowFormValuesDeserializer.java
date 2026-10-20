@@ -1,6 +1,6 @@
 package com.mayday.operations.workflow;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -20,21 +20,28 @@ public final class WorkflowFormValuesDeserializer extends ValueDeserializer<Map<
   /** 明细表也经相同的无类型 Map/List 解析路径，所有嵌套小数均保留原始有效位和 scale。 */
   @Override
   public Map<String, Object> deserialize(JsonParser parser, DeserializationContext context) {
-    if (parser.currentToken() != JsonToken.START_OBJECT) throw new BusinessException("审批表单值必须为对象");
+    if (parser.currentToken() != JsonToken.START_OBJECT) {
+      throw new BusinessException("审批表单值必须为对象");
+    }
     return object(parser, 0, new int[] {0});
   }
 
   /** 使用 Spring 已创建的 parser，保留其字符串/数字长度等读取约束；额外限制表单嵌套与元素总数。 */
   private Object value(JsonParser parser, int depth, int[] count) {
-    if (depth > MAX_DEPTH || ++count[0] > MAX_VALUES) throw new BusinessException("审批表单结构超过允许范围");
+    if (depth > MAX_DEPTH || ++count[0] > MAX_VALUES) {
+      throw new BusinessException("审批表单结构超过允许范围");
+    }
     var token = parser.currentToken();
-    if (token == null) throw new BusinessException("审批表单值不完整");
+    if (token == null) {
+      throw new BusinessException("审批表单值不完整");
+    }
     return switch (token) {
       case START_OBJECT -> object(parser, depth, count);
       case START_ARRAY -> {
         var items = new ArrayList<Object>();
-        while (parser.nextToken() != JsonToken.END_ARRAY)
+        while (parser.nextToken() != JsonToken.END_ARRAY) {
           items.add(value(parser, depth + 1, count));
+        }
         yield items;
       }
       case VALUE_NUMBER_FLOAT -> parser.getDecimalValue();
@@ -50,8 +57,9 @@ public final class WorkflowFormValuesDeserializer extends ValueDeserializer<Map<
   private Map<String, Object> object(JsonParser parser, int depth, int[] count) {
     Map<String, Object> result = new LinkedHashMap<>();
     while (parser.nextToken() != JsonToken.END_OBJECT) {
-      if (parser.currentToken() != JsonToken.PROPERTY_NAME)
+      if (parser.currentToken() != JsonToken.PROPERTY_NAME) {
         throw new BusinessException("审批表单值格式无效");
+      }
       String key = parser.currentName();
       parser.nextToken();
       result.put(key, value(parser, depth + 1, count));

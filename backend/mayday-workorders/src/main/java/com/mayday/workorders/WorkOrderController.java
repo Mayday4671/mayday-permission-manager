@@ -1,7 +1,7 @@
 package com.mayday.workorders;
 
-import com.mayday.common.ApiResponse;
-import com.mayday.common.PageResult;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.web.ApiResponse;
 import com.mayday.workorders.WorkOrderContracts.WorkOrderRequest;
 import com.mayday.workorders.WorkOrderContracts.WorkOrderView;
 import jakarta.validation.Valid;

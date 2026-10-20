@@ -1,6 +1,6 @@
 package com.mayday.operations.web;
 
-import com.mayday.common.BusinessException;
+import com.mayday.common.exception.BusinessException;
 import com.mayday.operations.NotificationService;
 import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.storage.StoredFileContent;
@@ -29,8 +29,9 @@ public class NotificationAttachmentController {
   public ResponseEntity<Resource> received(
       @PathVariable Long messageId, @PathVariable Long fileId) {
     var notification = service.ownNotification(messageId);
-    if (!notification.getAttachmentIds().contains(fileId))
+    if (!notification.getAttachmentIds().contains(fileId)) {
       throw new AccessDeniedException("文件不属于此通知");
+    }
     return download(fileId);
   }
 
@@ -39,8 +40,9 @@ public class NotificationAttachmentController {
   public ResponseEntity<Resource> managed(
       @PathVariable Long notificationId, @PathVariable Long fileId) {
     var notification = service.getManaged(notificationId);
-    if (!notification.getAttachmentIds().contains(fileId))
+    if (!notification.getAttachmentIds().contains(fileId)) {
       throw new AccessDeniedException("文件不属于此通知");
+    }
     return download(fileId);
   }
 

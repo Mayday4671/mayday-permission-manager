@@ -59,7 +59,7 @@ mayday:
     encryption-key: ${MAYDAY_IDENTITY_ENCRYPTION_KEY:}
     issuer-label: ${MAYDAY_IDENTITY_LABEL:Mayday}
     # providers 支持 Spring indexed 配置；可在部署配置文件或环境变量注册多个固定提供方。
-    providers: []
+    providers: [ ]
   deployment:
     production: ${MAYDAY_PRODUCTION:false}
     public-origin: ${MAYDAY_PUBLIC_ORIGIN:}

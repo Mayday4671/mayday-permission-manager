@@ -1,4 +1,4 @@
-package com.mayday.common;
+package com.mayday.common.web;
 
 /** 统一响应信封；业务失败同时使用正确的 HTTP 状态码，便于前端区分未登录、无权限与校验错误。 */
 public record ApiResponse<T>(boolean success, T data, String message) {

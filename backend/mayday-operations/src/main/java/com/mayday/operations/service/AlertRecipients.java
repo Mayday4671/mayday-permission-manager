@@ -1,6 +1,6 @@
 package com.mayday.operations.service;
 
-import com.mayday.common.SearchPredicates;
+import com.mayday.common.persistence.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.system.mapper.UserMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -15,12 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class AlertRecipients {
   private final UserMapper users;
   private final AccessPolicy access;
-
-  /** 告警候选的最小信息：ID与显示名；不借任务或监控配置页面提供全站敏感用户资料。 */
-  @Schema(
-      name = "AlertRecipientOption",
-      requiredProperties = {"value", "label"})
-  public record Option(Long value, String label) {}
 
   /** 调用控制器先检查对应操作权限，候选再次验证有效账号与实际业务查看权，查询最多100条。 */
   @Transactional(readOnly = true)
@@ -39,4 +33,10 @@ public class AlertRecipients {
         .map(user -> new Option(user.getId(), user.getNickname()))
         .toList();
   }
+
+  /** 告警候选的最小信息：ID与显示名；不借任务或监控配置页面提供全站敏感用户资料。 */
+  @Schema(
+      name = "AlertRecipientOption",
+      requiredProperties = {"value", "label"})
+  public record Option(Long value, String label) {}
 }

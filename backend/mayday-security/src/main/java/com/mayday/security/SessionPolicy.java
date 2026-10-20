@@ -57,8 +57,9 @@ public class SessionPolicy implements InitializingBean {
         || idleMinutes < 1
         || idleMinutes > absoluteMinutes
         || maxPerUser < 1
-        || maxPerUser > 20)
+        || maxPerUser > 20) {
       throw new IllegalArgumentException("会话配置无效：固定期限5–10080分钟，无请求期限1–固定期限，并发上限1–20");
+    }
   }
 
   /** 认证、签发和列表共用可测试的 UTC 时钟，不依赖部署机器的显示时区。 */
@@ -75,7 +76,9 @@ public class SessionPolicy implements InitializingBean {
 
   /** 统一认证与列表的失效时间；返回三种期限的最早值，null 表示记录无法安全恢复。 */
   public Instant effectiveExpiry(LoginSession session) {
-    if (session.getCreatedAt() == null || session.getExpiresAt() == null) return null;
+    if (session.getCreatedAt() == null || session.getExpiresAt() == null) {
+      return null;
+    }
     Instant activity =
         session.getLastActiveAt() == null ? session.getCreatedAt() : session.getLastActiveAt();
     Instant absolute = session.getCreatedAt().plusSeconds(absoluteMinutes * 60L);

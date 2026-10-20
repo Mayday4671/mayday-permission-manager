@@ -1,5 +1,6 @@
-package com.mayday.common;
+package com.mayday.common.util;
 
+import com.mayday.common.exception.BusinessException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.safety.Safelist;
@@ -9,8 +10,6 @@ import org.jsoup.safety.Safelist;
  * 暗中公开。前端清理只作纵深防护。
  */
 public final class RichText {
-  private RichText() {}
-
   private static final Safelist ALLOWED =
       new Safelist()
           .addTags(
@@ -29,18 +28,28 @@ public final class RichText {
               "li",
               "blockquote");
 
+  private RichText() {}
+
   /** 持久化前以服务端白名单清理正文，并同时限制原文及清理后长度；空正文和超长正文按业务错误拒绝。 */
   public static String clean(String input, int limit) {
-    if (input == null || input.length() > limit) throw new BusinessException("正文超出允许长度");
+    if (input == null || input.length() > limit) {
+      throw new BusinessException("正文超出允许长度");
+    }
     String html = Jsoup.clean(input, "", ALLOWED, new Document.OutputSettings().prettyPrint(false));
-    if (Jsoup.parse(html).text().isBlank()) throw new BusinessException("请输入有效正文");
-    if (html.length() > limit) throw new BusinessException("正文超出允许长度");
+    if (Jsoup.parse(html).text().isBlank()) {
+      throw new BusinessException("请输入有效正文");
+    }
+    if (html.length() > limit) {
+      throw new BusinessException("正文超出允许长度");
+    }
     return html;
   }
 
   /** 旧纯文本接口和初始化数据必须先转义，不能把原正文中的尖括号解释为 HTML。 */
   public static String plain(String input, int limit) {
-    if (input == null) throw new BusinessException("请输入有效正文");
+    if (input == null) {
+      throw new BusinessException("请输入有效正文");
+    }
     return clean(
         "<p>"
             + input

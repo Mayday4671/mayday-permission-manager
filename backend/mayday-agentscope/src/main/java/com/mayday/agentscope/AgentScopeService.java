@@ -2,9 +2,9 @@ package com.mayday.agentscope;
 
 import com.mayday.agentscope.mapper.AgentScopeConversationMapper;
 import com.mayday.agentscope.mapper.AgentScopeMessageMapper;
-import com.mayday.common.ModuleSwitches;
-import com.mayday.common.PageResult;
-import com.mayday.common.ServiceUnavailableException;
+import com.mayday.common.exception.ServiceUnavailableException;
+import com.mayday.common.persistence.PageResult;
+import com.mayday.common.util.ModuleSwitches;
 import com.mayday.security.AccessPolicy;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -85,16 +85,21 @@ public class AgentScopeService {
     access.require("agentscope:view");
     access.require("agentscope:chat");
     AgentScopeOptions options = configuration.current();
-    if (request.content().length() > options.maxMessageLength())
-      throw new com.mayday.common.BusinessException(
+    if (request.content().length() > options.maxMessageLength()) {
+      throw new com.mayday.common.exception.BusinessException(
           "消息不能超过 " + options.maxMessageLength() + " 个字符");
-    if (!options.modelReady()) throw new ServiceUnavailableException("智能体尚未配置模型服务，请联系系统管理员");
+    }
+    if (!options.modelReady()) {
+      throw new ServiceUnavailableException("智能体尚未配置模型服务，请联系系统管理员");
+    }
 
     Long ownerId = access.current().getId();
     String requestId = UUID.fromString(request.requestId()).toString();
     AgentScopeConversationCoordinator.TurnStart start =
         coordinator.beginTurn(ownerId, conversationId, requestId, request.content());
-    if (start.completed() != null) return start.completed();
+    if (start.completed() != null) {
+      return start.completed();
+    }
 
     try {
       String answer =
