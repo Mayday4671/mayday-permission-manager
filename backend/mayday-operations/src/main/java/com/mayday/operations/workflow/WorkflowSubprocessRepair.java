@@ -1,14 +1,14 @@
 package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessException;
+import com.mayday.operations.mapper.FlowVersionMapper;
 import com.mayday.operations.model.FlowRequest;
-import com.mayday.operations.repository.FlowVersionRepository;
 import com.mayday.operations.workflow.WorkflowSchema.Node;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import com.mayday.security.AccessPolicy;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.UserRepository;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -30,9 +30,9 @@ public class WorkflowSubprocessRepair {
   public static final String AUDIT_KEY = "__subprocessRepair";
   private final WorkflowJson json;
   private final WorkflowDefinitions definitions;
-  private final FlowVersionRepository versions;
-  private final UserRepository users;
-  private final EntryRepository entries;
+  private final FlowVersionMapper versions;
+  private final UserMapper users;
+  private final EntryMapper entries;
   private final AccessPolicy access;
 
   /** 版本和调用游标均来自打开弹窗时的服务端快照；客户端不能提交新子流程版本。 */
@@ -95,16 +95,7 @@ public class WorkflowSubprocessRepair {
                       : List.of(department.getLeaderId()))
           .orElse(List.of());
     }
-    return users
-        .findAll(
-            (root, query, criteria) -> {
-              query.distinct(true);
-              return root.join("roles").get("id").in(node.assigneeIds());
-            })
-        .stream()
-        .map(SysUser::getId)
-        .sorted()
-        .toList();
+    return users.membersOfRoles(node.assigneeIds()).stream().map(SysUser::getId).sorted().toList();
   }
 
   private List<Map<String, Object>> scopedPeople(List<Long> ids, boolean originalSource) {

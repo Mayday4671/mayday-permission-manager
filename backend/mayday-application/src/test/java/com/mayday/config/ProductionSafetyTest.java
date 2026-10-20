@@ -9,8 +9,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.UserRepository;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -22,7 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 /** 生产门禁覆盖独立凭据、来源格式、禁止演示/root、既有默认密码；本地模式保留开发体验。 */
 class ProductionSafetyTest {
-  private final UserRepository users = mock(UserRepository.class);
+  private final UserMapper users = mock(UserMapper.class);
   private final PasswordEncoder encoder = mock(PasswordEncoder.class);
 
   private MockEnvironment environment() {

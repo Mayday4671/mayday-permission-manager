@@ -3,12 +3,12 @@ package com.mayday.operations;
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.RichText;
+import com.mayday.operations.mapper.DeliveryMapper;
+import com.mayday.operations.mapper.NotificationMapper;
 import com.mayday.operations.model.Delivery;
 import com.mayday.operations.model.Notification;
 import com.mayday.operations.realtime.RealtimeEvents;
-import com.mayday.operations.repository.DeliveryRepository;
-import com.mayday.operations.repository.NotificationRepository;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,9 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class MessagePublisher {
-  private final UserRepository users;
-  private final NotificationRepository notifications;
-  private final DeliveryRepository deliveries;
+  private final UserMapper users;
+  private final NotificationMapper notifications;
+  private final DeliveryMapper deliveries;
   private final RealtimeEvents realtime;
 
   /** eventKey 必须稳定且对每个接收者唯一。重复发布原样返回，不能借重试修改已发布正文。 与调用方业务同事务提交；失败整批回滚，提交成功才推送刷新事件。 */
@@ -65,9 +65,9 @@ public class MessagePublisher {
     notification.setTargetType(targetType);
     notification.setTargetId(targetId);
     notification.setEventKey(eventKey);
-    notifications.saveAndFlush(notification);
+    notifications.save(notification);
     Delivery delivery = new Delivery();
-    delivery.setNotification(notification);
+    delivery.setNotificationId(notification.getId());
     delivery.setRecipientId(recipientId);
     delivery.setRecipientName(user.getNickname());
     deliveries.save(delivery);

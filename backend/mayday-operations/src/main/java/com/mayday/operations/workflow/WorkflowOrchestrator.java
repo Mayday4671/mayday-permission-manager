@@ -2,15 +2,15 @@ package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
+import com.mayday.operations.mapper.FlowRequestMapper;
+import com.mayday.operations.mapper.FlowTaskMapper;
 import com.mayday.operations.model.FlowRequest;
 import com.mayday.operations.model.FlowTask;
-import com.mayday.operations.repository.FlowRequestRepository;
-import com.mayday.operations.repository.FlowTaskRepository;
 import com.mayday.operations.workflow.WorkflowExecutionState.Token;
 import com.mayday.operations.workflow.WorkflowSchema.Node;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -30,11 +30,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class WorkflowOrchestrator {
   private final WorkflowSubprocessRepair subprocessRepair;
-  private final FlowRequestRepository requests;
-  private final FlowTaskRepository tasks;
+  private final FlowRequestMapper requests;
+  private final FlowTaskMapper tasks;
   private final WorkflowDefinitions definitions;
   private final WorkflowJson json;
-  private final UserRepository users;
+  private final UserMapper users;
   private final AccessPolicy access;
   private final WorkflowEvents events;
 
@@ -355,7 +355,7 @@ public class WorkflowOrchestrator {
           node.timeoutMinutes() == null
               ? null
               : BusinessTime.now().plusMinutes(node.timeoutMinutes()));
-      tasks.saveAndFlush(task);
+      tasks.save(task);
       if (!"WAITING".equals(task.getStatus())) host.activate(request, task);
     }
     if ("COPY".equals(node.type())) token.setNodeId(node.next());
@@ -448,7 +448,7 @@ public class WorkflowOrchestrator {
     child.setSubmittedFormData(child.getFormData());
     child.setSubmittedAt(BusinessTime.now());
     child.setAttachmentIds(attachments);
-    requests.saveAndFlush(child);
+    requests.save(child);
     token.setChildRequestId(child.getId());
     token.setStatus("WAIT_CHILD");
     parent.setExecutionState(json.write(state));

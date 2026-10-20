@@ -1,8 +1,8 @@
 package com.mayday.service;
 
 import com.mayday.common.BusinessException;
+import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -20,7 +20,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 @RequiredArgsConstructor
 public class SettingService {
-  private final EntryRepository entries;
+  private final EntryMapper entries;
   private final JsonMapper json;
   private final PortalThemePolicy portalTheme;
 

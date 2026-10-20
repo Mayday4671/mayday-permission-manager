@@ -4,17 +4,20 @@ import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.RichText;
 import com.mayday.content.ContentPublication;
-import com.mayday.content.ContentPublicationRepository;
 import com.mayday.content.ContentRevision;
-import com.mayday.content.ContentRevisionRepository;
 import com.mayday.content.Notice;
-import com.mayday.content.NoticeRepository;
+import com.mayday.content.mapper.ContentPublicationMapper;
+import com.mayday.content.mapper.ContentRevisionMapper;
+import com.mayday.content.mapper.NoticeMapper;
 import com.mayday.security.AccessPolicy;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.UserRepository;
 import com.mayday.web.ContentContracts.Draft;
 import com.mayday.web.ContentContracts.Publish;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryCondition;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -23,7 +26,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,17 +37,17 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ContentService {
-  private final NoticeRepository notices;
-  private final ContentRevisionRepository revisions;
-  private final ContentPublicationRepository publications;
-  private final EntryRepository entries;
-  private final UserRepository users;
+  private final NoticeMapper notices;
+  private final ContentRevisionMapper revisions;
+  private final ContentPublicationMapper publications;
+  private final EntryMapper entries;
+  private final UserMapper users;
   private final AccessPolicy access;
   private final ContentAssets assets;
   private final SettingService settings;
   private final ChangeAuditService changeAudit;
   private final PortalStructureService portal;
-  private final com.mayday.operations.repository.FlowRequestRepository approvalRequests;
+  private final com.mayday.operations.mapper.FlowRequestMapper approvalRequests;
 
   /** 先验证内容查看权限与作者/部门范围，再选择普通读取或主记录行锁；所有管理用例复用此边界，行锁要求调用者处于事务。 */
   public Notice managed(Long id, boolean lock) {
@@ -140,9 +142,10 @@ public class ContentService {
     v.put(
         "publiclyVisible",
         online(n)
-            && notices.exists(
-                publiclyVisible()
-                    .and((root, query, criteria) -> criteria.equal(root.get("id"), n.getId()))));
+            && notices.selectCountByQuery(
+                    QueryWrapper.create()
+                        .where(publiclyVisible().and(new QueryColumn("id").eq(n.getId()))))
+                > 0);
     v.put("publishedAt", n.getPublishedAt());
     v.put("liveOfflineAt", n.getLiveOfflineAt());
     v.put("deletedAt", n.getDeletedAt());
@@ -184,19 +187,9 @@ public class ContentService {
         && (n.getLiveOfflineAt() == null || n.getLiveOfflineAt().isAfter(BusinessTime.now()));
   }
 
-  /** 在数据库查询层只选择有效上线且PUBLIC的修订，避免先分页再过滤导致数量泄露或公开草稿正文。 */
-  public static Specification<Notice> publiclyVisible() {
-    return (r, q, c) ->
-        c.and(
-            c.isNull(r.get("deletedAt")),
-            c.isTrue(r.get("published")),
-            c.isNotNull(r.get("liveRevisionId")),
-            c.equal(r.get("liveRevision").get("visibility"), "PUBLIC"),
-            c.isTrue(r.get("liveRevision").get("categoryEntry").get("enabled")),
-            c.isTrue(r.get("liveRevision").get("portalChannel").get("enabled")),
-            c.or(
-                c.isNull(r.get("liveOfflineAt")),
-                c.greaterThan(r.get("liveOfflineAt"), BusinessTime.now())));
+  /** 在数据库查询层只选择有效上线且PUBLIC的修订；条件由内容仓储统一定义。 */
+  public static QueryCondition publiclyVisible() {
+    return com.mayday.content.mapper.NoticeMapper.publiclyVisible();
   }
 
   /** 按动作权限保存新不可变修订，校验版本、分类、标签和附件归属并清理富文本；兼容旧published字段也必须独立发布授权。 */
@@ -241,7 +234,7 @@ public class ContentService {
         n.getDraftRevisionId() == null
             ? 1
             : revision(n.getDraftRevisionId(), n.getId()).getRevisionNumber() + 1;
-    notices.saveAndFlush(n);
+    notices.save(n);
     var r = new ContentRevision();
     r.setNoticeId(n.getId());
     r.setRevisionNumber(number);
@@ -262,7 +255,8 @@ public class ContentService {
     r.setSeoDescription(req.seoDescription());
     r.setEditorId(access.current().getId());
     r.setEditorName(access.current().getNickname());
-    revisions.saveAndFlush(r);
+    revisions.save(r);
+    revisions.syncCollections(r);
     n.setDraftRevisionId(r.getId());
     n.setDraftStatus("DRAFT");
     clearSchedule(n);
@@ -271,7 +265,8 @@ public class ContentService {
       checkApproval(n, r);
       goLive(n, r, null, access.current().getNickname(), "直接发布");
     } else if (Boolean.FALSE.equals(req.published()) && n.isPublished()) takeOffline(n, "旧接口下线");
-    notices.flush();
+    notices.save(n);
+    notices.syncTags(n);
     return view(n);
   }
 
@@ -307,7 +302,7 @@ public class ContentService {
       n.setScheduledActorId(access.current().getId());
       n.setDraftStatus("SCHEDULED");
     } else goLive(n, r, req.offlineAt(), access.current().getNickname(), "直接发布");
-    notices.flush();
+    notices.save(n);
     return view(n);
   }
 
@@ -328,10 +323,10 @@ public class ContentService {
             p -> {
               p.setOfflineAt(now);
               p.setReason(reason);
+              publications.save(p);
             });
     n.setPublished(false);
     n.setLiveRevisionId(null);
-    n.setLiveRevision(null);
     n.setLiveOfflineAt(null);
     if ("PUBLISHED".equals(n.getDraftStatus())) n.setDraftStatus("OFFLINE");
     changeAudit.record("内容", n.getId(), reason, before, publicationSnapshot(n));
@@ -343,7 +338,6 @@ public class ContentService {
     portal.contentChannel(r.getCategoryId(), r.getPortalChannelId());
     takeOffline(n, "被新发布替换");
     n.setLiveRevisionId(r.getId());
-    n.setLiveRevision(r);
     n.setPublished(true);
     n.setPublishedAt(BusinessTime.now());
     n.setLiveOfflineAt(offlineAt);
@@ -379,7 +373,7 @@ public class ContentService {
     takeOffline(n, "人工下线");
     clearSchedule(n);
     n.setDraftStatus("OFFLINE");
-    notices.flush();
+    notices.save(n);
     return view(n);
   }
 
@@ -392,6 +386,7 @@ public class ContentService {
     takeOffline(n, "移入回收站");
     clearSchedule(n);
     n.setDeletedAt(BusinessTime.now());
+    notices.save(n);
   }
 
   /** 恢复只进入草稿状态，绝不自动重新上线；要求独立恢复权限及版本检查，防止旧弹窗改变回收站状态。 */
@@ -406,7 +401,7 @@ public class ContentService {
     n.setPublished(false);
     n.setLiveRevisionId(null);
     clearSchedule(n);
-    notices.flush();
+    notices.save(n);
     return view(n);
   }
 
@@ -419,9 +414,7 @@ public class ContentService {
     if (approvalRequests.existsByBusinessTypeAndBusinessId("CONTENT", id))
       throw new BusinessException("内容仍被审批历史引用，保留在回收站以便审计");
     publications.deleteByNoticeId(id);
-    publications.flush();
     revisions.deleteByNoticeId(id);
-    revisions.flush();
     notices.delete(n);
   }
 
@@ -454,5 +447,6 @@ public class ContentService {
       n.setDraftStatus("DRAFT");
       n.setScheduleError(error.getMessage());
     }
+    notices.save(n);
   }
 }

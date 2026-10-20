@@ -10,10 +10,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.mayday.system.mapper.SessionMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.LoginSession;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.SessionRepository;
-import com.mayday.system.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -27,13 +27,14 @@ import org.springframework.security.access.AccessDeniedException;
 class SessionLifecycleTest {
   private static final Instant NOW = Instant.parse("2026-10-04T06:00:00Z");
   private final SessionPolicy policy = new SessionPolicy();
-  private final SessionRepository sessions = mock(SessionRepository.class);
-  private final UserRepository users = mock(UserRepository.class);
+  private final SessionMapper sessions = mock(SessionMapper.class);
+  private final UserMapper users = mock(UserMapper.class);
   private final TokenService tokens =
       new TokenService(sessions, users, policy, Clock.fixed(NOW, ZoneOffset.UTC));
 
   private LoginSession session(int ageMinutes, int idleMinutes) {
     var session = new LoginSession();
+    session.setTokenHash("hash-" + ageMinutes + "-" + idleMinutes);
     session.setCreatedAt(NOW.minusSeconds(ageMinutes * 60L));
     session.setLastActiveAt(NOW.minusSeconds(idleMinutes * 60L));
     session.setExpiresAt(session.getCreatedAt().plusSeconds(720 * 60L));
@@ -100,8 +101,8 @@ class SessionLifecycleTest {
     when(sessions.findByUserIdOrderByCreatedAtAscTokenHashAsc(1L))
         .thenReturn(List.of(expired, older, newer));
     String token = tokens.issue(account, "127.0.0.1", "test-device");
-    verify(sessions).deleteAll(List.of(expired));
-    verify(sessions).deleteAll(List.of(older));
+    verify(sessions).deleteBatchByIds(List.of(expired.getTokenHash()));
+    verify(sessions).deleteBatchByIds(List.of(older.getTokenHash()));
     var saved = ArgumentCaptor.forClass(LoginSession.class);
     verify(sessions).save(saved.capture());
     assertEquals(TokenService.hash(token), saved.getValue().getTokenHash());

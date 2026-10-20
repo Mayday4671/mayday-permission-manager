@@ -1,11 +1,12 @@
 package com.mayday.bulk;
 
+import com.mayday.bulk.mapper.BulkJobMapper;
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.operations.cluster.DurableTasks;
 import com.mayday.security.AccessPolicy;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.UserRepository;
 import jakarta.annotation.PreDestroy;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -40,8 +41,8 @@ import tools.jackson.databind.json.JsonMapper;
 public class BulkService {
   private static final List<String> ACTIVE = List.of("QUEUED", "RUNNING");
   private static final int MAX_EXPORT_ROWS = 100000;
-  private final BulkJobRepository jobs;
-  private final UserRepository users;
+  private final BulkJobMapper jobs;
+  private final UserMapper users;
   private final AccessPolicy access;
   private final BulkIdentity identity;
   private final Map<String, BulkResourceAdapter> adapters;
@@ -72,8 +73,8 @@ public class BulkService {
           new ThreadPoolExecutor.AbortPolicy());
 
   public BulkService(
-      BulkJobRepository jobs,
-      UserRepository users,
+      BulkJobMapper jobs,
+      UserMapper users,
       AccessPolicy access,
       BulkIdentity identity,
       List<BulkResourceAdapter> adapters,
@@ -151,7 +152,7 @@ public class BulkService {
           job.setInputChecksum(identity.encodeInput(bytes));
           job.setProcessedRows(imported);
           job.setTotalRows(imported);
-          jobs.saveAndFlush(job);
+          jobs.save(job);
           return new BulkContracts.ImportResult(job.getId(), imported);
         });
   }
@@ -186,7 +187,7 @@ public class BulkService {
               created.setQueryJson(json.writeValueAsString(filter));
               created.setIdempotencyKey(idempotencyKey);
               created.setResultKey(UUID.randomUUID().toString());
-              return jobs.saveAndFlush(created);
+              return jobs.save(created);
             });
     durable.enqueue(TASK_TYPE, String.valueOf(job.getId()), String.valueOf(job.getId()), 3);
     return view(job.getId());

@@ -1,8 +1,8 @@
 package com.mayday.service;
 
+import com.mayday.system.mapper.ChangeAuditMapper;
 import com.mayday.system.model.ChangeAudit;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.ChangeAuditRepository;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @RequiredArgsConstructor
 public class ChangeAuditService {
-  private final ChangeAuditRepository repository;
+  private final ChangeAuditMapper repository;
   private final ObjectMapper mapper;
 
   /** 单字段可读差异；集合等复杂值由业务转为稳定、已脱敏的文本。 */

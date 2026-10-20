@@ -1,6 +1,8 @@
 package com.mayday.workorders;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -9,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.mayday.security.AccessPolicy;
 import com.mayday.workorders.WorkOrderContracts.WorkOrderRequest;
+import com.mayday.workorders.mapper.WorkOrderMapper;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +24,7 @@ import org.springframework.security.access.AccessDeniedException;
 /** 保护模板的关键安全边界；生成的接口还需在真实 MySQL 中验证行级范围和事务。 */
 @ExtendWith(MockitoExtension.class)
 class WorkOrderServiceTest {
-  @Mock private WorkOrderRepository repository;
+  @Mock private WorkOrderMapper repository;
   @Mock private AccessPolicy access;
   private WorkOrderService service;
 
@@ -33,7 +36,7 @@ class WorkOrderServiceTest {
 
   /** 动作未授权时必须在访问仓储前失败，不能先查询再隐藏结果。 */
   @Test
-  void missingPermissionDoesNotReadRepository() {
+  void missingPermissionDoesNotReadEntityMapper() {
     doThrow(new AccessDeniedException("denied")).when(access).require("workorders:view");
     assertThrows(AccessDeniedException.class, () -> service.get(1L));
     verify(repository, never()).findById(anyLong());
@@ -55,7 +58,8 @@ class WorkOrderServiceTest {
     when(repository.findById(1L)).thenReturn(Optional.of(existing()));
     WorkOrderRequest request = new WorkOrderRequest("测试", "测试", true, 3L);
     assertThrows(OptimisticLockingFailureException.class, () -> service.update(1L, request));
-    verify(repository, never()).flush();
+    // MyBatis-Flex 无持久化上下文；版本前置校验失败时不应产生任何更新调用。
+    verify(repository, never()).update(any(), anyBoolean());
   }
 
   private WorkOrder existing() {

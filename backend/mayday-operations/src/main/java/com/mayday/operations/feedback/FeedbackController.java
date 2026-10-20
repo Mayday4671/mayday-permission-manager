@@ -3,7 +3,7 @@ package com.mayday.operations.feedback;
 import com.mayday.common.ApiResponse;
 import com.mayday.common.PageResult;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class FeedbackController {
   private final FeedbackService service;
   private final AccessPolicy access;
-  private final UserRepository users;
+  private final UserMapper users;
 
   /** 分配候选只包含账号ID和显示名，不暴露联系方式、角色详情或登录凭据。 */
   @Schema(
@@ -63,13 +63,13 @@ public class FeedbackController {
     access.require("feedback:assign");
     return ApiResponse.ok(
         users
-            .findAll(
-                (root, query, criteria) ->
-                    criteria.and(
-                        criteria.isTrue(root.get("enabled")),
-                        com.mayday.common.SearchPredicates.contains(
-                            criteria, root.get("nickname"), keyword)),
-                PageResult.request(1, 100))
+            .paginate(
+                1,
+                100,
+                com.mybatisflex.core.query.QueryWrapper.create()
+                    .where(new com.mybatisflex.core.query.QueryColumn("enabled").eq(true))
+                    .and(com.mayday.common.SearchPredicates.contains("nickname", keyword)))
+            .getRecords()
             .stream()
             .filter(
                 user ->

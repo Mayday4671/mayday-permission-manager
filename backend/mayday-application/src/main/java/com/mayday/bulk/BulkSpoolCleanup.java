@@ -1,5 +1,7 @@
 package com.mayday.bulk;
 
+import com.mayday.bulk.mapper.BulkJobMapper;
+import com.mayday.operations.cluster.mapper.DurableTaskMapper;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
@@ -16,7 +18,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Iterator;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -28,8 +29,9 @@ public class BulkSpoolCleanup {
   private static final Pattern DOWNLOAD =
       Pattern.compile("(" + UUID + ")\\.csv-[0-9]{1,30}\\.download");
   private static final Pattern CACHE = Pattern.compile("(" + UUID + ")\\.(?:csv|part)");
-  private final JdbcTemplate jdbc;
   private final BulkResultStore results;
+  private final BulkJobMapper jobs;
+  private final DurableTaskMapper durableTasks;
   private final Path spool;
   private DirectoryStream<Path> scan;
   private Iterator<Path> cursor;
@@ -38,12 +40,14 @@ public class BulkSpoolCleanup {
 
   /** 配置与生成/下载目录使用同一键，实例应各自配置spool；不会扫描用户上传目录或任意外部路径。 */
   public BulkSpoolCleanup(
-      JdbcTemplate jdbc,
       BulkResultStore results,
+      BulkJobMapper jobs,
+      DurableTaskMapper durableTasks,
       @Value("${mayday.bulk.spool-directory:${java.io.tmpdir}/mayday-bulk/${server.port:8080}}")
           String directory) {
-    this.jdbc = jdbc;
     this.results = results;
+    this.jobs = jobs;
+    this.durableTasks = durableTasks;
     spool = Path.of(directory).toAbsolutePath().normalize();
   }
 
@@ -81,10 +85,7 @@ public class BulkSpoolCleanup {
       closeScan();
       return;
     }
-    long cutoff =
-        jdbc.queryForObject(
-            "select cast(unix_timestamp(current_timestamp(3))*1000 as unsigned)-86400000",
-            Long.class);
+    long cutoff = durableTasks.nowMillis() - 86400000;
     int scanned = 0, deleted = 0;
     try {
       // 保留单个目录迭代游标到下一轮，不把整个目录装入内存；大量活跃文件也不会让尾部旧文件永远饥饿。
@@ -115,15 +116,7 @@ public class BulkSpoolCleanup {
           var cache = CACHE.matcher(name);
           boolean eligible;
           if (part.matches()) {
-            eligible =
-                jdbc.queryForObject(
-                        "select count(*) from sys_durable_task where task_type='BULK_EXPORT' and"
-                            + " lease_token=? and status='RUNNING' and"
-                            + " lease_until>cast(unix_timestamp(current_timestamp(3))*1000 as"
-                            + " unsigned)",
-                        Long.class,
-                        part.group(2))
-                    == 0;
+            eligible = durableTasks.countRunningByLease(part.group(2)) == 0;
           } else if (download.matches()) {
             // 下载缓存没有独立租约；仍存在未过期作业时保留它，防止回收长时间正在重建的下载文件。
             eligible = inactive(download.group(1));
@@ -173,12 +166,7 @@ public class BulkSpoolCleanup {
   }
 
   private boolean inactive(String key) {
-    return jdbc.queryForObject(
-            "select count(*) from sys_bulk_job where result_key=? and"
-                + " expires_at>current_timestamp(6)",
-            Long.class,
-            key)
-        == 0;
+    return jobs.countActiveByKey(key) == 0;
   }
 
   /** 根目录也不得是链接、重解析目录或被替换到另一位置；不存在目录时等待生成器初始化。 */

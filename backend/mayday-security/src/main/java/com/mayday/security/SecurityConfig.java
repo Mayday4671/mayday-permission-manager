@@ -1,9 +1,9 @@
 package com.mayday.security;
 
 import com.mayday.common.ModuleSwitches;
+import com.mayday.system.mapper.AuditLogMapper;
 import com.mayday.system.model.AuditLog;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.AuditRepository;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -34,7 +34,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @RequiredArgsConstructor
 public class SecurityConfig {
   private final TokenService tokens;
-  private final AuditRepository audits;
+  private final AuditLogMapper audits;
   private final ModuleSwitches modules;
 
   /** 密码仅使用成本 12 的 BCrypt；原密码只在登录或设置密码的请求中短暂使用。 */

@@ -4,11 +4,12 @@ import com.mayday.common.ApiResponse;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
 import com.mayday.operations.NotificationService;
-import com.mayday.operations.repository.DeliveryRepository;
-import com.mayday.operations.repository.NotificationRepository;
+import com.mayday.operations.mapper.DeliveryMapper;
+import com.mayday.operations.mapper.NotificationMapper;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
+import com.mybatisflex.core.query.QueryCondition;
+import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.validation.Valid;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -30,9 +31,9 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional(readOnly = true)
 public class MessageController {
   private final NotificationService service;
-  private final NotificationRepository notifications;
-  private final DeliveryRepository deliveries;
-  private final UserRepository users;
+  private final NotificationMapper notifications;
+  private final DeliveryMapper deliveries;
+  private final UserMapper users;
   private final AccessPolicy access;
 
   /** 人员选项同时按 users:view、启用状态与当前用户数据范围查询，不能从全量账号在前端裁剪。 */
@@ -41,8 +42,10 @@ public class MessageController {
     access.require("users:view");
     return ApiResponse.ok(
         users
-            .findAll(
-                access.<SysUser>filter("users", "id").and((r, q, c) -> c.isTrue(r.get("enabled"))))
+            .selectListByQuery(
+                access
+                    .filter("users", "id")
+                    .and(new com.mybatisflex.core.query.QueryColumn("enabled").eq(true)))
             .stream()
             .map(u -> Map.of("id", u.getId(), "name", u.getNickname(), "username", u.getUsername()))
             .toList());
@@ -62,14 +65,14 @@ public class MessageController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     access.require("notifications:view");
-    var spec =
-        service
-            .manageable()
-            .and(NotificationService.state(status))
-            .and((r, q, c) -> SearchPredicates.contains(c, r.get("title"), keyword));
+    QueryWrapper filter = service.manageable();
+    QueryCondition displayState = NotificationService.state(status);
+    if (displayState != null) filter.and(displayState);
+    filter.and(SearchPredicates.contains("title", keyword));
     return ApiResponse.ok(
-        PageResult.from(
-            notifications.findAll(spec, PageResult.request(page, size)).map(service::view)));
+        PageResult.of(
+            notifications.paginate(PageResult.request(page, size), filter.orderBy("id desc")),
+            service::view));
   }
 
   /** 通知详情重新核验发件管理范围，附件元信息不替代附件下载接口的独立鉴权。 */
@@ -88,9 +91,11 @@ public class MessageController {
     return ApiResponse.ok(
         PageResult.from(
             deliveries
-                .findAll(
-                    (r, q, c) -> c.equal(r.get("notification").get("id"), id),
-                    PageResult.request(page, size))
+                .paginate(
+                    PageResult.request(page, size),
+                    com.mybatisflex.core.query.QueryWrapper.create()
+                        .where(new com.mybatisflex.core.query.QueryColumn("notification_id").eq(id))
+                        .orderBy("id desc"))
                 .map(
                     d ->
                         Map.of(
@@ -157,17 +162,18 @@ public class MessageController {
       @RequestParam(defaultValue = "10") int size) {
     access.require("messages:view");
     return ApiResponse.ok(
-        PageResult.from(
-            deliveries
-                .findAll(service.visibleInbox(read, keyword), PageResult.request(page, size))
-                .map(service::inbox)));
+        PageResult.of(
+            deliveries.paginate(
+                PageResult.request(page, size),
+                service.visibleInbox(read, keyword).orderBy("id desc")),
+            service::inbox));
   }
 
   /** 未读计数与收件箱复用同一账号、撤回和过期条件，不能统计不可见通知。 */
   @GetMapping("/messages/unread")
   public ApiResponse<?> unread() {
     access.require("messages:view");
-    return ApiResponse.ok(deliveries.count(service.visibleInbox(false, "")));
+    return ApiResponse.ok(deliveries.selectCountByQuery(service.visibleInbox(false, "")));
   }
 
   /** 消息详情通过投递编号核验当前收件人和有效通知，读取本身不隐式写入已读状态。 */

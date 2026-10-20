@@ -21,7 +21,7 @@
 本地默认 `DB_MIGRATIONS_ENABLED=true`，应用账号同时负责迁移与运行。正式环境可以分两阶段：
 
 1. 停止旧业务写入，完成数据库与文件备份；使用独立迁移账号运行同版本应用的 Flyway 迁移，确认结构与校验和一致。
-2. 结束迁移任务，业务服务改用只具备业务库 `SELECT/INSERT/UPDATE/DELETE` 权限的运行账号，设置 `DB_MIGRATIONS_ENABLED=false`。Hibernate 仍校验结构，不自动创建表。
+2. 结束迁移任务，业务服务改用只具备业务库 `SELECT/INSERT/UPDATE/DELETE` 权限的运行账号，设置 `DB_MIGRATIONS_ENABLED=false`。表结构仅由 Flyway 迁移维护，运行期不做结构校验或建表。
 3. 检查就绪探针与正常业务读写，再切换入口。不能删除 Flyway 历史或关闭结构校验来跳过迁移错误。
 
 真实验证脚本在独立数据库创建迁移账号和仅 DML 运行账号，验证首次初始化、迁移关闭后的重启与读写。已有版本升级还应保留 `flyway_schema_history` 的读取权限；它包含在业务库 SELECT 授权内。

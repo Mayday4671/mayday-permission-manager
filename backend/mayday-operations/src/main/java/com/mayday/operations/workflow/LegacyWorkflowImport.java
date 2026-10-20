@@ -1,13 +1,13 @@
 package com.mayday.operations.workflow;
 
+import com.mayday.operations.mapper.FlowDefinitionMapper;
+import com.mayday.operations.mapper.FlowRequestMapper;
+import com.mayday.operations.mapper.FlowTaskMapper;
+import com.mayday.operations.mapper.FlowVersionMapper;
 import com.mayday.operations.model.FlowTask;
 import com.mayday.operations.model.FlowVersion;
-import com.mayday.operations.repository.FlowDefinitionRepository;
-import com.mayday.operations.repository.FlowRequestRepository;
-import com.mayday.operations.repository.FlowTaskRepository;
-import com.mayday.operations.repository.FlowVersionRepository;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.UserMapper;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,12 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Order(50)
 @RequiredArgsConstructor
 public class LegacyWorkflowImport implements CommandLineRunner {
-  private final FlowDefinitionRepository definitions;
-  private final FlowVersionRepository versions;
-  private final FlowRequestRepository requests;
-  private final FlowTaskRepository tasks;
-  private final EntryRepository entries;
-  private final UserRepository users;
+  private final FlowDefinitionMapper definitions;
+  private final FlowVersionMapper versions;
+  private final FlowRequestMapper requests;
+  private final FlowTaskMapper tasks;
+  private final EntryMapper entries;
+  private final UserMapper users;
   private final WorkflowJson json;
   private final com.mayday.common.ModuleSwitches modules;
 
@@ -44,7 +44,7 @@ public class LegacyWorkflowImport implements CommandLineRunner {
         publishedVersion.setVersionNumber(1);
         publishedVersion.setSchemaJson(json.write(schema));
         publishedVersion.setPublisherName("旧版迁移");
-        versions.saveAndFlush(publishedVersion);
+        versions.save(publishedVersion);
         definition.setDraftSchema(publishedVersion.getSchemaJson());
         definition.setPublishedVersionId(publishedVersion.getId());
         if (definition.getCategoryId() == null)

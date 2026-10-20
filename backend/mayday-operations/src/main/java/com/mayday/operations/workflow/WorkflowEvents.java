@@ -2,11 +2,11 @@ package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessTime;
 import com.mayday.operations.MessagePublisher;
+import com.mayday.operations.mapper.BusinessEventMapper;
+import com.mayday.operations.mapper.NotificationMapper;
 import com.mayday.operations.model.BusinessEvent;
 import com.mayday.operations.model.FlowRequest;
-import com.mayday.operations.repository.BusinessEventRepository;
-import com.mayday.operations.repository.NotificationRepository;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -16,9 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class WorkflowEvents {
-  private final BusinessEventRepository events;
-  private final NotificationRepository notifications;
-  private final UserRepository users;
+  private final BusinessEventMapper events;
+  private final NotificationMapper notifications;
+  private final UserMapper users;
   private final MessagePublisher publisher;
   private final WorkflowPrivateDrafts privateDrafts;
 

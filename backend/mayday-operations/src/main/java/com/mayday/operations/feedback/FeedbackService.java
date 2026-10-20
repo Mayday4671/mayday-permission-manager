@@ -7,9 +7,11 @@ import com.mayday.common.ModuleSwitches;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
 import com.mayday.operations.MessagePublisher;
+import com.mayday.operations.feedback.mapper.FeedbackHistoryMapper;
+import com.mayday.operations.feedback.mapper.FeedbackMapper;
 import com.mayday.security.AccessPolicy;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.UserRepository;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -34,10 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FeedbackService {
   private static final SecureRandom RANDOM = new SecureRandom();
-  private final com.mayday.security.JdbcSecurityState limits;
-  private final FeedbackRepository repository;
-  private final FeedbackHistoryRepository histories;
-  private final UserRepository users;
+  private final com.mayday.security.SecurityStateStore limits;
+  private final FeedbackMapper repository;
+  private final FeedbackHistoryMapper histories;
+  private final UserMapper users;
   private final AccessPolicy access;
   private final MessagePublisher messages;
   private final ModuleSwitches modules;
@@ -129,7 +131,7 @@ public class FeedbackService {
     feedback.setContent(request.content().trim());
     feedback.setArticleId(request.articleId());
     feedback.setContact(request.contact());
-    repository.saveAndFlush(feedback);
+    repository.save(feedback);
     return new Receipt(receipt, feedback.getCreatedAt());
   }
 
@@ -159,16 +161,14 @@ public class FeedbackService {
   @Transactional(readOnly = true)
   public PageResult<AdminView> list(String keyword, String status, int page, int size) {
     access.require("feedback:view");
+    com.mybatisflex.core.query.QueryWrapper filter =
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .where(SearchPredicates.contains("title", keyword));
+    if (status != null && !status.isBlank())
+      filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
     return PageResult.from(
         repository
-            .findAll(
-                (root, query, criteria) ->
-                    criteria.and(
-                        SearchPredicates.contains(criteria, root.get("title"), keyword),
-                        status == null || status.isBlank()
-                            ? criteria.conjunction()
-                            : criteria.equal(root.get("status"), status)),
-                PageResult.request(page, size))
+            .paginate(PageResult.request(page, size), filter.orderBy("id desc"))
             .map(feedback -> view(feedback, false)));
   }
 
@@ -223,7 +223,7 @@ public class FeedbackService {
     history.setPublicReply(request.publicReply());
     history.setInternalNote(request.internalNote());
     histories.save(history);
-    repository.saveAndFlush(feedback);
+    repository.save(feedback);
     return view(feedback, true);
   }
 

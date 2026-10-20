@@ -3,11 +3,10 @@ package com.mayday.web;
 import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
 import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.ChangeAuditService.Difference;
+import com.mayday.system.mapper.ChangeAuditMapper;
 import com.mayday.system.model.ChangeAudit;
-import com.mayday.system.repository.ChangeAuditRepository;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,7 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ChangeAuditController {
-  private final ChangeAuditRepository repository;
+  private final ChangeAuditMapper repository;
   private final AccessPolicy access;
   private final ObjectMapper mapper;
 
@@ -52,16 +51,16 @@ public class ChangeAuditController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     access.require("logs:view");
+    var filter = com.mybatisflex.core.query.QueryWrapper.create();
+    com.mayday.common.SearchPredicates.anyOf(
+        filter,
+        com.mayday.common.SearchPredicates.contains("actor", keyword),
+        com.mayday.common.SearchPredicates.contains("action", keyword),
+        com.mayday.common.SearchPredicates.contains("resource", keyword));
     return ApiResponse.ok(
         PageResult.from(
             repository
-                .findAll(
-                    (root, query, criteria) ->
-                        criteria.or(
-                            SearchPredicates.contains(criteria, root.get("actor"), keyword),
-                            SearchPredicates.contains(criteria, root.get("action"), keyword),
-                            SearchPredicates.contains(criteria, root.get("resource"), keyword)),
-                    PageResult.request(page, size))
+                .paginate(PageResult.request(page, size), filter.orderBy("id desc"))
                 .map(this::view)));
   }
 

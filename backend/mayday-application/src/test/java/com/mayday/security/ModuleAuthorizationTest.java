@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import com.mayday.common.ModuleSwitches;
+import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.EntryRepository;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -28,7 +28,7 @@ class ModuleAuthorizationTest {
   void administratorCannotUseDisabledOrUnknownPermissions() {
     ModuleSwitches modules = new ModuleSwitches();
     modules.setEnabled(Map.of("crawler", false));
-    AccessPolicy access = new AccessPolicy(mock(EntryRepository.class), modules);
+    AccessPolicy access = new AccessPolicy(mock(EntryMapper.class), modules);
     SysUser user = user("admin", Set.of());
     authenticate(user);
     assertTrue(access.has("users:view"));
@@ -39,7 +39,7 @@ class ModuleAuthorizationTest {
 
   @Test
   void unregisteredPersistedGrantsAreNotTreatedAsValidAuthorization() {
-    AccessPolicy access = new AccessPolicy(mock(EntryRepository.class), new ModuleSwitches());
+    AccessPolicy access = new AccessPolicy(mock(EntryMapper.class), new ModuleSwitches());
     SysUser user = user("legacy", Set.of("users:view", "unregistered:view"));
     authenticate(user);
     assertTrue(access.has("users:view"));

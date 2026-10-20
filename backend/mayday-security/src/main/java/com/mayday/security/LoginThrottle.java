@@ -11,7 +11,7 @@ public class LoginThrottle {
 
   /** 生产只装配共享实现；账号大小写与既有登录规范一致，来源取实际连接地址而非伪造代理头。 */
   @Autowired
-  public LoginThrottle(JdbcSecurityState state) {
+  public LoginThrottle(SecurityStateStore state) {
     this.state = state;
   }
 

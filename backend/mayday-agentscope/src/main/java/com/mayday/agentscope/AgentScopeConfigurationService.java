@@ -1,16 +1,13 @@
 package com.mayday.agentscope;
 
+import com.mayday.agentscope.mapper.AgentScopeConfigMapper;
 import com.mayday.common.BusinessException;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.security.AccessPolicy;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -27,10 +24,7 @@ public class AgentScopeConfigurationService implements InitializingBean {
   private static final String SELECT_SQL =
       "select api_key_cipher, model, request_timeout_seconds, max_message_length, "
           + "max_context_messages, system_prompt from sys_agentscope_config where id = 1";
-  private static final RowMapper<StoredSettings> ROW_MAPPER =
-      AgentScopeConfigurationService::mapRow;
-
-  private final JdbcTemplate jdbc;
+  private final AgentScopeConfigMapper configStore;
   private final AgentScopeSettings deploymentDefaults;
   private final AgentScopeSecretCipher cipher;
   private final ModuleSwitches modules;
@@ -40,13 +34,13 @@ public class AgentScopeConfigurationService implements InitializingBean {
 
   /** Builds a transaction boundary so runtime state is published only after the database commit. */
   public AgentScopeConfigurationService(
-      JdbcTemplate jdbc,
+      AgentScopeConfigMapper configStore,
       AgentScopeSettings deploymentDefaults,
       AgentScopeSecretCipher cipher,
       ModuleSwitches modules,
       AccessPolicy access,
       PlatformTransactionManager transactionManager) {
-    this.jdbc = jdbc;
+    this.configStore = configStore;
     this.deploymentDefaults = deploymentDefaults;
     this.cipher = cipher;
     this.modules = modules;
@@ -59,7 +53,7 @@ public class AgentScopeConfigurationService implements InitializingBean {
    */
   @Override
   public void afterPropertiesSet() {
-    List<StoredSettings> rows = jdbc.query(SELECT_SQL, ROW_MAPPER);
+    List<StoredSettings> rows = selectStored();
     if (rows.isEmpty()) {
       current.set(fromDeploymentDefaults());
       return;
@@ -82,7 +76,7 @@ public class AgentScopeConfigurationService implements InitializingBean {
     access.require("agentscope:configure");
     validate(request);
 
-    StoredSettings previous = jdbc.query(SELECT_SQL, ROW_MAPPER).stream().findFirst().orElse(null);
+    StoredSettings previous = selectStored().stream().findFirst().orElse(null);
     String apiKeyCipher = previous == null ? null : previous.apiKeyCipher();
     String submittedSecret = request.apiSecret() == null ? "" : request.apiSecret().trim();
     if (request.clearApiSecret() && !submittedSecret.isEmpty())
@@ -101,17 +95,7 @@ public class AgentScopeConfigurationService implements InitializingBean {
     Long actorId = access.current().getId();
     transaction.executeWithoutResult(
         status ->
-            jdbc.update(
-                "insert into sys_agentscope_config "
-                    + "(id, api_key_cipher, model, request_timeout_seconds, max_message_length, "
-                    + "max_context_messages, system_prompt, updated_by, created_at, updated_at) "
-                    + "values (1, ?, ?, ?, ?, ?, ?, ?, now(6), now(6)) "
-                    + "on duplicate key update api_key_cipher = values(api_key_cipher), "
-                    + "model = values(model), request_timeout_seconds = values(request_timeout_seconds), "
-                    + "max_message_length = values(max_message_length), "
-                    + "max_context_messages = values(max_context_messages), "
-                    + "system_prompt = values(system_prompt), updated_by = values(updated_by), "
-                    + "updated_at = now(6)",
+            configStore.upsert(
                 next.apiKeyCipher(),
                 next.model(),
                 next.requestTimeoutSeconds(),
@@ -168,12 +152,12 @@ public class AgentScopeConfigurationService implements InitializingBean {
   }
 
   private String source() {
-    return jdbc.query(SELECT_SQL, ROW_MAPPER).isEmpty() ? "部署默认值" : "后台配置";
+    return selectStored().isEmpty() ? "部署默认值" : "后台配置";
   }
 
   /** Indicates whether an encrypted administrator override exists, without reading its contents. */
   private boolean hasStoredApiKey() {
-    return jdbc.query(SELECT_SQL, ROW_MAPPER).stream()
+    return selectStored().stream()
         .findFirst()
         .map(row -> row.apiKeyCipher() != null && !row.apiKeyCipher().isBlank())
         .orElse(false);
@@ -190,16 +174,22 @@ public class AgentScopeConfigurationService implements InitializingBean {
       throw new BusinessException("系统提示词不能为空");
   }
 
-  private static StoredSettings mapRow(ResultSet row, int rowNumber) throws SQLException {
-    return new StoredSettings(
-        row.getString("api_key_cipher"),
-        row.getString("model"),
-        row.getInt("request_timeout_seconds"),
-        row.getInt("max_message_length"),
-        row.getInt("max_context_messages"),
-        row.getString("system_prompt"));
+  /** 读取单例配置行；空结果代表尚未在后台保存，使用部署默认值。 */
+  private List<StoredSettings> selectStored() {
+    return configStore.selectStored().stream()
+        .map(
+            row ->
+                new StoredSettings(
+                    row.getString("api_key_cipher"),
+                    row.getString("model"),
+                    row.getInt("request_timeout_seconds"),
+                    row.getInt("max_message_length"),
+                    row.getInt("max_context_messages"),
+                    row.getString("system_prompt")))
+        .toList();
   }
 
+  /** 数据库单例配置行的原始快照；密钥为加密密文，仅在装配运行选项时解密。 */
   private record StoredSettings(
       String apiKeyCipher,
       String model,

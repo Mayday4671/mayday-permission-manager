@@ -5,10 +5,10 @@ import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
-import com.mayday.operations.repository.BusinessEventRepository;
-import com.mayday.operations.repository.FlowDefinitionRepository;
-import com.mayday.operations.repository.FlowRequestRepository;
-import com.mayday.operations.repository.FlowVersionRepository;
+import com.mayday.operations.mapper.BusinessEventMapper;
+import com.mayday.operations.mapper.FlowDefinitionMapper;
+import com.mayday.operations.mapper.FlowRequestMapper;
+import com.mayday.operations.mapper.FlowVersionMapper;
 import com.mayday.operations.workflow.WorkflowDefinitions;
 import com.mayday.operations.workflow.WorkflowEngine;
 import com.mayday.operations.workflow.WorkflowFormValuesDeserializer;
@@ -18,7 +18,7 @@ import com.mayday.operations.workflow.WorkflowSimulation;
 import com.mayday.operations.workflow.WorkflowSubprocessRepair;
 import com.mayday.operations.workflow.WorkflowTemplates;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -44,17 +44,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WorkflowController {
-  private final FlowDefinitionRepository definitions;
-  private final FlowVersionRepository versions;
-  private final FlowRequestRepository requests;
+  private final FlowDefinitionMapper definitions;
+  private final FlowVersionMapper versions;
+  private final FlowRequestMapper requests;
   private final WorkflowDefinitions models;
   private final WorkflowEngine engine;
   private final AccessPolicy access;
-  private final UserRepository users;
+  private final UserMapper users;
   private final WorkflowJson json;
   private final WorkflowSimulation simulation;
-  private final BusinessEventRepository events;
-  private final com.mayday.system.repository.RoleRepository roles;
+  private final BusinessEventMapper events;
+  private final com.mayday.system.mapper.RoleMapper roles;
 
   /** 发布或催办携带乐观版本，过期页面不能改变当前流程/申请状态。 */
   @Schema(name = "WorkflowVersionRequest")
@@ -108,14 +108,18 @@ public class WorkflowController {
     return ApiResponse.ok(
         PageResult.from(
             definitions
-                .findAll(
-                    (r, q, c) ->
-                        c.and(
-                            SearchPredicates.contains(c, r.get("name"), keyword),
-                            c.isTrue(r.get("enabled")),
-                            c.equal(r.get("businessType"), "GENERAL"),
-                            c.isNotNull(r.get("publishedVersionId"))),
-                    PageResult.request(page, size))
+                .paginate(
+                    PageResult.request(page, size),
+                    com.mybatisflex.core.query.QueryWrapper.create()
+                        .where(SearchPredicates.contains("name", keyword))
+                        .and(new com.mybatisflex.core.query.QueryColumn("enabled").eq(true))
+                        .and(
+                            new com.mybatisflex.core.query.QueryColumn("business_type")
+                                .eq("GENERAL"))
+                        .and(
+                            new com.mybatisflex.core.query.QueryColumn("published_version_id")
+                                .isNotNull())
+                        .orderBy("id desc"))
                 .map(models::option)));
   }
 
@@ -148,18 +152,17 @@ public class WorkflowController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     access.require("workflows:view");
+    var filter =
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .where(SearchPredicates.contains("name", keyword));
+    if (enabled != null)
+      filter.and(new com.mybatisflex.core.query.QueryColumn("enabled").eq(enabled));
+    if (categoryId != null)
+      filter.and(new com.mybatisflex.core.query.QueryColumn("category_id").eq(categoryId));
     return ApiResponse.ok(
         PageResult.from(
             definitions
-                .findAll(
-                    (r, q, c) ->
-                        c.and(
-                            SearchPredicates.contains(c, r.get("name"), keyword),
-                            enabled == null ? c.conjunction() : c.equal(r.get("enabled"), enabled),
-                            categoryId == null
-                                ? c.conjunction()
-                                : c.equal(r.get("categoryId"), categoryId)),
-                    PageResult.request(page, size))
+                .paginate(PageResult.request(page, size), filter.orderBy("id desc"))
                 .map(models::view)));
   }
 
@@ -259,19 +262,10 @@ public class WorkflowController {
         && !java.util.Set.of(
                 "DRAFT", "PENDING", "RETURNED", "APPROVED", "REJECTED", "WITHDRAWN", "CANCELLED")
             .contains(status)) throw new BusinessException("未知申请状态");
+    var filter = engine.filter(keyword, box);
+    if (status != null) filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
     return ApiResponse.ok(
-        PageResult.from(
-            requests
-                .findAll(
-                    engine
-                        .filter(keyword, box)
-                        .and(
-                            (r, q, c) ->
-                                status == null
-                                    ? c.conjunction()
-                                    : c.equal(r.get("status"), status)),
-                    PageResult.request(page, size))
-                .map(engine::summary)));
+        PageResult.of(requests.paginate(PageResult.request(page, size), filter), engine::summary));
   }
 
   /** 详情按当前参与范围与节点可读字段返回，未来节点人员不能提前读取申请。 */

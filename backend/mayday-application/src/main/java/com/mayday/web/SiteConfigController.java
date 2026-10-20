@@ -5,8 +5,8 @@ import com.mayday.common.BusinessException;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.SettingService;
 import com.mayday.service.UserService;
+import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/system/site-config")
 @RequiredArgsConstructor
 public class SiteConfigController {
-  private final EntryRepository entries;
+  private final EntryMapper entries;
   private final AccessPolicy access;
   private final SettingService settings;
 

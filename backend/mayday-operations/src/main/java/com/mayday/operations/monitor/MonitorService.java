@@ -5,8 +5,10 @@ import com.mayday.common.BusinessTime;
 import com.mayday.common.EntityVersions;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.operations.MessagePublisher;
+import com.mayday.operations.monitor.mapper.MonitorPolicyMapper;
+import com.mayday.operations.monitor.mapper.MonitorSampleMapper;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -19,7 +21,6 @@ import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -30,11 +31,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 @RequiredArgsConstructor
 public class MonitorService {
-  private final MonitorSampleRepository samples;
-  private final MonitorPolicyRepository policies;
+  private final MonitorSampleMapper samples;
+  private final MonitorPolicyMapper policies;
   private final DataSource dataSource;
   private final AccessPolicy access;
-  private final UserRepository users;
+  private final UserMapper users;
   private final MessagePublisher messages;
   private final ModuleSwitches modules;
   private final PlatformTransactionManager transactionManager;
@@ -154,7 +155,7 @@ public class MonitorService {
     if (minutes < 5 || minutes > 60) throw new BusinessException("趋势窗口需为5至60分钟");
     return samples
         .findByNodeIdAndCreatedAtGreaterThanEqualOrderByIdDesc(
-            nodeId, BusinessTime.now().minusMinutes(minutes), PageRequest.of(0, 120))
+            nodeId, BusinessTime.now().minusMinutes(minutes), 120)
         .stream()
         .sorted(Comparator.comparing(MonitorSample::getId))
         .map(
@@ -198,7 +199,7 @@ public class MonitorService {
               policy.setHeapThresholdPercent(request.heapThresholdPercent());
               policy.setDatabaseThresholdMs(request.databaseThresholdMs());
               policy.setAlertUserId(request.alertUserId());
-              return view(policies.saveAndFlush(policy));
+              return view(policies.save(policy));
             });
   }
 

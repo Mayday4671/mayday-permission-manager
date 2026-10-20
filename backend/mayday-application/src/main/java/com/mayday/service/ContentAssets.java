@@ -2,9 +2,9 @@ package com.mayday.service;
 
 import com.mayday.common.BusinessException;
 import com.mayday.common.FileUsage;
-import com.mayday.content.ContentRevisionRepository;
+import com.mayday.content.mapper.ContentRevisionMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.model.StoredFile;
-import com.mayday.operations.repository.StoredFileRepository;
 import com.mayday.operations.storage.StoredFileContent;
 import com.mayday.security.AccessPolicy;
 import java.util.HashSet;
@@ -19,9 +19,9 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ContentAssets implements FileUsage {
-  private final StoredFileRepository files;
+  private final StoredFileMapper files;
   private final StoredFileContent content;
-  private final ContentRevisionRepository revisions;
+  private final ContentRevisionMapper revisions;
   private final AccessPolicy access;
 
   /** 在业务写事务中按固定顺序锁定附件，检查所有者和有效状态，阻止关联与回收之间的竞态。 */

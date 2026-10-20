@@ -1,56 +1,41 @@
 package com.mayday.content;
 
 import com.mayday.common.BaseEntity;
-import com.mayday.system.model.SystemEntry;
-import jakarta.persistence.CollectionTable;
-import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import com.mybatisflex.annotation.Column;
+import com.mybatisflex.annotation.Table;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 
-/** 正文修订只新增不覆盖；审批结果仅修改授权状态，不能替换已审正文。分类/标签通过稳定 ID 关联。 */
+/**
+ * 正文修订只新增不覆盖；审批结果仅修改授权状态，不能替换已审正文。分类/标签通过稳定 ID 关联。
+ *
+ * <p>标签与附件是 cms_revision_tag / cms_revision_file 关联表，标记为非列并由仓储读取时装配、保存时重建； 分类与栏目只保留稳定
+ * ID，联表展示由查询显式完成。
+ */
 @Getter
 @Setter
-@Entity
-@Table(name = "cms_revision")
+@Table(
+    value = "cms_revision",
+    onInsert = BaseEntity.CreatedAtListener.class,
+    onUpdate = BaseEntity.UpdatedAtListener.class)
 public class ContentRevision extends BaseEntity {
-  @Column(nullable = false)
   private Long noticeId;
 
   private int revisionNumber;
 
-  @Column(nullable = false, length = 160)
   private String title;
 
-  @Column(name = "category_id", nullable = false)
   private Long categoryId;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "category_id", insertable = false, updatable = false)
-  private SystemEntry categoryEntry;
-
   /** 栏目归属随修订冻结，不由分类名称或前端路由推断；旧修订由升级迁移补齐。 */
-  @Column(name = "portal_channel_id")
   private Long portalChannelId;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "portal_channel_id", insertable = false, updatable = false)
-  private PortalChannel portalChannel;
-
-  @Column(length = 500)
   private String summary;
 
-  @Column(nullable = false, columnDefinition = "text")
   private String content;
 
-  @Column(nullable = false, length = 24)
   private String visibility = "PUBLIC";
 
   /** 封面和附件仅保存授权文件 ID，展示时仍按当前内容版本重新验证关联。 */
@@ -60,16 +45,12 @@ public class ContentRevision extends BaseEntity {
   private boolean pinned;
   private boolean recommended;
 
-  @Column(length = 160)
   private String seoTitle;
 
-  @Column(length = 250)
   private String seoKeywords;
 
-  @Column(length = 500)
   private String seoDescription;
 
-  @Column(nullable = false, length = 24)
   private String approvalStatus = "DRAFT";
 
   /** 审批绑定此修订编号，旧审批结果不能授权后来产生的新修订。 */
@@ -77,16 +58,11 @@ public class ContentRevision extends BaseEntity {
 
   private Long editorId;
 
-  @Column(length = 64)
   private String editorName;
 
-  @ElementCollection(fetch = FetchType.EAGER)
-  @CollectionTable(name = "cms_revision_tag", joinColumns = @JoinColumn(name = "revision_id"))
-  @Column(name = "tag_id", nullable = false)
+  @Column(ignore = true)
   private Set<Long> tagIds = new HashSet<>();
 
-  @ElementCollection(fetch = FetchType.EAGER)
-  @CollectionTable(name = "cms_revision_file", joinColumns = @JoinColumn(name = "revision_id"))
-  @Column(name = "file_id", nullable = false)
+  @Column(ignore = true)
   private Set<Long> attachmentIds = new HashSet<>();
 }

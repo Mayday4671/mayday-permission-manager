@@ -4,8 +4,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.mayday.common.ModuleSwitches;
-import com.mayday.operations.repository.BusinessEventRepository;
-import com.mayday.operations.repository.ScheduledJobRepository;
+import com.mayday.operations.mapper.BusinessEventMapper;
+import com.mayday.operations.mapper.ScheduledJobMapper;
 import com.mayday.operations.service.JobRunner;
 import com.mayday.operations.service.JobSchedule;
 import com.mayday.operations.workflow.WorkflowEventWorker;
@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 class ModuleWorkersTest {
   @Test
   void disabledSchedulerDoesNotQueryOrExecuteJobs() {
-    ScheduledJobRepository jobs = mock(ScheduledJobRepository.class);
+    ScheduledJobMapper jobs = mock(ScheduledJobMapper.class);
     JobRunner runner = mock(JobRunner.class);
     ModuleSwitches modules = new ModuleSwitches();
     modules.setEnabled(Map.of("scheduler", false));
@@ -27,7 +27,7 @@ class ModuleWorkersTest {
 
   @Test
   void disabledNotificationDependencyStopsApprovalDelivery() {
-    BusinessEventRepository events = mock(BusinessEventRepository.class);
+    BusinessEventMapper events = mock(BusinessEventMapper.class);
     WorkflowEvents delivery = mock(WorkflowEvents.class);
     ModuleSwitches modules = new ModuleSwitches();
     modules.setEnabled(Map.of("notifications", false, "approvals", true));

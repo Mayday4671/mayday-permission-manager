@@ -12,9 +12,9 @@ import static org.mockito.Mockito.when;
 import com.mayday.common.BusinessException;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.UserService;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.web.Contracts.UserRequest;
 import jakarta.validation.Validation;
 import java.nio.charset.StandardCharsets;
@@ -26,14 +26,14 @@ import org.mockito.ArgumentCaptor;
 class UserBulkAdapterTest {
   private final AccessPolicy access = mock(AccessPolicy.class);
   private final UserService userService = mock(UserService.class);
-  private final UserRepository users = mock(UserRepository.class);
+  private final UserMapper users = mock(UserMapper.class);
   private final UserBulkAdapter adapter =
       new UserBulkAdapter(
           access,
           userService,
           users,
-          mock(RoleRepository.class),
-          mock(EntryRepository.class),
+          mock(RoleMapper.class),
+          mock(EntryMapper.class),
           Validation.buildDefaultValidatorFactory().getValidator());
 
   private CsvCodec.Document document(String text) {

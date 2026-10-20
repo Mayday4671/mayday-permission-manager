@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.mayday.agentscope.mapper.AgentScopeConversationMapper;
+import com.mayday.agentscope.mapper.AgentScopeMessageMapper;
 import com.mayday.common.ConflictException;
 import java.util.List;
 import java.util.Optional;
@@ -27,8 +29,8 @@ class AgentScopeConversationCoordinatorTest {
   private static final String REQUEST_ID = "43ce66a9-75b9-4cad-bf1b-aa189b22071e";
   private static final String PROMPT = "请总结这条记录";
 
-  @Mock private AgentScopeConversationRepository conversations;
-  @Mock private AgentScopeMessageRepository messages;
+  @Mock private AgentScopeConversationMapper conversations;
+  @Mock private AgentScopeMessageMapper messages;
   @Mock private AgentScopeSettings settings;
 
   @InjectMocks private AgentScopeConversationCoordinator coordinator;

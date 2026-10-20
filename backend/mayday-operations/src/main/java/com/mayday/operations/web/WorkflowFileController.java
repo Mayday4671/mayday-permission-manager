@@ -1,7 +1,7 @@
 package com.mayday.operations.web;
 
 import com.mayday.common.BusinessException;
-import com.mayday.operations.repository.StoredFileRepository;
+import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.storage.StoredFileContent;
 import com.mayday.operations.workflow.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional(readOnly = true)
 public class WorkflowFileController {
   private final WorkflowEngine engine;
-  private final StoredFileRepository files;
+  private final StoredFileMapper files;
   private final StoredFileContent content;
 
   /** 核对审批参与关系及请求实际附件后流式下载，复用统一存储并拒绝回收文件。 */

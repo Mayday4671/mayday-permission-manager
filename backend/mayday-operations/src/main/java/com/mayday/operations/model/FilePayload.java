@@ -1,22 +1,19 @@
 package com.mayday.operations.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
-import jakarta.persistence.Table;
+import com.mybatisflex.annotation.Id;
+import com.mybatisflex.annotation.KeyType;
+import com.mybatisflex.annotation.Table;
 import lombok.Getter;
 import lombok.Setter;
 
 /** 历史 MYSQL 文件正文的兼容存储；新上传采用配置的本地或对象存储，列表不加载正文。 */
-@Entity
-@Table(name = "ops_file_payload")
 @Getter
 @Setter
+@Table("ops_file_payload")
 public class FilePayload {
-  @Id private Long id;
+  /** 与文件元信息表共享主键；正文的存活期由文件删除流程统一管理。 */
+  @Id(keyType = KeyType.Auto)
+  private Long id;
 
-  @Lob
-  @Column(nullable = false, columnDefinition = "longblob")
   private byte[] data;
 }

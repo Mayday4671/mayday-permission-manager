@@ -35,6 +35,8 @@
     <agentscope.version>2.0.4</agentscope.version>
     <swagger-annotations.version>2.2.47</swagger-annotations.version>
     <spotless.version>2.44.3</spotless.version>
+    <!-- 持久层统一使用 MyBatis-Flex；boot4 starter 与当前 Spring Boot 大版本配套。 -->
+    <mybatis-flex.version>1.11.8</mybatis-flex.version>
   </properties>
   <dependencies>
     <dependency>
@@ -43,6 +45,15 @@
       <optional>true</optional>
     </dependency>
   </dependencies>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.mybatis-flex</groupId>
+        <artifactId>mybatis-flex-spring-boot4-starter</artifactId>
+        <version>${mybatis-flex.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
   <build>
     <plugins>
       <plugin>

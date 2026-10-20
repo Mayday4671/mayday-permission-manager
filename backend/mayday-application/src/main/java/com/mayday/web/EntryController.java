@@ -3,17 +3,16 @@ package com.mayday.web;
 import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
 import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.NavigationCatalog;
 import com.mayday.service.SettingService;
 import com.mayday.service.UserService;
+import com.mayday.system.mapper.DictionaryItemMapper;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.DictionaryItemRepository;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
 import com.mayday.web.Contracts.EntryRequest;
 import jakarta.validation.Valid;
 import java.util.HashSet;
@@ -47,15 +46,15 @@ public class EntryController {
           "categories",
           "tags",
           "approvalcategories");
-  private final EntryRepository entries;
-  private final UserRepository users;
-  private final RoleRepository roles;
-  private final DictionaryItemRepository dictionaryItems;
+  private final EntryMapper entries;
+  private final UserMapper users;
+  private final RoleMapper roles;
+  private final DictionaryItemMapper dictionaryItems;
   private final SettingService settings;
-  private final com.mayday.content.NoticeRepository notices;
-  private final com.mayday.content.ContentRevisionRepository revisions;
+  private final com.mayday.content.mapper.NoticeMapper notices;
+  private final com.mayday.content.mapper.ContentRevisionMapper revisions;
   private final AccessPolicy access;
-  private final com.mayday.operations.repository.FlowDefinitionRepository workflows;
+  private final com.mayday.operations.mapper.FlowDefinitionMapper workflows;
 
   private void guard(String kind, String action) {
     if (!KINDS.contains(kind)) throw new BusinessException("未知资源类型");
@@ -74,23 +73,20 @@ public class EntryController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     guard(kind, "view");
+    var filter =
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .where(new com.mybatisflex.core.query.QueryColumn("kind").eq(kind));
+    com.mayday.common.SearchPredicates.anyOf(
+        filter,
+        com.mayday.common.SearchPredicates.contains("name", keyword),
+        com.mayday.common.SearchPredicates.contains("code", keyword));
+    if (groupName != null && !groupName.isBlank())
+      filter.and(new com.mybatisflex.core.query.QueryColumn("group_name").eq(groupName));
+    if (enabled != null)
+      filter.and(new com.mybatisflex.core.query.QueryColumn("enabled").eq(enabled));
     return ApiResponse.ok(
         PageResult.from(
-            entries.findAll(
-                (root, query, criteria) -> {
-                  var base =
-                      criteria.and(
-                          criteria.equal(root.get("kind"), kind),
-                          criteria.or(
-                              SearchPredicates.contains(criteria, root.get("name"), keyword),
-                              SearchPredicates.contains(criteria, root.get("code"), keyword)));
-                  if (groupName != null && !groupName.isBlank())
-                    base = criteria.and(base, criteria.equal(root.get("groupName"), groupName));
-                  return enabled == null
-                      ? base
-                      : criteria.and(base, criteria.equal(root.get("enabled"), enabled));
-                },
-                PageResult.request(page, size))));
+            entries.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
 
   /** 新增指定资源，组织结构写入额外要求管理员身份，避免间接扩大数据权限。 */
@@ -184,7 +180,7 @@ public class EntryController {
     entity.setPermission(request.permission());
     entity.setPath(request.path());
     entity.setEnabled(request.enabled());
-    return entries.saveAndFlush(entity);
+    return entries.save(entity);
   }
 
   /** 删除前保护内置参数/字典，并检查子节点、账号、授权范围、内容和审批的所有关联。 */
@@ -201,8 +197,7 @@ public class EntryController {
       settings.invalidateAfterCommit();
     }
     if (dictionaryItems.existsByDictionaryId(id)) throw new BusinessException("字典仍有选项，请先清理字典项");
-    if ("posts".equals(kind)
-        && users.count((root, query, criteria) -> criteria.isMember(id, root.get("postIds"))) > 0)
+    if ("posts".equals(kind) && users.countUsersByPost(id) > 0)
       throw new BusinessException("岗位仍被账号引用，请先调整关联");
     if ("dictionaries".equals(kind) && "user.status".equals(entry.getCode()))
       throw new BusinessException("内置账号状态字典不能删除");
@@ -220,11 +215,11 @@ public class EntryController {
 
   private boolean contentReferences(String kind, String name) {
     if ("categories".equals(kind))
-      return notices.count((root, query, criteria) -> criteria.equal(root.get("category"), name))
+      return notices.selectCountByQuery(
+              com.mybatisflex.core.query.QueryWrapper.create()
+                  .where(new com.mybatisflex.core.query.QueryColumn("category").eq(name)))
           > 0;
-    if ("tags".equals(kind))
-      return notices.count((root, query, criteria) -> criteria.isMember(name, root.get("tags")))
-          > 0;
+    if ("tags".equals(kind)) return notices.countByTag(name) > 0;
     return false;
   }
 }

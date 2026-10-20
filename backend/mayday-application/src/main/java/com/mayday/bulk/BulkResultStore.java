@@ -1,5 +1,6 @@
 package com.mayday.bulk;
 
+import com.mayday.bulk.mapper.BulkResultMapper;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,7 +12,6 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,12 +20,12 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class BulkResultStore {
-  private final JdbcTemplate jdbc;
   private final Object[] cacheLocks = new Object[64];
+  private final BulkResultMapper results;
   private final int[] readers = new int[64];
 
-  public BulkResultStore(JdbcTemplate jdbc) {
-    this.jdbc = jdbc;
+  public BulkResultStore(BulkResultMapper results) {
+    this.results = results;
     java.util.Arrays.setAll(cacheLocks, index -> new Object());
   }
 
@@ -35,18 +35,7 @@ public class BulkResultStore {
       long size = Files.size(source);
       if (size > 32L * 1024 * 1024)
         throw new com.mayday.common.BusinessException("单份导出最大 32 MB，请缩小筛选范围");
-      jdbc.update(
-          connection -> {
-            var statement =
-                connection.prepareStatement(
-                    "insert into sys_bulk_result(job_id,content,created_at)"
-                        + " values(?,?,cast(unix_timestamp(current_timestamp(3))*1000 as unsigned))"
-                        + " on duplicate key update"
-                        + " content=values(content),created_at=values(created_at)");
-            statement.setLong(1, jobId);
-            statement.setBinaryStream(2, input, size);
-            return statement;
-          });
+      results.upsert(jobId, input.readAllBytes());
     } catch (IOException failure) {
       throw new IllegalStateException("导出正文提交失败", failure);
     }
@@ -72,9 +61,7 @@ public class BulkResultStore {
       try {
         if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS))
           throw new IllegalStateException("导出缓存类型异常");
-        long now =
-            jdbc.queryForObject(
-                "select cast(unix_timestamp(current_timestamp(3))*1000 as unsigned)", Long.class);
+        long now = results.nowMillis();
         Files.setLastModifiedTime(target, FileTime.fromMillis(now));
       } catch (IOException failure) {
         throw new IllegalStateException("导出缓存访问失败", failure);
@@ -129,41 +116,30 @@ public class BulkResultStore {
 
   /** 只在作业缓存锁内写缺失结果；先写完整临时文件，再发布不可变缓存供并发下载读取。 */
   private boolean restoreMissing(long jobId, Path target) {
-    return jdbc.query(
-        "select content from sys_bulk_result where job_id=?",
-        result -> {
-          if (!result.next()) return false;
-          Path temporary = null;
-          try {
-            // 完整写入唯一临时文件后才发布目标，避免另一个下载请求把半写缓存误认为完整文件。
-            temporary =
-                Files.createTempFile(target.getParent(), target.getFileName() + "-", ".download");
-            try (InputStream input = result.getBinaryStream(1);
-                var output = Files.newOutputStream(temporary)) {
-              input.transferTo(output);
-            }
-            try {
-              Files.move(
-                  temporary,
-                  target,
-                  StandardCopyOption.ATOMIC_MOVE,
-                  StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException unsupported) {
-              // 同目录完整文件重命名，不退回到直接写入公开下载目标。
-              Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
-            }
-            return true;
-          } catch (IOException failure) {
-            throw new IllegalStateException("导出下载缓存创建失败", failure);
-          } finally {
-            if (temporary != null)
-              try {
-                Files.deleteIfExists(temporary);
-              } catch (IOException ignored) {
-                /* 仅清理本次下载创建的临时文件。 */
-              }
-          }
-        },
-        jobId);
+    var content = results.load(jobId);
+    if (content.isEmpty()) return false;
+    Path temporary = null;
+    try {
+      // 完整写入唯一临时文件后才发布目标，避免另一个下载请求把半写缓存误认为完整文件。
+      temporary = Files.createTempFile(target.getParent(), target.getFileName() + "-", ".download");
+      Files.write(temporary, content.get());
+      try {
+        Files.move(
+            temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+      } catch (AtomicMoveNotSupportedException unsupported) {
+        // 同目录完整文件重命名，不退回到直接写入公开下载目标。
+        Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+      }
+      return true;
+    } catch (IOException failure) {
+      throw new IllegalStateException("导出下载缓存创建失败", failure);
+    } finally {
+      if (temporary != null)
+        try {
+          Files.deleteIfExists(temporary);
+        } catch (IOException ignored) {
+          /* 仅清理本次下载创建的临时文件。 */
+        }
+    }
   }
 }

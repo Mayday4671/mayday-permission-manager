@@ -3,13 +3,14 @@ package com.mayday.web;
 import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
 import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.UserService;
+import com.mayday.system.mapper.DictionaryItemMapper;
+import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.DictionaryItem;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.DictionaryItemRepository;
-import com.mayday.system.repository.EntryRepository;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryWrapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -22,8 +23,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,8 +39,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/system")
 @RequiredArgsConstructor
 public class DictionaryController {
-  private final EntryRepository entries;
-  private final DictionaryItemRepository items;
+  private final EntryMapper entries;
+  private final DictionaryItemMapper items;
   private final AccessPolicy access;
 
   /** 字典选项可编辑字段；颜色只允许主题支持的标识，更新必须携带原 version。 */
@@ -80,21 +79,16 @@ public class DictionaryController {
       @RequestParam(defaultValue = "10") int size) {
     access.require("dictionaries:view");
     type(typeId);
-    var paging = PageResult.request(page, size);
+    var filter = QueryWrapper.create().where(new QueryColumn("dictionary_id").eq(typeId));
+    com.mayday.common.SearchPredicates.anyOf(
+        filter,
+        com.mayday.common.SearchPredicates.contains("label", keyword),
+        com.mayday.common.SearchPredicates.contains("value", keyword));
+    if (enabled != null) filter.and(new QueryColumn("enabled").eq(enabled));
     return ApiResponse.ok(
         PageResult.from(
-            items.findAll(
-                (root, query, criteria) ->
-                    criteria.and(
-                        criteria.equal(root.get("dictionaryId"), typeId),
-                        criteria.or(
-                            SearchPredicates.contains(criteria, root.get("label"), keyword),
-                            SearchPredicates.contains(criteria, root.get("value"), keyword)),
-                        enabled == null
-                            ? criteria.conjunction()
-                            : criteria.equal(root.get("enabled"), enabled)),
-                PageRequest.of(
-                    paging.getPageNumber(), paging.getPageSize(), Sort.by("sortOrder", "id")))));
+            items.paginate(
+                PageResult.request(page, size), filter.orderBy("sort_order asc, id asc"))));
   }
 
   /** 新选项固定属于路径指定字典，内置账号状态的值仍受 true/false 契约约束。 */
@@ -128,7 +122,7 @@ public class DictionaryController {
     item.setColor(request.color());
     item.setSortOrder(request.sortOrder());
     item.setEnabled(request.enabled());
-    return items.saveAndFlush(item);
+    return items.save(item);
   }
 
   /** 只删除对应字典内的普通选项，内置账号状态选项允许停用但禁止破坏性删除。 */

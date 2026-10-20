@@ -26,19 +26,11 @@ spring:
         # driver 时区必须与会话区一致；显式 canonical 属性覆盖旧 DB_URL 中 serverTimezone 别名。
         connectionTimeZone: Asia/Shanghai
         preserveInstants: true
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        type:
-          # JDBC 4.2 直接绑定 LocalDate/LocalDateTime，避免 Timestamp 中转借用 JVM 默认时区。
-          # Instant 的 Java 类型与 UTC 安全时钟不变，物理时间点另由下面的绑定策略保证。
-          java_time_use_direct_jdbc: true
-          # MySQL 会话为 +08:00：避免 Hibernate 默认 UTC Calendar 把 UTC 文本误作 +08 墙上值。
-          # 普通 TIMESTAMP 绑定交给固定 driver/session 区及 preserveInstants 保持真实 epoch。
-          preferred_instant_jdbc_type: TIMESTAMP
+  # MyBatis-Flex 没有持久化上下文；时间绑定由 JDBC 驱动与会话时区直接完成，
+  # DATETIME 物理值语义与连接初始化的 +08:00 会话区保持一致。
+  mybatis-flex:
+    global-config:
+      print-banner: false
   flyway:
     # 分离DDL/DML账号时，先用部署迁移任务升级，再关闭业务进程的自动DDL。
     enabled: ${DB_MIGRATIONS_ENABLED:true}

@@ -6,11 +6,11 @@ import com.mayday.common.FileUsage;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
 import com.mayday.operations.OperationSupport;
+import com.mayday.operations.mapper.FileDirectoryMapper;
+import com.mayday.operations.mapper.NotificationMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.model.FileDirectory;
 import com.mayday.operations.model.StoredFile;
-import com.mayday.operations.repository.FileDirectoryRepository;
-import com.mayday.operations.repository.NotificationRepository;
-import com.mayday.operations.repository.StoredFileRepository;
 import com.mayday.security.AccessPolicy;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -39,9 +39,9 @@ public class FileCenterService {
   private static final Set<String> ALLOWED_EXTENSIONS =
       Set.of("pdf", "txt", "csv", "png", "jpg", "jpeg", "webp", "docx", "xlsx", "zip");
   private static final Set<String> IMAGE_EXTENSIONS = Set.of("png", "jpg", "jpeg", "webp");
-  private final StoredFileRepository files;
-  private final FileDirectoryRepository directories;
-  private final NotificationRepository notifications;
+  private final StoredFileMapper files;
+  private final FileDirectoryMapper directories;
+  private final NotificationMapper notifications;
   private final List<FileUsage> businessReferences;
   private final AccessPolicy access;
   private final StorageSettings settings;
@@ -53,28 +53,23 @@ public class FileCenterService {
       String keyword, Long directoryId, boolean deleted, int page, int size) {
     access.require("files:view");
     if (directoryId != null && directoryId > 0) directory(directoryId, false);
+    com.mybatisflex.core.query.QueryWrapper filter =
+        com.mybatisflex.core.query.QueryWrapper.create();
+    if (!access.has("files:all"))
+      filter.where(
+          new com.mybatisflex.core.query.QueryColumn("owner_id").eq(access.current().getId()));
+    if (directoryId != null) {
+      if (directoryId == 0)
+        filter.and(new com.mybatisflex.core.query.QueryColumn("directory_id").isNull());
+      else filter.and(new com.mybatisflex.core.query.QueryColumn("directory_id").eq(directoryId));
+    }
+    filter.and(
+        deleted
+            ? new com.mybatisflex.core.query.QueryColumn("deleted_at").isNotNull()
+            : new com.mybatisflex.core.query.QueryColumn("deleted_at").isNull());
+    filter.and(SearchPredicates.contains("name", keyword));
     return PageResult.from(
-        files.findAll(
-            (root, query, builder) -> {
-              var ownership =
-                  access.has("files:all")
-                      ? builder.conjunction()
-                      : builder.equal(root.get("ownerId"), access.current().getId());
-              var location =
-                  directoryId == null
-                      ? builder.conjunction()
-                      : directoryId == 0
-                          ? builder.isNull(root.get("directoryId"))
-                          : builder.equal(root.get("directoryId"), directoryId);
-              return builder.and(
-                  ownership,
-                  location,
-                  deleted
-                      ? builder.isNotNull(root.get("deletedAt"))
-                      : builder.isNull(root.get("deletedAt")),
-                  SearchPredicates.contains(builder, root.get("name"), keyword));
-            },
-            PageResult.request(page, size)));
+        files.paginate(PageResult.request(page, size), filter.orderBy("id desc")));
   }
 
   /** 单条操作复用列表的所有者边界，防止猜测文件 ID 绕过列表范围。 */
@@ -144,7 +139,7 @@ public class FileCenterService {
     }
     value.setName(normalizedName);
     value.setParentId(targetParent);
-    return directories.saveAndFlush(value);
+    return directories.save(value);
   }
 
   /** 先锁定目录并检查提交版本，再验证包括回收文件在内的内容，防止与上传并发删除目录。 */
@@ -221,7 +216,7 @@ public class FileCenterService {
         storage.write(file.getThumbnailKey(), input, thumbnail.length, "image/png");
       }
     }
-    return files.saveAndFlush(file);
+    return files.save(file);
   }
 
   /** 提取用于展示和下载的文件名，去除目录与控制字符；此名称不参与存储对象键生成。 */
@@ -286,8 +281,8 @@ public class FileCenterService {
         }
         default -> throw new IllegalStateException("未经校验的文件操作");
       }
+      files.save(file);
     }
-    files.flush();
     return selected.size();
   }
 }

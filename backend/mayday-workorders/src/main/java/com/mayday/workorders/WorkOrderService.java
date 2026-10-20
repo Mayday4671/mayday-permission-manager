@@ -7,6 +7,10 @@ import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.workorders.WorkOrderContracts.WorkOrderRequest;
 import com.mayday.workorders.WorkOrderContracts.WorkOrderView;
+import com.mayday.workorders.mapper.WorkOrderMapper;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryCondition;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,26 +21,21 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WorkOrderService {
-  private final WorkOrderRepository repository;
+  private final WorkOrderMapper repository;
   private final AccessPolicy access;
 
   /** 关键词按字面量匹配，状态筛选与行级范围在 SQL 中合并，分页总数不会扩大可见范围。 */
   public PageResult<WorkOrderView> list(String keyword, Boolean enabled, int page, int size) {
     access.require("workorders:view");
-    return PageResult.from(
-        repository
-            .findAll(
-                access
-                    .<WorkOrder>filter("workorders", "ownerId")
-                    .and(
-                        (root, query, builder) ->
-                            builder.and(
-                                SearchPredicates.contains(builder, root.get("title"), keyword),
-                                enabled == null
-                                    ? builder.conjunction()
-                                    : builder.equal(root.get("enabled"), enabled))),
-                PageResult.request(page, size))
-            .map(WorkOrderView::from));
+    QueryWrapper filter = access.filter("workorders", "owner_id");
+    QueryCondition keywordMatch =
+        keyword == null ? null : SearchPredicates.contains("title", keyword);
+    if (keywordMatch != null) filter.and(keywordMatch);
+    if (enabled != null) filter.and(new QueryColumn("enabled").eq(enabled));
+    return PageResult.of(
+        repository.paginate(
+            PageResult.request(page, size), filter.orderBy(new QueryColumn("id").desc())),
+        WorkOrderView::from);
   }
 
   /** 单条读取重用可见性检查；范围外记录即使主键存在也拒绝访问。 */
@@ -56,10 +55,10 @@ public class WorkOrderService {
     // CUSTOM 只允许指定部门；不能创建一条自己不在授权范围内的记录。
     access.checkData("workorders", entity.getOwnerId(), entity.getDepartmentId());
     assign(entity, request);
-    return WorkOrderView.from(repository.saveAndFlush(entity));
+    return WorkOrderView.from(repository.save(entity));
   }
 
-  /** 编辑先校验原记录范围和客户端版本，只覆盖请求白名单字段，提交时由 JPA 再检查并发。 */
+  /** 编辑先校验原记录范围和客户端版本，只覆盖请求白名单字段，更新语句同时校验乐观锁版本。 */
   @Transactional
   public WorkOrderView update(Long id, WorkOrderRequest request) {
     access.require("workorders:view");
@@ -67,10 +66,10 @@ public class WorkOrderService {
     WorkOrder entity = visible(id);
     EntityVersions.requireCurrent(entity, request.version());
     assign(entity, request);
-    return WorkOrderView.from(repository.saveAndFlush(entity));
+    return WorkOrderView.from(repository.save(entity));
   }
 
-  /** 删除与刷新在同一事务完成；授权、版本或外键失败均回滚，禁止绕过页面直接删除他人数据。 */
+  /** 删除与授权检查在同一事务完成；授权、版本或外键失败均回滚，禁止绕过页面直接删除他人数据。 */
   @Transactional
   public void delete(Long id, Long version) {
     access.require("workorders:view");
@@ -78,7 +77,6 @@ public class WorkOrderService {
     WorkOrder entity = visible(id);
     EntityVersions.requireCurrent(entity, version);
     repository.delete(entity);
-    repository.flush();
   }
 
   /** 集中保护按 ID 读取和修改的入口，所有服务方法都必须先检查对应动作权限。 */

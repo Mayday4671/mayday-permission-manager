@@ -1,6 +1,6 @@
 package com.mayday.operations.service;
 
-import com.mayday.system.repository.SessionRepository;
+import com.mayday.system.mapper.SessionMapper;
 import java.time.Instant;
 import javax.sql.DataSource;
 import org.springframework.context.annotation.Bean;
@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class CoreJobHandlers {
   @Bean
-  JobHandler sessionCleanupHandler(SessionRepository sessions) {
+  JobHandler sessionCleanupHandler(SessionMapper sessions) {
     return new JobHandler() {
       @Override
       public String key() {

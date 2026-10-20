@@ -5,17 +5,22 @@ import com.mayday.common.BaseEntity;
 import com.mayday.common.BusinessException;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
+import com.mayday.identity.mapper.ExternalIdentityMapper;
+import com.mayday.identity.mapper.IdentityChallengeMapper;
+import com.mayday.identity.mapper.MfaCredentialMapper;
 import com.mayday.security.AccessPolicy;
 import com.mayday.security.TokenService;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
 import com.mayday.web.Contracts.UserRequest;
 import com.mayday.web.Contracts.UserStatusRequest;
 import com.mayday.web.Contracts.UserView;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -24,7 +29,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,15 +39,24 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional
 public class UserService {
-  private final UserRepository users;
-  private final RoleRepository roles;
-  private final EntryRepository entries;
+  private final UserMapper users;
+
+  private final RoleMapper roles;
+
+  private final EntryMapper entries;
+
   private final AccessPolicy access;
+
   private final PasswordEncoder encoder;
+
   private final TokenService tokens;
+
   private final ChangeAuditService changeAudit;
-  private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
   private final AgentScopeAccountCleanup agentScopeAccountCleanup;
+  private final IdentityChallengeMapper challengeStore;
+  private final MfaCredentialMapper mfaStore;
+  private final ExternalIdentityMapper externalIdentities;
 
   /** 将账号转换为页面DTO，部门失效显示未分配；邮箱和电话按当前操作者的独立字段读取权限脱敏。 */
   public UserView view(SysUser u) {
@@ -59,17 +72,15 @@ public class UserService {
   @Transactional(readOnly = true)
   public PageResult<UserView> list(
       String keyword, Boolean enabled, Long departmentId, int page, int size) {
-    Specification<SysUser> filter = access.filter("users", "id");
-    filter =
-        filter.and(
-            (r, q, c) ->
-                c.or(
-                    SearchPredicates.contains(c, r.get("username"), keyword),
-                    SearchPredicates.contains(c, r.get("nickname"), keyword)));
-    if (enabled != null) filter = filter.and((r, q, c) -> c.equal(r.get("enabled"), enabled));
-    if (departmentId != null)
-      filter = filter.and((r, q, c) -> c.equal(r.get("departmentId"), departmentId));
-    return PageResult.from(users.findAll(filter, PageResult.request(page, size)).map(this::view));
+    QueryWrapper filter = access.filter("users", "id");
+    SearchPredicates.anyOf(
+        filter,
+        SearchPredicates.contains("username", keyword),
+        SearchPredicates.contains("nickname", keyword));
+    if (enabled != null) filter.and(new QueryColumn("enabled").eq(enabled));
+    if (departmentId != null) filter.and(new QueryColumn("department_id").eq(departmentId));
+    return PageResult.from(
+        users.paginate(PageResult.request(page, size), filter.orderBy("id desc")).map(this::view));
   }
 
   /** 验证访问目标的范围，同时阻止低权限管理员修改高权限账号。 */
@@ -144,9 +155,10 @@ public class UserService {
     if (id != null && !req.enabled()) {
       tokens.revokeUser(id);
       // 停用必须同时撤销尚未完成的首因素证明，重新启用不能恢复原 MFA/OIDC 绑定挑战。
-      jdbc.update("delete from sys_identity_challenge where user_id=?", id);
+      challengeStore.deleteByUser(id);
     }
-    users.saveAndFlush(u);
+    users.save(u);
+    users.syncCollections(u);
     changeAudit.record(
         "用户", u.getId(), id == null ? "创建账号" : "编辑账号/角色分配", before, auditSnapshot(u));
     return view(u);
@@ -161,10 +173,9 @@ public class UserService {
     tokens.revokeUser(id);
     changeAudit.record("用户", id, "删除账号", auditSnapshot(u), Map.of());
     // 通过既有数据范围、角色等级与保护账号检查后，精确清理该账号的身份材料；不删除其他业务历史。
-    jdbc.update("delete from sys_identity_challenge where user_id=?", id);
-    jdbc.update("delete from sys_mfa_recovery where user_id=?", id);
-    jdbc.update("delete from sys_mfa_credential where user_id=?", id);
-    jdbc.update("delete from sys_external_identity where user_id=?", id);
+    challengeStore.deleteByUser(id);
+    mfaStore.deleteByUser(id);
+    externalIdentities.deleteByUser(id);
     // AgentScope 状态表使用框架的 userId/sessionId 复合键，不受 sys_user 外键级联；账号删除时显式清除。
     agentScopeAccountCleanup.deleteAccountData(id);
     users.delete(u);
@@ -188,12 +199,12 @@ public class UserService {
       user.setEnabled(req.enabled());
       if (!req.enabled()) {
         tokens.revokeUser(user.getId());
-        jdbc.update("delete from sys_identity_challenge where user_id=?", user.getId());
+        challengeStore.deleteByUser(user.getId());
       }
       changeAudit.record(
           "用户", user.getId(), req.enabled() ? "启用账号" : "停用账号", before, auditSnapshot(user));
     }
-    users.saveAllAndFlush(selected);
+    users.saveAll(selected);
   }
 
   /** 在可管理目标范围内按密码策略重新加密凭据并撤销全部旧会话；审计仅记录重置行为，绝不保存密码或密码摘要。 */

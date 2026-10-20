@@ -3,27 +3,26 @@ package com.mayday.operations.workflow;
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.FileUsage;
-import com.mayday.common.SearchPredicates;
 import com.mayday.operations.OperationSupport;
+import com.mayday.operations.mapper.FlowDecisionMapper;
+import com.mayday.operations.mapper.FlowRequestMapper;
+import com.mayday.operations.mapper.FlowTaskMapper;
+import com.mayday.operations.mapper.FlowVersionMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.model.FlowDecision;
 import com.mayday.operations.model.FlowRequest;
 import com.mayday.operations.model.FlowTask;
 import com.mayday.operations.model.FlowVersion;
 import com.mayday.operations.realtime.RealtimeEvents;
-import com.mayday.operations.repository.FlowDecisionRepository;
-import com.mayday.operations.repository.FlowRequestRepository;
-import com.mayday.operations.repository.FlowTaskRepository;
-import com.mayday.operations.repository.FlowVersionRepository;
-import com.mayday.operations.repository.StoredFileRepository;
 import com.mayday.operations.storage.StoredFileContent;
 import com.mayday.operations.workflow.WorkflowSchema.Field;
 import com.mayday.operations.workflow.WorkflowSchema.Node;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import com.mayday.security.AccessPolicy;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.UserRepository;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -40,7 +39,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,24 +50,23 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WorkflowEngine implements FileUsage {
-  private final FlowRequestRepository requests;
-  private final FlowTaskRepository tasks;
-  private final FlowDecisionRepository history;
-  private final FlowVersionRepository versions;
+  private final FlowRequestMapper requests;
+  private final FlowTaskMapper tasks;
+  private final FlowDecisionMapper history;
+  private final FlowVersionMapper versions;
   private final WorkflowDefinitions definitions;
   private final WorkflowDelegations delegations;
   private final WorkflowOrchestrator orchestrator;
   private final WorkflowSubprocessRepair subprocessRepair;
   private final WorkflowJson json;
   private final WorkflowPrivateDrafts privateDrafts;
-  private final UserRepository users;
-  private final EntryRepository entries;
-  private final StoredFileRepository files;
+  private final UserMapper users;
+  private final EntryMapper entries;
+  private final StoredFileMapper files;
   private final AccessPolicy access;
   private final WorkflowEvents events;
   private final RealtimeEvents realtime;
   private final List<WorkflowBusiness> businesses;
-  private final jakarta.persistence.EntityManager entityManager;
 
   /** 提交只接受已发布版本编号，人员、节点和账号身份由服务端解析并冻结。 */
   @Schema(name = "WorkflowSubmission")
@@ -186,7 +183,7 @@ public class WorkflowEngine implements FileUsage {
     var request =
         (lock ? requests.lockById(id) : requests.findById(id))
             .orElseThrow(() -> new BusinessException("审批申请不存在"));
-    if (lock && request.getRootRequestId() != null) entityManager.refresh(request);
+    // MyBatis-Flex 无持久化上下文，锁定后的读取即数据库最新提交，无需再显式刷新。
     if ("DRAFT".equals(request.getStatus())
         && !Objects.equals(request.getApplicantId(), access.current().getId()))
       throw new AccessDeniedException("申请草稿只对本人可见");
@@ -194,89 +191,14 @@ public class WorkflowEngine implements FileUsage {
     return request;
   }
 
-  /** 待办在 SQL 中按当前账号任务过滤；全量管理需独立权限，不能分页后再在浏览器裁剪。 */
-  public Specification<FlowRequest> filter(String keyword, String box) {
+  /** 待办在 SQL 中按当前账号任务过滤；全量管理需独立权限，不能分页后再在浏览器裁剪。查询条件由仓储统一构建。 */
+  public com.mybatisflex.core.query.QueryWrapper filter(String keyword, String box) {
     access.require("requests:view");
-    Long userId = access.current().getId();
     if (!Set.of("mine", "drafts", "copies", "todo", "done", "participated", "all").contains(box))
       throw new BusinessException("未知审批筛选");
     if (box.equals("all")) access.require("requests:manage");
     if (box.equals("todo") || box.equals("done")) access.require("requests:approve");
-    return (request, q, c) -> {
-      // 旧库的退回保存曾覆盖 title；搜索计数也不能成为探测私人标题的旁路。
-      var closing = q.subquery(Long.class);
-      var close = closing.from(FlowDecision.class);
-      closing
-          .select(c.max(close.<Long>get("id")))
-          .where(
-              c.equal(close.get("requestId"), request.get("id")),
-              c.equal(close.get("runNumber"), request.get("runNumber")),
-              close.get("action").in("RETURN", "WITHDRAW"));
-      var legacyEdit = q.subquery(Long.class);
-      var edit = legacyEdit.from(FlowDecision.class);
-      legacyEdit
-          .select(edit.get("id"))
-          .where(
-              c.equal(edit.get("requestId"), request.get("id")),
-              c.equal(edit.get("runNumber"), request.get("runNumber")),
-              c.equal(edit.get("action"), "EDIT"),
-              c.greaterThan(edit.get("id"), closing));
-      var own = c.equal(request.get("applicantId"), userId);
-      var oldPrivate =
-          c.and(
-              c.not(own),
-              request.get("status").in("RETURNED", "WITHDRAWN", "CANCELLED"),
-              c.isNull(request.get("privateDraft")),
-              c.exists(legacyEdit));
-      var safeTitle =
-          c.<String>selectCase()
-              .when(
-                  oldPrivate,
-                  c.concat(
-                      c.coalesce(request.<String>get("definitionName"), "审批"),
-                      c.concat(" · 申请 #", request.get("id").as(String.class))))
-              .when(
-                  c.and(own, c.isNotNull(request.get("privateDraft"))),
-                  c.function(
-                      "JSON_UNQUOTE",
-                      String.class,
-                      c.function(
-                          "JSON_EXTRACT",
-                          String.class,
-                          request.get("privateDraft"),
-                          c.literal("$.title"))))
-              .otherwise(request.get("title"));
-      var base = SearchPredicates.contains(c, safeTitle, keyword);
-      if (box.equals("all")) return c.and(base, c.notEqual(request.get("status"), "DRAFT"));
-      if (box.equals("mine")) return c.and(base, c.equal(request.get("applicantId"), userId));
-      if (box.equals("drafts"))
-        return c.and(
-            base,
-            c.equal(request.get("applicantId"), userId),
-            c.equal(request.get("status"), "DRAFT"));
-      if (box.equals("participated"))
-        return c.and(base, c.isMember(userId, request.get("approverIds")));
-      var sub = q.subquery(Long.class);
-      var task = sub.from(FlowTask.class);
-      var state =
-          box.equals("todo")
-              ? c.equal(task.get("status"), "PENDING")
-              : box.equals("copies")
-                  ? c.equal(task.get("kind"), "COPY")
-                  : task.get("status").in("APPROVED", "REJECTED", "RETURNED", "TRANSFERRED");
-      sub.select(task.get("requestId")).where(c.equal(task.get("assigneeId"), userId), state);
-      var match = request.get("id").in(sub);
-      if (box.equals("todo"))
-        return c.and(
-            base,
-            c.equal(request.get("status"), "PENDING"),
-            c.or(
-                match,
-                c.and(
-                    c.isNull(request.get("schemaSnapshot")),
-                    c.equal(request.get("currentApproverId"), userId))));
-      return c.and(base, match);
-    };
+    return requests.listFilter(keyword, box, access.current().getId());
   }
 
   /** 列表只提供申请元信息，不包含表单正文、附件内容及未来节点人员名单。 */
@@ -369,9 +291,10 @@ public class WorkflowEngine implements FileUsage {
     out.put(
         "history",
         history
-            .findAll(
-                (a, q, c) -> c.equal(a.get("requestId"), id),
-                org.springframework.data.domain.Sort.by("id"))
+            .selectListByQuery(
+                com.mybatisflex.core.query.QueryWrapper.create()
+                    .where(new com.mybatisflex.core.query.QueryColumn("request_id").eq(id))
+                    .orderBy("id asc"))
             .stream()
             .map(
                 decision ->
@@ -660,7 +583,7 @@ public class WorkflowEngine implements FileUsage {
     request.setAttachmentIds(fileIds(spec, form));
     if (draft && !"GENERAL".equals(request.getBusinessType()))
       business(request.getBusinessType()).validateDraft(request, input.businessVersion());
-    requests.saveAndFlush(request);
+    requests.save(request);
     if (!draft && !"GENERAL".equals(request.getBusinessType()))
       business(request.getBusinessType()).submitted(request, input.businessVersion());
     else if ("GENERAL".equals(request.getBusinessType())
@@ -672,7 +595,8 @@ public class WorkflowEngine implements FileUsage {
       record(request, "SUBMIT", null, "发起申请", null);
       advance(request, spec.startNodeId());
     }
-    requests.flush();
+    requests.save(request);
+    requests.syncCollections(request);
     refreshParticipants(request);
     return detail(request.getId());
   }
@@ -749,7 +673,6 @@ public class WorkflowEngine implements FileUsage {
           });
       decision.setChangesJson(changes.isEmpty() ? null : json.write(changes));
     }
-    requests.flush();
     refreshParticipants(request);
     return detail(id);
   }
@@ -836,7 +759,10 @@ public class WorkflowEngine implements FileUsage {
                     : submittedValues(request),
                 readable(request, spec, requestTasks)));
     history
-        .findAll((root, query, cb) -> cb.equal(root.get("requestId"), request.getId()))
+        .selectListByQuery(
+            com.mybatisflex.core.query.QueryWrapper.create()
+                .where(
+                    new com.mybatisflex.core.query.QueryColumn("request_id").eq(request.getId())))
         .forEach(
             decision ->
                 result.addAll(
@@ -934,7 +860,7 @@ public class WorkflowEngine implements FileUsage {
             node.timeoutMinutes() == null
                 ? null
                 : BusinessTime.now().plusMinutes(node.timeoutMinutes()));
-        tasks.saveAndFlush(task);
+        tasks.save(task);
         if (!"WAITING".equals(task.getStatus())) activate(request, task);
       }
       if ("COPY".equals(node.type())) {
@@ -970,7 +896,10 @@ public class WorkflowEngine implements FileUsage {
     request.setCurrentNodeId(null);
     request.setCurrentApproverId(null);
     for (var task : tasks.findByRequestIdOrderByIdAsc(request.getId()))
-      if (Set.of("PENDING", "WAITING").contains(task.getStatus())) task.setStatus("CANCELLED");
+      if (Set.of("PENDING", "WAITING").contains(task.getStatus())) {
+        task.setStatus("CANCELLED");
+        tasks.save(task);
+      }
     if (!request.getBusinessType().equals("GENERAL") && (active || !"CANCELLED".equals(status)))
       business(request.getBusinessType()).completed(request);
     String label =
@@ -1187,7 +1116,7 @@ public class WorkflowEngine implements FileUsage {
           old.getOriginalAssigneeName() == null ? sourceName : old.getOriginalAssigneeName());
       replacement.setDelegationId(null);
       replacement.setAssignmentNote("人员交接：" + input.reason().trim());
-      tasks.saveAndFlush(replacement);
+      tasks.save(replacement);
       if ("PENDING".equals(replacement.getStatus())) activate(request, replacement);
     }
     request.setCurrentApproverId(
@@ -1203,7 +1132,6 @@ public class WorkflowEngine implements FileUsage {
         sourceName + " → " + target.getNickname() + "；" + input.reason().trim(),
         target);
     request.setUpdatedAt(BusinessTime.now());
-    requests.flush();
     refreshParticipants(request);
     return detail(id);
   }
@@ -1217,7 +1145,6 @@ public class WorkflowEngine implements FileUsage {
     if (reason == null || reason.isBlank() || reason.length() > 300)
       throw new BusinessException("请输入 1 至 300 字恢复说明");
     orchestrator.recover(request, reason.trim(), this);
-    requests.flush();
     return detail(id);
   }
 
@@ -1238,8 +1165,10 @@ public class WorkflowEngine implements FileUsage {
     var caller = schema(request).node((String) audit.get("callerNodeId"));
     var decision = record(request, "SUBPROCESS_REPAIR", caller, input.reason().trim(), null);
     decision.setChangesJson(json.write(Map.of(WorkflowSubprocessRepair.AUDIT_KEY, audit)));
+    history.save(decision);
     request.setUpdatedAt(BusinessTime.now());
-    requests.flush();
+    requests.save(request);
+    requests.syncCollections(request);
     refreshParticipants(request);
     return detail(id);
   }
@@ -1311,9 +1240,10 @@ public class WorkflowEngine implements FileUsage {
     if (!"DRAFT".equals(request.getStatus())
         || !Objects.equals(request.getApplicantId(), access.current().getId()))
       throw new AccessDeniedException("只能删除本人未提交的草稿");
-    history.deleteAll(history.findAll((root, query, cb) -> cb.equal(root.get("requestId"), id)));
+    history.deleteByQuery(
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .where(new com.mybatisflex.core.query.QueryColumn("request_id").eq(id)));
     requests.delete(request);
-    requests.flush();
     realtime.changed(Set.of(access.current().getId()), "requests");
   }
 
@@ -1370,7 +1300,8 @@ public class WorkflowEngine implements FileUsage {
         throw new BusinessException("终止不能修改表单");
       finish(request, "CANCELLED");
       record(request, "TERMINATE", null, input.comment(), null);
-      requests.flush();
+      requests.save(request);
+      requests.syncCollections(request);
       refreshParticipants(request);
       return detail(id);
     }
@@ -1461,7 +1392,11 @@ public class WorkflowEngine implements FileUsage {
           }
           current.stream()
               .filter(pending -> Set.of("PENDING", "WAITING").contains(pending.getStatus()))
-              .forEach(pending -> pending.setStatus("CANCELLED"));
+              .forEach(
+                  pending -> {
+                    pending.setStatus("CANCELLED");
+                    tasks.save(pending);
+                  });
           if (input.targetNodeId() == null) finish(request, "RETURNED");
           else {
             var trail = path(request);
@@ -1473,7 +1408,6 @@ public class WorkflowEngine implements FileUsage {
         case "APPROVE" -> {
           task.setStatus("APPROVED");
           task.setDecidedAt(BusinessTime.now());
-          tasks.flush();
           var group =
               tasks.findByRequestIdOrderByIdAsc(id).stream()
                   .filter(
@@ -1509,7 +1443,11 @@ public class WorkflowEngine implements FileUsage {
           if (ready) {
             group.stream()
                 .filter(t -> t.getStatus().equals("PENDING"))
-                .forEach(t -> t.setStatus("CANCELLED"));
+                .forEach(
+                    t -> {
+                      t.setStatus("CANCELLED");
+                      tasks.save(t);
+                    });
             if (task.getExecutionTokenId() == null) advance(request, node.next());
             else orchestrator.approved(request, task, node.next(), this);
           }
@@ -1567,7 +1505,7 @@ public class WorkflowEngine implements FileUsage {
                     : task.getOriginalAssigneeName());
             added.setAssignmentNote("转交审批");
           }
-          tasks.saveAndFlush(added);
+          tasks.save(added);
           if (action.equals("TRANSFER")) {
             task.setStatus("TRANSFERRED");
             task.setDecidedAt(BusinessTime.now());
@@ -1581,13 +1519,16 @@ public class WorkflowEngine implements FileUsage {
         }
         default -> throw new BusinessException("不支持的审批动作");
       }
+      if (!input.action().equals("COMMENT")) tasks.save(task);
       var decision = record(request, action, node, input.comment(), target);
       decision.setNodeVisit(task.getNodeVisit());
       decision.setTargetNodeId(input.targetNodeId());
       decision.setChangesJson(changes.isEmpty() ? null : json.write(changes));
+      history.save(decision);
       request.setUpdatedAt(BusinessTime.now());
     }
-    requests.flush();
+    requests.save(request);
+    requests.syncCollections(request);
     refreshParticipants(request);
     return detail(id);
   }
@@ -1636,7 +1577,7 @@ public class WorkflowEngine implements FileUsage {
           request.getApplicantName() + "提醒你处理审批");
     request.setLastRemindedAt(now);
     record(request, "REMIND", null, "催办全部当前审批待办", null);
-    requests.flush();
+    requests.save(request);
     refreshParticipants(request);
     return detail(id);
   }

@@ -7,19 +7,19 @@ import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.security.SessionPolicy;
 import com.mayday.security.TokenService;
+import com.mayday.system.mapper.SessionMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.LoginSession;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.SessionRepository;
-import com.mayday.system.repository.UserRepository;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryCondition;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.time.Clock;
-import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,8 +35,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/operations/sessions")
 @RequiredArgsConstructor
 public class SessionController {
-  private final SessionRepository sessions;
-  private final UserRepository users;
+  private final SessionMapper sessions;
+  private final UserMapper users;
   private final AccessPolicy access;
   private final SessionPolicy policy;
   private final Clock sessionClock;
@@ -57,51 +57,59 @@ public class SessionController {
     access.require("sessions:view");
     String current = TokenService.hash(auth.substring(7));
     var now = sessionClock.instant();
-    Specification<SysUser> userScope = access.filter("users", "id");
-    Specification<LoginSession> scope =
-        (root, query, builder) -> {
-          var user = query.from(SysUser.class);
-          var visible = builder.equal(user.get("id"), access.current().getId());
-          if (access.has("users:view"))
-            visible = builder.or(visible, userScope.toPredicate(user, query, builder));
-          return builder.and(
-              builder.equal(root.get("userId"), user.get("id")),
-              builder.isTrue(user.get("enabled")),
-              visible,
-              builder.greaterThan(root.get("expiresAt"), now),
-              builder.greaterThan(
-                  root.get("createdAt"), now.minusSeconds(policy.getAbsoluteMinutes() * 60L)),
-              builder.greaterThan(
-                  builder.<Instant>coalesce(root.get("lastActiveAt"), root.get("createdAt")),
-                  now.minusSeconds(policy.getIdleMinutes() * 60L)),
-              builder.or(
-                  SearchPredicates.contains(builder, user.get("username"), keyword),
-                  SearchPredicates.contains(builder, user.get("nickname"), keyword)));
-        };
+    // 会话本身没有部门列；可见账号集合由用户表的行级并集子查询决定，本人会话始终可见。
+    QueryCondition visibleUser = new QueryColumn("id").eq(access.current().getId());
+    QueryCondition scopeCondition = access.scopeCondition("users", "id");
+    if (access.has("users:view") && scopeCondition != null)
+      visibleUser = visibleUser.or(scopeCondition);
+    QueryWrapper visibleUsers =
+        QueryWrapper.create()
+            .select(new QueryColumn("id"))
+            .from(SysUser.class)
+            .where(new QueryColumn("enabled").eq(true).and(visibleUser));
+    QueryCondition keywordMatch =
+        SearchPredicates.contains("username", keyword)
+            .or(SearchPredicates.contains("nickname", keyword));
+    visibleUsers.where(keywordMatch);
+    QueryWrapper filter =
+        QueryWrapper.create()
+            .where(new QueryColumn("user_id").in(visibleUsers))
+            .and(
+                sessions.activeWindow(
+                    now, policy.getAbsoluteMinutes() * 60L, policy.getIdleMinutes() * 60L));
     // UUID作为次级排序键，保证同一时刻多会话分页不重复或遗漏。
-    var paging =
-        PageRequest.of(
-            Math.max(1, page) - 1,
-            Math.max(1, Math.min(size, 100)),
-            Sort.by(Sort.Direction.DESC, "createdAt", "sessionId"));
+    var pageData =
+        sessions.paginate(
+            PageResult.request(page, size), filter.orderBy("created_at desc, session_id desc"));
+    // 一批取回本页账号的展示名，避免逐行加载账号及其授权明细。
+    Map<Long, SysUser> nameIndex = new HashMap<>();
+    if (!pageData.getRecords().isEmpty()) {
+      for (var row :
+          sessions.userSnapshots(
+              pageData.getRecords().stream().map(LoginSession::getUserId).distinct().toList())) {
+        SysUser snapshot = new SysUser();
+        snapshot.setId(row.getLong("id"));
+        snapshot.setUsername(row.getString("username"));
+        snapshot.setNickname(row.getString("nickname"));
+        nameIndex.put(snapshot.getId(), snapshot);
+      }
+    }
     var result =
-        sessions
-            .findAll(scope, paging)
-            .map(
-                s -> {
-                  var u = users.findById(s.getUserId()).orElseThrow();
-                  Map<String, Object> m = new LinkedHashMap<>();
-                  m.put("id", s.getSessionId());
-                  m.put("username", u.getUsername());
-                  m.put("nickname", u.getNickname());
-                  m.put("createdAt", s.getCreatedAt());
-                  m.put("lastActiveAt", s.getLastActiveAt());
-                  m.put("expiresAt", policy.effectiveExpiry(s));
-                  m.put("ip", s.getIp());
-                  m.put("device", s.getDevice());
-                  m.put("current", current.equals(s.getTokenHash()));
-                  return m;
-                });
+        pageData.map(
+            s -> {
+              var u = nameIndex.get(s.getUserId());
+              Map<String, Object> m = new LinkedHashMap<>();
+              m.put("id", s.getSessionId());
+              m.put("username", u.getUsername());
+              m.put("nickname", u.getNickname());
+              m.put("createdAt", s.getCreatedAt());
+              m.put("lastActiveAt", s.getLastActiveAt());
+              m.put("expiresAt", policy.effectiveExpiry(s));
+              m.put("ip", s.getIp());
+              m.put("device", s.getDevice());
+              m.put("current", current.equals(s.getTokenHash()));
+              return m;
+            });
     return ApiResponse.ok(PageResult.from(result));
   }
 

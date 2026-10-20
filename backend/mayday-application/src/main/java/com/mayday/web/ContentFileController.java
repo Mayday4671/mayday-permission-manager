@@ -2,9 +2,9 @@ package com.mayday.web;
 
 import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
-import com.mayday.content.ContentRevisionRepository;
-import com.mayday.content.NoticeRepository;
-import com.mayday.operations.repository.StoredFileRepository;
+import com.mayday.content.mapper.ContentRevisionMapper;
+import com.mayday.content.mapper.NoticeMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.storage.StoredFileContent;
 import com.mayday.operations.workflow.WorkflowEngine;
 import com.mayday.service.ContentService;
@@ -24,10 +24,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ContentFileController {
-  private final NoticeRepository notices;
-  private final ContentRevisionRepository revisions;
+  private final NoticeMapper notices;
+  private final ContentRevisionMapper revisions;
   private final ContentService content;
-  private final StoredFileRepository files;
+  private final StoredFileMapper files;
   private final StoredFileContent fileContent;
   private final WorkflowEngine approvals;
 
@@ -51,8 +51,12 @@ public class ContentFileController {
 
   private ResponseEntity<?> publicFile(Long id, Long fileId, boolean image) {
     var found =
-        notices.findOne(
-            ContentService.publiclyVisible().and((r, q, c) -> c.equal(r.get("id"), id)));
+        java.util.Optional.ofNullable(
+            notices.selectOneByQuery(
+                com.mybatisflex.core.query.QueryWrapper.create()
+                    .where(
+                        ContentService.publiclyVisible()
+                            .and(new com.mybatisflex.core.query.QueryColumn("id").eq(id)))));
     if (found.isEmpty()) return missing();
     var r = revisions.findById(found.get().getLiveRevisionId()).orElseThrow();
     if (image) fileId = r.getCoverId();

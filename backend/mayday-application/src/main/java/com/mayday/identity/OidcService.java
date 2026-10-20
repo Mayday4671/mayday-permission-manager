@@ -1,20 +1,19 @@
 package com.mayday.identity;
 
 import com.mayday.common.BusinessException;
-import com.mayday.security.JdbcSecurityState;
+import com.mayday.identity.mapper.ExternalIdentityMapper;
+import com.mayday.security.SecurityStateStore;
 import com.mayday.security.TokenService;
 import com.mayday.service.ChangeAuditService;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.web.Contracts.LoginView;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -27,12 +26,12 @@ public class OidcService {
   private final IdentityProperties properties;
   private final IdentitySecrets secrets;
   private final IdentityStore challenges;
+  private final ExternalIdentityMapper externalIdentities;
   private final OidcClient client;
   private final MfaService mfa;
   private final TokenService tokens;
-  private final UserRepository users;
-  private final JdbcTemplate jdbc;
-  private final JdbcSecurityState rates;
+  private final UserMapper users;
+  private final SecurityStateStore rates;
   private final Clock sessionClock;
   private final PlatformTransactionManager transactions;
   private final ChangeAuditService changeAudit;
@@ -78,12 +77,8 @@ public class OidcService {
       if (userId == null || session == null) throw new BusinessException("请先使用本地账号登录后绑定企业身份");
       var user = mfa.reauthenticate(userId, password, factor, ip);
       credentialHash = TokenService.hash(user.getPasswordHash());
-      if (jdbc.queryForObject(
-              "select count(*) from sys_external_identity where user_id=? and provider_id=?",
-              Long.class,
-              userId,
-              providerId)
-          > 0) throw new BusinessException("当前账号已绑定此企业登录方式，请先解除旧绑定");
+      if (externalIdentities.countByUserAndProvider(userId, providerId) > 0)
+        throw new BusinessException("当前账号已绑定此企业登录方式，请先解除旧绑定");
     }
     String browser = IdentityStore.random(),
         nonce = IdentityStore.random(),
@@ -149,14 +144,13 @@ public class OidcService {
                     .authenticate(bearer)
                     .filter(user -> user.getId().equals(account.getId()))
                     .isEmpty()) throw rejected();
-            jdbc.update(
-                "insert into sys_external_identity(id,user_id,provider_id,issuer_hash,subject_hash,created_at) values(?,?,?,?,?,?)",
+            externalIdentities.insertBinding(
                 UUID.randomUUID().toString(),
                 account.getId(),
                 provider.getId(),
                 issuerHash,
                 subjectHash,
-                Timestamp.from(sessionClock.instant()));
+                sessionClock.instant());
             changeAudit.record(
                 "用户",
                 account.getId(),
@@ -166,11 +160,7 @@ public class OidcService {
             return new Completion(true, null);
           }
           var matches =
-              jdbc.queryForList(
-                  "select id,user_id from sys_external_identity where provider_id=? and issuer_hash=? and subject_hash=?",
-                  provider.getId(),
-                  issuerHash,
-                  subjectHash);
+              externalIdentities.findByIdentity(provider.getId(), issuerHash, subjectHash);
           if (matches.isEmpty()) throw new BusinessException("此企业身份尚未绑定本地账号，请先用本地账号登录并在个人中心绑定");
           Map<String, Object> match = matches.getFirst();
           var account =
@@ -180,55 +170,46 @@ public class OidcService {
                   .orElseThrow(OidcService::rejected);
           // 先锁账号，再用当前读核对映射；RR 下普通读取会继续看到等锁前的旧快照。
           // 与解绑保持账号 → 映射的锁顺序，不能把首次定位映射改为先取映射锁。
-          if (jdbc.queryForList(
-                      "select id from sys_external_identity where id=? and user_id=? for update",
-                      match.get("id"),
-                      account.getId())
-                  .size()
-              != 1) throw rejected();
+          if (externalIdentities.countLocked((String) match.get("id"), account.getId()) != 1)
+            throw rejected();
           var login = mfa.loginAfterPrimary(account, ip, device, (String) match.get("id"));
           if (!login.mfaRequired())
-            jdbc.update(
-                "update sys_external_identity set last_login_at=? where id=?",
-                Timestamp.from(sessionClock.instant()),
-                match.get("id"));
+            externalIdentities.touchLogin((String) match.get("id"), sessionClock.instant());
           return new Completion(false, login);
         });
   }
 
   /** 绑定摘要限定为当前用户；禁用/删除提供方也能解除旧绑定，不依赖外部服务在线。 */
   public List<Binding> bindings(Long userId) {
-    return jdbc.query(
-        "select id,provider_id,created_at,last_login_at from sys_external_identity where user_id=? order by created_at desc",
-        (row, index) -> {
-          String id = row.getString("provider_id");
-          String name =
-              properties.getProviders().stream()
-                  .filter(provider -> provider.getId().equals(id))
-                  .map(IdentityProperties.Provider::getName)
-                  .findFirst()
-                  .orElse(id);
-          var last = row.getTimestamp("last_login_at");
-          return new Binding(
-              row.getString("id"),
-              id,
-              name,
-              row.getTimestamp("created_at").toInstant().toString(),
-              last == null ? null : last.toInstant().toString());
-        },
-        userId);
+    return externalIdentities.bindings(userId).stream()
+        .map(
+            row -> {
+              String id = row.getString("provider_id");
+              String name =
+                  properties.getProviders().stream()
+                      .filter(provider -> provider.getId().equals(id))
+                      .map(IdentityProperties.Provider::getName)
+                      .findFirst()
+                      .orElse(id);
+              var last = row.get("last_login_at");
+              var created = row.get("created_at");
+              return new Binding(
+                  row.getString("id"),
+                  id,
+                  name,
+                  created == null ? null : created.toString(),
+                  last == null ? null : last.toString());
+            })
+        .toList();
   }
 
   /** 本地密码是最后登录通道的明确证明；解绑后撤销所有会话，不能拿已有企业会话绕过密码/MFA。 */
   @org.springframework.transaction.annotation.Transactional
   public void unbind(Long userId, String id, String password, String factor, String ip) {
     mfa.reauthenticate(userId, password, factor, ip);
-    var binding =
-        jdbc.queryForList(
-            "select provider_id from sys_external_identity where id=? and user_id=?", id, userId);
+    var binding = externalIdentities.findProvider(id, userId);
     if (binding.isEmpty()) throw new BusinessException("绑定不存在或已解除");
-    if (jdbc.update("delete from sys_external_identity where id=? and user_id=?", id, userId) != 1)
-      throw new BusinessException("绑定不存在或已解除");
+    if (externalIdentities.delete(id, userId) != 1) throw new BusinessException("绑定不存在或已解除");
     changeAudit.record(
         "用户",
         userId,

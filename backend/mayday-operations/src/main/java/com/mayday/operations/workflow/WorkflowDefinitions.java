@@ -2,21 +2,21 @@ package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessException;
 import com.mayday.operations.OperationSupport;
+import com.mayday.operations.mapper.FlowDefinitionMapper;
+import com.mayday.operations.mapper.FlowRequestMapper;
+import com.mayday.operations.mapper.FlowVersionMapper;
 import com.mayday.operations.model.FlowDefinition;
 import com.mayday.operations.model.FlowVersion;
-import com.mayday.operations.repository.FlowDefinitionRepository;
-import com.mayday.operations.repository.FlowRequestRepository;
-import com.mayday.operations.repository.FlowVersionRepository;
 import com.mayday.operations.workflow.WorkflowSchema.Field;
 import com.mayday.operations.workflow.WorkflowSchema.Node;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import com.mayday.security.AccessPolicy;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -41,12 +41,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WorkflowDefinitions {
-  private final FlowDefinitionRepository definitions;
-  private final FlowVersionRepository versions;
-  private final FlowRequestRepository requests;
-  private final UserRepository users;
-  private final EntryRepository entries;
-  private final RoleRepository roles;
+  private final FlowDefinitionMapper definitions;
+  private final FlowVersionMapper versions;
+  private final FlowRequestMapper requests;
+  private final UserMapper users;
+  private final EntryMapper entries;
+  private final RoleMapper roles;
   private final AccessPolicy access;
   private final WorkflowJson json;
 
@@ -152,7 +152,7 @@ public class WorkflowDefinitions {
     definition.setBusinessType(input.businessType());
     definition.setEnabled(input.enabled());
     definition.setDraftSchema(schema);
-    definitions.saveAndFlush(definition);
+    definitions.save(definition);
     return view(definition);
   }
 
@@ -179,10 +179,11 @@ public class WorkflowDefinitions {
             + 1);
     published.setSchemaJson(json.write(schema));
     published.setPublisherName(access.current().getNickname());
-    versions.saveAndFlush(published);
+    versions.save(published);
     definition.setPublishedVersionId(published.getId());
     definition.setDraftSchema(published.getSchemaJson());
-    definitions.flush();
+    definitions.save(definition);
+    definitions.syncSteps(definition);
     return view(definition);
   }
 
@@ -377,13 +378,7 @@ public class WorkflowDefinitions {
         } else {
           node.assigneeIds().forEach(this::validRole);
           candidates =
-              users
-                  .findAll(
-                      (r, q, c) -> {
-                        q.distinct(true);
-                        return r.join("roles").get("id").in(node.assigneeIds());
-                      })
-                  .stream()
+              users.membersOfRoles(node.assigneeIds()).stream()
                   .filter(
                       user ->
                           user.isEnabled()

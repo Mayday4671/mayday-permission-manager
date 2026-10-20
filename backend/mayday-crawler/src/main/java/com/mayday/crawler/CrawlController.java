@@ -4,8 +4,10 @@ import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
-import com.mayday.operations.repository.FilePayloadRepository;
-import com.mayday.operations.repository.StoredFileRepository;
+import com.mayday.crawler.mapper.CrawlItemMapper;
+import com.mayday.crawler.mapper.CrawlTaskMapper;
+import com.mayday.operations.mapper.FilePayloadMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.security.AccessPolicy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -38,13 +40,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/crawler/tasks")
 @RequiredArgsConstructor
 public class CrawlController {
-  private final CrawlTaskRepository tasks;
-  private final CrawlItemRepository items;
+  private final CrawlTaskMapper tasks;
+  private final CrawlItemMapper items;
   private final CrawlStore store;
   private final AccessPolicy access;
   private final WebFetcher fetcher;
-  private final StoredFileRepository files;
-  private final FilePayloadRepository payloads;
+  private final StoredFileMapper files;
+  private final FilePayloadMapper payloads;
   private final CrawlArticles articles;
   private final Semaphore previews = new Semaphore(2);
 
@@ -66,18 +68,16 @@ public class CrawlController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     access.require("crawler:view");
+    var filter =
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .where(new com.mybatisflex.core.query.QueryColumn("archived").eq(false));
+    if (!access.has("crawler:all"))
+      filter.and(
+          new com.mybatisflex.core.query.QueryColumn("owner_id").eq(access.current().getId()));
+    filter.and(SearchPredicates.contains("name", keyword));
+    if (status != null) filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
     return ApiResponse.ok(
-        PageResult.from(
-            tasks.findAll(
-                (r, q, c) ->
-                    c.and(
-                        c.isFalse(r.get("archived")),
-                        access.has("crawler:all")
-                            ? c.conjunction()
-                            : c.equal(r.get("ownerId"), access.current().getId()),
-                        SearchPredicates.contains(c, r.get("name"), keyword),
-                        status == null ? c.conjunction() : c.equal(r.get("status"), status)),
-                PageResult.request(page, size))));
+        PageResult.from(tasks.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
 
   /** 读取配置必须保留原所有者边界；配置已删除时不返回旧的可编辑规则。 */
@@ -134,15 +134,13 @@ public class CrawlController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     store.configuration(id, false);
+    var filter =
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .where(new com.mybatisflex.core.query.QueryColumn("task_id").eq(id));
+    if (kind != null) filter.and(new com.mybatisflex.core.query.QueryColumn("kind").eq(kind));
+    if (status != null) filter.and(new com.mybatisflex.core.query.QueryColumn("status").eq(status));
     return ApiResponse.ok(
-        PageResult.from(
-            items.findAll(
-                (r, q, c) ->
-                    c.and(
-                        c.equal(r.get("taskId"), id),
-                        kind == null ? c.conjunction() : c.equal(r.get("kind"), kind),
-                        status == null ? c.conjunction() : c.equal(r.get("status"), status)),
-                PageResult.request(page, size))));
+        PageResult.from(items.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
 
   /** 规则预览须有执行权，每次只请求入口一页并受并发额度限制，不保存配置或采集结果。 */
@@ -232,8 +230,7 @@ public class CrawlController {
                 .toString())
         .contentType(MediaType.parseMediaType(file.getContentType()))
         .body(
-            payloads
-                .findById(file.getId())
+            java.util.Optional.ofNullable(payloads.selectOneById(file.getId()))
                 .orElseThrow(() -> new BusinessException("文件正文不存在"))
                 .getData());
   }

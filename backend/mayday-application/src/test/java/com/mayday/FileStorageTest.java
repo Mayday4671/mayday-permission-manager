@@ -16,13 +16,13 @@ import static org.mockito.Mockito.when;
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.FileUsage;
+import com.mayday.operations.mapper.FileDirectoryMapper;
+import com.mayday.operations.mapper.FilePayloadMapper;
+import com.mayday.operations.mapper.NotificationMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.model.FileDirectory;
 import com.mayday.operations.model.FilePayload;
 import com.mayday.operations.model.StoredFile;
-import com.mayday.operations.repository.FileDirectoryRepository;
-import com.mayday.operations.repository.FilePayloadRepository;
-import com.mayday.operations.repository.NotificationRepository;
-import com.mayday.operations.repository.StoredFileRepository;
 import com.mayday.operations.storage.FileCenterService;
 import com.mayday.operations.storage.FileStorage;
 import com.mayday.operations.storage.ImageThumbnail;
@@ -168,11 +168,11 @@ class FileStorageTest {
 
   @Test
   void legacyMysqlBytesRemainReadableAndKeysNeverSerialize() throws IOException {
-    FilePayloadRepository payloads = mock(FilePayloadRepository.class);
+    FilePayloadMapper payloads = mock(FilePayloadMapper.class);
     FilePayload payload = new FilePayload();
     payload.setId(7L);
     payload.setData(new byte[] {1, 2, 3});
-    when(payloads.findById(7L)).thenReturn(Optional.of(payload));
+    when(payloads.selectOneById(7L)).thenReturn(payload);
     StoredFile file = file(7L, 1L);
     file.setStorageKey("must-not-leak");
     file.setThumbnailKey("must-not-leak-thumbnail");
@@ -213,7 +213,7 @@ class FileStorageTest {
         AccessDeniedException.class, () -> fixture.service.batch("RECYCLE", List.of(2L, 1L), null));
     assertNull(own.getDeletedAt());
     assertNull(other.getDeletedAt());
-    verify(fixture.files, never()).flush();
+    verify(fixture.files, never()).save(any());
   }
 
   @Test
@@ -253,10 +253,9 @@ class FileStorageTest {
     FileStorage storage = mock(FileStorage.class);
     when(storage.provider()).thenReturn("LOCAL");
     StoredFileContent content =
-        new StoredFileContent(mock(FilePayloadRepository.class), List.of(storage));
+        new StoredFileContent(mock(FilePayloadMapper.class), List.of(storage));
     FileCenterService service = fixture.withContent(content);
-    when(fixture.files.saveAndFlush(any()))
-        .thenThrow(new IllegalStateException("database rejected"));
+    when(fixture.files.save(any())).thenThrow(new IllegalStateException("database rejected"));
     TransactionSynchronizationManager.initSynchronization();
     try {
       assertThrows(
@@ -294,9 +293,9 @@ class FileStorageTest {
 
   /** 只模拟授权与仓库边界，不用测试绕过真实生产登录或修改日常数据库。 */
   private class Fixture {
-    private final StoredFileRepository files = mock(StoredFileRepository.class);
-    private final FileDirectoryRepository directories = mock(FileDirectoryRepository.class);
-    private final NotificationRepository notifications = mock(NotificationRepository.class);
+    private final StoredFileMapper files = mock(StoredFileMapper.class);
+    private final FileDirectoryMapper directories = mock(FileDirectoryMapper.class);
+    private final NotificationMapper notifications = mock(NotificationMapper.class);
     private final FileUsage usage = mock(FileUsage.class);
     private final AccessPolicy access = mock(AccessPolicy.class);
     private final FileCenterService service;

@@ -1,9 +1,9 @@
 package com.mayday.service;
 
 import com.mayday.common.BusinessException;
-import com.mayday.content.ContentRevisionRepository;
 import com.mayday.content.Notice;
-import com.mayday.content.NoticeRepository;
+import com.mayday.content.mapper.ContentRevisionMapper;
+import com.mayday.content.mapper.NoticeMapper;
 import com.mayday.operations.model.FlowRequest;
 import com.mayday.operations.workflow.WorkflowBusiness;
 import com.mayday.security.AccessPolicy;
@@ -18,8 +18,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ContentApprovalBinding implements WorkflowBusiness {
   private final ContentService content;
-  private final NoticeRepository notices;
-  private final ContentRevisionRepository revisions;
+  private final NoticeMapper notices;
+  private final ContentRevisionMapper revisions;
   private final AccessPolicy access;
 
   @Override

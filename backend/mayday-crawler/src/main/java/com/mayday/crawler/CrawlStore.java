@@ -3,20 +3,21 @@ package com.mayday.crawler;
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.FileUsage;
+import com.mayday.crawler.mapper.CrawlItemMapper;
+import com.mayday.crawler.mapper.CrawlTaskMapper;
 import com.mayday.operations.OperationSupport;
+import com.mayday.operations.mapper.FilePayloadMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.model.FilePayload;
 import com.mayday.operations.model.StoredFile;
-import com.mayday.operations.repository.FilePayloadRepository;
-import com.mayday.operations.repository.StoredFileRepository;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,18 +27,17 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional
 public class CrawlStore implements FileUsage {
-  private final CrawlTaskRepository tasks;
-  private final CrawlItemRepository items;
+  private final CrawlTaskMapper tasks;
+  private final CrawlItemMapper items;
   private final AccessPolicy access;
-  private final UserRepository users;
-  private final StoredFileRepository files;
-  private final FilePayloadRepository payloads;
+  private final UserMapper users;
+  private final StoredFileMapper files;
+  private final FilePayloadMapper payloads;
   private final CrawlArticles articles;
-  private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   /** 所有节点使用数据库时间处理租约，应用服务器时钟偏差不改变所有权。 */
   private LocalDateTime databaseNow() {
-    return jdbc.queryForObject("select current_timestamp(6)", LocalDateTime.class);
+    return tasks.databaseNow();
   }
 
   private static final Set<String> ACTIVE = Set.of("QUEUED", "RUNNING");
@@ -90,7 +90,7 @@ public class CrawlStore implements FileUsage {
     }
     task.setName(name.trim());
     task.setRulesJson(rules.json());
-    return tasks.saveAndFlush(task);
+    return tasks.save(task);
   }
 
   /** 校验当前版本与执行/文件权限，初次入队、续跑和失败项重试分别处理，不重复创建成功结果。 */
@@ -126,7 +126,7 @@ public class CrawlStore implements FileUsage {
     task.setNextFetchAt(BusinessTime.now());
     task.setLeaseToken(null);
     task.setLeaseUntil(null);
-    return tasks.saveAndFlush(task);
+    return tasks.save(task);
   }
 
   /** 停止立即撤销租约并将正在请求的条目回到队列，已经在网络中的旧结果不再允许提交。 */
@@ -136,7 +136,7 @@ public class CrawlStore implements FileUsage {
     OperationSupport.version(task, version);
     if (!ACTIVE.contains(task.getStatus())) throw new BusinessException("任务当前没有运行");
     pause(task, null);
-    return tasks.saveAndFlush(task);
+    return tasks.save(task);
   }
 
   private void pause(CrawlTask task, String reason) {
@@ -169,10 +169,9 @@ public class CrawlStore implements FileUsage {
       task.setLeaseToken(null);
       task.setLeaseUntil(null);
       task.setNextFetchAt(null);
-      tasks.saveAndFlush(task);
+      tasks.save(task);
     } else {
       items.deleteByTaskId(id);
-      items.flush();
       tasks.delete(task);
     }
   }
@@ -195,7 +194,7 @@ public class CrawlStore implements FileUsage {
   /** 从到期任务领取一条队列并生成 120 秒租约；数据库内串行领取，网络处理在提交后执行。 */
   public Work claim() {
     var now = databaseNow();
-    for (Long id : tasks.ready(now, PageRequest.of(0, 10))) {
+    for (Long id : tasks.ready(now, 10)) {
       var task = tasks.lock(id).orElseThrow();
       if (!ACTIVE.contains(task.getStatus())
           || task.getLeaseUntil() != null && task.getLeaseUntil().isAfter(now)
@@ -213,8 +212,8 @@ public class CrawlStore implements FileUsage {
                   i.setError("连续故障恢复已达重试上限，可明确重试");
                   task.setFailedCount(task.getFailedCount() + 1);
                 } else i.setStatus("QUEUED");
+                items.save(i);
               });
-      items.flush();
       var item = items.findFirstByTaskIdAndStatusOrderByIdAsc(id, "QUEUED").orElse(null);
       if (item == null) {
         task.setStatus(task.getFailedCount() > 0 ? "PARTIAL" : "COMPLETED");
@@ -307,7 +306,7 @@ public class CrawlStore implements FileUsage {
       file.setOwnerId(task.getOwnerId());
       file.setOwnerName(task.getOwnerName());
       file.setSize(image.length);
-      files.saveAndFlush(file);
+      files.save(file);
       var payload = new FilePayload();
       payload.setId(file.getId());
       payload.setData(image);
@@ -347,12 +346,7 @@ public class CrawlStore implements FileUsage {
       return null;
     if (kind.equals("DETAIL")
         && ordinal == 0
-        && items.count(
-                (r, q, c) ->
-                    c.and(
-                        c.equal(r.get("taskId"), task.getId()),
-                        c.equal(r.get("kind"), "DETAIL"),
-                        c.equal(r.get("ordinal"), 0)))
+        && items.countByTaskIdAndKindAndOrdinal(task.getId(), "DETAIL", 0)
             >= task.getRules().maxDetails()) return null;
     if (!kind.equals("IMAGE")
         && items.countByTaskIdAndKindAndRootUrl(task.getId(), kind, root)
@@ -366,7 +360,7 @@ public class CrawlStore implements FileUsage {
     item.setRootUrl(root);
     item.setSourceUrl(source);
     item.setOrdinal(ordinal);
-    items.saveAndFlush(item);
+    items.save(item);
     return item;
   }
 

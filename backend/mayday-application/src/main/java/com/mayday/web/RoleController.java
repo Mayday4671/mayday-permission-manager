@@ -4,15 +4,15 @@ import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessException;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.security.PermissionCatalog;
 import com.mayday.service.UserService;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.DepartmentGrant;
 import com.mayday.system.model.SysRole;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
 import com.mayday.web.Contracts.RoleRequest;
+import com.mybatisflex.core.query.QueryWrapper;
 import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,9 +39,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/system/roles")
 @RequiredArgsConstructor
 public class RoleController {
-  private final RoleRepository roles;
-  private final UserRepository users;
-  private final com.mayday.system.repository.EntryRepository entries;
+  private final RoleMapper roles;
+  private final UserMapper users;
+  private final com.mayday.system.mapper.EntryMapper entries;
   private final AccessPolicy access;
   private final ModuleSwitches modules;
   private final com.mayday.service.ChangeAuditService changeAudit;
@@ -53,14 +53,13 @@ public class RoleController {
       @RequestParam(defaultValue = "") String keyword,
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
+    var filter = QueryWrapper.create();
+    com.mayday.common.SearchPredicates.anyOf(
+        filter,
+        com.mayday.common.SearchPredicates.contains("name", keyword),
+        com.mayday.common.SearchPredicates.contains("code", keyword));
     return ApiResponse.ok(
-        PageResult.from(
-            roles.findAll(
-                (root, query, criteria) ->
-                    criteria.or(
-                        SearchPredicates.contains(criteria, root.get("name"), keyword),
-                        SearchPredicates.contains(criteria, root.get("code"), keyword)),
-                PageResult.request(page, size))));
+        PageResult.from(roles.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
 
   /** 返回已注册且部署模块启用的权限分组，供配置界面展示；服务端保存时再次验证授权边界。 */
@@ -150,7 +149,8 @@ public class RoleController {
     role.setDataScopes(new HashMap<>(request.dataScopes()));
     role.setScopeDepartments(new HashSet<>(grants));
     access.checkGrant(List.of(role));
-    roles.saveAndFlush(role);
+    roles.save(role);
+    roles.syncDetails(role);
     changeAudit.record(
         "角色", role.getId(), id == null ? "创建角色" : "调整角色授权", before, auditSnapshot(role));
     return role;

@@ -1,16 +1,14 @@
 package com.mayday.identity;
 
 import com.mayday.common.BusinessException;
+import com.mayday.identity.mapper.IdentityChallengeMapper;
 import com.mayday.security.TokenService;
 import java.security.SecureRandom;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -19,13 +17,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** 身份挑战只存摘要与加密材料；独立短事务保存失败计数和一次性消费，网络请求不占行锁。 */
 @Component
 public class IdentityStore {
-  private final JdbcTemplate jdbc;
+  private final IdentityChallengeMapper challenges;
   private final Clock clock;
   private final TransactionTemplate isolated;
 
   public IdentityStore(
-      JdbcTemplate jdbc, Clock sessionClock, PlatformTransactionManager transactions) {
-    this.jdbc = jdbc;
+      IdentityChallengeMapper challenges,
+      Clock sessionClock,
+      PlatformTransactionManager transactions) {
+    this.challenges = challenges;
     this.clock = sessionClock;
     isolated = new TransactionTemplate(transactions);
     isolated.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -60,34 +60,31 @@ public class IdentityStore {
       throw new IllegalArgumentException("身份挑战用途不受支持");
     String token = random();
     Instant now = clock.instant();
-    jdbc.update(
-        "delete from sys_identity_challenge where expires_at < ? limit 1000",
-        Timestamp.from(now.minusSeconds(86400)));
-    jdbc.update(
-        "insert into sys_identity_challenge(token_hash,purpose,user_id,source_hash,browser_hash,session_hash,credential_hash,credential_revision,payload_cipher,expires_at,created_at) values(?,?,?,?,?,?,?,?,?,?,?)",
-        TokenService.hash(token),
-        purpose,
-        userId,
-        TokenService.hash(source),
-        digest(browser),
-        digest(session),
-        credentialHash,
-        credentialRevision,
-        payloadCipher,
-        Timestamp.from(now.plusSeconds(300)),
-        Timestamp.from(now));
+    challenges.purgeExpired(now.minusSeconds(86400));
+    challenges.insert(
+        new Challenge(
+            TokenService.hash(token),
+            purpose,
+            userId,
+            TokenService.hash(source),
+            digest(browser),
+            digest(session),
+            credentialHash,
+            credentialRevision,
+            payloadCipher,
+            now.plusSeconds(300),
+            null,
+            0),
+        now);
     return token;
   }
 
   /** 载入尚未消费的挑战；格式、用途、到期、来源错误统一拒绝，避免匿名枚举本地账号。 */
   public Challenge read(String token, String purpose, String source) {
     if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) throw invalid();
-    return jdbc
-        .query(
-            "select * from sys_identity_challenge where token_hash=?",
-            this::map,
-            TokenService.hash(token))
-        .stream()
+    return challenges.find(TokenService.hash(token)).stream()
+        .map(this::map)
+        .filter(row -> row != null)
         .filter(
             row ->
                 row.purpose.equals(purpose)
@@ -101,12 +98,7 @@ public class IdentityStore {
 
   /** 正式证明成功后只允许一个调用消费；与外层业务事务一起提交，不能重复签发登录会话。 */
   public void consume(Challenge challenge) {
-    if (jdbc.update(
-            "update sys_identity_challenge set consumed_at=? where token_hash=? and consumed_at is null and failed_attempts<5 and expires_at>?",
-            Timestamp.from(clock.instant()),
-            challenge.hash,
-            Timestamp.from(clock.instant()))
-        != 1) throw invalid();
+    if (challenges.consume(challenge.hash, clock.instant()) != 1) throw invalid();
   }
 
   /** OIDC code 交换前消费并独立提交；外部网络失败不能让同一 state/code 再次进入交换。 */
@@ -116,11 +108,7 @@ public class IdentityStore {
 
   /** 失败证明不因上层业务异常回滚计数；第 5 次失败后旧挑战不能继续猜测。 */
   public void failed(Challenge challenge) {
-    isolated.executeWithoutResult(
-        status ->
-            jdbc.update(
-                "update sys_identity_challenge set failed_attempts=least(failed_attempts+1,5) where token_hash=? and consumed_at is null",
-                challenge.hash));
+    isolated.executeWithoutResult(status -> challenges.fail(challenge.hash));
   }
 
   /** 256 位随机 URL 安全凭证；用于挑战、浏览器关联和 PKCE，不作长期业务标识。 */
@@ -130,22 +118,32 @@ public class IdentityStore {
     return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 
-  private Challenge map(ResultSet row, int index) throws SQLException {
-    Number userId = (Number) row.getObject("user_id");
-    Timestamp consumed = row.getTimestamp("consumed_at");
+  /** 行值到挑战快照；时间列由驱动以 java.time 类型返回，空值表示尚未消费。 */
+  private Challenge map(com.mybatisflex.core.row.Row row) {
+    Long userId = row.getLong("user_id");
+    Object consumed = row.get("consumed_at");
+    Object expires = row.get("expires_at");
     return new Challenge(
         row.getString("token_hash"),
         row.getString("purpose"),
-        userId == null ? null : userId.longValue(),
+        userId,
         row.getString("source_hash"),
         row.getString("browser_hash"),
         row.getString("session_hash"),
         row.getString("credential_hash"),
         row.getString("credential_revision"),
         row.getString("payload_cipher"),
-        row.getTimestamp("expires_at").toInstant(),
-        consumed == null ? null : consumed.toInstant(),
+        expires == null ? null : toInstant(expires),
+        consumed == null ? null : toInstant(consumed),
         row.getInt("failed_attempts"));
+  }
+
+  private static Instant toInstant(Object value) {
+    if (value instanceof Instant instant) return instant;
+    if (value instanceof java.time.LocalDateTime time)
+      return time.atZone(java.time.ZoneOffset.UTC).toInstant();
+    if (value instanceof Timestamp stamp) return stamp.toInstant();
+    throw new IllegalStateException("不支持的时间列类型: " + value.getClass());
   }
 
   private static String digest(String value) {

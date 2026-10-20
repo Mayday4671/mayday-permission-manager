@@ -29,8 +29,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.mock.env.MockEnvironment;
 
 /** 协议层使用真实 loopback HTTP 提供商和 RSA ID token；验证不是模拟一个固定 subject 返回值。 */
@@ -304,32 +302,27 @@ class IdentityProtocolTest {
   }
 
   @Test
-  void existingMfaCredentialsRequireMatchingKeyEvenWhenNewEnrollmentIsDisabled() throws Exception {
+  void existingMfaCredentialsRequireMatchingKeyEvenWhenNewEnrollmentIsDisabled() {
     var properties = new IdentityProperties(new MockEnvironment());
     properties.setEncryptionKey(Base64.getEncoder().encodeToString(new byte[32]));
     var secrets = new IdentitySecrets(properties);
     String cipher = secrets.encrypt("persisted-only-test-secret", "mfa:123");
-    JdbcTemplate jdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
-    java.sql.ResultSet row = org.mockito.Mockito.mock(java.sql.ResultSet.class);
-    org.mockito.Mockito.when(row.getString("secret_cipher")).thenReturn(cipher);
-    org.mockito.Mockito.when(row.getLong("user_id")).thenReturn(123L);
-    org.mockito.Mockito.doAnswer(
-            invocation -> {
-              invocation.<RowCallbackHandler>getArgument(1).processRow(row);
-              return null;
-            })
-        .when(jdbc)
-        .query(
-            org.mockito.ArgumentMatchers.eq("select user_id,secret_cipher from sys_mfa_credential"),
-            org.mockito.ArgumentMatchers.any(RowCallbackHandler.class));
-    var guard = new IdentityStartupGuard(secrets, jdbc);
+    com.mayday.identity.mapper.MfaCredentialMapper credentials =
+        org.mockito.Mockito.mock(com.mayday.identity.mapper.MfaCredentialMapper.class);
+    com.mybatisflex.core.row.Row row = new com.mybatisflex.core.row.Row();
+    row.put("user_id", 123L);
+    row.put("secret_cipher", cipher);
+    org.mockito.Mockito.when(credentials.selectAllRows()).thenReturn(java.util.List.of(row));
+    var guard = new IdentityStartupGuard(credentials, secrets);
     guard.afterPropertiesSet();
     properties.setEncryptionKey("");
-    assertThrows(IllegalStateException.class, () -> guard.afterPropertiesSet());
+    org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalStateException.class, () -> guard.afterPropertiesSet());
     byte[] replacement = new byte[32];
     replacement[0] = 1;
     properties.setEncryptionKey(Base64.getEncoder().encodeToString(replacement));
-    assertThrows(IllegalStateException.class, () -> guard.afterPropertiesSet());
+    org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalStateException.class, () -> guard.afterPropertiesSet());
   }
 
   @Test

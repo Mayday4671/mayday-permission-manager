@@ -8,10 +8,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.mayday.common.BusinessException;
+import com.mayday.operations.mapper.FlowDefinitionMapper;
+import com.mayday.operations.mapper.FlowRequestMapper;
+import com.mayday.operations.mapper.FlowVersionMapper;
 import com.mayday.operations.model.FlowRequest;
-import com.mayday.operations.repository.FlowDefinitionRepository;
-import com.mayday.operations.repository.FlowRequestRepository;
-import com.mayday.operations.repository.FlowVersionRepository;
 import com.mayday.operations.workflow.WorkflowDefinitions;
 import com.mayday.operations.workflow.WorkflowJson;
 import com.mayday.operations.workflow.WorkflowSchema;
@@ -20,10 +20,10 @@ import com.mayday.operations.workflow.WorkflowSchema.Field;
 import com.mayday.operations.workflow.WorkflowSchema.Node;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import com.mayday.security.AccessPolicy;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -245,10 +245,10 @@ class WorkflowFormSchemaTest {
         () -> fixture.definitions().resolveStoredSnapshot(42L, fixture.applicant()));
   }
 
-  /** Repository 模拟只提供已存实例；真实 JSON 编码器保持冻结模型，不接受参数模型替换。 */
+  /** EntityMapper 模拟只提供已存实例；真实 JSON 编码器保持冻结模型，不接受参数模型替换。 */
   private StoredFixture stored(Spec schema) {
-    FlowRequestRepository requests = mock(FlowRequestRepository.class);
-    UserRepository users = mock(UserRepository.class);
+    FlowRequestMapper requests = mock(FlowRequestMapper.class);
+    UserMapper users = mock(UserMapper.class);
     AccessPolicy access = mock(AccessPolicy.class);
     WorkflowJson json = new WorkflowJson();
     FlowRequest request = new FlowRequest();
@@ -266,12 +266,12 @@ class WorkflowFormSchemaTest {
     when(access.hasFor(approver, "requests:approve")).thenReturn(true);
     WorkflowDefinitions definitions =
         new WorkflowDefinitions(
-            mock(FlowDefinitionRepository.class),
-            mock(FlowVersionRepository.class),
+            mock(FlowDefinitionMapper.class),
+            mock(FlowVersionMapper.class),
             requests,
             users,
-            mock(EntryRepository.class),
-            mock(RoleRepository.class),
+            mock(EntryMapper.class),
+            mock(RoleMapper.class),
             access,
             json);
     return new StoredFixture(definitions, applicant, approver, access);

@@ -2,10 +2,9 @@ package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessTime;
 import com.mayday.common.ModuleSwitches;
-import com.mayday.operations.repository.FlowTaskRepository;
+import com.mayday.operations.mapper.FlowTaskMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,14 +14,14 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class WorkflowReminderWorker {
   private final ModuleSwitches modules;
-  private final FlowTaskRepository tasks;
+  private final FlowTaskMapper tasks;
   private final WorkflowReminders reminders;
 
   /** 每轮只取前一百条到期任务，逐项重新行锁校验；单项失败下轮重试，不阻断其他任务。 */
   @Scheduled(fixedDelay = 30_000L, initialDelay = 20_000L)
   public void run() {
     if (!modules.isEnabled("approvals")) return;
-    for (Long taskId : tasks.due(BusinessTime.now(), PageRequest.of(0, 100))) {
+    for (Long taskId : tasks.due(BusinessTime.now(), 100)) {
       try {
         reminders.timeout(taskId);
       } catch (RuntimeException error) {

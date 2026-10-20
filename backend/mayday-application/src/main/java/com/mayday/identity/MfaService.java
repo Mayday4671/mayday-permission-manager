@@ -1,25 +1,26 @@
 package com.mayday.identity;
 
 import com.mayday.common.BusinessException;
+import com.mayday.identity.mapper.ExternalIdentityMapper;
+import com.mayday.identity.mapper.IdentityChallengeMapper;
+import com.mayday.identity.mapper.MfaCredentialMapper;
 import com.mayday.security.AccessPolicy;
 import com.mayday.security.LoginThrottle;
 import com.mayday.security.TokenService;
 import com.mayday.security.Totp;
 import com.mayday.service.ChangeAuditService;
 import com.mayday.service.UserService;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.UserRepository;
 import com.mayday.web.Contracts.LoginView;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -32,8 +33,7 @@ public class MfaService {
   private final IdentityProperties properties;
   private final IdentitySecrets secrets;
   private final IdentityStore challenges;
-  private final JdbcTemplate jdbc;
-  private final UserRepository users;
+  private final UserMapper users;
   private final PasswordEncoder encoder;
   private final TokenService tokens;
   private final LoginThrottle throttle;
@@ -41,6 +41,9 @@ public class MfaService {
   private final AccessPolicy access;
   private final UserService userService;
   private final ChangeAuditService changeAudit;
+  private final MfaCredentialMapper mfaStore;
+  private final ExternalIdentityMapper externalIdentities;
+  private final IdentityChallengeMapper challengeStore;
 
   /** 个人中心只显示启用状态与剩余恢复码数；不返回已保存的共享密钥或散列。 */
   public record Status(boolean available, boolean enabled, long recoveryCodesRemaining) {}
@@ -52,13 +55,8 @@ public class MfaService {
   public Status status(Long userId) {
     return new Status(
         properties.isMfaEnabled(),
-        jdbc.queryForObject(
-                "select count(*) from sys_mfa_credential where user_id=?", Long.class, userId)
-            > 0,
-        jdbc.queryForObject(
-            "select count(*) from sys_mfa_recovery where user_id=? and used_at is null",
-            Long.class,
-            userId));
+        mfaStore.countCredential(userId) > 0,
+        mfaStore.countUnusedRecovery(userId));
   }
 
   /** 首因素通过后重新持有账号锁；只有没有 MFA 的账号才直接签发会话。 */
@@ -104,11 +102,7 @@ public class MfaService {
     if (challenge.payloadCipher() != null) {
       externalBindingId =
           secrets.decrypt(challenge.payloadCipher(), "mfa-binding:" + account.getId());
-      var binding =
-          jdbc.queryForList(
-              "select provider_id,issuer_hash from sys_external_identity where id=? and user_id=? for update",
-              externalBindingId,
-              account.getId());
+      var binding = externalIdentities.lockBinding(externalBindingId, account.getId());
       if (binding.isEmpty()) throw invalid();
       var provider = properties.provider(string(binding.getFirst(), "provider_id"));
       if (!TokenService.hash(provider.getIssuer())
@@ -125,10 +119,7 @@ public class MfaService {
     challenges.consume(challenge);
     succeeded(account.getId(), ip);
     if (externalBindingId != null)
-      jdbc.update(
-          "update sys_external_identity set last_login_at=? where id=?",
-          Timestamp.from(sessionClock.instant()),
-          externalBindingId);
+      externalIdentities.touchLogin(externalBindingId, sessionClock.instant());
     return new LoginView(tokens.issue(account, ip, device));
   }
 
@@ -204,13 +195,8 @@ public class MfaService {
     challenges.consume(challenge);
     succeeded(userId, ip);
     String revision = UUID.randomUUID().toString();
-    jdbc.update(
-        "insert into sys_mfa_credential(user_id,secret_cipher,revision,last_step,created_at) values(?,?,?,?,?)",
-        userId,
-        secrets.encrypt(secret, "mfa:" + userId),
-        revision,
-        step,
-        Timestamp.from(sessionClock.instant()));
+    mfaStore.insertCredential(
+        userId, secrets.encrypt(secret, "mfa:" + userId), revision, step, sessionClock.instant());
     var codes = newRecovery(userId, revision);
     tokens.revokeUser(userId);
     changeAudit.record("用户", userId, "开通多因素认证", Map.of("MFA", "未开通"), Map.of("MFA", "已开通"));
@@ -234,9 +220,8 @@ public class MfaService {
   public void disable(Long userId, String password, String factor, String ip) {
     reauthenticate(userId, password, factor, ip);
     if (credential(userId) == null) throw new BusinessException("尚未开通多因素认证");
-    jdbc.update("delete from sys_mfa_recovery where user_id=?", userId);
-    jdbc.update("delete from sys_mfa_credential where user_id=?", userId);
-    jdbc.update("delete from sys_identity_challenge where user_id=?", userId);
+    mfaStore.deleteByUser(userId);
+    challengeStore.deleteByUser(userId);
     tokens.revokeUser(userId);
     changeAudit.record("用户", userId, "关闭多因素认证", Map.of("MFA", "已开通"), Map.of("MFA", "未开通"));
   }
@@ -257,9 +242,8 @@ public class MfaService {
     userService.manageable(userId);
     reauthenticate(access.current().getId(), password, factor, ip);
     if (credential(userId) == null) throw new BusinessException("该账号尚未开通多因素认证");
-    jdbc.update("delete from sys_mfa_recovery where user_id=?", userId);
-    jdbc.update("delete from sys_mfa_credential where user_id=?", userId);
-    jdbc.update("delete from sys_identity_challenge where user_id=?", userId);
+    mfaStore.deleteByUser(userId);
+    challengeStore.deleteByUser(userId);
     tokens.revokeUser(userId);
     changeAudit.record(
         "用户",
@@ -270,7 +254,7 @@ public class MfaService {
   }
 
   private List<String> newRecovery(Long userId, String revision) {
-    jdbc.update("delete from sys_mfa_recovery where user_id=?", userId);
+    mfaStore.deleteRecoveryByUser(userId);
     var result = new ArrayList<String>();
     for (int index = 0; index < 10; index++) {
       byte[] bytes = new byte[16];
@@ -284,11 +268,7 @@ public class MfaService {
               + code.substring(16, 24)
               + "-"
               + code.substring(24);
-      jdbc.update(
-          "insert into sys_mfa_recovery(code_hash,user_id,credential_revision) values(?,?,?)",
-          TokenService.hash(code),
-          userId,
-          revision);
+      mfaStore.insertRecovery(TokenService.hash(code), userId, revision);
       result.add(formatted);
     }
     return result;
@@ -298,12 +278,11 @@ public class MfaService {
     String normalized =
         factor == null ? "" : factor.trim().replace("-", "").toUpperCase(java.util.Locale.ROOT);
     if (normalized.matches("[A-F0-9]{32}")) {
-      if (jdbc.update(
-              "update sys_mfa_recovery set used_at=? where code_hash=? and user_id=? and credential_revision=? and used_at is null",
-              Timestamp.from(sessionClock.instant()),
+      if (mfaStore.consumeRecovery(
               TokenService.hash(normalized),
               userId,
-              string(credential, "revision"))
+              string(credential, "revision"),
+              sessionClock.instant())
           == 1) return;
     } else {
       long step =
@@ -312,26 +291,14 @@ public class MfaService {
               normalized,
               sessionClock.instant(),
               ((Number) credential.get("last_step")).longValue());
-      if (step >= 0
-          && jdbc.update(
-                  "update sys_mfa_credential set last_step=? where user_id=? and last_step<?",
-                  step,
-                  userId,
-                  step)
-              == 1) return;
+      if (step >= 0 && mfaStore.advanceStep(userId, step) == 1) return;
     }
     throw new BusinessException("身份验证码不正确或已使用");
   }
 
   /** 所有凭据证明调用方先持有账号锁；当前读拒绝等锁期间刚启用/撤销后的旧快照。状态摘要独立使用无锁 count。 */
   private Map<String, Object> credential(Long userId) {
-    return jdbc
-        .queryForList(
-            "select secret_cipher,revision,last_step from sys_mfa_credential where user_id=? for update",
-            userId)
-        .stream()
-        .findFirst()
-        .orElse(null);
+    return mfaStore.lockCredential(userId).orElse(null);
   }
 
   private SysUser current(Long userId) {

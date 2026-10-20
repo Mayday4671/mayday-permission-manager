@@ -5,6 +5,7 @@ import com.mayday.netty.RelayConfig;
 import com.mayday.netty.RelaySnapshot;
 import com.mayday.netty.UdpRelay;
 import com.mayday.operations.OperationSupport;
+import com.mayday.relay.mapper.RelaySettingsMapper;
 import com.mayday.security.AccessPolicy;
 import jakarta.annotation.PreDestroy;
 import java.util.Objects;
@@ -18,14 +19,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class RelayService {
-  private final RelaySettingsRepository repository;
+  private final RelaySettingsMapper repository;
   private final AccessPolicy access;
   private final TransactionTemplate transaction;
   private final UdpRelay relay = new UdpRelay();
 
   /** 将 JPA 配置、事务边界和授权接入独立转发核心，数据库事务只在控制面运行。 */
   public RelayService(
-      RelaySettingsRepository repository, AccessPolicy access, PlatformTransactionManager manager) {
+      RelaySettingsMapper repository, AccessPolicy access, PlatformTransactionManager manager) {
     this.repository = repository;
     this.access = access;
     this.transaction = new TransactionTemplate(manager);
@@ -57,7 +58,7 @@ public class RelayService {
           var row = settings();
           OperationSupport.version(row, version);
           row.apply(config);
-          return repository.saveAndFlush(row);
+          return repository.save(row);
         });
   }
 

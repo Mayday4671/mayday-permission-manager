@@ -1,11 +1,13 @@
 package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessException;
+import com.mayday.operations.mapper.FlowDecisionMapper;
 import com.mayday.operations.model.FlowDecision;
 import com.mayday.operations.model.FlowRequest;
-import com.mayday.operations.repository.FlowDecisionRepository;
 import com.mayday.operations.workflow.WorkflowSchema.Field;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,7 +15,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 /**
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class WorkflowPrivateDrafts {
-  private final FlowDecisionRepository history;
+  private final FlowDecisionMapper history;
   private final WorkflowJson json;
 
   /** 只识别旧版退回/撤回后 EDIT 覆盖。已有独立私人稿表示已提交列正确，不再重建；终止后的 CANCELLED 仍需兼容，因为管理员终止并不会使此前私人修改成为正式审批数据。 */
@@ -31,8 +32,10 @@ public class WorkflowPrivateDrafts {
         || !Set.of("RETURNED", "WITHDRAWN", "CANCELLED").contains(request.getStatus()))
       return List.of();
     var records =
-        history.findAll(
-            (root, query, cb) -> cb.equal(root.get("requestId"), request.getId()), Sort.by("id"));
+        history.selectListByQuery(
+            QueryWrapper.create()
+                .where(new QueryColumn("request_id").eq(request.getId()))
+                .orderBy("id asc"));
     long closed =
         records.stream()
             .filter(

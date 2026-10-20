@@ -2,20 +2,20 @@ package com.mayday.service;
 
 import com.mayday.common.BusinessTime;
 import com.mayday.content.ContentPublication;
-import com.mayday.content.ContentPublicationRepository;
 import com.mayday.content.ContentRevision;
-import com.mayday.content.ContentRevisionRepository;
 import com.mayday.content.Notice;
-import com.mayday.content.NoticeRepository;
+import com.mayday.content.mapper.ContentPublicationMapper;
+import com.mayday.content.mapper.ContentRevisionMapper;
+import com.mayday.content.mapper.NoticeMapper;
 import com.mayday.security.PermissionCatalog;
+import com.mayday.system.mapper.DictionaryItemMapper;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.DictionaryItem;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.DictionaryItemRepository;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -36,13 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class BootstrapData implements CommandLineRunner {
-  private final UserRepository users;
-  private final RoleRepository roles;
-  private final EntryRepository entries;
-  private final DictionaryItemRepository dictionaryItems;
-  private final NoticeRepository notices;
-  private final ContentRevisionRepository revisions;
-  private final ContentPublicationRepository publications;
+  private final UserMapper users;
+  private final RoleMapper roles;
+  private final EntryMapper entries;
+  private final DictionaryItemMapper dictionaryItems;
+  private final NoticeMapper notices;
+  private final ContentRevisionMapper revisions;
+  private final ContentPublicationMapper publications;
   private final PasswordEncoder encoder;
   private final PortalStructureService portal;
 
@@ -321,7 +321,7 @@ public class BootstrapData implements CommandLineRunner {
     n.setAuthorId(owner.getId());
     n.setDepartmentId(owner.getDepartmentId());
     n.setAuthorName("Mayday 团队");
-    notices.saveAndFlush(n);
+    notices.save(n);
     var r = new ContentRevision();
     r.setNoticeId(n.getId());
     r.setRevisionNumber(1);
@@ -337,7 +337,7 @@ public class BootstrapData implements CommandLineRunner {
     r.setEditorId(owner.getId());
     r.setPortalChannelId(portal.contentChannel(r.getCategoryId(), null));
     r.setEditorName(owner.getNickname());
-    revisions.saveAndFlush(r);
+    revisions.save(r);
     n.setDraftRevisionId(r.getId());
     if (published) {
       n.setLiveRevisionId(r.getId());

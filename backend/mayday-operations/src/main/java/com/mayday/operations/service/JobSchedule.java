@@ -1,7 +1,7 @@
 package com.mayday.operations.service;
 
 import com.mayday.common.BusinessTime;
-import com.mayday.operations.repository.ScheduledJobRepository;
+import com.mayday.operations.mapper.ScheduledJobMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 @EnableScheduling
 @RequiredArgsConstructor
 public class JobSchedule {
-  private final ScheduledJobRepository jobs;
+  private final ScheduledJobMapper jobs;
   private final JobRunner runner;
   private final com.mayday.common.ModuleSwitches modules;
   private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(JobSchedule.class);

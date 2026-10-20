@@ -27,8 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class IdentityController {
   private final MfaService mfa;
+
   private final OidcService oidc;
+
   private final AccessPolicy access;
+
   private final Environment environment;
 
   /** 敏感身份变更必须当场证明本地密码，已开通 MFA 时同时提交一次性因素。 */

@@ -1,11 +1,10 @@
 package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessTime;
+import com.mayday.operations.mapper.FlowRequestMapper;
+import com.mayday.operations.mapper.FlowTaskMapper;
 import com.mayday.operations.model.FlowTask;
 import com.mayday.operations.realtime.RealtimeEvents;
-import com.mayday.operations.repository.FlowRequestRepository;
-import com.mayday.operations.repository.FlowTaskRepository;
-import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -16,10 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class WorkflowReminders {
-  private final FlowTaskRepository tasks;
-  private final FlowRequestRepository requests;
+  private final FlowTaskMapper tasks;
+  private final FlowRequestMapper requests;
   private final WorkflowEvents events;
-  private final EntityManager entityManager;
   private final RealtimeEvents realtime;
   private final WorkflowOrchestrator orchestrator;
 
@@ -32,10 +30,10 @@ public class WorkflowReminders {
     if (rootCandidate != null && rootCandidate.getRootRequestId() != null)
       requests.lockById(rootCandidate.getRootRequestId());
     var request = requests.lockById(candidate.getRequestId()).orElse(null);
-    if (request != null && request.getExecutionState() != null) entityManager.refresh(request);
     if (request == null || !"PENDING".equals(request.getStatus())) return;
-    // 第一次读可能早于等待行锁，刷新实体确保读到前一个决策事务提交后的任务状态。
-    entityManager.refresh(candidate);
+    // 第一次读可能早于等待行锁；拿锁后重新读取，确保读到前一个决策事务提交后的任务状态。
+    candidate = tasks.findById(taskId).orElse(null);
+    if (candidate == null) return;
     LocalDateTime now = BusinessTime.now();
     if (!"PENDING".equals(candidate.getStatus())
         || (candidate.getExecutionTokenId() == null

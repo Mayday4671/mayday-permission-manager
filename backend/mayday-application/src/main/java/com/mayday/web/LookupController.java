@@ -6,12 +6,13 @@ import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.NavigationCatalog;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysRole;
-import com.mayday.system.model.SysUser;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,9 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/system")
 @RequiredArgsConstructor
 public class LookupController {
-  private final EntryRepository entries;
-  private final RoleRepository roles;
-  private final UserRepository users;
+  private final EntryMapper entries;
+  private final RoleMapper roles;
+  private final UserMapper users;
   private final AccessPolicy access;
   private final com.mayday.common.ModuleSwitches modules;
 
@@ -43,16 +44,12 @@ public class LookupController {
       @RequestParam(defaultValue = "30") int size) {
     if ("users".equals(kind)) {
       access.require("users:view");
-      var found =
-          users.findAll(
-              (root, query, criteria) ->
-                  criteria.and(
-                      access.<SysUser>filter("users", "id").toPredicate(root, query, criteria),
-                      criteria.isTrue(root.get("enabled")),
-                      criteria.or(
-                          SearchPredicates.contains(criteria, root.get("nickname"), keyword),
-                          SearchPredicates.contains(criteria, root.get("username"), keyword))),
-              PageResult.request(page, size));
+      var userFilter = access.filter("users", "id").and(new QueryColumn("enabled").eq(true));
+      SearchPredicates.anyOf(
+          userFilter,
+          SearchPredicates.contains("nickname", keyword),
+          SearchPredicates.contains("username", keyword));
+      var found = users.paginate(PageResult.request(page, size), userFilter.orderBy("id desc"));
       return ApiResponse.ok(
           PageResult.from(
               found.map(
@@ -70,13 +67,13 @@ public class LookupController {
         access.require("approvalcategories:view");
     } else if (!access.has("notices:view")) access.require(kind + ":view");
     var found =
-        entries.findAll(
-            (root, query, criteria) ->
-                criteria.and(
-                    criteria.equal(root.get("kind"), kind),
-                    criteria.isTrue(root.get("enabled")),
-                    SearchPredicates.contains(criteria, root.get("name"), keyword)),
-            PageResult.request(page, size));
+        entries.paginate(
+            PageResult.request(page, size),
+            QueryWrapper.create()
+                .where(new QueryColumn("kind").eq(kind))
+                .and(new QueryColumn("enabled").eq(true))
+                .and(SearchPredicates.contains("name", keyword))
+                .orderBy("sort_order asc, id asc"));
     return ApiResponse.ok(
         PageResult.from(
             found.map(entry -> Map.of("value", entry.getId(), "label", entry.getName()))));

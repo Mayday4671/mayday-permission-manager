@@ -3,6 +3,10 @@ package com.mayday.crawler;
 import com.mayday.common.BusinessException;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
+import com.mayday.crawler.mapper.CrawlArticleImageMapper;
+import com.mayday.crawler.mapper.CrawlArticleMapper;
+import com.mayday.crawler.mapper.CrawlItemMapper;
+import com.mayday.crawler.mapper.CrawlTaskMapper;
 import com.mayday.security.AccessPolicy;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -22,10 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional
 public class CrawlArticles {
-  private final CrawlArticleRepository articles;
-  private final CrawlArticleImageRepository links;
-  private final CrawlItemRepository items;
-  private final CrawlTaskRepository tasks;
+  private final CrawlArticleMapper articles;
+  private final CrawlArticleImageMapper links;
+  private final CrawlItemMapper items;
+  private final CrawlTaskMapper tasks;
   private final AccessPolicy access;
 
   /** 列表摘要与真实采集计数；图片数只统计已保存的不同文件，不相信文章标题里的“10P”等提示。 */
@@ -83,7 +87,7 @@ public class CrawlArticles {
     } else if (article.getSummary().isBlank() && !text.body().isBlank()) {
       article.setSummary(ArticleExtractor.limit(text.body().replaceAll("\\s+", " "), 300));
     }
-    articles.saveAndFlush(article);
+    articles.save(article);
     item.setArticleId(article.getId());
     item.setArticleBody(text.body());
     item.setBodyTruncated(text.truncated());
@@ -115,7 +119,6 @@ public class CrawlArticles {
   /** 仅彻底清理数据时移除归档文章，普通配置归档保留历史正文与来源。 */
   public void deleteArticles(Long task) {
     articles.deleteByTaskId(task);
-    articles.flush();
   }
 
   /** 下载失败或尚在队列的封面不返回地址；浏览器只请求已入库图片的鉴权接口。 */
@@ -164,23 +167,21 @@ public class CrawlArticles {
     boolean all = access.has("crawler:all");
     Long owner = access.current().getId();
     // 跨任务卡片必须先在 SQL 内限制任务所有者，再统计总数和分页，不能取回所有文章后在前端过滤。
+    var allowedTasks =
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .select(new com.mybatisflex.core.query.QueryColumn("id"))
+            .from(CrawlTask.class);
+    if (!all) allowedTasks.where(new com.mybatisflex.core.query.QueryColumn("owner_id").eq(owner));
+    var filter =
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .where(new com.mybatisflex.core.query.QueryColumn("task_id").in(allowedTasks));
+    if (task != null) filter.and(new com.mybatisflex.core.query.QueryColumn("task_id").eq(task));
+    filter.and(SearchPredicates.contains("title", keyword));
     var data =
-        articles.findAll(
-            (r, q, c) -> {
-              var allowed = q.subquery(Long.class);
-              var t = allowed.from(CrawlTask.class);
-              allowed
-                  .select(t.get("id"))
-                  .where(all ? c.conjunction() : c.equal(t.get("ownerId"), owner));
-              return c.and(
-                  r.get("taskId").in(allowed),
-                  task == null ? c.conjunction() : c.equal(r.get("taskId"), task),
-                  SearchPredicates.contains(c, r.get("title"), keyword));
-            },
-            PageResult.request(page, Math.min(size, 24)));
+        articles.paginate(PageResult.request(page, Math.min(size, 24)), filter.orderBy("id desc"));
     var byId = new HashMap<Long, CrawlTask>();
     tasks
-        .findAllById(data.stream().map(CrawlArticle::getTaskId).distinct().toList())
+        .findAllById(data.getRecords().stream().map(CrawlArticle::getTaskId).distinct().toList())
         .forEach(t -> byId.put(t.getId(), t));
     return PageResult.from(
         data.map(

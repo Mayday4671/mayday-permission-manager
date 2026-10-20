@@ -1,9 +1,7 @@
 package com.mayday.operations.model;
 
 import com.mayday.common.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import com.mybatisflex.annotation.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,35 +9,31 @@ import lombok.Setter;
 /** 每人一条待办。申请主记录行锁保护整组会签；转交保留原任务为历史，加签标记为必签。 */
 @Getter
 @Setter
-@Entity
-@Table(name = "ops_flow_task")
+@Table(
+    value = "ops_flow_task",
+    onInsert = BaseEntity.CreatedAtListener.class,
+    onUpdate = BaseEntity.UpdatedAtListener.class)
 public class FlowTask extends BaseEntity {
   private Long requestId;
 
-  @Column(length = 40)
   private String nodeId;
 
-  @Column(length = 80)
   private String nodeName;
 
   private Long assigneeId;
 
-  @Column(length = 64)
   private String assigneeName;
 
   /** 临时委托或管理员交接前的原指定人；为空表示任务没有发生归属替换。 */
   private Long originalAssigneeId;
 
-  @Column(length = 64)
   private String originalAssigneeName;
 
   /** 已激活的任务保存委托来源；委托撤销或到期不追溯改变该任务。 */
   private Long delegationId;
 
-  @Column(length = 500)
   private String assignmentNote;
 
-  @Column(length = 20)
   private String status = "PENDING";
 
   private boolean mandatory;
@@ -50,11 +44,9 @@ public class FlowTask extends BaseEntity {
   private int nodeVisit;
 
   /** 并行办理只核验本游标的访问批次，不能用申请最后激活的节点排除其他合法支路。 */
-  @Column(length = 40)
   private String executionTokenId;
 
   /** 抄送没有审批能力；顺签尚未轮到的任务为 WAITING，不计入个人待办。 */
-  @Column(nullable = false, length = 16)
   private String kind = "APPROVAL";
 
   /** 仅抄送接收者能标记已读，不能修改其他接收者的阅读状态。 */

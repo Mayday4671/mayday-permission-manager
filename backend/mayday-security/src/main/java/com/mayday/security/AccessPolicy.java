@@ -1,13 +1,14 @@
 package com.mayday.security;
 
 import com.mayday.common.ModuleSwitches;
+import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.DepartmentGrant;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
-import jakarta.persistence.criteria.Predicate;
-import java.util.ArrayList;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryCondition;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -16,7 +17,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 @Component("access")
 @RequiredArgsConstructor
 public class AccessPolicy {
-  private final EntryRepository entries;
+  private final EntryMapper entries;
   private final ModuleSwitches modules;
 
   /** 取得过滤器本次载入的数据库账号；只能在已经认证的请求或显式建立身份上下文之后调用。 */
@@ -182,17 +182,24 @@ public class AccessPolicy {
     if (!contains(resource, ownerId, departmentId)) throw new AccessDeniedException("该数据不在您的授权范围内");
   }
 
-  /** 把同一行级并集放进 SQL 查询和计数；实体必须具备约定的所有者字段及 departmentId 字段。 */
-  public <T> Specification<T> filter(String resource, String ownerField) {
-    return (root, query, builder) -> {
-      EffectiveScope scope = effectiveScope(resource);
-      if (scope.all()) return builder.conjunction();
-      var predicates = new ArrayList<Predicate>();
-      if (scope.self()) predicates.add(builder.equal(root.get(ownerField), current().getId()));
-      if (!scope.departments().isEmpty())
-        predicates.add(root.get("departmentId").in(scope.departments()));
-      return builder.or(predicates.toArray(Predicate[]::new));
-    };
+  /** 把同一行级并集放进 SQL 查询和计数；调用方传数据库列名，实体表必须具备约定的所有者列及 department_id 列。 */
+  public QueryWrapper filter(String resource, String ownerColumn) {
+    QueryWrapper wrapper = QueryWrapper.create();
+    QueryCondition condition = scopeCondition(resource, ownerColumn);
+    return condition == null ? wrapper : wrapper.where(condition);
+  }
+
+  /** 行级并集的条件形态，供联查或子查询组合；全部范围返回 null 表示不限制。 */
+  public QueryCondition scopeCondition(String resource, String ownerColumn) {
+    EffectiveScope scope = effectiveScope(resource);
+    if (scope.all()) return null;
+    QueryCondition self = scope.self() ? new QueryColumn(ownerColumn).eq(current().getId()) : null;
+    QueryCondition departments =
+        scope.departments().isEmpty()
+            ? null
+            : new QueryColumn("department_id").in(scope.departments());
+    if (self != null && departments != null) return self.or(departments);
+    return self != null ? self : departments;
   }
 
   /** 只能委托自己已拥有的权限和数据范围。角色管理权不等于授予超级管理员的权力。 */

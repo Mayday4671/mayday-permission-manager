@@ -1,9 +1,8 @@
 package com.mayday.operations.service;
 
-import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class AlertRecipients {
-  private final UserRepository users;
+  private final UserMapper users;
   private final AccessPolicy access;
 
   /** 告警候选的最小信息：ID与显示名；不借任务或监控配置页面提供全站敏感用户资料。 */
@@ -28,12 +27,13 @@ public class AlertRecipients {
   public List<Option> list(String permission, String keyword) {
     access.require(permission);
     return users
-        .findAll(
-            (root, query, criteria) ->
-                criteria.and(
-                    criteria.isTrue(root.get("enabled")),
-                    SearchPredicates.contains(criteria, root.get("nickname"), keyword)),
-            PageResult.request(1, 100))
+        .paginate(
+            1,
+            100,
+            com.mybatisflex.core.query.QueryWrapper.create()
+                .where(new com.mybatisflex.core.query.QueryColumn("enabled").eq(true))
+                .and(SearchPredicates.contains("nickname", keyword)))
+        .getRecords()
         .stream()
         .filter(user -> access.hasFor(user, permission))
         .map(user -> new Option(user.getId(), user.getNickname()))

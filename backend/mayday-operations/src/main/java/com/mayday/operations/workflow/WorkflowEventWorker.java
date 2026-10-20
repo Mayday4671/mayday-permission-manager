@@ -1,9 +1,8 @@
 package com.mayday.operations.workflow;
 
 import com.mayday.common.BusinessTime;
-import com.mayday.operations.repository.BusinessEventRepository;
+import com.mayday.operations.mapper.BusinessEventMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -11,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class WorkflowEventWorker {
-  private final BusinessEventRepository events;
+  private final BusinessEventMapper events;
   private final WorkflowEvents delivery;
   private final com.mayday.common.ModuleSwitches modules;
 
@@ -19,7 +18,7 @@ public class WorkflowEventWorker {
   @Scheduled(fixedDelay = 3000, initialDelay = 5000)
   public void run() {
     if (!modules.isEnabled("approvals")) return;
-    for (Long id : events.due(BusinessTime.now(), PageRequest.of(0, 100)))
+    for (Long id : events.due(BusinessTime.now(), 100))
       try {
         delivery.deliver(id);
       } catch (Exception error) {

@@ -1,6 +1,6 @@
 package com.mayday.config;
 
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
 @DependsOnDatabaseInitialization
 public class ProductionSafety implements InitializingBean {
   private final Environment environment;
-  private final UserRepository users;
+  private final UserMapper users;
   private final PasswordEncoder encoder;
   private static final Set<String> EXAMPLE_SECRETS =
       Set.of("MaydayDb_2026_local", "MaydayRoot_2026_local", "Mayday@2026");

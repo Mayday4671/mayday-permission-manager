@@ -9,10 +9,10 @@ import com.mayday.security.PermissionCatalog;
 import com.mayday.security.SlideCaptchaService;
 import com.mayday.security.TokenService;
 import com.mayday.service.UserService;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.UserRepository;
 import com.mayday.web.Contracts.DataScope;
 import com.mayday.web.Contracts.LoginRequest;
 import com.mayday.web.Contracts.LoginView;
@@ -39,13 +39,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
-  private final UserRepository users;
+  private final UserMapper users;
   private final PasswordEncoder encoder;
   private final TokenService tokens;
   private final AccessPolicy access;
   private final LoginThrottle throttle;
   private final SlideCaptchaService captcha;
-  private final EntryRepository entries;
+  private final EntryMapper entries;
   private final MfaService mfa;
 
   /** 消费账号及来源绑定的滑块凭证，限流并验证密码/启用状态后签发不透明会话令牌。 */

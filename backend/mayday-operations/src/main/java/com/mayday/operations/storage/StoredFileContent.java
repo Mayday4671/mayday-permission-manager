@@ -1,8 +1,8 @@
 package com.mayday.operations.storage;
 
 import com.mayday.common.BusinessException;
+import com.mayday.operations.mapper.FilePayloadMapper;
 import com.mayday.operations.model.StoredFile;
-import com.mayday.operations.repository.FilePayloadRepository;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,10 +20,10 @@ import org.springframework.stereotype.Service;
 /** 统一正文读取入口：文件中心、通知、审批和门户复用存储路由，不再直接假设正文在 MySQL。 本服务不授予访问权，调用方必须先验证所属业务；回收或待清理文件始终拒绝读取。 */
 @Service
 public class StoredFileContent {
-  private final FilePayloadRepository payloads;
+  private final FilePayloadMapper payloads;
   private final List<FileStorage> storages;
 
-  public StoredFileContent(FilePayloadRepository payloads, List<FileStorage> storages) {
+  public StoredFileContent(FilePayloadMapper payloads, List<FileStorage> storages) {
     this.payloads = payloads;
     this.storages = List.copyOf(storages);
   }
@@ -41,8 +41,7 @@ public class StoredFileContent {
     active(file);
     if ("MYSQL".equals(file.getStorageProvider()))
       return new ByteArrayInputStream(
-          payloads
-              .findById(file.getId())
+          java.util.Optional.ofNullable(payloads.selectOneById(file.getId()))
               .orElseThrow(() -> new BusinessException("文件正文不存在"))
               .getData());
     return storage(file.getStorageProvider()).open(file.getStorageKey());

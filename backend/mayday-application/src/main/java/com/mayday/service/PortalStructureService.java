@@ -2,15 +2,15 @@ package com.mayday.service;
 
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
-import com.mayday.content.ContentRevisionRepository;
-import com.mayday.content.NoticeRepository;
 import com.mayday.content.PortalCategory;
-import com.mayday.content.PortalCategoryRepository;
 import com.mayday.content.PortalChannel;
-import com.mayday.content.PortalChannelRepository;
-import com.mayday.content.PortalHomeRepository;
+import com.mayday.content.mapper.ContentRevisionMapper;
+import com.mayday.content.mapper.NoticeMapper;
+import com.mayday.content.mapper.PortalCategoryMapper;
+import com.mayday.content.mapper.PortalChannelMapper;
+import com.mayday.content.mapper.PortalHomeMapper;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.repository.EntryRepository;
+import com.mayday.system.mapper.EntryMapper;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -32,12 +32,12 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PortalStructureService {
-  private final PortalChannelRepository channels;
-  private final PortalCategoryRepository categories;
-  private final PortalHomeRepository homes;
-  private final EntryRepository entries;
-  private final ContentRevisionRepository revisions;
-  private final NoticeRepository notices;
+  private final PortalChannelMapper channels;
+  private final PortalCategoryMapper categories;
+  private final PortalHomeMapper homes;
+  private final EntryMapper entries;
+  private final ContentRevisionMapper revisions;
+  private final NoticeMapper notices;
   private final AccessPolicy access;
   private final JsonMapper json;
 
@@ -59,7 +59,6 @@ public class PortalStructureService {
       binding.setSortOrder(entry.getSortOrder());
       categories.save(binding);
     }
-    categories.flush();
   }
 
   /** 栏目输入只接受受支持模板与站内访问名称；分类编号必须真实、唯一且未归属其他栏目。 */
@@ -235,7 +234,7 @@ public class PortalStructureService {
     channel.setEnabled(input.enabled());
     // 分类次序也是栏目配置；即使基本字段未变，也必须递增版本，防止旧弹窗覆盖另一人的分类调整。
     if (id != null) channel.setUpdatedAt(BusinessTime.now());
-    channels.saveAndFlush(channel);
+    channels.save(channel);
     for (int index = 0; index < input.categoryIds().size(); index++) {
       Long categoryId = input.categoryIds().get(index);
       var binding = categories.findById(categoryId).orElseGet(PortalCategory::new);
@@ -244,7 +243,6 @@ public class PortalStructureService {
       binding.setSortOrder(index);
       categories.save(binding);
     }
-    categories.flush();
     return view(channel, false);
   }
 
@@ -278,18 +276,25 @@ public class PortalStructureService {
     if (id == null) return;
     access.require("notices:view");
     var article =
-        notices
-            .findOne(ContentService.publiclyVisible().and((r, q, c) -> c.equal(r.get("id"), id)))
+        java.util.Optional.ofNullable(
+                notices.selectOneByQuery(
+                    com.mybatisflex.core.query.QueryWrapper.create()
+                        .where(
+                            ContentService.publiclyVisible()
+                                .and(new com.mybatisflex.core.query.QueryColumn("id").eq(id)))))
             .orElseThrow(() -> new BusinessException("只能选择当前已公开上线的内容"));
     access.checkData("notices", article.getAuthorId(), article.getDepartmentId());
     if (notice
         && !"NOTICE"
             .equals(
-                revisions
-                    .findById(article.getLiveRevisionId())
-                    .orElseThrow()
-                    .getPortalChannel()
-                    .getTemplate())) throw new BusinessException("公告条只能选择公告栏目内容");
+                channels
+                    .findById(
+                        revisions
+                            .findById(article.getLiveRevisionId())
+                            .orElseThrow()
+                            .getPortalChannelId())
+                    .map(channel -> channel.getTemplate())
+                    .orElse(""))) throw new BusinessException("公告条只能选择公告栏目内容");
   }
 
   /** 首页推荐不会发布文章；选择范围、上线状态及公告类型均在服务端检查，原配置版本必须匹配。 */
@@ -309,7 +314,7 @@ public class PortalStructureService {
     home.setFeaturedArticleIds(json.writeValueAsString(input.featuredArticleIds()));
     home.setAllowThemeToggle(input.allowThemeToggle());
     home.setNightPrimaryColor(input.nightPrimaryColor().toLowerCase(java.util.Locale.ROOT));
-    homes.saveAndFlush(home);
+    homes.save(home);
     return home(true);
   }
 
@@ -322,7 +327,7 @@ public class PortalStructureService {
     UserService.version(home, input.version());
     home.setAllowThemeToggle(input.allowThemeToggle());
     home.setNightPrimaryColor(input.nightPrimaryColor().toLowerCase(java.util.Locale.ROOT));
-    homes.saveAndFlush(home);
+    homes.save(home);
     return home(true);
   }
 }

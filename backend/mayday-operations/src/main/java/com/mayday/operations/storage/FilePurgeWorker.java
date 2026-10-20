@@ -1,7 +1,7 @@
 package com.mayday.operations.storage;
 
-import com.mayday.operations.repository.FilePayloadRepository;
-import com.mayday.operations.repository.StoredFileRepository;
+import com.mayday.operations.mapper.FilePayloadMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -12,14 +12,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 @Slf4j
 public class FilePurgeWorker {
-  private final StoredFileRepository files;
-  private final FilePayloadRepository payloads;
+  private final StoredFileMapper files;
+  private final FilePayloadMapper payloads;
   private final StoredFileContent content;
   private final TransactionTemplate transactions;
 
   public FilePurgeWorker(
-      StoredFileRepository files,
-      FilePayloadRepository payloads,
+      StoredFileMapper files,
+      FilePayloadMapper payloads,
       StoredFileContent content,
       PlatformTransactionManager transactionManager) {
     this.files = files;
@@ -41,14 +41,12 @@ public class FilePurgeWorker {
               try {
                 if ("MYSQL".equals(file.getStorageProvider())) {
                   payloads.deleteById(file.getId());
-                  payloads.flush();
                 } else {
                   FileStorage storage = content.storage(file.getStorageProvider());
                   if (file.getThumbnailKey() != null) storage.delete(file.getThumbnailKey());
                   storage.delete(file.getStorageKey());
                 }
                 files.delete(file);
-                files.flush();
               } catch (Exception exception) {
                 file.setPurgeError("存储清理失败，将自动重试；请检查部署配置或存储服务");
                 files.save(file);

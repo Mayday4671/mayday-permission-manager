@@ -3,22 +3,24 @@ package com.mayday.operations;
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.RichText;
-import com.mayday.common.SearchPredicates;
+import com.mayday.operations.mapper.DeliveryMapper;
+import com.mayday.operations.mapper.NotificationMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
 import com.mayday.operations.model.Delivery;
 import com.mayday.operations.model.Notification;
 import com.mayday.operations.model.StoredFile;
 import com.mayday.operations.realtime.RealtimeEvents;
-import com.mayday.operations.repository.DeliveryRepository;
-import com.mayday.operations.repository.NotificationRepository;
-import com.mayday.operations.repository.StoredFileRepository;
 import com.mayday.operations.storage.StoredFileContent;
 import com.mayday.security.AccessPolicy;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SysUser;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryCondition;
+import com.mybatisflex.core.query.QueryWrapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -31,7 +33,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,12 +44,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
-  private final NotificationRepository notifications;
-  private final DeliveryRepository deliveries;
-  private final UserRepository users;
-  private final EntryRepository entries;
-  private final RoleRepository roles;
-  private final StoredFileRepository files;
+  private final NotificationMapper notifications;
+  private final DeliveryMapper deliveries;
+  private final UserMapper users;
+  private final EntryMapper entries;
+  private final RoleMapper roles;
+  private final StoredFileMapper files;
   private final AccessPolicy access;
   private final RealtimeEvents realtime;
 
@@ -123,11 +124,11 @@ public class NotificationService {
       Long targetId) {}
 
   /** 管理列表按发件人限制；全部管理权限只扩大通知范围，不扩大可发送的用户范围。 */
-  public Specification<Notification> manageable() {
-    return (r, q, c) ->
-        access.has("notifications:all")
-            ? c.conjunction()
-            : c.equal(r.get("senderId"), access.current().getId());
+  public QueryWrapper manageable() {
+    QueryWrapper wrapper = QueryWrapper.create();
+    if (!access.has("notifications:all"))
+      wrapper.where(new QueryColumn("sender_id").eq(access.current().getId()));
+    return wrapper;
   }
 
   private Notification managed(Long id, boolean lock) {
@@ -201,21 +202,18 @@ public class NotificationService {
         : notification.getStatus();
   }
 
-  /** 显示状态筛选与详情保持一致，过期筛选在数据库执行而不是分页后丢弃。 */
-  public static Specification<Notification> state(String status) {
-    return (r, q, c) -> {
-      if (status == null || status.isBlank()) return c.conjunction();
-      var now = BusinessTime.now();
-      if ("EXPIRED".equals(status))
-        return c.and(
-            c.equal(r.get("status"), "PUBLISHED"), c.lessThanOrEqualTo(r.get("expiresAt"), now));
-      if ("PUBLISHED".equals(status))
-        return c.and(
-            c.equal(r.get("status"), status),
-            c.or(c.isNull(r.get("expiresAt")), c.greaterThan(r.get("expiresAt"), now)));
-      if (!Set.of("DRAFT", "WITHDRAWN").contains(status)) throw new BusinessException("通知状态无效");
-      return c.equal(r.get("status"), status);
-    };
+  /** 显示状态筛选与详情保持一致，过期筛选在数据库执行而不是分页后丢弃；空筛选返回 null 表示不限制。 */
+  public static QueryCondition state(String status) {
+    if (status == null || status.isBlank()) return null;
+    java.time.LocalDateTime now = BusinessTime.now();
+    if ("EXPIRED".equals(status))
+      return new QueryColumn("status").eq("PUBLISHED").and(new QueryColumn("expires_at").le(now));
+    if ("PUBLISHED".equals(status))
+      return new QueryColumn("status")
+          .eq(status)
+          .and(new QueryColumn("expires_at").isNull().or(new QueryColumn("expires_at").gt(now)));
+    if (!Set.of("DRAFT", "WITHDRAWN").contains(status)) throw new BusinessException("通知状态无效");
+    return new QueryColumn("status").eq(status);
   }
 
   private void draftOnly(Notification notification) {
@@ -265,25 +263,26 @@ public class NotificationService {
       notification.setSenderName(access.current().getNickname());
     }
     recipients(notification);
-    return view(notifications.saveAndFlush(notification));
+    notifications.save(notification);
+    notifications.syncCollections(notification);
+    return view(notification);
   }
 
   /** 部门与角色仅解析当前直接成员；不隐式包含下级部门，不静默丢弃越权目标。 */
   public List<SysUser> recipients(Notification notification) {
     access.require("users:view");
     Set<Long> ids = notification.getRecipientIds();
-    Specification<SysUser> target;
+    QueryWrapper target = QueryWrapper.create().where(new QueryColumn("enabled").eq(true));
     switch (notification.getRecipientType()) {
       case "ALL":
         if (!"ALL".equals(access.scope("users")))
           throw new AccessDeniedException("向全部用户发送需要全部用户数据范围");
-        target = (r, q, c) -> c.isTrue(r.get("enabled"));
         break;
       case "USERS":
         var selected = users.findAllById(ids);
         if (selected.size() != ids.size() || selected.stream().anyMatch(u -> !u.isEnabled()))
           throw new BusinessException("收件人已停用或不存在");
-        target = (r, q, c) -> r.get("id").in(ids);
+        target.and(new QueryColumn("id").in(ids));
         break;
       case "DEPARTMENTS":
         var depts = entries.findAllById(ids);
@@ -292,23 +291,19 @@ public class NotificationService {
                 .anyMatch(
                     delivery -> !delivery.isEnabled() || !"departments".equals(delivery.getKind())))
           throw new BusinessException("请选择有效部门");
-        target = (r, q, c) -> c.and(c.isTrue(r.get("enabled")), r.get("departmentId").in(ids));
+        target.and(new QueryColumn("department_id").in(ids));
         break;
       case "ROLES":
         var selectedRoles = roles.findAllById(ids);
         if (selectedRoles.size() != ids.size()
             || selectedRoles.stream().anyMatch(r -> !r.isEnabled()))
           throw new BusinessException("请选择有效角色");
-        target =
-            (r, q, c) -> {
-              q.distinct(true);
-              return c.and(c.isTrue(r.get("enabled")), r.join("roles").get("id").in(ids));
-            };
+        target.and(new QueryColumn("id").in(users.roleMemberIds(ids)));
         break;
       default:
         throw new BusinessException("接收范围无效");
     }
-    var resolved = users.findAll(target);
+    var resolved = users.selectListByQuery(target);
     if (resolved.isEmpty()) throw new BusinessException("接收范围内没有启用用户");
     for (var u : resolved) access.checkData("users", u.getId(), u.getDepartmentId());
     return resolved;
@@ -329,14 +324,15 @@ public class NotificationService {
     validateFiles(notification.getAttachmentIds());
     notification.setStatus("PUBLISHED");
     notification.setPublishedAt(BusinessTime.now());
+    notifications.save(notification);
+    notifications.syncCollections(notification);
     for (var u : recipients) {
       var delivery = new Delivery();
-      delivery.setNotification(notification);
+      delivery.setNotificationId(notification.getId());
       delivery.setRecipientId(u.getId());
       delivery.setRecipientName(u.getNickname());
       deliveries.save(delivery);
     }
-    notifications.flush();
     realtime.changed(recipients.stream().map(SysUser::getId).toList(), "messages");
     return view(notification);
   }
@@ -351,7 +347,7 @@ public class NotificationService {
     OperationSupport.version(notification, version);
     notification.setStatus("WITHDRAWN");
     notification.setWithdrawnAt(BusinessTime.now());
-    notifications.flush();
+    notifications.save(notification);
     realtime.changed(
         deliveries.findByNotificationId(id).stream().map(Delivery::getRecipientId).toList(),
         "messages");
@@ -374,7 +370,9 @@ public class NotificationService {
     notification.setAttachmentIds(new HashSet<>(old.getAttachmentIds()));
     notification.setSenderId(access.current().getId());
     notification.setSenderName(access.current().getNickname());
-    return view(notifications.saveAndFlush(notification));
+    notifications.save(notification);
+    notifications.syncCollections(notification);
+    return view(notification);
   }
 
   /** 发布记录须先明确撤回才能删除；删除草稿或撤回记录会一并删除投递，但保留操作审计。 */
@@ -385,36 +383,33 @@ public class NotificationService {
     if (!Set.of("DRAFT", "WITHDRAWN").contains(notification.getStatus()))
       throw new BusinessException("请先撤回通知再删除");
     deliveries.deleteByNotificationId(id);
-    deliveries.flush();
     notifications.delete(notification);
   }
 
-  /** 详情、未读计数与附件共用同一可见性条件，旧 URL 和缓存不构成访问授权。 */
-  public Specification<Delivery> visibleInbox(Boolean read, String keyword) {
-    return (r, q, c) ->
-        c.and(
-            c.equal(r.get("recipientId"), access.current().getId()),
-            c.equal(r.get("notification").get("status"), "PUBLISHED"),
-            c.or(
-                c.isNull(r.get("notification").get("expiresAt")),
-                c.greaterThan(r.get("notification").get("expiresAt"), BusinessTime.now())),
-            SearchPredicates.contains(c, r.get("notification").get("title"), keyword),
-            read == null
-                ? c.conjunction()
-                : read ? c.isNotNull(r.get("readAt")) : c.isNull(r.get("readAt")));
+  /** 详情、未读计数与附件共用同一可见性条件；条件由投递仓储统一构建。 */
+  public QueryWrapper visibleInbox(Boolean read, String keyword) {
+    return deliveries.visibleInbox(
+        read, keyword, access.current().getId(), com.mayday.common.BusinessTime.now());
   }
 
   /** 消息编号属于收件投递而非通知编号，读取时校验当前账号、发布、撤回及过期条件。 */
   public Delivery ownMessage(Long id) {
     access.require("messages:view");
-    return deliveries
-        .findOne(visibleInbox(null, "").and((r, q, c) -> c.equal(r.get("id"), id)))
+    return java.util.Optional.ofNullable(
+            deliveries.selectOneByQuery(visibleInbox(null, "").and(new QueryColumn("id").eq(id))))
+        .orElseThrow(() -> new AccessDeniedException("消息不存在或已撤回、过期"));
+  }
+
+  /** 消息编号对应的可读通知；必须先通过 ownMessage 的收件人校验。 */
+  public Notification ownNotification(Long messageId) {
+    return notifications
+        .findById(ownMessage(messageId).getNotificationId())
         .orElseThrow(() -> new AccessDeniedException("消息不存在或已撤回、过期"));
   }
 
   /** 列表只投递摘要和本人阅读状态，正文和附件内容走独立受保护详情接口。 */
   public Inbox inbox(Delivery delivery) {
-    var notification = delivery.getNotification();
+    var notification = notifications.findById(delivery.getNotificationId()).orElseThrow();
     return new Inbox(
         delivery.getId(),
         delivery.getVersion(),
@@ -432,7 +427,7 @@ public class NotificationService {
   /** 明确查看详情后由前端另行标记已读，读取失败不能把未读消息误置为已读。 */
   public MessageDetail detail(Long id) {
     var delivery = ownMessage(id);
-    var notification = delivery.getNotification();
+    var notification = notifications.findById(delivery.getNotificationId()).orElseThrow();
     return new MessageDetail(
         inbox(delivery),
         notification.getContent(),
@@ -463,8 +458,8 @@ public class NotificationService {
     access.require("notifications:view");
     access.require("users:view");
     var allowedUsers =
-        users.findAll(
-            access.<SysUser>filter("users", "id").and((r, q, c) -> c.isTrue(r.get("enabled"))));
+        users.selectListByQuery(
+            access.filter("users", "id").and(new QueryColumn("enabled").eq(true)));
     Set<Long> allowed = new HashSet<>();
     allowedUsers.forEach(u -> allowed.add(u.getId()));
     if ("departments".equals(kind))
@@ -472,12 +467,7 @@ public class NotificationService {
           .filter(SystemEntry::isEnabled)
           .filter(
               e -> {
-                var members =
-                    users.findAll(
-                        (r, q, c) ->
-                            c.and(
-                                c.isTrue(r.get("enabled")),
-                                c.equal(r.get("departmentId"), e.getId())));
+                var members = users.membersOfRole(e.getId());
                 return !members.isEmpty()
                     && members.stream().allMatch(u -> allowed.contains(u.getId()));
               })
@@ -488,14 +478,7 @@ public class NotificationService {
           .filter(SysRole::isEnabled)
           .filter(
               e -> {
-                var members =
-                    users.findAll(
-                        (r, q, c) -> {
-                          q.distinct(true);
-                          return c.and(
-                              c.isTrue(r.get("enabled")),
-                              c.equal(r.join("roles").get("id"), e.getId()));
-                        });
+                var members = users.membersOfRole(e.getId());
                 return !members.isEmpty()
                     && members.stream().allMatch(u -> allowed.contains(u.getId()));
               })

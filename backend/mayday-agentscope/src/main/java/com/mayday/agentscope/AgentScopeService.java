@@ -1,14 +1,13 @@
 package com.mayday.agentscope;
 
+import com.mayday.agentscope.mapper.AgentScopeConversationMapper;
+import com.mayday.agentscope.mapper.AgentScopeMessageMapper;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.common.PageResult;
 import com.mayday.common.ServiceUnavailableException;
 import com.mayday.security.AccessPolicy;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,8 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentScopeService {
   private static final String COMPLETE = "COMPLETE";
 
-  private final AgentScopeConversationRepository conversations;
-  private final AgentScopeMessageRepository messages;
+  private final AgentScopeConversationMapper conversations;
+  private final AgentScopeMessageMapper messages;
   private final AgentScopeConversationCoordinator coordinator;
   private final AgentScopeRuntime runtime;
   private final AgentScopeSettings settings;
@@ -54,14 +53,10 @@ public class AgentScopeService {
   public PageResult<AgentScopeDtos.ConversationView> conversations(int page, int size) {
     moduleGuard.requireEnabled();
     access.require("agentscope:view");
-    PageRequest request =
-        PageRequest.of(
-            Math.max(1, page) - 1,
-            Math.min(100, Math.max(1, size)),
-            Sort.by(Sort.Direction.DESC, "updatedAt").and(Sort.by(Sort.Direction.DESC, "id")));
     return PageResult.from(
         conversations
-            .findByOwnerIdOrderByUpdatedAtDescIdDesc(access.current().getId(), request)
+            .findByOwnerIdOrderByUpdatedAtDescIdDesc(
+                access.current().getId(), Math.max(1, page), Math.min(100, Math.max(1, size)))
             .map(this::conversationView));
   }
 
@@ -77,9 +72,9 @@ public class AgentScopeService {
     moduleGuard.requireEnabled();
     access.require("agentscope:view");
     coordinator.ownedConversation(access.current().getId(), conversationId);
-    PageRequest request = PageResult.request(page, size);
-    Page<AgentScopeMessage> result =
-        messages.findByConversationIdAndStatusOrderByIdDesc(conversationId, COMPLETE, request);
+    var result =
+        messages.findByConversationIdAndStatusOrderByIdDesc(
+            conversationId, COMPLETE, PageResult.request(page, size));
     return PageResult.from(result.map(AgentScopeConversationCoordinator::view));
   }
 

@@ -1,6 +1,6 @@
 # Mayday Admin
 
-一套带独立前台门户的模块化后台管理系统。前端使用 React + Ant Design + TypeScript，后端使用 Java 21 + Spring Boot 4 + MySQL 8.4。
+一套带独立前台门户的模块化后台管理系统。前端使用 React + Ant Design + TypeScript，后端使用 Java 21 + Spring Boot 4 + MyBatis-Flex + MySQL 8.4。
 
 权限按**资源、操作、数据范围**分别定义，菜单与后端授权解耦。后台与前台拥有独立主题，前台采用内容型门户布局，支持桌面与手机。
 

@@ -3,11 +3,11 @@ package com.mayday.bulk;
 import com.mayday.common.BusinessException;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.UserService;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
 import com.mayday.web.Contracts.UserRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
@@ -38,9 +38,9 @@ public class UserBulkAdapter implements BulkResourceAdapter {
           "enabled");
   private final AccessPolicy access;
   private final UserService userService;
-  private final UserRepository users;
-  private final RoleRepository roles;
-  private final EntryRepository entries;
+  private final UserMapper users;
+  private final RoleMapper roles;
+  private final EntryMapper entries;
   private final Validator validator;
 
   @Override

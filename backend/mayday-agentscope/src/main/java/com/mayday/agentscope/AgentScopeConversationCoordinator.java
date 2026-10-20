@@ -1,5 +1,7 @@
 package com.mayday.agentscope;
 
+import com.mayday.agentscope.mapper.AgentScopeConversationMapper;
+import com.mayday.agentscope.mapper.AgentScopeMessageMapper;
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.ConflictException;
@@ -25,8 +27,8 @@ public class AgentScopeConversationCoordinator {
   private static final String COMPLETE = "COMPLETE";
   private static final String FAILED = "FAILED";
 
-  private final AgentScopeConversationRepository conversations;
-  private final AgentScopeMessageRepository messages;
+  private final AgentScopeConversationMapper conversations;
+  private final AgentScopeMessageMapper messages;
   private final AgentScopeSettings settings;
 
   /**

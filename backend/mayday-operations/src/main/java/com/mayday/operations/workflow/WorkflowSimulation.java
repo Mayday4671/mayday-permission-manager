@@ -3,8 +3,8 @@ package com.mayday.operations.workflow;
 import com.mayday.common.BusinessException;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import com.mayday.security.AccessPolicy;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 public class WorkflowSimulation {
   private final WorkflowDefinitions definitions;
   private final WorkflowJson json;
-  private final UserRepository users;
+  private final UserMapper users;
   private final AccessPolicy access;
 
   /** 并行展开全部支路再显示一次汇合；子流程展示固定版本的内部路径，不静默当作普通节点跳过。 */

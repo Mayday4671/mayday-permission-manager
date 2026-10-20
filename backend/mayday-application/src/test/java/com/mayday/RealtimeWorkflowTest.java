@@ -16,24 +16,23 @@ import static org.mockito.Mockito.when;
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.operations.MessagePublisher;
+import com.mayday.operations.mapper.DeliveryMapper;
+import com.mayday.operations.mapper.FlowRequestMapper;
+import com.mayday.operations.mapper.FlowTaskMapper;
+import com.mayday.operations.mapper.NotificationMapper;
 import com.mayday.operations.model.FlowRequest;
 import com.mayday.operations.model.FlowTask;
 import com.mayday.operations.model.Notification;
 import com.mayday.operations.realtime.RealtimeEvents;
 import com.mayday.operations.realtime.RealtimeStreams;
-import com.mayday.operations.repository.DeliveryRepository;
-import com.mayday.operations.repository.FlowRequestRepository;
-import com.mayday.operations.repository.FlowTaskRepository;
-import com.mayday.operations.repository.NotificationRepository;
 import com.mayday.operations.workflow.WorkflowEvents;
 import com.mayday.operations.workflow.WorkflowReminders;
 import com.mayday.operations.workflow.WorkflowSchema;
 import com.mayday.operations.workflow.WorkflowTemplates;
 import com.mayday.security.AccessPolicy;
 import com.mayday.security.TokenService;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.UserRepository;
-import jakarta.persistence.EntityManager;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -118,9 +117,9 @@ class RealtimeWorkflowTest {
 
   @Test
   void duplicateMessageEventCannotChangeRecipientOrRepublishContent() {
-    UserRepository users = mock(UserRepository.class);
-    NotificationRepository notifications = mock(NotificationRepository.class);
-    DeliveryRepository deliveries = mock(DeliveryRepository.class);
+    UserMapper users = mock(UserMapper.class);
+    NotificationMapper notifications = mock(NotificationMapper.class);
+    DeliveryMapper deliveries = mock(DeliveryMapper.class);
     RealtimeEvents realtime = mock(RealtimeEvents.class);
     when(users.lockById(1L)).thenReturn(Optional.of(user(1L)));
     when(users.lockById(2L)).thenReturn(Optional.of(user(2L)));
@@ -130,7 +129,7 @@ class RealtimeWorkflowTest {
     when(notifications.findByEventKey("fixed")).thenReturn(Optional.of(previous));
     MessagePublisher publisher = new MessagePublisher(users, notifications, deliveries, realtime);
     assertEquals(10L, publisher.publish("fixed", 1L, "不能覆盖的标题", "不能覆盖的正文", "测试", "APPROVAL", 20L));
-    verify(notifications, never()).saveAndFlush(any());
+    verify(notifications, never()).save(any());
     verify(deliveries, never()).save(any());
     assertThrows(
         BusinessException.class,
@@ -139,11 +138,10 @@ class RealtimeWorkflowTest {
 
   @Test
   void overdueReminderIsOneTimeAndStopsWhenRequestFinishes() {
-    FlowTaskRepository tasks = mock(FlowTaskRepository.class);
-    FlowRequestRepository requests = mock(FlowRequestRepository.class);
+    FlowTaskMapper tasks = mock(FlowTaskMapper.class);
+    FlowRequestMapper requests = mock(FlowRequestMapper.class);
     WorkflowEvents events = mock(WorkflowEvents.class);
     RealtimeEvents realtime = mock(RealtimeEvents.class);
-    EntityManager entityManager = mock(EntityManager.class);
     FlowTask task = new FlowTask();
     task.setId(1L);
     task.setRequestId(10L);
@@ -162,7 +160,6 @@ class RealtimeWorkflowTest {
             tasks,
             requests,
             events,
-            entityManager,
             realtime,
             mock(com.mayday.operations.workflow.WorkflowOrchestrator.class));
     reminders.timeout(1L);

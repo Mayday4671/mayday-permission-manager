@@ -25,21 +25,21 @@ import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.operations.MessagePublisher;
+import com.mayday.operations.mapper.JobExecutionMapper;
+import com.mayday.operations.mapper.ScheduledJobMapper;
 import com.mayday.operations.model.JobExecution;
 import com.mayday.operations.model.ScheduledJob;
 import com.mayday.operations.monitor.MonitorPolicy;
-import com.mayday.operations.monitor.MonitorPolicyRepository;
 import com.mayday.operations.monitor.MonitorSample;
-import com.mayday.operations.monitor.MonitorSampleRepository;
 import com.mayday.operations.monitor.MonitorService;
-import com.mayday.operations.repository.JobExecutionRepository;
-import com.mayday.operations.repository.ScheduledJobRepository;
+import com.mayday.operations.monitor.mapper.MonitorPolicyMapper;
+import com.mayday.operations.monitor.mapper.MonitorSampleMapper;
 import com.mayday.operations.service.JobHandler;
 import com.mayday.operations.service.JobRunner;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.ChangeAuditService;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.UserRepository;
 import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -104,11 +104,11 @@ class GeneralPlatformTest {
   /** 业务失败先回滚，失败记录单独提交，随后提醒投递失败也不能抹掉已经提交的 FAILED 结果。 */
   @Test
   void jobFailureIsCommittedBeforeNotificationFailure() {
-    ScheduledJobRepository jobs = mock(ScheduledJobRepository.class);
-    JobExecutionRepository executions = mock(JobExecutionRepository.class);
+    ScheduledJobMapper jobs = mock(ScheduledJobMapper.class);
+    JobExecutionMapper executions = mock(JobExecutionMapper.class);
     MessagePublisher messages = mock(MessagePublisher.class);
     AccessPolicy access = mock(AccessPolicy.class);
-    UserRepository users = mock(UserRepository.class);
+    UserMapper users = mock(UserMapper.class);
     PlatformTransactionManager transactions = transactions();
     JobHandler handler = mock(JobHandler.class);
     when(handler.key()).thenReturn("FAIL_TEST");
@@ -129,7 +129,7 @@ class GeneralPlatformTest {
     when(jobs.findById(1L)).thenReturn(Optional.of(job));
     when(users.findById(2L)).thenReturn(Optional.of(recipient));
     when(access.hasFor(recipient, "scheduler:view")).thenReturn(true);
-    when(executions.saveAndFlush(any(JobExecution.class)))
+    when(executions.save(any(JobExecution.class)))
         .thenAnswer(
             invocation -> {
               JobExecution saved = invocation.getArgument(0);
@@ -160,14 +160,15 @@ class GeneralPlatformTest {
     assertTrue(job.getNextRunAt().isAfter(BusinessTime.now()));
     var order = inOrder(transactions, executions, messages);
     order.verify(transactions).rollback(any(TransactionStatus.class));
-    order.verify(executions).saveAndFlush(any(JobExecution.class));
+    order.verify(executions).save(any(JobExecution.class));
     order.verify(transactions).commit(any(TransactionStatus.class));
     order
         .verify(messages)
         .publish(
             anyString(), anyLong(), anyString(), anyString(), anyString(), anyString(), anyLong());
     order.verify(transactions).rollback(any(TransactionStatus.class));
-    verify(executions, never()).save(any(JobExecution.class));
+    // 全流程固定三次保存：排队回执、运行中状态与最终失败结果；提醒重试不再追加记录。
+    verify(executions, times(3)).save(any(JobExecution.class));
     ArgumentCaptor<TransactionDefinition> definitions =
         ArgumentCaptor.forClass(TransactionDefinition.class);
     verify(transactions, times(6)).getTransaction(definitions.capture());
@@ -182,8 +183,8 @@ class GeneralPlatformTest {
   /** 扩展用例即使已有外层事务，执行失败与失败记录仍各自隔离，外层随后回滚也不能丢失已提交失败证据。 */
   @Test
   void jobFailureHistorySurvivesAnOuterTransactionRollback() {
-    ScheduledJobRepository jobs = mock(ScheduledJobRepository.class);
-    JobExecutionRepository executions = mock(JobExecutionRepository.class);
+    ScheduledJobMapper jobs = mock(ScheduledJobMapper.class);
+    JobExecutionMapper executions = mock(JobExecutionMapper.class);
     TransactionProbe transactions = new TransactionProbe();
     JobHandler handler = mock(JobHandler.class);
     when(handler.key()).thenReturn("FAIL_TEST");
@@ -197,7 +198,7 @@ class GeneralPlatformTest {
     job.setCron("0 */5 * * * *");
     when(jobs.lock(1L)).thenReturn(Optional.of(job));
     when(jobs.findById(1L)).thenReturn(Optional.of(job));
-    when(executions.saveAndFlush(any(JobExecution.class)))
+    when(executions.save(any(JobExecution.class)))
         .thenAnswer(
             invocation -> {
               JobExecution saved = invocation.getArgument(0);
@@ -215,7 +216,7 @@ class GeneralPlatformTest {
             transactions,
             List.of(handler),
             mock(AccessPolicy.class),
-            mock(UserRepository.class),
+            mock(UserMapper.class),
             durable(transactions),
             tools.jackson.databind.json.JsonMapper.builder().build());
     assertThrows(
@@ -245,11 +246,11 @@ class GeneralPlatformTest {
   /** 完成投递的执行记录退出扫描队列，即使另一节点已取得旧候选列表，行锁内重查也不重复发布。 */
   @Test
   void failureRetryMarksDeliveryCompleteAndRejectsStaleCandidates() {
-    ScheduledJobRepository jobs = mock(ScheduledJobRepository.class);
-    JobExecutionRepository executions = mock(JobExecutionRepository.class);
+    ScheduledJobMapper jobs = mock(ScheduledJobMapper.class);
+    JobExecutionMapper executions = mock(JobExecutionMapper.class);
     MessagePublisher messages = mock(MessagePublisher.class);
     AccessPolicy access = mock(AccessPolicy.class);
-    UserRepository users = mock(UserRepository.class);
+    UserMapper users = mock(UserMapper.class);
     ScheduledJob job = new ScheduledJob();
     job.setId(1L);
     job.setAlertUserId(2L);
@@ -295,10 +296,10 @@ class GeneralPlatformTest {
   @Test
   void failureRetrySkipsUnavailableRecipientsWithoutNotification() {
     for (String recipientState : List.of("NONE", "DELETED", "REVOKED")) {
-      ScheduledJobRepository jobs = mock(ScheduledJobRepository.class);
-      JobExecutionRepository executions = mock(JobExecutionRepository.class);
+      ScheduledJobMapper jobs = mock(ScheduledJobMapper.class);
+      JobExecutionMapper executions = mock(JobExecutionMapper.class);
       MessagePublisher messages = mock(MessagePublisher.class);
-      UserRepository users = mock(UserRepository.class);
+      UserMapper users = mock(UserMapper.class);
       PlatformTransactionManager transactions = transactions();
       ScheduledJob job = new ScheduledJob();
       job.setId(1L);
@@ -345,12 +346,12 @@ class GeneralPlatformTest {
   @Test
   void monitorKeepsSamplingWhenRecipientIsNoLongerAuthorized() throws Exception {
     for (boolean deleted : List.of(false, true)) {
-      MonitorSampleRepository samples = mock(MonitorSampleRepository.class);
-      MonitorPolicyRepository policies = mock(MonitorPolicyRepository.class);
+      MonitorSampleMapper samples = mock(MonitorSampleMapper.class);
+      MonitorPolicyMapper policies = mock(MonitorPolicyMapper.class);
       DataSource dataSource = mock(DataSource.class);
       Connection connection = mock(Connection.class);
       AccessPolicy access = mock(AccessPolicy.class);
-      UserRepository users = mock(UserRepository.class);
+      UserMapper users = mock(UserMapper.class);
       MessagePublisher messages = mock(MessagePublisher.class);
       PlatformTransactionManager transactions = transactions();
       when(dataSource.getConnection()).thenReturn(connection);
@@ -393,10 +394,10 @@ class GeneralPlatformTest {
   /** 告警发送异常发生在正常采样提交之后，不能回滚曲线或提前进入30分钟冷却。 */
   @Test
   void monitorCommitsSampleBeforeFailedAlertAndDoesNotConsumeCooldown() {
-    MonitorSampleRepository samples = mock(MonitorSampleRepository.class);
-    MonitorPolicyRepository policies = mock(MonitorPolicyRepository.class);
+    MonitorSampleMapper samples = mock(MonitorSampleMapper.class);
+    MonitorPolicyMapper policies = mock(MonitorPolicyMapper.class);
     AccessPolicy access = mock(AccessPolicy.class);
-    UserRepository users = mock(UserRepository.class);
+    UserMapper users = mock(UserMapper.class);
     MessagePublisher messages = mock(MessagePublisher.class);
     PlatformTransactionManager transactions = transactions();
     MonitorPolicy policy = new MonitorPolicy();

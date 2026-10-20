@@ -4,11 +4,11 @@ import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.PageResult;
 import com.mayday.operations.OperationSupport;
+import com.mayday.operations.mapper.FlowDefinitionMapper;
+import com.mayday.operations.mapper.FlowDelegationMapper;
 import com.mayday.operations.model.FlowDelegation;
-import com.mayday.operations.repository.FlowDefinitionRepository;
-import com.mayday.operations.repository.FlowDelegationRepository;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -29,9 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WorkflowDelegations {
-  private final FlowDelegationRepository delegations;
-  private final FlowDefinitionRepository definitions;
-  private final UserRepository users;
+  private final FlowDelegationMapper delegations;
+  private final FlowDefinitionMapper definitions;
+  private final UserMapper users;
   private final AccessPolicy access;
   private final WorkflowJson json;
 
@@ -74,14 +74,16 @@ public class WorkflowDelegations {
   public PageResult<Map<String, Object>> list(String box, int page, int size) {
     requireOwner();
     if (!Set.of("mine", "received").contains(box)) throw new BusinessException("未知委托列表");
+    String column = box.equals("mine") ? "owner_id" : "target_id";
     return PageResult.from(
         delegations
-            .findAll(
-                (r, q, c) ->
-                    c.equal(
-                        r.get(box.equals("mine") ? "ownerId" : "targetId"),
-                        access.current().getId()),
-                PageResult.request(page, size))
+            .paginate(
+                PageResult.request(page, size),
+                com.mybatisflex.core.query.QueryWrapper.create()
+                    .where(
+                        new com.mybatisflex.core.query.QueryColumn(column)
+                            .eq(access.current().getId()))
+                    .orderBy("id desc"))
             .map(this::view));
   }
 
@@ -127,7 +129,7 @@ public class WorkflowDelegations {
     delegation.setEndsAt(input.endsAt());
     delegation.setDefinitionIdsJson(json.write(Map.of("ids", ids.stream().sorted().toList())));
     delegation.setReason(input.reason().trim());
-    return view(delegations.saveAndFlush(delegation));
+    return view(delegations.save(delegation));
   }
 
   /** 只有本人能撤销，先锁本人再核对版本；撤销不可改成他人的委托或重新启用旧记录。 */
@@ -141,7 +143,7 @@ public class WorkflowDelegations {
     OperationSupport.version(delegation, version);
     if (delegation.getRevokedAt() != null) throw new BusinessException("委托已撤销");
     delegation.setRevokedAt(BusinessTime.now());
-    delegations.flush();
+    delegations.save(delegation);
     return view(delegation);
   }
 

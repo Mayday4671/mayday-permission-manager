@@ -5,11 +5,11 @@ import com.mayday.common.BusinessTime;
 import com.mayday.common.ModuleSwitches;
 import com.mayday.operations.MessagePublisher;
 import com.mayday.operations.cluster.DurableTasks;
+import com.mayday.operations.mapper.JobExecutionMapper;
+import com.mayday.operations.mapper.ScheduledJobMapper;
 import com.mayday.operations.model.JobExecution;
-import com.mayday.operations.repository.JobExecutionRepository;
-import com.mayday.operations.repository.ScheduledJobRepository;
 import com.mayday.security.AccessPolicy;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.UserMapper;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,28 +30,28 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Service
 public class JobRunner {
-  private final ScheduledJobRepository jobs;
-  private final JobExecutionRepository executions;
+  private final ScheduledJobMapper jobs;
+  private final JobExecutionMapper executions;
   private final MessagePublisher messages;
   private final ModuleSwitches modules;
   private final PlatformTransactionManager transactionManager;
   private final Map<String, JobHandler> handlers;
   private final AccessPolicy access;
-  private final UserRepository users;
+  private final UserMapper users;
   private final DurableTasks durable;
   private final JsonMapper json;
   private final Map<Long, DurableTasks.Lease> active = new ConcurrentHashMap<>();
   private static final String TASK_TYPE = "SCHEDULER";
 
   public JobRunner(
-      ScheduledJobRepository jobs,
-      JobExecutionRepository executions,
+      ScheduledJobMapper jobs,
+      JobExecutionMapper executions,
       MessagePublisher messages,
       ModuleSwitches modules,
       PlatformTransactionManager transactionManager,
       List<JobHandler> registeredHandlers,
       AccessPolicy access,
-      UserRepository users,
+      UserMapper users,
       DurableTasks durable,
       JsonMapper json) {
     this.jobs = jobs;
@@ -141,7 +141,7 @@ public class JobRunner {
                           history.setJobName(work.name());
                           history.setStatus("QUEUED");
                           history.setResult("等待执行");
-                          return executions.saveAndFlush(history);
+                          return executions.save(history);
                         }));
     var lease = durable.claim(TASK_TYPE, key);
     return lease == null ? executions.findByTaskKey(key).orElse(receipt) : execute(lease);
@@ -195,7 +195,7 @@ public class JobRunner {
             history.setStatus("RUNNING");
             history.setResult("执行中");
             history.setAttempts(lease.attempt());
-            executions.saveAndFlush(history);
+            executions.save(history);
             return null;
           });
       return durable.finish(
@@ -211,7 +211,7 @@ public class JobRunner {
             history.setDurationMs((System.nanoTime() - started) / 1000000);
             history.setAttempts(lease.attempt());
             advance(job, work);
-            return executions.saveAndFlush(history);
+            return executions.save(history);
           });
     } catch (DurableTasks.LostLease stale) {
       return executions.findByTaskKey(lease.key()).orElse(null);
@@ -233,7 +233,7 @@ public class JobRunner {
             history.setAttempts(lease.attempt());
             if (!"QUEUED".equals(nextState))
               jobs.lock(work.jobId()).ifPresent(job -> advance(job, work));
-            failed[0] = executions.saveAndFlush(history);
+            failed[0] = executions.save(history);
           });
       if (failed[0] != null && "FAILED".equals(failed[0].getStatus())) notifyFailure(failed[0]);
       return failed[0];

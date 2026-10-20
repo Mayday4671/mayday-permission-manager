@@ -3,14 +3,13 @@ package com.mayday.web;
 import com.mayday.common.ApiResponse;
 import com.mayday.common.BusinessTime;
 import com.mayday.common.PageResult;
-import com.mayday.content.Notice;
-import com.mayday.content.NoticeRepository;
+import com.mayday.content.mapper.NoticeMapper;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.AuditQueryService;
-import com.mayday.system.repository.AuditRepository;
-import com.mayday.system.repository.EntryRepository;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
+import com.mayday.system.mapper.AuditLogMapper;
+import com.mayday.system.mapper.EntryMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -27,11 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class DashboardController {
-  private final UserRepository users;
-  private final RoleRepository roles;
-  private final EntryRepository entries;
-  private final NoticeRepository notices;
-  private final AuditRepository audits;
+  private final UserMapper users;
+  private final RoleMapper roles;
+  private final EntryMapper entries;
+  private final NoticeMapper notices;
+  private final AuditLogMapper audits;
   private final AccessPolicy access;
   private final com.mayday.service.ContentService content;
 
@@ -42,25 +41,26 @@ public class DashboardController {
   public ApiResponse<?> dashboard() {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put(
-        "users", access.has("users:view") ? users.count(access.filter("users", "id")) : null);
+        "users",
+        access.has("users:view") ? users.selectCountByQuery(access.filter("users", "id")) : null);
     result.put("roles", access.has("roles:view") ? roles.count() : null);
     result.put(
         "departments", access.has("departments:view") ? entries.countByKind("departments") : null);
     result.put(
         "notices",
         access.has("notices:view")
-            ? notices.count(
+            ? notices.selectCountByQuery(
                 access
-                    .<Notice>filter("notices", "authorId")
-                    .and((root, query, criteria) -> criteria.isNull(root.get("deletedAt"))))
+                    .filter("notices", "author_id")
+                    .and(new com.mybatisflex.core.query.QueryColumn("deleted_at").isNull()))
             : null);
     result.put(
         "published",
         access.has("notices:view")
-            ? notices.count(
+            ? notices.selectCountByQuery(
                 access
-                    .<Notice>filter("notices", "authorId")
-                    .and((root, query, criteria) -> criteria.isTrue(root.get("published"))))
+                    .filter("notices", "author_id")
+                    .and(new com.mybatisflex.core.query.QueryColumn("published").eq(true)))
             : null);
     List<Map<String, Object>> trend = new ArrayList<>();
     if (access.has("logs:view"))
@@ -71,34 +71,41 @@ public class DashboardController {
                 "date",
                 date.toString(),
                 "count",
-                audits.count(
-                    AuditQueryService.kind(false)
-                        .and(
-                            (root, query, criteria) ->
-                                criteria.and(
-                                    criteria.greaterThanOrEqualTo(
-                                        root.get("createdAt"), date.atStartOfDay()),
-                                    criteria.lessThan(
-                                        root.get("createdAt"),
-                                        date.plusDays(1).atStartOfDay()))))));
+                audits.selectCountByQuery(
+                    com.mybatisflex.core.query.QueryWrapper.create()
+                        .where(
+                            AuditQueryService.kind(false)
+                                .and(
+                                    new com.mybatisflex.core.query.QueryColumn("created_at")
+                                        .ge(date.atStartOfDay()))
+                                .and(
+                                    new com.mybatisflex.core.query.QueryColumn("created_at")
+                                        .lt(date.plusDays(1).atStartOfDay()))))));
       }
     result.put("trend", trend);
     result.put(
         "recentLogs",
         access.has("logs:view")
-            ? audits.findAll(AuditQueryService.kind(false), PageResult.request(1, 5)).getContent()
+            ? audits
+                .paginate(
+                    PageResult.request(1, 5),
+                    com.mybatisflex.core.query.QueryWrapper.create()
+                        .where(AuditQueryService.kind(false))
+                        .orderBy("id desc"))
+                .getRecords()
             : List.of());
     result.put(
         "recentNotices",
         access.has("notices:view")
             ? notices
-                .findAll(
+                .paginate(
+                    PageResult.request(1, 4),
                     access
-                        .<Notice>filter("notices", "authorId")
-                        .and((root, query, criteria) -> criteria.isNull(root.get("deletedAt"))),
-                    PageResult.request(1, 4))
+                        .filter("notices", "author_id")
+                        .and(new com.mybatisflex.core.query.QueryColumn("deleted_at").isNull())
+                        .orderBy("id desc"))
                 .map(content::view)
-                .getContent()
+                .getRecords()
             : List.of());
     return ApiResponse.ok(result);
   }

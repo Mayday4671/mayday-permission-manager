@@ -3,10 +3,8 @@ package com.mayday.web;
 import com.mayday.common.ApiResponse;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
-import com.mayday.content.ContentPublicationRepository;
-import com.mayday.content.ContentRevision;
-import com.mayday.content.Notice;
-import com.mayday.content.NoticeRepository;
+import com.mayday.content.mapper.ContentPublicationMapper;
+import com.mayday.content.mapper.NoticeMapper;
 import com.mayday.security.AccessPolicy;
 import com.mayday.service.ContentService;
 import com.mayday.web.ContentContracts.Draft;
@@ -31,8 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class NoticeController {
-  private final NoticeRepository notices;
-  private final ContentPublicationRepository publications;
+  private final NoticeMapper notices;
+  private final ContentPublicationMapper publications;
   private final ContentService service;
   private final AccessPolicy access;
   private final com.mayday.service.PortalStructureService portal;
@@ -57,53 +55,28 @@ public class NoticeController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     access.require("notices:view");
-    var spec =
-        access
-            .<Notice>filter("notices", "authorId")
-            .and(
-                (root, query, criteria) ->
-                    criteria.and(
-                        criteria.isNull(root.get("deletedAt")),
-                        SearchPredicates.contains(
-                            criteria,
-                            Boolean.TRUE.equals(publiclyVisible)
-                                ? root.get("liveRevision").get("title")
-                                : root.get("title"),
-                            keyword),
-                        published == null
-                            ? criteria.conjunction()
-                            : criteria.equal(root.get("published"), published),
-                        status == null || status.isBlank()
-                            ? criteria.conjunction()
-                            : criteria.equal(root.get("draftStatus"), status)));
-    if (Boolean.TRUE.equals(publiclyVisible)) spec = spec.and(ContentService.publiclyVisible());
+    boolean visibleOnly = Boolean.TRUE.equals(publiclyVisible);
+    var filter = access.filter("notices", "author_id");
+    filter.and(new com.mybatisflex.core.query.QueryColumn("deleted_at").isNull());
+    // 公开列表按上线修订标题搜索，管理列表按草稿标题搜索；不能借搜索探测未发布标题。
+    filter.and(
+        visibleOnly
+            ? com.mayday.content.mapper.NoticeMapper.liveTitleContains(keyword)
+            : SearchPredicates.contains("title", keyword));
+    if (published != null)
+      filter.and(new com.mybatisflex.core.query.QueryColumn("published").eq(published));
+    if (status != null && !status.isBlank())
+      filter.and(new com.mybatisflex.core.query.QueryColumn("draft_status").eq(status));
+    if (visibleOnly) filter.and(ContentService.publiclyVisible());
     if (categoryId != null || portalChannelId != null || portalTemplate != null)
-      spec =
-          spec.and(
-              (root, query, criteria) -> {
-                var categoryQuery = query.subquery(Long.class);
-                var revision = categoryQuery.from(ContentRevision.class);
-                categoryQuery
-                    .select(revision.get("id"))
-                    .where(
-                        criteria.and(
-                            categoryId == null
-                                ? criteria.conjunction()
-                                : criteria.equal(revision.get("categoryId"), categoryId),
-                            portalChannelId == null
-                                ? criteria.conjunction()
-                                : criteria.equal(revision.get("portalChannelId"), portalChannelId),
-                            portalTemplate == null
-                                ? criteria.conjunction()
-                                : criteria.equal(
-                                    revision.get("portalChannel").get("template"),
-                                    portalTemplate)));
-                return root.get(
-                        Boolean.TRUE.equals(publiclyVisible) ? "liveRevisionId" : "draftRevisionId")
-                    .in(categoryQuery);
-              });
+      filter.and(
+          com.mayday.content.mapper.NoticeMapper.revisionPointerFilter(
+              visibleOnly, categoryId, portalChannelId, portalTemplate));
     return ApiResponse.ok(
-        PageResult.from(notices.findAll(spec, PageResult.request(page, size)).map(service::view)));
+        PageResult.from(
+            notices
+                .paginate(PageResult.request(page, size), filter.orderBy("id desc"))
+                .map(service::view)));
   }
 
   /** 读取当前有权管理的非回收内容，服务层检查查看权限与记录所属范围。 */
@@ -127,9 +100,11 @@ public class NoticeController {
     service.managed(id, false);
     return ApiResponse.ok(
         PageResult.from(
-            publications.findAll(
-                (root, query, criteria) -> criteria.equal(root.get("noticeId"), id),
-                PageResult.request(page, size))));
+            publications.paginate(
+                PageResult.request(page, size),
+                com.mybatisflex.core.query.QueryWrapper.create()
+                    .where(new com.mybatisflex.core.query.QueryColumn("notice_id").eq(id))
+                    .orderBy("id desc"))));
   }
 
   /** 创建草稿修订，作者和部门来自当前身份，文件引用与正文清洗由服务层统一处理。 */
@@ -178,16 +153,13 @@ public class NoticeController {
     return ApiResponse.ok(
         PageResult.from(
             notices
-                .findAll(
+                .paginate(
+                    PageResult.request(page, size),
                     access
-                        .<Notice>filter("notices", "authorId")
-                        .and(
-                            (root, query, criteria) ->
-                                criteria.and(
-                                    criteria.isNotNull(root.get("deletedAt")),
-                                    SearchPredicates.contains(
-                                        criteria, root.get("title"), keyword))),
-                    PageResult.request(page, size))
+                        .filter("notices", "author_id")
+                        .and(new com.mybatisflex.core.query.QueryColumn("deleted_at").isNotNull())
+                        .and(SearchPredicates.contains("title", keyword))
+                        .orderBy("id desc"))
                 .map(service::view)));
   }
 

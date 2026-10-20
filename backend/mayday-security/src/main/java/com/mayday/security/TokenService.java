@@ -1,9 +1,9 @@
 package com.mayday.security;
 
+import com.mayday.system.mapper.SessionMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.LoginSession;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.SessionRepository;
-import com.mayday.system.repository.UserRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -24,8 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class TokenService {
-  private final SessionRepository sessions;
-  private final UserRepository users;
+  private final SessionMapper sessions;
+  private final UserMapper users;
   private final SessionPolicy policy;
   private final Clock sessionClock;
 
@@ -54,10 +54,14 @@ public class TokenService {
     Instant now = sessionClock.instant();
     var previous = sessions.findByUserIdOrderByCreatedAtAscTokenHashAsc(current.getId());
     var active = previous.stream().filter(s -> policy.active(s, now)).toList();
-    sessions.deleteAll(previous.stream().filter(s -> !policy.active(s, now)).toList());
+    sessions.deleteBatchByIds(
+        previous.stream()
+            .filter(s -> !policy.active(s, now))
+            .map(LoginSession::getTokenHash)
+            .toList());
     int revoke = Math.max(0, active.size() - policy.getMaxPerUser() + 1);
-    sessions.deleteAll(active.subList(0, revoke));
-    sessions.flush();
+    sessions.deleteBatchByIds(
+        active.subList(0, revoke).stream().map(LoginSession::getTokenHash).toList());
     byte[] bytes = new byte[32];
     new SecureRandom().nextBytes(bytes);
     String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);

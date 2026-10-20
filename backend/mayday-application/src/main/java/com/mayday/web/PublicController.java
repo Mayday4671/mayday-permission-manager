@@ -2,21 +2,21 @@ package com.mayday.web;
 
 import com.mayday.common.ApiResponse;
 import com.mayday.common.PageResult;
-import com.mayday.common.SearchPredicates;
-import com.mayday.content.ContentRevisionRepository;
 import com.mayday.content.Notice;
-import com.mayday.content.NoticeRepository;
+import com.mayday.content.mapper.ContentRevisionMapper;
+import com.mayday.content.mapper.NoticeMapper;
+import com.mayday.content.mapper.PortalChannelMapper;
 import com.mayday.service.ContentAssets;
 import com.mayday.service.ContentService;
 import com.mayday.service.SettingService;
+import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.SystemEntry;
-import com.mayday.system.repository.EntryRepository;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryWrapper;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,9 +33,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PublicController {
-  private final NoticeRepository notices;
-  private final ContentRevisionRepository revisions;
-  private final EntryRepository entries;
+  private final NoticeMapper notices;
+  private final PortalChannelMapper channels;
+  private final ContentRevisionMapper revisions;
+  private final EntryMapper entries;
   private final SettingService settingService;
   private final com.mayday.service.PortalStructureService portal;
   private final ContentAssets assets;
@@ -91,9 +92,10 @@ public class PublicController {
     view.put("content", detail ? revision.getContent() : null);
     view.put("categoryId", revision.getCategoryId());
     view.put("portalChannelId", revision.getPortalChannelId());
-    view.put("channelCode", revision.getPortalChannel().getCode());
-    view.put("channelName", revision.getPortalChannel().getName());
-    view.put("channelTemplate", revision.getPortalChannel().getTemplate());
+    var channel = channels.findById(revision.getPortalChannelId()).orElse(null);
+    view.put("channelCode", channel == null ? "" : channel.getCode());
+    view.put("channelName", channel == null ? "" : channel.getName());
+    view.put("channelTemplate", channel == null ? "" : channel.getTemplate());
     view.put(
         "category",
         entries.findById(revision.getCategoryId()).map(SystemEntry::getName).orElse(""));
@@ -134,8 +136,10 @@ public class PublicController {
 
   private Map<String, Object> visibleArticle(Long id) {
     if (id == null) return null;
-    return notices
-        .findOne(ContentService.publiclyVisible().and((r, q, c) -> c.equal(r.get("id"), id)))
+    return java.util.Optional.ofNullable(
+            notices.selectOneByQuery(
+                QueryWrapper.create()
+                    .where(ContentService.publiclyVisible().and(new QueryColumn("id").eq(id)))))
         .map(n -> article(n, false))
         .orElse(null);
   }
@@ -143,22 +147,15 @@ public class PublicController {
   /** 自动主视觉和公告分别按模板查询，避免其他栏目的大量新内容挤出首页必要入口。 */
   private Map<String, Object> automaticArticle(String template) {
     return notices
-        .findAll(
-            ContentService.publiclyVisible()
-                .and(
-                    (root, query, criteria) ->
-                        criteria.equal(
-                            root.get("liveRevision").get("portalChannel").get("template"),
-                            template)),
-            PageRequest.of(
-                0,
-                1,
-                Sort.by(
-                    Sort.Order.desc("liveRevision.recommended"),
-                    Sort.Order.desc("liveRevision.pinned"),
-                    Sort.Order.desc("liveRevision.sortOrder"),
-                    Sort.Order.desc("publishedAt"),
-                    Sort.Order.desc("id"))))
+        .selectListByQueryAs(
+            notices
+                .publicArticles()
+                .and(new com.mybatisflex.core.query.QueryColumn("pc.template").eq(template))
+                .orderBy(
+                    "lr.recommended desc, lr.pinned desc, lr.sort_order desc,"
+                        + " cms_notice.published_at desc, cms_notice.id desc")
+                .limit(1),
+            com.mayday.content.Notice.class)
         .stream()
         .findFirst()
         .map(n -> article(n, false))
@@ -171,16 +168,14 @@ public class PublicController {
     var config = portal.home(false);
     var recent =
         notices
-            .findAll(
-                ContentService.publiclyVisible(),
-                PageRequest.of(
-                    0,
-                    12,
-                    Sort.by(
-                        Sort.Order.desc("liveRevision.recommended"),
-                        Sort.Order.desc("liveRevision.pinned"),
-                        Sort.Order.desc("publishedAt"),
-                        Sort.Order.desc("id"))))
+            .selectListByQueryAs(
+                notices
+                    .publicArticles()
+                    .orderBy(
+                        "lr.recommended desc, lr.pinned desc, lr.sort_order desc,"
+                            + " cms_notice.published_at desc, cms_notice.id desc")
+                    .limit(12),
+                com.mayday.content.Notice.class)
             .stream()
             .map(n -> article(n, false))
             .toList();
@@ -221,59 +216,42 @@ public class PublicController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "9") int size) {
     Long channelId = channel == null ? null : portal.publicChannel(channel).getId();
-    var specification =
-        ContentService.publiclyVisible()
-            .and(
-                (root, query, criteria) ->
-                    criteria.and(
-                        SearchPredicates.contains(
-                            criteria, root.get("liveRevision").get("title"), keyword),
-                        categoryId == null
-                            ? criteria.conjunction()
-                            : criteria.equal(
-                                root.get("liveRevision").get("categoryId"), categoryId),
-                        channelId == null
-                            ? criteria.conjunction()
-                            : criteria.equal(
-                                root.get("liveRevision").get("portalChannelId"), channelId),
-                        category.isBlank()
-                            ? criteria.conjunction()
-                            : criteria.equal(
-                                root.get("liveRevision").get("categoryEntry").get("name"),
-                                category),
-                        tagId == null
-                            ? criteria.conjunction()
-                            : criteria.isMember(tagId, root.get("liveRevision").get("tagIds")),
-                        recommended == null
-                            ? criteria.conjunction()
-                            : criteria.equal(
-                                root.get("liveRevision").get("recommended"), recommended)));
-    var request =
-        PageRequest.of(
-            Math.max(0, page - 1),
+    var articles =
+        notices
+            .publicArticles()
+            .and(com.mayday.content.mapper.NoticeMapper.portalTitleContains(keyword));
+    if (categoryId != null)
+      articles.and(new com.mybatisflex.core.query.QueryColumn("lr.category_id").eq(categoryId));
+    if (channelId != null)
+      articles.and(
+          new com.mybatisflex.core.query.QueryColumn("lr.portal_channel_id").eq(channelId));
+    if (!category.isBlank())
+      articles.and(new com.mybatisflex.core.query.QueryColumn("ce.name").eq(category));
+    if (tagId != null) articles.and(com.mayday.content.mapper.NoticeMapper.taggedWith(tagId));
+    if (recommended != null)
+      articles.and(new com.mybatisflex.core.query.QueryColumn("lr.recommended").eq(recommended));
+    var articlePage =
+        notices.paginateAs(
+            Math.max(1, page),
             Math.max(1, Math.min(100, size)),
-            Sort.by(
-                Sort.Order.desc("liveRevision.pinned"),
-                Sort.Order.desc("liveRevision.sortOrder"),
-                Sort.Order.desc("publishedAt"),
-                Sort.Order.desc("id")));
+            articles.orderBy(
+                "lr.pinned desc, lr.sort_order desc, cms_notice.published_at desc, cms_notice.id desc"),
+            com.mayday.content.Notice.class);
     return ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())
-        .body(
-            ApiResponse.ok(
-                PageResult.from(
-                    notices
-                        .findAll(specification, request)
-                        .map(notice -> article(notice, false)))));
+        .body(ApiResponse.ok(PageResult.from(articlePage.map(notice -> article(notice, false)))));
   }
 
   /** 只返回当前公开上线修订；不存在、内部或未发布的内容统一返回 404，避免探测草稿。 */
   @GetMapping("/articles/{id}")
   public ResponseEntity<?> detail(@PathVariable Long id) {
     var found =
-        notices.findOne(
-            ContentService.publiclyVisible()
-                .and((root, query, criteria) -> criteria.equal(root.get("id"), id)));
+        java.util.Optional.ofNullable(
+            notices.selectOneByQuery(
+                QueryWrapper.create()
+                    .where(
+                        ContentService.publiclyVisible()
+                            .and(new com.mybatisflex.core.query.QueryColumn("id").eq(id)))));
     if (found.isEmpty())
       return ResponseEntity.status(404)
           .cacheControl(CacheControl.noStore())
@@ -288,9 +266,12 @@ public class PublicController {
   @Transactional
   public ResponseEntity<?> recordView(@PathVariable Long id) {
     var found =
-        notices.findOne(
-            ContentService.publiclyVisible()
-                .and((root, query, criteria) -> criteria.equal(root.get("id"), id)));
+        java.util.Optional.ofNullable(
+            notices.selectOneByQuery(
+                QueryWrapper.create()
+                    .where(
+                        ContentService.publiclyVisible()
+                            .and(new com.mybatisflex.core.query.QueryColumn("id").eq(id)))));
     if (found.isEmpty())
       return ResponseEntity.status(404)
           .cacheControl(CacheControl.noStore())

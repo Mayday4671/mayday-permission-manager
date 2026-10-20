@@ -8,21 +8,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.mayday.operations.mapper.FlowDecisionMapper;
 import com.mayday.operations.model.FlowDecision;
 import com.mayday.operations.model.FlowRequest;
-import com.mayday.operations.repository.FlowDecisionRepository;
 import com.mayday.operations.workflow.WorkflowSchema.Field;
 import com.mayday.operations.workflow.WorkflowSchema.Spec;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 
 /** 私人稿读取边界回归；真实字段/附件/标题搜索授权及事务回滚另由隔离 MySQL HTTP 验收。 */
 class WorkflowPrivateDraftsTest {
-  private final FlowDecisionRepository history = mock(FlowDecisionRepository.class);
+  private final FlowDecisionMapper history = mock(FlowDecisionMapper.class);
   private final WorkflowJson json = new WorkflowJson();
   private final WorkflowPrivateDrafts drafts = new WorkflowPrivateDrafts(history, json);
   private final Spec schema =
@@ -50,7 +48,7 @@ class WorkflowPrivateDraftsTest {
     assertEquals(List.of(10), drafts.submittedValues(request, schema).get("proof"));
     assertEquals("未提交修改", drafts.editableValues(request).get("memo"));
     assertEquals(List.of(20), drafts.editableValues(request).get("proof"));
-    verify(history, never()).findAll(any(Specification.class), any(Sort.class));
+    verify(history, never()).selectListByQuery(any(com.mybatisflex.core.query.QueryWrapper.class));
   }
 
   @Test
@@ -75,7 +73,7 @@ class WorkflowPrivateDraftsTest {
                 Map.of("before", "审批修正", "after", "私人修改"),
                 "proof",
                 Map.of("before", List.of(10L), "after", List.of(20L)))));
-    when(history.findAll(any(Specification.class), any(Sort.class)))
+    when(history.selectListByQuery(any(com.mybatisflex.core.query.QueryWrapper.class)))
         .thenReturn(List.of(submit, approval, closed, edit));
     request.setTitle("私人标题覆盖");
     request.setFormData(json.write(Map.of("memo", "私人修改", "proof", List.of(20L))));
@@ -107,7 +105,7 @@ class WorkflowPrivateDraftsTest {
     var edit = decision(6, "EDIT");
     edit.setRunNumber(2);
     edit.setChangesJson(json.write(Map.of("memo", Map.of("after", "第二轮私稿"))));
-    when(history.findAll(any(Specification.class), any(Sort.class)))
+    when(history.selectListByQuery(any(com.mybatisflex.core.query.QueryWrapper.class)))
         .thenReturn(List.of(first, second, closed, edit));
     assertEquals("第二轮", drafts.submittedValues(request, schema).get("memo"));
     assertEquals(List.of(11), drafts.submittedValues(request, schema).get("proof"));

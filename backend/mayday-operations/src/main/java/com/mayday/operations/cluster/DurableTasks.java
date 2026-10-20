@@ -1,14 +1,14 @@
 package com.mayday.operations.cluster;
 
 import com.mayday.common.BusinessException;
-import java.util.List;
+import com.mayday.operations.cluster.mapper.DurableTaskMapper;
+import com.mybatisflex.core.row.Row;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -20,18 +20,18 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class DurableTasks {
-  private final JdbcTemplate jdbc;
+  private final DurableTaskMapper queue;
   private final TransactionTemplate transaction;
   private final String instance = UUID.randomUUID().toString();
   private final long leaseMillis;
 
   /** 租约不依靠主机时钟；每次启动有新实例标识，不把上次进程的所有权继承给当前进程。 */
   public DurableTasks(
-      JdbcTemplate jdbc,
+      DurableTaskMapper queue,
       PlatformTransactionManager manager,
       @Value("${mayday.tasks.lease-seconds:90}") int leaseSeconds) {
     if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalStateException("任务租约须为 15–300 秒");
-    this.jdbc = jdbc;
+    this.queue = queue;
     leaseMillis = leaseSeconds * 1000L;
     transaction = new TransactionTemplate(manager);
     transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -43,8 +43,7 @@ public class DurableTasks {
       long id, String type, String key, String payload, String token, int attempt) {}
 
   private long now() {
-    return jdbc.queryForObject(
-        "select cast(unix_timestamp(current_timestamp(3))*1000 as unsigned)", Long.class);
+    return queue.nowMillis();
   }
 
   /** 同一类型和业务键只能有一个作业；不同内容不能借旧键覆盖已排队或完成的任务。 */
@@ -58,24 +57,12 @@ public class DurableTasks {
         || maxAttempts > 10) throw new BusinessException("后台任务参数无效");
     return transaction.execute(
         status -> {
-          jdbc.update(
-              "insert ignore into sys_durable_task(task_type,business_key,payload,status,attempts,max_attempts,next_attempt_at,created_at,updated_at) values(?,?,?,'QUEUED',0,?,?,?,?)",
-              type,
-              key,
-              payload,
-              maxAttempts,
-              now(),
-              now(),
-              now());
-          var rows =
-              jdbc.query(
-                  "select id,payload from sys_durable_task where task_type=? and business_key=? for update",
-                  (row, number) -> new Object[] {row.getLong(1), row.getString(2)},
-                  type,
-                  key);
-          if (!Objects.equals(rows.getFirst()[1], payload))
+          long now = now();
+          queue.enqueue(type, key, payload, maxAttempts, now);
+          Row existing = queue.lockByKey(type, key);
+          if (!Objects.equals(existing.getString("payload"), payload))
             throw new BusinessException("任务标识已用于不同内容");
-          return (Long) rows.getFirst()[0];
+          return existing.getLong("id");
         });
   }
 
@@ -89,45 +76,22 @@ public class DurableTasks {
     return transaction.execute(
         status -> {
           long now = now();
-          List<Lease> rows =
-              jdbc.query(
-                  "select id,task_type,business_key,payload,attempts from sys_durable_task where task_type=? and (? is null or business_key=?) and ((status='QUEUED' and next_attempt_at<=?) or (status='RUNNING' and lease_until<=?)) order by next_attempt_at,id limit 1 for update skip locked",
-                  (row, number) ->
-                      new Lease(
-                          row.getLong(1),
-                          row.getString(2),
-                          row.getString(3),
-                          row.getString(4),
-                          UUID.randomUUID().toString(),
-                          row.getInt(5) + 1),
-                  type,
-                  key,
-                  key,
-                  now,
-                  now);
-          if (rows.isEmpty()) return null;
-          Lease lease = rows.getFirst();
-          int max =
-              jdbc.queryForObject(
-                  "select max_attempts from sys_durable_task where id=?",
-                  Integer.class,
-                  lease.id());
-          if (lease.attempt() > max) {
-            jdbc.update(
-                "update sys_durable_task set status='FAILED',last_error='任务重试次数已达上限',lease_token=null,lease_until=null,updated_at=? where id=?",
-                now,
-                lease.id());
+          Row claimed = queue.claimRow(type, key, now);
+          if (claimed == null) return null;
+          Lease lease =
+              new Lease(
+                  claimed.getLong("id"),
+                  claimed.getString("task_type"),
+                  claimed.getString("business_key"),
+                  claimed.getString("payload"),
+                  UUID.randomUUID().toString(),
+                  claimed.getInt("attempts") + 1);
+          if (lease.attempt() > queue.maxAttempts(lease.id())) {
+            queue.markFailedByCap(lease.id(), now);
             return null;
           }
-          jdbc.update(
-              "update sys_durable_task set status='RUNNING',attempts=?,lease_owner=?,lease_token=?,lease_until=?,heartbeat_at=?,updated_at=? where id=?",
-              lease.attempt(),
-              instance,
-              lease.token(),
-              now + leaseMillis,
-              now,
-              now,
-              lease.id());
+          queue.markRunning(
+              lease.id(), lease.attempt(), instance, lease.token(), now + leaseMillis, now);
           return lease;
         });
   }
@@ -135,15 +99,7 @@ public class DurableTasks {
   /** 心跳只延长仍有效的原租约；过期令牌不能凭一次迟到的心跳抢回已丢失的所有权。 */
   public boolean heartbeat(Lease lease) {
     long now = now();
-    return jdbc.update(
-            "update sys_durable_task set lease_until=?,heartbeat_at=?,updated_at=? where id=? and status='RUNNING' and lease_token=? and lease_until>?",
-            now + leaseMillis,
-            now,
-            now,
-            lease.id(),
-            lease.token(),
-            now)
-        == 1;
+    return queue.heartbeat(lease.id(), lease.token(), now + leaseMillis, now) == 1;
   }
 
   /** 业务写入持任务行锁并在提交前再次核验时间；暂停很久或取消的旧工作器不能提交成功。 */
@@ -158,14 +114,7 @@ public class DurableTasks {
   }
 
   private boolean validLocked(Lease lease) {
-    List<Boolean> rows =
-        jdbc.query(
-            "select status='RUNNING' and lease_token=? and lease_until>? from sys_durable_task where id=? for update",
-            (row, number) -> row.getBoolean(1),
-            lease.token(),
-            now(),
-            lease.id());
-    return !rows.isEmpty() && rows.getFirst();
+    return queue.validForUpdate(lease.id(), lease.token(), now());
   }
 
   /** 完成与业务输出写入可以位于同一 fenced 事务；成功以后任何旧令牌不能再次改状态。 */
@@ -180,10 +129,7 @@ public class DurableTasks {
           if (!validLocked(lease)) throw new LostLease();
           T result = work.get();
           if (!validLocked(lease)) throw new LostLease();
-          jdbc.update(
-              "update sys_durable_task set status='SUCCEEDED',lease_token=null,lease_until=null,last_error=null,updated_at=? where id=?",
-              now(),
-              lease.id());
+          queue.markSucceeded(lease.id(), now());
           return result;
         });
   }
@@ -198,19 +144,14 @@ public class DurableTasks {
     transaction.executeWithoutResult(
         status -> {
           if (!validLocked(lease)) return;
-          int max =
-              jdbc.queryForObject(
-                  "select max_attempts from sys_durable_task where id=?",
-                  Integer.class,
-                  lease.id());
+          int max = queue.maxAttempts(lease.id());
           String next = retryable && lease.attempt() < max ? "QUEUED" : "FAILED";
-          jdbc.update(
-              "update sys_durable_task set status=?,lease_token=null,lease_until=null,last_error=?,next_attempt_at=?,updated_at=? where id=?",
+          queue.markOutcome(
+              lease.id(),
               next,
               explanation.substring(0, Math.min(300, explanation.length())),
               now() + Math.min(60000, 1000L << Math.min(6, lease.attempt())),
-              now(),
-              lease.id());
+              now());
           update.accept(next);
         });
   }
@@ -224,12 +165,7 @@ public class DurableTasks {
   public boolean cancel(String type, String key, Runnable update) {
     return transaction.execute(
         status -> {
-          int changed =
-              jdbc.update(
-                  "update sys_durable_task set status='CANCELLED',lease_token=null,lease_until=null,updated_at=? where task_type=? and business_key=? and status in ('QUEUED','RUNNING')",
-                  now(),
-                  type,
-                  key);
+          int changed = queue.cancelQueuedOrRunning(type, key, now());
           if (changed == 1) update.run();
           return changed == 1;
         });
@@ -244,13 +180,7 @@ public class DurableTasks {
   public boolean retry(String type, String key, Runnable update) {
     return transaction.execute(
         status -> {
-          int changed =
-              jdbc.update(
-                  "update sys_durable_task set status='QUEUED',attempts=0,last_error=null,next_attempt_at=?,updated_at=? where task_type=? and business_key=? and status in ('FAILED','CANCELLED')",
-                  now(),
-                  now(),
-                  type,
-                  key);
+          int changed = queue.retryFailed(type, key, now());
           if (changed == 1) update.run();
           return changed == 1;
         });
@@ -260,39 +190,22 @@ public class DurableTasks {
   public void synchronizeTerminal(String type, String key, Consumer<String> update) {
     transaction.executeWithoutResult(
         status -> {
-          var rows =
-              jdbc.query(
-                  "select status from sys_durable_task where task_type=? and business_key=? for update",
-                  (row, number) -> row.getString(1),
-                  type,
-                  key);
-          if (!rows.isEmpty() && Set.of("FAILED", "CANCELLED").contains(rows.getFirst()))
-            update.accept(rows.getFirst());
+          Row locked = queue.lockStatus(type, key);
+          if (locked != null && Set.of("FAILED", "CANCELLED").contains(locked.getString("status")))
+            update.accept(locked.getString("status"));
         });
   }
 
   /** 状态只供注册业务协调自己的公开进度；不存在匿名查询全部队列的入口。 */
   public String state(String type, String key) {
-    return jdbc
-        .query(
-            "select status from sys_durable_task where task_type=? and business_key=?",
-            (row, number) -> row.getString(1),
-            type,
-            key)
-        .stream()
-        .findFirst()
-        .orElse(null);
+    return queue.status(type, key);
   }
 
   /** 队列行与业务回执共用短事务；返回原有终态，不能因网络重试重新发布成功或抹掉执行历史。 */
   public <T> T inspect(String type, String key, Supplier<T> view) {
     return transaction.execute(
         status -> {
-          jdbc.queryForObject(
-              "select id from sys_durable_task where task_type=? and business_key=? for update",
-              Long.class,
-              type,
-              key);
+          queue.lockRow(type, key);
           return view.get();
         });
   }

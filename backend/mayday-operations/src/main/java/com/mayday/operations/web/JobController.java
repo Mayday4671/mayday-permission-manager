@@ -5,10 +5,10 @@ import com.mayday.common.BusinessException;
 import com.mayday.common.PageResult;
 import com.mayday.common.SearchPredicates;
 import com.mayday.operations.OperationSupport;
+import com.mayday.operations.mapper.JobExecutionMapper;
+import com.mayday.operations.mapper.ScheduledJobMapper;
 import com.mayday.operations.model.JobExecution;
 import com.mayday.operations.model.ScheduledJob;
-import com.mayday.operations.repository.JobExecutionRepository;
-import com.mayday.operations.repository.ScheduledJobRepository;
 import com.mayday.operations.service.JobRunner;
 import com.mayday.security.AccessPolicy;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -33,11 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/operations")
 @RequiredArgsConstructor
 public class JobController {
-  private final ScheduledJobRepository jobs;
-  private final JobExecutionRepository executions;
+  private final ScheduledJobMapper jobs;
+  private final JobExecutionMapper executions;
   private final JobRunner runner;
   private final AccessPolicy access;
-  private final com.mayday.system.repository.UserRepository users;
+  private final com.mayday.system.mapper.UserMapper users;
   private final com.mayday.operations.service.AlertRecipients alertRecipients;
 
   /** 配置提交白名单，处理器名称来自注册Bean，Cron和接收人由服务验证；修改时版本必须与当前记录一致。 */
@@ -75,14 +75,13 @@ public class JobController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     access.require("scheduler:view");
+    com.mybatisflex.core.query.QueryWrapper filter =
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .where(SearchPredicates.contains("name", keyword));
+    if (enabled != null)
+      filter.and(new com.mybatisflex.core.query.QueryColumn("enabled").eq(enabled));
     return ApiResponse.ok(
-        PageResult.from(
-            jobs.findAll(
-                (r, q, c) ->
-                    c.and(
-                        SearchPredicates.contains(c, r.get("name"), keyword),
-                        enabled == null ? c.conjunction() : c.equal(r.get("enabled"), enabled)),
-                PageResult.request(page, size))));
+        PageResult.from(jobs.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
 
   /** 新配置必须具备创建权限，验证注册处理器、六段Cron和可查看调度的告警接收人后提交。 */
@@ -125,7 +124,7 @@ public class JobController {
     job.setEnabled(req.enabled());
     job.setAlertUserId(req.alertUserId());
     job.setNextRunAt(req.enabled() ? next : null);
-    return jobs.saveAndFlush(job);
+    return jobs.save(job);
   }
 
   /** 删除仅移除锁定配置，历史执行结果独立保留；需要调度删除权限而不能用执行权限代替。 */
@@ -169,13 +168,12 @@ public class JobController {
       @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size) {
     access.require("scheduler:view");
+    com.mybatisflex.core.query.QueryWrapper filter =
+        com.mybatisflex.core.query.QueryWrapper.create()
+            .where(SearchPredicates.contains("job_name", keyword));
+    if (jobId != null) filter.and(new com.mybatisflex.core.query.QueryColumn("job_id").eq(jobId));
     return ApiResponse.ok(
         PageResult.from(
-            executions.findAll(
-                (r, q, c) ->
-                    c.and(
-                        SearchPredicates.contains(c, r.get("jobName"), keyword),
-                        jobId == null ? c.conjunction() : c.equal(r.get("jobId"), jobId)),
-                PageResult.request(page, size))));
+            executions.paginate(PageResult.request(page, size), filter.orderBy("id desc"))));
   }
 }

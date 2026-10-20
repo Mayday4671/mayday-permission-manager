@@ -1,10 +1,11 @@
 package com.mayday.service;
 
 import com.mayday.common.BusinessTime;
-import com.mayday.content.NoticeRepository;
+import com.mayday.content.mapper.NoticeMapper;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class ContentSchedule {
-  private final NoticeRepository notices;
+  private final NoticeMapper notices;
   private final ContentService service;
 
   /** 每轮最多领取100篇到期内容，每篇调用独立事务重新校验排期；单篇失败保留时间点以供下一轮重试。 */
@@ -21,16 +22,20 @@ public class ContentSchedule {
   public void tick() {
     var now = BusinessTime.now();
     var due =
-        notices.findAll(
-            (r, q, c) ->
-                c.and(
-                    c.isNull(r.get("deletedAt")),
-                    c.or(
-                        c.lessThanOrEqualTo(r.get("scheduledPublishAt"), now),
-                        c.and(
-                            c.isTrue(r.get("published")),
-                            c.lessThanOrEqualTo(r.get("liveOfflineAt"), now)))),
-            PageRequest.of(0, 100));
+        notices.selectListByQuery(
+            QueryWrapper.create()
+                .where(
+                    new QueryColumn("deleted_at")
+                        .isNull()
+                        .and(
+                            new QueryColumn("scheduled_publish_at")
+                                .le(now)
+                                .or(
+                                    new QueryColumn("published")
+                                        .eq(true)
+                                        .and(new QueryColumn("live_offline_at").le(now)))))
+                .orderBy("id asc")
+                .limit(100));
     for (var n : due)
       try {
         service.applyDue(n.getId());

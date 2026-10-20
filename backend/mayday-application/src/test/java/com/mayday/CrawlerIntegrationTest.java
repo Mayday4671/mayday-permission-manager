@@ -16,24 +16,24 @@ import static org.mockito.Mockito.when;
 
 import com.mayday.common.BusinessException;
 import com.mayday.common.BusinessTime;
-import com.mayday.crawler.CrawlArticleImageRepository;
-import com.mayday.crawler.CrawlArticleRepository;
 import com.mayday.crawler.CrawlArticles;
 import com.mayday.crawler.CrawlController;
-import com.mayday.crawler.CrawlItemRepository;
 import com.mayday.crawler.CrawlRules;
 import com.mayday.crawler.CrawlStore;
 import com.mayday.crawler.CrawlTask;
-import com.mayday.crawler.CrawlTaskRepository;
 import com.mayday.crawler.CrawlWorker;
 import com.mayday.crawler.PageExtractor;
 import com.mayday.crawler.WebFetcher;
-import com.mayday.operations.repository.FilePayloadRepository;
-import com.mayday.operations.repository.StoredFileRepository;
+import com.mayday.crawler.mapper.CrawlArticleImageMapper;
+import com.mayday.crawler.mapper.CrawlArticleMapper;
+import com.mayday.crawler.mapper.CrawlItemMapper;
+import com.mayday.crawler.mapper.CrawlTaskMapper;
+import com.mayday.operations.mapper.FilePayloadMapper;
+import com.mayday.operations.mapper.StoredFileMapper;
+import com.mayday.system.mapper.RoleMapper;
+import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysRole;
 import com.mayday.system.model.SysUser;
-import com.mayday.system.repository.RoleRepository;
-import com.mayday.system.repository.UserRepository;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -78,15 +78,15 @@ class CrawlerIntegrationTest {
   @Autowired CrawlStore store;
   @Autowired CrawlWorker worker;
   @Autowired CrawlController controller;
-  @Autowired CrawlTaskRepository tasks;
-  @Autowired CrawlItemRepository items;
-  @Autowired CrawlArticleRepository articles;
-  @Autowired CrawlArticleImageRepository articleImages;
+  @Autowired CrawlTaskMapper tasks;
+  @Autowired CrawlItemMapper items;
+  @Autowired CrawlArticleMapper articles;
+  @Autowired CrawlArticleImageMapper articleImages;
   @Autowired CrawlArticles articleStore;
-  @Autowired UserRepository users;
-  @Autowired RoleRepository roles;
-  @Autowired StoredFileRepository files;
-  @Autowired FilePayloadRepository payloads;
+  @Autowired UserMapper users;
+  @Autowired RoleMapper roles;
+  @Autowired StoredFileMapper files;
+  @Autowired FilePayloadMapper payloads;
   @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
   @MockitoBean WebFetcher fetcher;
   SysUser owner;
@@ -115,13 +115,13 @@ class CrawlerIntegrationTest {
                 "crawler:delete",
                 "crawler:download",
                 "files:create")));
-    role = roles.saveAndFlush(role);
+    role = roles.save(role);
     owner = new SysUser();
     owner.setUsername("crawler_test");
     owner.setNickname("采集测试");
     owner.setPasswordHash("unused-test-only");
     owner.getRoles().add(role);
-    owner = users.saveAndFlush(owner);
+    owner = users.save(owner);
     login(owner);
     when(fetcher.fetch(anyString(), any(), anyBoolean()))
         .thenAnswer(
@@ -157,12 +157,12 @@ class CrawlerIntegrationTest {
   void cleanup() {
     tx.executeWithoutResult(
         s -> {
-          articleImages.deleteAllInBatch();
-          items.deleteAllInBatch();
-          articles.deleteAllInBatch();
-          tasks.deleteAllInBatch();
-          payloads.deleteAllInBatch();
-          files.deleteAllInBatch();
+          articleImages.deleteByQuery(com.mybatisflex.core.query.QueryWrapper.create());
+          items.deleteByQuery(com.mybatisflex.core.query.QueryWrapper.create());
+          articles.deleteByQuery(com.mybatisflex.core.query.QueryWrapper.create());
+          tasks.deleteByQuery(com.mybatisflex.core.query.QueryWrapper.create());
+          payloads.deleteByQuery(com.mybatisflex.core.query.QueryWrapper.create());
+          files.deleteByQuery(com.mybatisflex.core.query.QueryWrapper.create());
         });
     if (owner != null) users.deleteById(owner.getId());
     if (role != null) roles.deleteById(role.getId());
