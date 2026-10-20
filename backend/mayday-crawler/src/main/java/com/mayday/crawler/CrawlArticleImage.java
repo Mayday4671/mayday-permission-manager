@@ -11,8 +11,11 @@ import lombok.Setter;
 @Table(value = "crawl_article_image", onInsert = BaseEntity.CreatedAtListener.class, onUpdate = BaseEntity.UpdatedAtListener.class)
 public class CrawlArticleImage extends BaseEntity
 {
+
+    /** 所属采集文章 ID；同一图片可以被多篇文章分别引用 */
     private Long articleId;
 
+    /** 对应 IMAGE 队列项 ID；下载完成后通过其 file_id 读取文件，失败时保留关联供重试 */
     private Long itemId;
 
     /** 详情页序号与页内图片位置共同确定顺序，不能依据异步下载完成时间排序。 */

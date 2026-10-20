@@ -1,5 +1,6 @@
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.source.tree.VariableTree;
 import com.sun.source.util.DocTrees;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePathScanner;
@@ -52,8 +53,13 @@ public final class SourceConventions {
             failures.add(file + ": 通配导入 " + declaration.getQualifiedIdentifier());
         new TreePathScanner<Void, Void>() {
           private void requireDescription(String boundary) {
+            requireDescription(boundary, 8);
+          }
+
+          // 实体字段与数据库 COMMENT 同源，六字快照即视为有效说明。
+          private void requireDescription(String boundary, int minLength) {
             String description = docs.getDocComment(getCurrentPath());
-            if (description == null || description.strip().length() < 8)
+            if (description == null || description.strip().length() < minLength)
               failures.add(
                   file
                       + ": "
@@ -83,6 +89,19 @@ public final class SourceConventions {
                 && !inherited
                 && node.getReturnType() != null) requireDescription("公开方法 " + node.getName());
             return super.visitMethod(node, unused);
+          }
+
+          @Override
+          public Void visitVariable(VariableTree node, Void unused) {
+            // 实体字段注释与数据库 COMMENT 同源维护；非实体类、静态常量和局部变量不在此约束。
+            if (getCurrentPath().getParentPath().getLeaf() instanceof ClassTree owner
+                && owner.getModifiers().getAnnotations().stream()
+                    .anyMatch(
+                        annotation ->
+                            annotation.getAnnotationType().toString().equals("Table"))
+                && !node.getModifiers().getFlags().contains(Modifier.STATIC))
+              requireDescription("实体字段 " + node.getName(), 6);
+            return super.visitVariable(node, unused);
           }
         }.scan(unit, null);
       }

@@ -22,10 +22,14 @@ import lombok.Setter;
 @Table(value = "sys_role", onInsert = BaseEntity.CreatedAtListener.class, onUpdate = BaseEntity.UpdatedAtListener.class)
 public class SysRole extends BaseEntity
 {
+
+    /** 唯一角色编码；admin 为受保护的超级管理员角色，普通角色不能授予超出自身权限的能力 */
     private String code;
 
+    /** 角色展示名称；不用于鉴权判断 */
     private String name;
 
+    /** 角色职责与授权用途说明 */
     private String description;
 
     /** 停用立即排除操作权限与数据范围，保留账号关联便于后续恢复。 */

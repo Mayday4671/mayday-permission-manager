@@ -15,6 +15,7 @@ public class FilePayload
     /** 与文件元信息表共享主键；正文的存活期由文件删除流程统一管理。 */
     @Id(keyType = KeyType.Auto)
     private Long id;
+    /** 原始二进制内容 LONGBLOB；下载采用附件响应，不把上传内容作为页面执行 */
 
     private byte[] data;
 }

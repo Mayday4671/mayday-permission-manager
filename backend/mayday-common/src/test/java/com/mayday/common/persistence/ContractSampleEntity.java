@@ -10,6 +10,9 @@ import lombok.Setter;
 @Table("contract_sample")
 public class ContractSampleEntity extends BaseEntity
 {
+    /** 覆盖驼峰转下划线的示例名称列。 */
     private String userName;
+
+    /** 覆盖外键风格命名与范围条件构建的示例部门列。 */
     private Long departmentId;
 }

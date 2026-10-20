@@ -13,32 +13,45 @@ import lombok.Setter;
 @Table(value = "ops_flow_task", onInsert = BaseEntity.CreatedAtListener.class, onUpdate = BaseEntity.UpdatedAtListener.class)
 public class FlowTask extends BaseEntity
 {
+    /** 审批实例 ID，外键 ops_flow_request.id */
+
     private Long requestId;
+    /** 模型节点稳定 ID，与实例快照中节点对应 */
 
     private String nodeId;
+    /** 生成任务时节点名称快照 */
 
     private String nodeName;
+    /** 待办账号 ID，逻辑关联 sys_user.id；不能由请求参数冒充 */
 
     private Long assigneeId;
+    /** 待办人昵称快照 */
 
     private String assigneeName;
 
     /** 临时委托或管理员交接前的原指定人；为空表示任务没有发生归属替换。 */
     private Long originalAssigneeId;
 
+    /** 原指定审批人名称快照；没有替换任务归属时为空。 */
     private String originalAssigneeName;
 
     /** 已激活的任务保存委托来源；委托撤销或到期不追溯改变该任务。 */
     private Long delegationId;
 
+    /** 任务归属说明：委托来源、交接理由或委托不适用原因；不包含隐藏表单字段。 */
     private String assignmentNote;
+    /**
+     * 任务状态：WAITING顺签未轮到/PENDING待办/APPROVED通过/REJECTED驳回/RETURNED退回/TRANSFERRED转交/CANCELLED失效/COPIED抄送
+     */
 
     private String status = "PENDING";
+    /** 加签必签标记；1 时必须独立通过，不能被原或签审批人的通过代替 */
 
     private boolean mandatory;
 
     /** 任务属于哪个提交轮次和节点办理批次；旧任务只用于历史展示。 */
     private int runNumber = 1;
+    /** 所属节点办理批次；同一节点退回重办不得混用以前的会签结果 */
 
     private int nodeVisit;
 
@@ -50,6 +63,7 @@ public class FlowTask extends BaseEntity
 
     /** 仅抄送接收者能标记已读，不能修改其他接收者的阅读状态。 */
     private LocalDateTime readAt;
+    /** 任务已处理时间；尚未处理时为 NULL */
 
     private LocalDateTime decidedAt;
 

@@ -14,13 +14,19 @@ import lombok.Setter;
 @Table(value = "ops_job_execution", onInsert = BaseEntity.CreatedAtListener.class, onUpdate = BaseEntity.UpdatedAtListener.class)
 public class JobExecution extends BaseEntity
 {
+    /** 任务 ID，逻辑关联 ops_job.id；任务删除后历史可保留 */
+
     private Long jobId;
+    /** 执行时任务名称快照 */
 
     private String jobName;
+    /** 执行结果状态：SUCCESS成功、FAILED失败；失败结果独立于业务事务保存，不能将请求成功等同于任务成功 */
 
     private String status;
+    /** 脱敏的运行结果说明；不得包含密码、令牌或未经授权的业务聚合数据 */
 
     private String result;
+    /** 处理器耗时，单位毫秒 */
 
     private long durationMs;
 

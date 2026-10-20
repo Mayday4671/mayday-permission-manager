@@ -24,11 +24,13 @@ public class SysUser extends BaseEntity
     @Column(ignore = true)
     private Set<Long> postIds = new HashSet<>();
 
+    /** 唯一登录名；修改个人资料不能改变此值，内置 admin 账号受保护 */
     private String username;
 
     /** BCrypt 摘要只在认证与设置密码边界使用，所有业务响应必须先映射为不含该字段的视图。 */
     private String passwordHash;
 
+    /** 显示昵称；不是登录凭据，审计身份以认证账号为准 */
     private String nickname;
 
     /** 读取与写入邮箱分别检查字段权限；实体字段存在不代表任意用户可以看到它。 */
@@ -37,6 +39,7 @@ public class SysUser extends BaseEntity
     /** 电话字段与邮箱采用独立授权，普通列表和导出共享相同的脱敏规则。 */
     private String phone;
 
+    /** 所属部门 ID，物理外键 sys_entry.id 且业务要求 kind=departments；NULL 表示未分配部门 */
     private Long departmentId;
 
     /** 停用后认证与后台任务授权均拒绝此账号，服务层同时撤销已有会话。 */
