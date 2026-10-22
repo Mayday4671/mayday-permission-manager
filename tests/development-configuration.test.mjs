@@ -36,6 +36,12 @@ test("Java 完整传递模块、存储、会话、MFA 及多 OIDC 配置，隔�
     SEED_DEMO_DATA: "false",
     MODULE_CRAWLER_ENABLED: "false",
     MODULE_WORKORDERS_ENABLED: "true",
+    MODULE_TELEGRAM_ENABLED: "true",
+    TELEGRAM_API_ID: "fixture-telegram-id",
+    TELEGRAM_API_HASH: "fixture-telegram-hash",
+    TELEGRAM_SESSION_ENCRYPTION_KEY: "fixture-session-key",
+    TELEGRAM_PROXY_PASSWORD: "fixture-proxy-password",
+    TELEGRAM_DATA_DIR: "fixture-telegram-data",
     MAYDAY_STORAGE_MODE: "S3",
     MAYDAY_STORAGE_S3_SECRET_KEY: "configured-s3-only",
     MAYDAY_PRODUCTION: "true",
@@ -89,6 +95,16 @@ test("Java 完整传递模块、存储、会话、MFA 及多 OIDC 配置，隔�
     "http://127.0.0.1:18080",
   );
   assert.equal(result.frontendEnvironment.ADMIN_PASSWORD, undefined);
+  for (const key of [
+    "TELEGRAM_API_ID",
+    "TELEGRAM_API_HASH",
+    "TELEGRAM_SESSION_ENCRYPTION_KEY",
+    "TELEGRAM_PROXY_PASSWORD",
+    "TELEGRAM_DATA_DIR",
+  ]) {
+    assert.equal(result.javaEnvironment[key], configured[key]);
+    assert.equal(result.frontendEnvironment[key], undefined);
+  }
   assert.equal(host.Path, "system-path");
 });
 

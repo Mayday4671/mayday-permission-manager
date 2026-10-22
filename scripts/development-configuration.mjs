@@ -6,6 +6,34 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { javaRuntimeEnvironment } from "./runtime-environment.mjs";
 
+/** Telegram 的身份凭据与私有会话选项只注入后台 JVM，不能进入浏览器环境。 */
+const telegramEnvironmentKeys = new Set([
+  "TELEGRAM_API_ID",
+  "TELEGRAM_API_HASH",
+  "TELEGRAM_SESSION_ENCRYPTION_KEY",
+  "TELEGRAM_DATA_DIR",
+  "TELEGRAM_SEARCH_BOT_USERNAME",
+  "TELEGRAM_PROXY_ENABLED",
+  "TELEGRAM_PROXY_TYPE",
+  "TELEGRAM_PROXY_HOST",
+  "TELEGRAM_PROXY_PORT",
+  "TELEGRAM_PROXY_USERNAME",
+  "TELEGRAM_PROXY_PASSWORD",
+  "TELEGRAM_PROXY_SECRET",
+  "TELEGRAM_MAX_MEDIA_FILE_BYTES",
+  "TELEGRAM_MAX_STORED_MEDIA_BYTES",
+  "TELEGRAM_MINIMUM_FREE_DISK_BYTES",
+  "TELEGRAM_MAX_MEDIA_WORKERS",
+  "TELEGRAM_MEDIA_DOWNLOAD_TIMEOUT_SECONDS",
+  "TELEGRAM_MEDIA_RETENTION_DAYS",
+  "TELEGRAM_7ZIP_PATH",
+  "TELEGRAM_FFMPEG_PATH",
+  "TELEGRAM_FFPROBE_PATH",
+  "TELEGRAM_MAX_PREVIEW_OUTPUT_BYTES",
+  "TELEGRAM_MAX_PREVIEW_DURATION_SECONDS",
+  "TELEGRAM_PREVIEW_TIMEOUT_SECONDS",
+]);
+
 /** 解析简单 KEY=VALUE 格式，支持数字索引和整段引号；#、$ 与反引号在值内保持字面量。 */
 export function parseDevelopmentEnvironment(source) {
   const settings = {};
@@ -95,6 +123,7 @@ export function developmentConfiguration(root, settings, hostEnvironment) {
     Object.entries(settings).filter(
       ([key]) =>
         /^(?:MAYDAY_|MODULE_)/.test(key) ||
+        telegramEnvironmentKeys.has(key) ||
         [
           "DB_MIGRATIONS_ENABLED",
           "ADMIN_PASSWORD",
