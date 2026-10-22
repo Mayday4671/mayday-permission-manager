@@ -72,6 +72,14 @@ export const adminPages = [
     group: "系统管理",
     icon: "settings",
   },
+  {
+    path: "/admin/telegram",
+    title: "Telegram",
+    permission: "telegram:view",
+    screen: "telegram",
+    group: "独立入口",
+    icon: "dashboard",
+  },
   // generator:frontend-pages
   {
     path: "/admin/udp-relay",

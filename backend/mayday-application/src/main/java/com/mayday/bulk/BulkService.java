@@ -297,6 +297,7 @@ public class BulkService
                     {
                         current.setStatus(terminal);
                         current.setFailure("FAILED".equals(terminal) ? "自动恢复重试已达上限，可手动重试" : "已取消");
+                        jobs.save(current);
                     }
                 }));
             }
@@ -401,6 +402,7 @@ public class BulkService
                 current.setFailure(null);
                 current.setProcessedRows(finalProcessed);
                 current.setTotalRows(finalProcessed);
+                jobs.save(current);
                 return null;
             });
         } catch (DurableTasks.LostLease failure)
@@ -414,6 +416,7 @@ public class BulkService
             durable.failed(lease, safeExplanation, recoverable, next -> jobs.lock(id).ifPresent(current -> {
                 current.setStatus(next);
                 current.setFailure(safeExplanation);
+                jobs.save(current);
             }));
         } finally
         {
@@ -444,6 +447,7 @@ public class BulkService
             }
             current.setStatus("CANCELLED");
             current.setFailure("已取消");
+            jobs.save(current);
         })))
         {
             throw new BusinessException("作业状态已变化，请刷新");
@@ -474,6 +478,7 @@ public class BulkService
                 current.setFailure(null);
                 current.setProcessedRows(0);
                 current.setTotalRows(0);
+                jobs.save(current);
             });
         }))
         {
@@ -511,6 +516,7 @@ public class BulkService
                 job.setStatus(state);
                 job.setProcessedRows(processed);
                 job.setTotalRows(total);
+                jobs.save(job);
             }));
             return null;
         });

@@ -1,6 +1,7 @@
 package com.mayday.content.mapper;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -72,18 +73,84 @@ public interface NoticeMapper extends EntityMapper<Notice>
         return new com.mybatisflex.core.query.RawQueryCondition(sql.toString(), params.toArray());
     }
 
-    /** 门户联表（lr 为上线修订别名）下的标题关键词条件；与公开可见性共用同一批别名。 */
-    static com.mybatisflex.core.query.QueryCondition portalTitleContains(String keyword)
+    /** 生成公开文章查询的固定联表与过滤条件；所有请求参数均由占位符绑定。 */
+    private static PublicArticleFilter publicArticleFilter(String keyword, String category, Long categoryId,
+            Long portalChannelId, Long tagId, Boolean recommended, String template)
     {
-        return com.mayday.common.persistence.SearchPredicates.containsExpression("lower(lr.title)", keyword);
+        StringBuilder sql = new StringBuilder("from cms_notice n join cms_revision lr on lr.id = n.live_revision_id"
+                + " join sys_entry ce on ce.id = lr.category_id"
+                + " join cms_portal_channel pc on pc.id = lr.portal_channel_id"
+                + " where n.deleted_at is null and n.published = 1 and lr.visibility = 'PUBLIC'"
+                + " and ce.enabled = 1 and pc.enabled = 1"
+                + " and (n.live_offline_at is null or n.live_offline_at > ?)");
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(com.mayday.common.util.BusinessTime.now());
+        if (keyword != null && !keyword.isBlank())
+        {
+            sql.append(" and lower(lr.title) like ? escape '!'");
+            parameters.add("%" + com.mayday.common.persistence.SearchPredicates.escapedLiteral(keyword) + "%");
+        }
+        if (category != null && !category.isBlank())
+        {
+            sql.append(" and ce.name = ?");
+            parameters.add(category);
+        }
+        if (categoryId != null)
+        {
+            sql.append(" and lr.category_id = ?");
+            parameters.add(categoryId);
+        }
+        if (portalChannelId != null)
+        {
+            sql.append(" and lr.portal_channel_id = ?");
+            parameters.add(portalChannelId);
+        }
+        if (tagId != null)
+        {
+            sql.append(" and exists (select 1 from cms_revision_tag rt"
+                    + " where rt.revision_id = lr.id and rt.tag_id = ?)");
+            parameters.add(tagId);
+        }
+        if (recommended != null)
+        {
+            sql.append(" and lr.recommended = ?");
+            parameters.add(recommended);
+        }
+        if (template != null)
+        {
+            sql.append(" and pc.template = ?");
+            parameters.add(template);
+        }
+        return new PublicArticleFilter(sql.toString(), parameters);
     }
 
-    /** 门户联表下按标签 ID 过滤；引用覆盖全部历史修订标签。 */
-    static com.mybatisflex.core.query.QueryCondition taggedWith(Long tagId)
+    /** 公开结果总数由同一组状态、分类和栏目条件计算，供前台分页显示。 */
+    default long countPublicArticles(String keyword, String category, Long categoryId, Long portalChannelId, Long tagId,
+            Boolean recommended)
     {
-        return new com.mybatisflex.core.query.RawQueryCondition(
-                "exists (select 1 from cms_revision_tag rt where rt.revision_id = lr.id" + " and rt.tag_id = ?)",
-                tagId);
+        PublicArticleFilter filter = publicArticleFilter(keyword, category, categoryId, portalChannelId, tagId,
+                recommended, null);
+        Object count = Db.selectObject("select count(*) " + filter.fromWhere(), filter.parameters().toArray());
+        return ((Number) count).longValue();
+    }
+
+    /** 按上线修订推荐、置顶和栏目顺序在 SQL 层分页；只选主键以避开实体联表投影别名限制。 */
+    default List<Long> publicArticleIds(String keyword, String category, Long categoryId, Long portalChannelId,
+            Long tagId, Boolean recommended, String template, boolean recommendedFirst, int limit, long offset)
+    {
+        PublicArticleFilter filter = publicArticleFilter(keyword, category, categoryId, portalChannelId, tagId,
+                recommended, template);
+        String ordering = recommendedFirst ? "lr.recommended desc, " : "";
+        String sql = "select n.id " + filter.fromWhere() + " order by " + ordering
+                + "lr.pinned desc, lr.sort_order desc, n.published_at desc, n.id desc limit ? offset ?";
+        List<Object> parameters = new ArrayList<>(filter.parameters());
+        parameters.add(limit);
+        parameters.add(offset);
+        return Db.selectListBySql(sql, parameters.toArray()).stream().map(row -> row.getLong("id")).toList();
+    }
+
+    /** 公开文章筛选 SQL 及其参数都在同一不可变值中传递，避免值和查询条件错位。 */
+    record PublicArticleFilter(String fromWhere, List<Object> parameters) {
     }
 
     default long countByPublished(boolean published)
@@ -148,14 +215,10 @@ public interface NoticeMapper extends EntityMapper<Notice>
         }
     }
 
-    /** 门户文章统一按当前上线修订联表：可见性、分类与栏目停用状态都在 SQL 层过滤。 */
-    default QueryWrapper publicArticles()
+    /** 彻底清除内容前删除旧版文本标签快照；回收与恢复仍保留此关联，供原兼容接口读取。 */
+    default void deleteTagsByNoticeId(Long noticeId)
     {
-        return QueryWrapper.create().select("cms_notice.*")
-                .from("cms_notice join cms_revision lr on lr.id = cms_notice.live_revision_id"
-                        + " join sys_entry ce on ce.id = lr.category_id"
-                        + " join cms_portal_channel pc on pc.id = lr.portal_channel_id")
-                .where(publiclyVisible());
+        Db.deleteBySql("delete from cms_notice_tag where notice_id = ?", noticeId);
     }
 
     /** 标签文本快照被引用的数量；标签删除保护由资料中心调用。 */

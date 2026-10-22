@@ -25,9 +25,9 @@ public final class NavigationCatalog
             page("approvalcategories", "审批分类", "/admin/approval-categories"),
             page("workflows", "流程定义", "/admin/workflows"), page("requests", "审批申请", "/admin/requests"),
             page("workorders", "工单管理", "/admin/workorders"), page("agentscope", "智能体", "/admin/agentscope"),
-            page("feedback", "客户反馈", "/admin/feedback"), page("scheduler", "任务调度", "/admin/scheduler"),
-            page("monitor", "服务监控", "/admin/monitor"), page("sessions", "在线会话", "/admin/sessions"),
-            new Page("changes", "变更记录", "/admin/changes", "logs:view"),
+            page("telegram", "Telegram", "/admin/telegram"), page("feedback", "客户反馈", "/admin/feedback"),
+            page("scheduler", "任务调度", "/admin/scheduler"), page("monitor", "服务监控", "/admin/monitor"),
+            page("sessions", "在线会话", "/admin/sessions"), new Page("changes", "变更记录", "/admin/changes", "logs:view"),
             // generator:navigation-pages
             new Page("tasks", "审批待办", "/admin/tasks", "requests:approve"));
     public static final Set<String> ICONS = Set.of("dashboard", "users", "roles", "departments", "menus", "notices",

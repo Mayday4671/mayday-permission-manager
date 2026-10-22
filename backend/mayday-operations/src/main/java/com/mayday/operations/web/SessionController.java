@@ -64,13 +64,18 @@ public class SessionController
         var now = sessionClock.instant();
         // 会话本身没有部门列；可见账号集合由用户表的行级并集子查询决定，本人会话始终可见。
         QueryCondition visibleUser = new QueryColumn("id").eq(access.current().getId());
-        QueryCondition scopeCondition = access.scopeCondition("users", "id");
-        if (access.has("users:view") && scopeCondition != null)
+        if (access.has("users:view"))
         {
-            visibleUser = visibleUser.or(scopeCondition);
+            QueryCondition scopeCondition = access.scopeCondition("users", "id");
+            // null 表示 ALL 范围；保留空过滤条件才能让管理员看到所有有效账号的会话。
+            visibleUser = scopeCondition == null ? null : visibleUser.or(scopeCondition);
         }
         QueryWrapper visibleUsers = QueryWrapper.create().select(new QueryColumn("id")).from(SysUser.class)
-                .where(new QueryColumn("enabled").eq(true).and(visibleUser));
+                .where(new QueryColumn("enabled").eq(true));
+        if (visibleUser != null)
+        {
+            visibleUsers.and(visibleUser);
+        }
         QueryCondition keywordMatch = SearchPredicates.contains("username", keyword)
                 .or(SearchPredicates.contains("nickname", keyword));
         visibleUsers.where(keywordMatch);

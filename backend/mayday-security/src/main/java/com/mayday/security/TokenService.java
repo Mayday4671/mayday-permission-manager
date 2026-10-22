@@ -60,10 +60,18 @@ public class TokenService
         Instant now = sessionClock.instant();
         var previous = sessions.findByUserIdOrderByCreatedAtAscTokenHashAsc(current.getId());
         var active = previous.stream().filter(s -> policy.active(s, now)).toList();
-        sessions.deleteBatchByIds(
-                previous.stream().filter(s -> !policy.active(s, now)).map(LoginSession::getTokenHash).toList());
+        var expiredIds = previous.stream().filter(s -> !policy.active(s, now)).map(LoginSession::getTokenHash).toList();
+        // Skip empty batches because MyBatis-Flex rejects them.
+        if (!expiredIds.isEmpty())
+        {
+            sessions.deleteBatchByIds(expiredIds);
+        }
         int revoke = Math.max(0, active.size() - policy.getMaxPerUser() + 1);
-        sessions.deleteBatchByIds(active.subList(0, revoke).stream().map(LoginSession::getTokenHash).toList());
+        if (revoke > 0)
+        {
+            var revokedIds = active.subList(0, revoke).stream().map(LoginSession::getTokenHash).toList();
+            sessions.deleteBatchByIds(revokedIds);
+        }
         byte[] bytes = new byte[32];
         new SecureRandom().nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);

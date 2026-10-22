@@ -33,6 +33,46 @@ export function canonicalize(value, key = "") {
   return value;
 }
 
+/** 汇总在线契约与仓库契约的安全差异，便于定位漂移而不打印请求或凭据。 */
+function contractDifferenceSummary(expectedText, actualText) {
+  const expected = JSON.parse(expectedText);
+  const actual = JSON.parse(actualText);
+  const expectedPaths = expected.paths ?? {};
+  const actualPaths = actual.paths ?? {};
+  const pathNames = new Set([
+    ...Object.keys(expectedPaths),
+    ...Object.keys(actualPaths),
+  ]);
+  const changedPaths = [...pathNames]
+    .filter(
+      (path) =>
+        JSON.stringify(canonicalize(expectedPaths[path] ?? null)) !==
+        JSON.stringify(canonicalize(actualPaths[path] ?? null)),
+    )
+    .sort();
+  const expectedSchemas = expected.components?.schemas ?? {};
+  const actualSchemas = actual.components?.schemas ?? {};
+  const schemaNames = new Set([
+    ...Object.keys(expectedSchemas),
+    ...Object.keys(actualSchemas),
+  ]);
+  const changedSchemas = [...schemaNames]
+    .filter(
+      (name) =>
+        JSON.stringify(canonicalize(expectedSchemas[name] ?? null)) !==
+        JSON.stringify(canonicalize(actualSchemas[name] ?? null)),
+    )
+    .sort();
+  return {
+    expectedPathCount: Object.keys(expectedPaths).length,
+    actualPathCount: Object.keys(actualPaths).length,
+    changedPaths: changedPaths.slice(0, 20),
+    changedPathCount: changedPaths.length,
+    changedSchemas: changedSchemas.slice(0, 20),
+    changedSchemaCount: changedSchemas.length,
+  };
+}
+
 let schema;
 if (args.includes("--offline"))
   schema = JSON.parse(readFileSync(schemaFile, "utf8"));
@@ -87,8 +127,14 @@ const types = await format(
   { parser: "typescript" },
 );
 if (args.includes("--check")) {
-  if (readFileSync(schemaFile, "utf8") !== contract)
+  const committedContract = readFileSync(schemaFile, "utf8");
+  if (committedContract !== contract) {
+    console.error(
+      "契约差异摘要：" +
+        JSON.stringify(contractDifferenceSummary(committedContract, contract)),
+    );
     throw new Error("后端契约已变化，请生成并提交 contracts/openapi.json");
+  }
   if (readFileSync(typeFile, "utf8") !== types)
     throw new Error("前端接口类型已过期，请重新生成");
   console.log(

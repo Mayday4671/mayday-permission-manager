@@ -23,6 +23,7 @@
     <module>mayday-netty</module>
     <module>mayday-workorders</module>
     <module>mayday-agentscope</module>
+    <module>mayday-telegram</module>
     <!-- generator:maven-modules -->
     <module>mayday-application</module>
   </modules>
@@ -38,6 +39,9 @@
     <spotless.version>2.44.3</spotless.version>
     <!-- 持久层统一使用 MyBatis-Flex；boot4 starter 与当前 Spring Boot 大版本配套。 -->
     <mybatis-flex.version>1.11.8</mybatis-flex.version>
+    <!-- TDLight Java 与 native 必须来自同一发行版，避免 JNI 二进制与 Java API 不兼容。 -->
+    <tdlight.version>3.5.7+td.1.8.68</tdlight.version>
+    <tdlight.native.classifier>windows_amd64</tdlight.native.classifier>
   </properties>
   <dependencies>
     <dependency>
@@ -53,8 +57,47 @@
         <artifactId>mybatis-flex-spring-boot4-starter</artifactId>
         <version>${mybatis-flex.version}</version>
       </dependency>
+      <dependency>
+        <groupId>it.tdlight</groupId>
+        <artifactId>tdlight-java-bom</artifactId>
+        <version>${tdlight.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
+  <repositories>
+    <repository>
+      <id>tdlight</id>
+      <url>https://mvn.mchv.eu/repository/mchv/</url>
+    </repository>
+  </repositories>
+  <profiles>
+    <profile>
+      <id>tdlight-native-linux-amd64</id>
+      <activation>
+        <os>
+          <family>unix</family>
+          <arch>amd64</arch>
+        </os>
+      </activation>
+      <properties>
+        <tdlight.native.classifier>linux_amd64_gnu_ssl3</tdlight.native.classifier>
+      </properties>
+    </profile>
+    <profile>
+      <id>tdlight-native-macos-arm64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <tdlight.native.classifier>macos_arm64</tdlight.native.classifier>
+      </properties>
+    </profile>
+  </profiles>
   <build>
     <plugins>
       <plugin>

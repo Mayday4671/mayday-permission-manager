@@ -1,69 +1,5 @@
 /** 自动从 contracts/openapi.json 生成；请修改服务端 DTO 后重新生成，禁止手工编辑。 */
 export interface paths {
-  "/api/agentscope/conversations": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["AgentScopeController_conversations"];
-    put?: never;
-    post: operations["AgentScopeController_createConversation"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/agentscope/conversations/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: operations["AgentScopeController_deleteConversation"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/agentscope/conversations/{id}/messages": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["AgentScopeController_messages"];
-    put?: never;
-    post: operations["AgentScopeController_send"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/agentscope/status": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["AgentScopeController_status"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/auth/captcha/challenge": {
     parameters: {
       query?: never;
@@ -2816,6 +2752,534 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/telegram/collections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_collections"];
+    put?: never;
+    post: operations["TelegramController_createCollection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/collections/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["TelegramController_deleteCollection"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/collections/{id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_cancelCollection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/collections/{id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_collectionMessages"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/collections/{id}/pause": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_pauseCollection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/collections/{id}/resume": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_resumeCollection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/collections/{id}/tracking": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_trackCollection"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/collections/channels": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_collectionChannels"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/archive-entries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_archiveEntries"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/archive-entry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_archiveEntry"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_mediaContent"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/hls/{assetName}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_videoPreviewAsset"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_retryMedia"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/stream": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_streamMedia"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/stream-ticket": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_mediaStreamTicket"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/video-preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_videoPreviewStatus"];
+    put?: never;
+    post: operations["TelegramController_requestVideoPreview"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/video-preview/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_cancelVideoPreview"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/messages/unmatched": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_unmatchedMessages"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/searches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_searches"];
+    put?: never;
+    post: operations["TelegramController_search"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/searches/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_search_1"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/searches/{id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_messages"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/searches/{id}/messages/{messageId}/buttons/{row}/{column}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_activateButton"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/searches/{id}/results": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_results"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/session/close": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_close"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/session/code": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_submitCode"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/session/email": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_submitEmailAddress"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/session/email-code": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_submitEmailCode"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/session/logout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_logOut"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/session/password": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_submitPassword"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/session/phone": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_submitPhoneNumber"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/session/register": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_register"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/session/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_start"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_status"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2834,41 +3298,13 @@ export interface components {
       /** Format: int64 */
       version: number;
     };
-    AgentScopeSettingsRequest: {
-      apiSecret?: string;
-      clearApiSecret: boolean;
-      /** Format: int32 */
-      maxContextMessages: number;
-      /** Format: int32 */
-      maxMessageLength: number;
-      model: string;
-      /** Format: int32 */
-      requestTimeoutSeconds: number;
-      systemPrompt: string;
-    };
-    AgentScopeSettingsView: {
-      apiSecretConfigured?: boolean;
-      apiSecretOverrideStored?: boolean;
-      configurationSource?: string;
-      /** Format: int32 */
-      maxContextMessages?: number;
-      /** Format: int32 */
-      maxMessageLength?: number;
-      model?: string;
-      modelReady?: boolean;
-      moduleEnabled?: boolean;
-      /** Format: int32 */
-      requestTimeoutSeconds?: number;
-      sdkVersion?: string;
-      systemPrompt?: string;
-    };
     AlertRecipientOption: {
       label: string;
       /** Format: int64 */
       value: number;
     };
-    ApiResponseAgentScopeSettingsView: {
-      data: components["schemas"]["AgentScopeSettingsView"];
+    ApiResponseArchivePage: {
+      data: components["schemas"]["ArchivePage"];
       message: string;
       success: boolean;
     };
@@ -2879,6 +3315,11 @@ export interface components {
     };
     ApiResponseBatchResult: {
       data: components["schemas"]["BatchResult"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseCallbackAnswerView: {
+      data: components["schemas"]["CallbackAnswerView"];
       message: string;
       success: boolean;
     };
@@ -3007,6 +3448,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseListTelegramChannelOption: {
+      data: components["schemas"]["TelegramChannelOption"][];
+      message: string;
+      success: boolean;
+    };
     ApiResponseListTemplate: {
       data: components["schemas"]["Template"][];
       message: string;
@@ -3021,6 +3467,16 @@ export interface components {
       data: {
         [key: string]: string;
       };
+      message: string;
+      success: boolean;
+    };
+    ApiResponseMediaStreamTicketView: {
+      data: components["schemas"]["MediaStreamTicketView"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseMediaView: {
+      data: components["schemas"]["MediaView"];
       message: string;
       success: boolean;
     };
@@ -3044,6 +3500,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponsePageResultCollectedMessageView: {
+      data: components["schemas"]["PageResultCollectedMessageView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponsePageResultConversationView: {
       data: components["schemas"]["PageResultConversationView"];
       message: string;
@@ -3064,13 +3525,28 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponsePageResultParsedMessageView: {
+      data: components["schemas"]["PageResultParsedMessageView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponsePageResultScheduledJob: {
       data: components["schemas"]["PageResultScheduledJob"];
       message: string;
       success: boolean;
     };
+    ApiResponsePageResultSearchView: {
+      data: components["schemas"]["PageResultSearchView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponsePageResultStoredFile: {
       data: components["schemas"]["PageResultStoredFile"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponsePageResultTaskView: {
+      data: components["schemas"]["PageResultTaskView"];
       message: string;
       success: boolean;
     };
@@ -3084,13 +3560,28 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponsePreviewView: {
+      data: components["schemas"]["PreviewView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseScheduledJob: {
       data: components["schemas"]["ScheduledJob"];
       message: string;
       success: boolean;
     };
+    ApiResponseSearchView: {
+      data: components["schemas"]["SearchView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseSessionView: {
       data: components["schemas"]["SessionView"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseSettingsView: {
+      data: components["schemas"]["SettingsView"];
       message: string;
       success: boolean;
     };
@@ -3114,6 +3605,16 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseTaskView: {
+      data: components["schemas"]["TaskView"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseTelegramStatusView: {
+      data: components["schemas"]["TelegramStatusView"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseTurnView: {
       data: components["schemas"]["TurnView"];
       message: string;
@@ -3133,6 +3634,24 @@ export interface components {
       data: components["schemas"]["WorkOrderView"];
       message: string;
       success: boolean;
+    };
+    ArchiveEntryView: {
+      encrypted?: boolean;
+      /** Format: int64 */
+      modifiedAt?: number;
+      name?: string;
+      /** Format: int64 */
+      size?: number;
+      withinExtractionLimit?: boolean;
+    };
+    ArchivePage: {
+      items?: components["schemas"]["ArchiveEntryView"][];
+      /** Format: int32 */
+      page?: number;
+      /** Format: int32 */
+      size?: number;
+      /** Format: int32 */
+      total?: number;
     };
     ArticleRule: {
       author?: string;
@@ -3169,6 +3688,11 @@ export interface components {
     Callback: {
       code: string;
       state: string;
+    };
+    CallbackAnswerView: {
+      showAlert?: boolean;
+      text?: string;
+      url?: string;
     };
     CategoryOption: {
       /** Format: int64 */
@@ -3231,6 +3755,23 @@ export interface components {
       /** Format: date */
       before: string;
       loginOnly?: boolean;
+    };
+    CollectedMessageView: {
+      albumId?: string;
+      canBeSaved?: boolean;
+      contentType?: string;
+      /** Format: int64 */
+      id?: number;
+      media?: components["schemas"]["MediaView"][];
+      messageText?: string;
+      metadataJson?: string;
+      senderId?: string;
+      /** Format: date-time */
+      telegramEditedAt?: string;
+      telegramMessageId?: string;
+      /** Format: date-time */
+      telegramSentAt?: string;
+      topicId?: string;
     };
     Completion: {
       bound?: boolean;
@@ -3618,6 +4159,25 @@ export interface components {
       mfaRequired?: boolean;
       token?: string;
     };
+    MediaStreamTicketView: {
+      /** Format: date-time */
+      expiresAt?: string;
+      url?: string;
+    };
+    MediaView: {
+      /** Format: int64 */
+      actualSize?: number;
+      contentUrl?: string;
+      /** Format: int64 */
+      expectedSize?: number;
+      failureMessage?: string;
+      fileName?: string;
+      /** Format: int64 */
+      id?: number;
+      kind?: string;
+      mediaType?: string;
+      status?: string;
+    };
     MessageView: {
       content?: string;
       /** Format: date-time */
@@ -3733,6 +4293,15 @@ export interface components {
       /** Format: int64 */
       total?: number;
     };
+    PageResultCollectedMessageView: {
+      items?: components["schemas"]["CollectedMessageView"][];
+      /** Format: int32 */
+      page?: number;
+      /** Format: int32 */
+      size?: number;
+      /** Format: int64 */
+      total?: number;
+    };
     PageResultConversationView: {
       items?: components["schemas"]["ConversationView"][];
       /** Format: int32 */
@@ -3769,6 +4338,15 @@ export interface components {
       /** Format: int64 */
       total?: number;
     };
+    PageResultParsedMessageView: {
+      items?: components["schemas"]["ParsedMessageView"][];
+      /** Format: int32 */
+      page?: number;
+      /** Format: int32 */
+      size?: number;
+      /** Format: int64 */
+      total?: number;
+    };
     PageResultScheduledJob: {
       items?: components["schemas"]["ScheduledJob"][];
       /** Format: int32 */
@@ -3778,8 +4356,26 @@ export interface components {
       /** Format: int64 */
       total?: number;
     };
+    PageResultSearchView: {
+      items?: components["schemas"]["SearchView"][];
+      /** Format: int32 */
+      page?: number;
+      /** Format: int32 */
+      size?: number;
+      /** Format: int64 */
+      total?: number;
+    };
     PageResultStoredFile: {
       items?: components["schemas"]["StoredFile"][];
+      /** Format: int32 */
+      page?: number;
+      /** Format: int32 */
+      size?: number;
+      /** Format: int64 */
+      total?: number;
+    };
+    PageResultTaskView: {
+      items?: components["schemas"]["TaskView"][];
       /** Format: int32 */
       page?: number;
       /** Format: int32 */
@@ -3823,10 +4419,36 @@ export interface components {
       template?: string;
       urlPointer?: string;
     };
+    ParsedMessageView: {
+      /** Format: int64 */
+      id?: number;
+      messageText?: string;
+      sourceLinks?: components["schemas"]["SourceLink"][];
+      /** Format: date-time */
+      telegramEditedAt?: string;
+      telegramMessageId?: string;
+      /** Format: date-time */
+      telegramSentAt?: string;
+    };
     PasswordRequest: {
       factor?: string;
       newPassword: string;
       oldPassword: string;
+    };
+    PreviewView: {
+      audioCodec?: string;
+      durationSeconds?: number;
+      /** Format: int64 */
+      id?: number;
+      manifestUrl?: string;
+      /** Format: int64 */
+      mediaId?: number;
+      status?: string;
+      statusMessage?: string;
+      transcoded?: boolean;
+      /** Format: date-time */
+      updatedAt?: string;
+      videoCodec?: string;
     };
     ProfileRequest: {
       /** Format: email */
@@ -3938,6 +4560,19 @@ export interface components {
       /** Format: int64 */
       version?: number;
     };
+    SearchView: {
+      botUsername?: string;
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: date-time */
+      expiresAt?: string;
+      /** Format: int64 */
+      id?: number;
+      keyword?: string;
+      parseStatus?: string;
+      status?: string;
+      statusMessage?: string;
+    };
     SendMessageRequest: {
       content: string;
       requestId: string;
@@ -3951,6 +4586,34 @@ export interface components {
       permissions: string[];
       user: components["schemas"]["UserView"];
     };
+    SettingsRequest: {
+      apiSecret?: string;
+      clearApiSecret?: boolean;
+      /** Format: int32 */
+      maxContextMessages?: number;
+      /** Format: int32 */
+      maxMessageLength?: number;
+      model: string;
+      /** Format: int32 */
+      requestTimeoutSeconds?: number;
+      systemPrompt: string;
+    };
+    SettingsView: {
+      apiSecretConfigured?: boolean;
+      apiSecretOverrideStored?: boolean;
+      configurationSource?: string;
+      /** Format: int32 */
+      maxContextMessages?: number;
+      /** Format: int32 */
+      maxMessageLength?: number;
+      model?: string;
+      modelReady?: boolean;
+      moduleEnabled?: boolean;
+      /** Format: int32 */
+      requestTimeoutSeconds?: number;
+      sdkVersion?: string;
+      systemPrompt?: string;
+    };
     Simulation: {
       /** Format: int64 */
       applicantId?: number;
@@ -3958,6 +4621,14 @@ export interface components {
       values?: {
         [key: string]: unknown;
       };
+    };
+    SourceLink: {
+      host?: string;
+      publicChat?: string;
+      /** Format: int64 */
+      sourceMessageId?: number;
+      sourceType?: string;
+      url?: string;
     };
     Spec: {
       allowRepeatApproval?: boolean;
@@ -4043,6 +4714,82 @@ export interface components {
       id: number;
       /** Format: int64 */
       version: number;
+    };
+    TaskView: {
+      /** Format: int32 */
+      collectedMessages?: number;
+      /** Format: date-time */
+      createdAt?: string;
+      /** Format: date */
+      fromDate?: string;
+      /** Format: int64 */
+      id?: number;
+      /** Format: date-time */
+      liveCheckedAt?: string;
+      liveStatusMessage?: string;
+      /** Format: int32 */
+      maxMessages?: number;
+      messageLink?: string;
+      /** Format: int32 */
+      scannedMessages?: number;
+      sourceTitle?: string;
+      status?: string;
+      statusMessage?: string;
+      /** Format: date */
+      toDate?: string;
+      trackingEnabled?: boolean;
+      /** Format: date-time */
+      updatedAt?: string;
+    };
+    TelegramChannelOption: {
+      chatId?: string;
+      title?: string;
+      username?: string;
+    };
+    TelegramCollectionRequest: {
+      channelId?: string;
+      downloadDocuments?: boolean;
+      downloadImages?: boolean;
+      downloadVideos?: boolean;
+      /** Format: date */
+      fromDate?: string;
+      /** Format: int32 */
+      maxMessages?: number;
+      messageLink?: string;
+      /** Format: date */
+      toDate?: string;
+    };
+    TelegramPhoneRequest: {
+      value: string;
+    };
+    TelegramRegistrationRequest: {
+      firstName: string;
+      lastName?: string;
+    };
+    TelegramSearchRequest: {
+      keyword: string;
+    };
+    TelegramSensitiveValueRequest: {
+      value: string;
+    };
+    TelegramStatusView: {
+      accountConfigured?: boolean;
+      archiveToolAvailable?: boolean;
+      connected?: boolean;
+      credentialsConfigured?: boolean;
+      enabled?: boolean;
+      encryptionKeyConfigured?: boolean;
+      maskedPhoneNumber?: string;
+      message?: string;
+      proxyConfigured?: boolean;
+      proxyEnabled?: boolean;
+      proxyType?: string;
+      state?: string;
+      telegramUserId?: string;
+      videoPreviewToolsAvailable?: boolean;
+    };
+    TelegramTrackingRequest: {
+      enabled: boolean;
     };
     Template: {
       description?: string;
@@ -4183,142 +4930,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-  AgentScopeController_conversations: {
-    parameters: {
-      query?: {
-        page?: number;
-        size?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiResponsePageResultConversationView"];
-        };
-      };
-    };
-  };
-  AgentScopeController_createConversation: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiResponseConversationView"];
-        };
-      };
-    };
-  };
-  AgentScopeController_deleteConversation: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiResponseVoid"];
-        };
-      };
-    };
-  };
-  AgentScopeController_messages: {
-    parameters: {
-      query?: {
-        page?: number;
-        size?: number;
-      };
-      header?: never;
-      path: {
-        id: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiResponsePageResultMessageView"];
-        };
-      };
-    };
-  };
-  AgentScopeController_send: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: number;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["SendMessageRequest"];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiResponseTurnView"];
-        };
-      };
-    };
-  };
-  AgentScopeController_status: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApiResponseStatusView"];
-        };
-      };
-    };
-  };
   CaptchaController_challenge: {
     parameters: {
       query?: never;
@@ -8487,7 +9098,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["ApiResponseAgentScopeSettingsView"];
+          "application/json": components["schemas"]["ApiResponseSettingsView"];
         };
       };
     };
@@ -8501,7 +9112,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["AgentScopeSettingsRequest"];
+        "application/json": components["schemas"]["SettingsRequest"];
       };
     };
     responses: {
@@ -8511,7 +9122,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["ApiResponseAgentScopeSettingsView"];
+          "application/json": components["schemas"]["ApiResponseSettingsView"];
         };
       };
     };
@@ -9333,6 +9944,840 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  TelegramController_collections: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePageResultTaskView"];
+        };
+      };
+    };
+  };
+  TelegramController_createCollection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramCollectionRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTaskView"];
+        };
+      };
+    };
+  };
+  TelegramController_deleteCollection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseVoid"];
+        };
+      };
+    };
+  };
+  TelegramController_cancelCollection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTaskView"];
+        };
+      };
+    };
+  };
+  TelegramController_collectionMessages: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePageResultCollectedMessageView"];
+        };
+      };
+    };
+  };
+  TelegramController_pauseCollection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTaskView"];
+        };
+      };
+    };
+  };
+  TelegramController_resumeCollection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTaskView"];
+        };
+      };
+    };
+  };
+  TelegramController_trackCollection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramTrackingRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTaskView"];
+        };
+      };
+    };
+  };
+  TelegramController_collectionChannels: {
+    parameters: {
+      query: {
+        query: string;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseListTelegramChannelOption"];
+        };
+      };
+    };
+  };
+  TelegramController_archiveEntries: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseArchivePage"];
+        };
+      };
+    };
+  };
+  TelegramController_archiveEntry: {
+    parameters: {
+      query: {
+        name: string;
+      };
+      header?: {
+        Range?: string;
+      };
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  TelegramController_mediaContent: {
+    parameters: {
+      query?: never;
+      header?: {
+        Range?: string;
+      };
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  TelegramController_videoPreviewAsset: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        assetName: string;
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  TelegramController_retryMedia: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseMediaView"];
+        };
+      };
+    };
+  };
+  TelegramController_streamMedia: {
+    parameters: {
+      query: {
+        ticket: string;
+      };
+      header?: {
+        Range?: string;
+      };
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  TelegramController_mediaStreamTicket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseMediaStreamTicketView"];
+        };
+      };
+    };
+  };
+  TelegramController_videoPreviewStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePreviewView"];
+        };
+      };
+    };
+  };
+  TelegramController_requestVideoPreview: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePreviewView"];
+        };
+      };
+    };
+  };
+  TelegramController_cancelVideoPreview: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePreviewView"];
+        };
+      };
+    };
+  };
+  TelegramController_unmatchedMessages: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePageResultMessageView"];
+        };
+      };
+    };
+  };
+  TelegramController_searches: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePageResultSearchView"];
+        };
+      };
+    };
+  };
+  TelegramController_search: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramSearchRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseSearchView"];
+        };
+      };
+    };
+  };
+  TelegramController_search_1: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseSearchView"];
+        };
+      };
+    };
+  };
+  TelegramController_messages: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePageResultMessageView"];
+        };
+      };
+    };
+  };
+  TelegramController_activateButton: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        column: number;
+        id: number;
+        messageId: number;
+        row: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseCallbackAnswerView"];
+        };
+      };
+    };
+  };
+  TelegramController_results: {
+    parameters: {
+      query?: {
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePageResultParsedMessageView"];
+        };
+      };
+    };
+  };
+  TelegramController_close: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
+        };
+      };
+    };
+  };
+  TelegramController_submitCode: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramSensitiveValueRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
+        };
+      };
+    };
+  };
+  TelegramController_submitEmailAddress: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramSensitiveValueRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
+        };
+      };
+    };
+  };
+  TelegramController_submitEmailCode: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramSensitiveValueRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
+        };
+      };
+    };
+  };
+  TelegramController_logOut: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
+        };
+      };
+    };
+  };
+  TelegramController_submitPassword: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramSensitiveValueRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
+        };
+      };
+    };
+  };
+  TelegramController_submitPhoneNumber: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramPhoneRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
+        };
+      };
+    };
+  };
+  TelegramController_register: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TelegramRegistrationRequest"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
+        };
+      };
+    };
+  };
+  TelegramController_start: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
+        };
+      };
+    };
+  };
+  TelegramController_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseTelegramStatusView"];
         };
       };
     };

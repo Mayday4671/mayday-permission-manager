@@ -108,4 +108,12 @@ public interface RoleMapper extends EntityMapper<SysRole>
                     role.getId(), grant.getResource(), grant.getDepartmentId());
         }
     }
+
+    /** 删除已解除账号关联的角色前清除权限、范围及指定部门子表，避免非级联外键阻止物理删除。 */
+    default void deleteDetails(Long roleId)
+    {
+        Db.deleteBySql("delete from sys_role_scope_department where role_id = ?", roleId);
+        Db.deleteBySql("delete from sys_role_scope where role_id = ?", roleId);
+        Db.deleteBySql("delete from sys_role_permission where role_id = ?", roleId);
+    }
 }

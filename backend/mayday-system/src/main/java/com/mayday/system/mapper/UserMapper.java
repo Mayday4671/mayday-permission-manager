@@ -1,8 +1,11 @@
 package com.mayday.system.mapper;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -101,6 +104,38 @@ public interface UserMapper extends EntityMapper<SysUser>
         return user;
     }
 
+    /**
+     * 为分页列表一次性装配角色名称和 ID；列表视图必须返回真实角色关联，前端编辑表单才能可靠回显当前分配。
+     *
+     * <p>
+     * 该查询只加载列表展示所需的角色标识与名称，不加载每个角色的权限、范围和部门授权；授权判断仍通过按 ID 读取的
+     * {@link #load(SysUser)} 取得完整角色明细，避免把轻量列表投影误用于鉴权。
+     */
+    default void loadRoleSummaries(List<SysUser> users)
+    {
+        if (users.isEmpty())
+        {
+            return;
+        }
+        Map<Long, SysUser> byId = new LinkedHashMap<>();
+        users.forEach(user -> {
+            user.setRoles(new HashSet<>());
+            byId.put(user.getId(), user);
+        });
+        String placeholders = String.join(",", java.util.Collections.nCopies(byId.size(), "?"));
+        String sql = "select ur.user_id, r.id as role_id, r.name as role_name"
+                + " from sys_user_role ur join sys_role r on r.id = ur.role_id" + " where ur.user_id in ("
+                + placeholders + ") order by ur.user_id, r.id";
+        List<Object> parameters = List.copyOf(byId.keySet());
+        for (Row row : Db.selectListBySql(sql, parameters.toArray()))
+        {
+            SysRole role = new SysRole();
+            role.setId(row.getLong("role_id"));
+            role.setName(row.getString("role_name"));
+            byId.get(row.getLong("user_id")).getRoles().add(role);
+        }
+    }
+
     /** 按单一角色解析启用成员；供审批人快照与通知目标解析复用。 */
     default java.util.List<SysUser> membersOfRole(Long roleId)
     {
@@ -118,6 +153,32 @@ public interface UserMapper extends EntityMapper<SysUser>
         }
         return selectListByQuery(QueryWrapper.create().where(new QueryColumn("enabled").eq(true))
                 .and(new QueryColumn("id").in(roleMemberIds(roleIds))));
+    }
+
+    /**
+     * 按角色与当前动作权限解析启用成员；查询先限制到最多 101 个候选账号，再装配完整角色明细，供流程校验 100 人上限与实际授权。
+     *
+     * <p>
+     * 角色授权位于关联表，基础用户查询不会自动加载；若直接对未装配的用户调用 hasFor，会把所有角色成员误判为无权限。
+     */
+    default List<SysUser> membersOfRolesWithPermission(java.util.Collection<Long> roleIds, String permission)
+    {
+        if (roleIds == null || roleIds.isEmpty())
+        {
+            return List.of();
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(roleIds.size(), "?"));
+        String sql = "select distinct u.id as user_id from sys_user u" + " join sys_user_role ur on ur.user_id = u.id"
+                + " join sys_role r on r.id = ur.role_id"
+                + " left join sys_role_permission rp on rp.role_id = r.id and rp.permission = ?"
+                + " where u.enabled = 1 and r.enabled = 1 and ur.role_id in (" + placeholders + ")"
+                + " and (r.code = 'admin' or rp.role_id is not null) order by u.id limit 101";
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(permission);
+        parameters.addAll(roleIds);
+        List<Long> userIds = Db.selectListBySql(sql, parameters.toArray()).stream().map(row -> row.getLong("user_id"))
+                .toList();
+        return findAllById(userIds);
     }
 
     /** 引用岗位的账号数；岗位删除保护由资料中心调用。 */
@@ -146,5 +207,12 @@ public interface UserMapper extends EntityMapper<SysUser>
         {
             Db.updateBySql("insert into sys_user_role(user_id, role_id) values (?, ?)", user.getId(), role.getId());
         }
+    }
+
+    /** 物理删除账号前清理无级联外键的岗位与角色关联；普通编辑仍通过 {@link #syncCollections(SysUser)} 原子重建。 */
+    default void deleteCollections(Long userId)
+    {
+        Db.deleteBySql("delete from sys_user_post where user_id = ?", userId);
+        Db.deleteBySql("delete from sys_user_role where user_id = ?", userId);
     }
 }

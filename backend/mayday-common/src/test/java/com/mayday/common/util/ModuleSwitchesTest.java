@@ -22,6 +22,7 @@ class ModuleSwitchesTest
         assertTrue(modules.isEnabled("crawler"));
         assertFalse(modules.isEnabled("workorders"));
         assertFalse(modules.isEnabled("agentscope"));
+        assertFalse(modules.isEnabled("telegram"));
     }
 
     /** 覆盖集合、单条、附件直接请求，同时验证相似路径不会被模糊前缀误伤。 */
@@ -40,12 +41,29 @@ class ModuleSwitchesTest
             assertFalse(modules.pathEnabled(path), path);
         }
         assertFalse(modules.pathEnabled("/api/agentscope/conversations"));
+        assertFalse(modules.pathEnabled("/api/telegram/status"));
         assertFalse(modules.permissionEnabled("requests:approve"));
         assertFalse(modules.permissionEnabled("notices:publish"));
         assertTrue(modules.permissionEnabled("users:update"));
         assertTrue(modules.pathEnabled("/api/system/users"));
         assertTrue(modules.pathEnabled("/api/platform/features"));
         assertTrue(modules.pathEnabled("/api/crawler-extra"));
+        assertFalse(modules.permissionEnabled("telegram:view"));
+    }
+
+    /** Telegram 默认关闭；显式启用后只恢复其自身 API 与权限，不影响其他模块开关。 */
+    @Test
+    void telegramModuleUsesTheSharedSwitchAndBlocksItsApiWhenDisabled()
+    {
+        ModuleSwitches modules = new ModuleSwitches();
+        assertFalse(modules.pathEnabled("/api/telegram/status"));
+        assertFalse(modules.permissionEnabled("telegram:search"));
+
+        modules.setEnabled(Map.of("telegram", true));
+        assertTrue(modules.isEnabled("telegram"));
+        assertTrue(modules.pathEnabled("/api/telegram/status"));
+        assertTrue(modules.permissionEnabled("telegram:search"));
+        assertTrue(modules.pathEnabled("/api/telegram-extra/status"));
     }
 
     /** 拼写错误应在配置边界失败，避免静默忽略后留下意外开放的业务入口。 */

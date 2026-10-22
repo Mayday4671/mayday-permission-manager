@@ -56,6 +56,7 @@ public class WorkflowEvents
         if (notifications.findByEventKey(event.getEventKey()).isPresent())
         {
             event.setStatus("DELIVERED");
+            events.save(event);
             return;
         }
         var user = users.findById(event.getRecipientId()).orElse(null);
@@ -64,12 +65,14 @@ public class WorkflowEvents
         {
             event.setStatus("SKIPPED");
             event.setLastError("接收账号已删除");
+            events.save(event);
             return;
         }
         publisher.publish(event.getEventKey(), user.getId(), event.getTitle(), event.getBody(), "审批中心", "APPROVAL",
                 event.getRequestId());
         event.setStatus("DELIVERED");
         event.setLastError(null);
+        events.save(event);
     }
 
     /** 投递事务已回滚后用新事务记录指数退避，避免把数据库异常原文或账号资料写进页面。 */
@@ -84,5 +87,6 @@ public class WorkflowEvents
         event.setAttempts(Math.min(event.getAttempts() + 1, 10000));
         event.setNextAttemptAt(BusinessTime.now().plusSeconds(Math.min(3600, 1L << Math.min(12, event.getAttempts()))));
         event.setLastError("投递暂时失败，系统将自动重试");
+        events.save(event);
     }
 }

@@ -19,16 +19,16 @@ public interface IdentityChallengeMapper
         Db.updateBySql("delete from sys_identity_challenge where expires_at < ? limit 1000", Timestamp.from(before));
     }
 
-    /** 写入新挑战；令牌、来源与浏览器关联只存摘要。 */
-    default void insert(Challenge challenge, Instant expiresAt)
+    /** 写入新挑战；到期时间来自挑战快照，创建时间由服务端时钟统一传入。 */
+    default void insert(Challenge challenge, Instant createdAt)
     {
         Db.updateBySql(
                 "insert into sys_identity_challenge(token_hash,purpose,user_id,source_hash,browser_hash,session_hash,"
                         + "credential_hash,credential_revision,payload_cipher,expires_at,created_at) values(?,?,?,?,?,?,?,?,?,?,?)",
                 challenge.hash(), challenge.purpose(), challenge.userId(), challenge.sourceHash(),
                 challenge.browserHash(), challenge.sessionHash(), challenge.credentialHash(),
-                challenge.credentialRevision(), challenge.payloadCipher(), Timestamp.from(expiresAt),
-                Timestamp.from(Instant.now()));
+                challenge.credentialRevision(), challenge.payloadCipher(), Timestamp.from(challenge.expiresAt()),
+                Timestamp.from(createdAt));
     }
 
     /** 按令牌摘要读取原始行；过滤与校验由服务层完成。 */

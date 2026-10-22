@@ -39,6 +39,9 @@ public class ContentApprovalBinding implements WorkflowBusiness
         n.setDraftStatus("PENDING");
         r.setApprovalStatus("PENDING");
         r.setApprovalRequestId(request.getId());
+        // 审批绑定必须与申请创建处于同一事务；仅修改关联对象会让重读时丢失修订锁定信息。
+        notices.save(n);
+        revisions.save(r);
         return content.revisionView(r);
     }
 
@@ -90,7 +93,9 @@ public class ContentApprovalBinding implements WorkflowBusiness
         if (n.getDeletedAt() == null && Objects.equals(n.getDraftRevisionId(), r.getId()))
         {
             n.setDraftStatus(request.getStatus().equals("APPROVED") ? "APPROVED" : "DRAFT");
+            notices.save(n);
         }
+        revisions.save(r);
     }
 
     @Override

@@ -1,8 +1,9 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V34）
--- 唯一对外交付 SQL：68 张业务表、634 个业务字段、索引/外键及必要基础资料。
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V47）
+-- 唯一对外交付 SQL：77 张业务表、781 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
+
 -- 【使用方法】
 -- 1. 先创建独立空库，字符集 utf8mb4，排序规则 utf8mb4_0900_ai_ci。
 --    示例：CREATE DATABASE mayday CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
@@ -12,13 +13,13 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V34 的 Flyway BASELINE 标记，应用可正常校验并继续执行 V35+。
+-- 4. 本文件已包含 V47 的 Flyway BASELINE 标记，不会在空库启动时重复执行 V35–V47 迁移。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
 -- 中断后需核查新建测试库再重试，不保证整份 SQL 事务回滚。
 -- 【字段约定】DATETIME 业务时间采用 Asia/Shanghai；TIMESTAMP 保存时间点。
--- version 为 JPA 乐观锁，不是文章修订号；逻辑关联由服务层校验，物理外键见 CONSTRAINT。
+-- version 为 MyBatis-Flex 乐观锁，不是文章修订号；逻辑关联由服务层校验，物理外键见 CONSTRAINT。
 -- 【维护方式】以后新增结构先写下一份迁移，再同步本文件的结构/基础资料/基线版本。
 -- node scripts/database-docs.mjs --check 可核对本文件与运行库的中文注释。
 -- 历史 V12 注释中的 catalog/字典路径已合并到本文件；旧迁移保持原样以保留校验和。
@@ -650,12 +651,12 @@ CREATE TABLE `sys_user_role` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='账号与角色多对多关联；联合主键防止重复授权，用户与角色均有物理外键';
 
 
--- Flyway 版本管理表：记录本文件对应的 V15 基线，后续仍按正常增量迁移升级。
--- BASELINE 声明当前结构已处于版本 31；不伪造历史迁移的执行校验和。
+-- Flyway 版本管理表：记录本文件对应的 V47 基线，后续仍按正常增量迁移升级。
+-- BASELINE 声明当前结构已处于版本 47；不伪造历史迁移的执行校验和。
 -- 参考：https://documentation.red-gate.com/flyway/flyway-concepts/baselines
 CREATE TABLE flyway_schema_history (
   installed_rank INT NOT NULL COMMENT '安装记录顺序；由 Flyway 后续维护',
-  version VARCHAR(50) DEFAULT NULL COMMENT '数据库迁移版本；本初始化基线为 21',
+  version VARCHAR(50) DEFAULT NULL COMMENT '数据库迁移版本；本初始化基线为 47',
   description VARCHAR(200) NOT NULL COMMENT '迁移描述或基线标记',
   type VARCHAR(20) NOT NULL COMMENT '记录类型；BASELINE 表示导入后的结构起点，后续 SQL 表示增量迁移',
   script VARCHAR(1000) NOT NULL COMMENT '迁移脚本名或标准基线标记',
@@ -897,6 +898,11 @@ VALUES(1,'0.0.0.0',19000,'127.0.0.1',19001,16,16,64,NOW(6),NOW(6),0);
 INSERT INTO sys_entry(kind,name,code,path,permission,sort_order,enabled,created_at,updated_at,version)
 SELECT 'menus','UDP 转发','relay','/admin/udp-relay','relay:view',110,1,NOW(6),NOW(6),0
 WHERE NOT EXISTS(SELECT 1 FROM sys_entry WHERE kind='menus' AND code='relay');
+
+-- Telegram 为默认关闭的独立模块；此菜单只登记已实现路由，不授予用户任何 Telegram 权限。
+INSERT INTO sys_entry(kind,name,code,path,permission,sort_order,enabled,created_at,updated_at,version)
+SELECT 'menus','Telegram','telegram','/admin/telegram','telegram:view',120,1,NOW(6),NOW(6),0
+WHERE NOT EXISTS(SELECT 1 FROM sys_entry WHERE kind='menus' AND code='telegram');
 
 -- 只补建导航，不自动授予普通角色权限，不修改已有菜单或业务记录。
 INSERT INTO sys_entry(kind,name,code,path,permission,sort_order,enabled,created_at,updated_at,version)
@@ -1279,6 +1285,25 @@ CREATE TABLE `sys_agentscope_config` (
   CONSTRAINT `fk_agentscope_config_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `sys_user` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='智能体受控运维配置；密钥仅密文落库、读取接口仅暴露是否已配置，变更需 agentscope:configure 权限';
 
+-- Telegram 单账号摘要；TDLib 会话文件与加密密钥不放入数据库初始化脚本。
+CREATE TABLE `biz_telegram_account`
+(
+  `id`                  bigint       NOT NULL AUTO_INCREMENT COMMENT '记录主键；数据库自增，不接受客户端指定',
+  `account_slot`        varchar(32)  NOT NULL COMMENT '平台账号槽位；首版固定 primary，通过唯一索引保证全库只有一个授权账号',
+  `owner_id`            bigint       NOT NULL COMMENT 'Mayday 所有者账号主键；由首次授权的已登录用户赋值，普通请求不可更改',
+  `masked_phone_number` varchar(32)           DEFAULT NULL COMMENT '授权手机号脱敏摘要；仅作账号识别，不可用于登录或恢复验证码',
+  `telegram_user_id`    bigint                DEFAULT NULL COMMENT 'Telegram 授权用户 ID；仅 TDLib 授权完成后由服务端写入',
+  `authorization_state` varchar(40)  NOT NULL COMMENT '最近确认的 TDLib 授权状态枚举；不是实时连接状态，状态由服务端白名单更新',
+  `created_at`          datetime(6) NOT NULL COMMENT '记录创建时间；由服务端按 Asia/Shanghai 时区生成',
+  `updated_at`          datetime(6) NOT NULL COMMENT '记录更新时间；由服务端按 Asia/Shanghai 时区维护',
+  `version`             bigint       NOT NULL DEFAULT 0 COMMENT 'MyBatis-Flex 乐观锁版本；并发修改时拒绝旧状态覆盖',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_biz_telegram_account_slot` (`account_slot`),
+  UNIQUE KEY `uk_biz_telegram_account_user` (`telegram_user_id`),
+  KEY `idx_biz_telegram_account_owner` (`owner_id`),
+  CONSTRAINT `fk_biz_telegram_account_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Telegram 唯一授权账号的归属摘要；关闭模块或停止连接时保留，敏感会话密钥与 TDLib 数据不入库';
+
 -- 智能体模型配置入口位于智能体页面；系统菜单不重复暴露该设置页面。
 
 -- 原子共享状态守卫行；应用依赖固定主键，不保存账号或令牌。
@@ -1287,12 +1312,240 @@ INSERT INTO sys_realtime_guard(id) VALUES (1);
 -- 原子共享状态守卫行；应用依赖固定主键，不保存账号或令牌。
 INSERT INTO sys_security_guard(id) VALUES (1);
 
+-- 修复升级前已创建但缺少关联的保留管理员账号；不为其他账号新增管理员角色。
+INSERT INTO sys_user_role (user_id, role_id)
+SELECT u.id, r.id
+FROM sys_user u
+JOIN sys_role r ON r.code = 'admin'
+WHERE u.username = 'admin'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM sys_user_role existing_role
+    WHERE existing_role.user_id = u.id
+  );
+
+-- Search request history is user-owned and records external sends; it never stores login challenges.
+CREATE TABLE `biz_telegram_search` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT 'Mayday 创建时间，作为搜索提交时间排序依据',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '最后一次状态或关联信息更新时间',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，防止异步状态覆盖并发更新',
+  `owner_id` BIGINT NOT NULL COMMENT '发起搜索的 Mayday 用户 ID，用于数据范围和资源所有权校验',
+  `department_id` BIGINT NULL COMMENT '创建时的用户部门 ID，用于部门数据范围判断',
+  `keyword` VARCHAR(256) NOT NULL COMMENT '由用户主动提交并实际发送给机器人查询的关键词',
+  `bot_username` VARCHAR(64) NOT NULL COMMENT '服务端配置且经 Telegram 验证的公开机器人用户名',
+  `bot_chat_id` VARCHAR(32) NULL COMMENT '机器人私聊 ID，使用字符串保存以避免精度损失',
+  `sent_message_id` VARCHAR(32) NULL COMMENT 'Telegram 确认发送的查询消息 ID，字符串保存',
+  `status` VARCHAR(24) NOT NULL COMMENT '搜索状态：PENDING、SENDING、WAITING、COMPLETED、TIMEOUT、FAILED、CANCELLED',
+  `parse_status` VARCHAR(24) NOT NULL COMMENT '回复解析状态：UNKNOWN、PARTIAL 或 PARSED；不得将未识别内容伪装为结果',
+  `expires_at` DATETIME(6) NULL COMMENT '等待机器人回复的截止时间，超时任务不会自动重发消息',
+  `status_message` VARCHAR(256) NULL COMMENT '不包含秘密信息的状态说明，供管理页面展示',
+  PRIMARY KEY (`id`),
+  KEY `idx_biz_telegram_search_owner_created` (`owner_id`, `created_at`),
+  KEY `idx_biz_telegram_search_status_expiry` (`status`, `expires_at`),
+  CONSTRAINT `fk_biz_telegram_search_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户主动提交的 Telegram 机器人搜索记录；搜索查询不会在进程重启后被自动重发';
+
+-- This table is a limited projection of the one verified bot chat, not a general Telegram inbox.
+CREATE TABLE `biz_telegram_search_message` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT '该条业务消息投影首次保存时间',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '消息编辑或 TDLib 内容更新后的业务更新时间',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，避免旧更新覆盖新消息内容',
+  `owner_id` BIGINT NOT NULL COMMENT '消息归属的 Mayday 用户 ID；与搜索记录的发起人一致',
+  `department_id` BIGINT NULL COMMENT '搜索创建时的部门 ID，用于部门数据范围判断',
+  `search_id` BIGINT NULL COMMENT '明确关联的搜索记录；无法可靠关联时保持为空',
+  `bot_chat_id` VARCHAR(32) NOT NULL COMMENT '已验证搜索机器人私聊 ID，禁止写入其他聊天消息',
+  `telegram_message_id` VARCHAR(32) NOT NULL COMMENT 'Telegram 消息 ID，字符串保存避免 JavaScript 整数精度丢失',
+  `sender_id` VARCHAR(32) NULL COMMENT 'Telegram 用户发送方 ID；未知或非用户发送方为空',
+  `outgoing` TINYINT(1) NOT NULL COMMENT '是否为本账号发出的机器人查询消息',
+  `update_type` VARCHAR(64) NOT NULL COMMENT '提供本次快照的 TDLib 更新类型',
+  `content_type` VARCHAR(96) NOT NULL COMMENT 'TDLib 消息内容类型名称；未知类型也保留类型标识',
+  `message_text` MEDIUMTEXT NULL COMMENT '消息正文或媒体说明文字；不存储 TdApi 调试字符串',
+  `entities_json` JSON NOT NULL COMMENT '从已知 TDLib 字段构建的文本实体 JSON 投影',
+  `reply_markup_json` JSON NOT NULL COMMENT '已知按钮标签和按钮安全元数据的 JSON 投影',
+  `reply_to_message_id` VARCHAR(32) NULL COMMENT 'Telegram 显式回复指向的消息 ID，用于可靠关联搜索请求',
+  `telegram_sent_at` DATETIME NULL COMMENT 'Telegram 消息发送时间，按时间戳映射为服务端本地时间',
+  `telegram_edited_at` DATETIME NULL COMMENT 'Telegram 消息编辑时间；未编辑时为空',
+  `association_status` VARCHAR(24) NOT NULL COMMENT '关联状态：MATCHED 仅代表存在明确回复关系，UNMATCHED 代表未确认关联',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_biz_telegram_message_chat_message` (`bot_chat_id`, `telegram_message_id`),
+  KEY `idx_biz_telegram_message_owner_created` (`owner_id`, `created_at`),
+  KEY `idx_biz_telegram_message_search_time` (`search_id`, `telegram_sent_at`),
+  KEY `idx_biz_telegram_message_reply` (`reply_to_message_id`),
+  CONSTRAINT `fk_biz_telegram_message_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_biz_telegram_message_search` FOREIGN KEY (`search_id`) REFERENCES `biz_telegram_search` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='当前用户机器人搜索会话的消息快照；只保存指定机器人聊天，不作为完整消息归档';
+
+-- Shared Telegram account visibility follows the recorded owner's department scope.
+ALTER TABLE `biz_telegram_account`
+  ADD COLUMN `department_id` BIGINT NULL COMMENT '创建账号槽位时所有者的部门 ID，用于管理员角色的数据范围校验' AFTER `owner_id`,
+  ADD KEY `idx_biz_telegram_account_department` (`department_id`),
+  ADD CONSTRAINT `fk_biz_telegram_account_department` FOREIGN KEY (`department_id`) REFERENCES `sys_entry` (`id`);
+
+CREATE TABLE `biz_telegram_collection_task` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '采集任务主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT 'Mayday 创建时间，用于任务队列稳定排序',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '采集进度或状态最后更新时间',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，避免状态和游标并发覆盖',
+  `owner_id` BIGINT NOT NULL COMMENT '主动创建任务的 Mayday 用户 ID，用于任务及消息访问控制',
+  `department_id` BIGINT NULL COMMENT '创建时用户部门 ID，用于 Telegram 数据范围授权',
+  `message_link` VARCHAR(2048) NULL COMMENT '用户提供的 HTTPS Telegram 消息链接；频道来源任务为空，真实 chat/message 由 TDLib 验证',
+  `chat_id` VARCHAR(32) NULL COMMENT 'TDLib 验证后的聊天 ID，字符串保存以避免 64 位精度损失',
+  `cursor_message_id` VARCHAR(32) NULL COMMENT '已提交历史分页游标；后续页面只读取更早的消息',
+  `start_message_id` VARCHAR(32) NULL COMMENT 'TDLib 从来源链接解析得到的起始消息 ID',
+  `max_messages` INT NOT NULL COMMENT '本任务最多可采集的消息条数，范围为 1 至 500',
+  `collected_messages` INT NOT NULL DEFAULT 0 COMMENT '已保存的唯一消息数量，不包含重复回放',
+  `status` VARCHAR(24) NOT NULL COMMENT '任务状态：QUEUED、RUNNING、PAUSED、WAITING_ACCOUNT、COMPLETED、FAILED、CANCELLED',
+  `download_images` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否允许服务端按任务策略下载图片二进制；默认关闭',
+  `download_videos` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否允许服务端按任务策略下载视频二进制；默认关闭',
+  `download_documents` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否允许服务端按任务策略下载文件二进制；默认关闭',
+  `status_message` VARCHAR(256) NULL COMMENT '非敏感的进度或失败说明，不保存 TDLib 异常正文',
+  `lease_owner` VARCHAR(36) NULL COMMENT '当前工作进程随机租约标识；过期执行者不得提交消息',
+  `lease_expires_at` DATETIME(6) NULL COMMENT '租约到期时间，用于进程崩溃后的安全恢复',
+  `source_title` VARCHAR(255) NULL COMMENT 'TDLib 验证的采集来源名称；频道来源为频道名，消息链接来源为空',
+  `from_date` DATE NULL COMMENT '可选的包含式最早采集日期；按系统业务时区解释，空值表示不限制开始日期',
+  `to_date` DATE NULL COMMENT '可选的包含式最晚采集日期；按系统业务时区解释，空值表示不限制结束日期',
+  `scanned_messages` INT NOT NULL DEFAULT 0 COMMENT '已检查的频道/来源消息数，包含因日期筛选而略过的记录；每任务硬上限 5000',
+  `tracking_enabled` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '用户是否显式启用频道定期追赶；绝不代表 Telegram 推送监听或自动加入频道',
+  `live_cursor_message_id` VARCHAR(32) NULL COMMENT '频道最新追赶游标，与向旧历史回填使用的 cursor_message_id 分开保存',
+  `live_scanned_messages` INT NOT NULL DEFAULT 0 COMMENT '频道定期追赶累计检查的消息数；达到服务端硬上限后自动停止',
+  `live_checked_at` DATETIME(6) NULL COMMENT '最近一次向 Telegram 检查频道最新消息的时间',
+  `live_status_message` VARCHAR(256) NULL COMMENT '定期追赶状态说明；明确展示定期拉取模式和停止原因',
+  `live_lease_owner` VARCHAR(36) NULL COMMENT '追赶工作器独立租约令牌；不与历史回填任务租约共用',
+  `live_lease_expires_at` DATETIME(6) NULL COMMENT '追赶工作器租约过期时间，进程退出后可恢复',
+  PRIMARY KEY (`id`),
+  KEY `idx_biz_telegram_collection_owner_created` (`owner_id`, `created_at`),
+  KEY `idx_biz_telegram_collection_queue` (`status`, `lease_expires_at`, `created_at`),
+  KEY `idx_biz_telegram_collection_tracking` (`tracking_enabled`, `status`, `live_lease_expires_at`, `updated_at`),
+  CONSTRAINT `fk_biz_telegram_collection_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_biz_telegram_collection_department` FOREIGN KEY (`department_id`) REFERENCES `sys_entry` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户主动创建的 Telegram 有界消息历史任务；按账号权限读取，不自动加入频道';
+
+CREATE TABLE `biz_telegram_collection_message` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '采集消息内部主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT '本条 Telegram 消息快照首次保存时间',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '本条 Telegram 消息快照最后更新时间',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，避免重放覆盖较新的消息状态',
+  `owner_id` BIGINT NOT NULL COMMENT '来源采集任务所有者，用于消息行级数据范围检查',
+  `department_id` BIGINT NULL COMMENT '来源采集任务所有者部门，用于消息行级数据范围检查',
+  `task_id` BIGINT NOT NULL COMMENT '所属有界采集任务 ID',
+  `chat_id` VARCHAR(32) NOT NULL COMMENT 'Telegram 聊天外部 ID，字符串保存',
+  `telegram_message_id` VARCHAR(32) NOT NULL COMMENT 'Telegram 消息外部 ID，字符串保存',
+  `sender_id` VARCHAR(32) NULL COMMENT 'Telegram 发送者用户 ID，未知或非用户发送者为空',
+  `content_type` VARCHAR(96) NULL COMMENT 'TDLib 已知消息类型；受保护内容统一标记 PROTECTED',
+  `message_text` MEDIUMTEXT NULL COMMENT '可保存消息的正文或媒体说明；受保护消息不保存正文',
+  `metadata_json` JSON NOT NULL COMMENT '有界附件元数据；服务端隐藏 TDLib 文件 ID 和本机路径',
+  `album_id` VARCHAR(32) NULL COMMENT 'Telegram 媒体组标识，用于把同一相册消息归组',
+  `topic_id` VARCHAR(32) NULL COMMENT '论坛主题/消息线程 ID；未提供时为空',
+  `can_be_saved` TINYINT(1) NOT NULL COMMENT 'TDLib 是否允许保存该消息内容；为 0 时不存正文和附件元数据',
+  `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Telegram 永久删除墓碑标志；缓存移除不得直接置为删除',
+  `telegram_sent_at` DATETIME NULL COMMENT 'Telegram 原始发送时间，按平台业务时区转换',
+  `telegram_edited_at` DATETIME NULL COMMENT 'Telegram 最近编辑时间；原消息未编辑时为空',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_biz_telegram_collection_message` (`task_id`, `chat_id`, `telegram_message_id`),
+  KEY `idx_biz_telegram_collection_message_owner_time` (`owner_id`, `telegram_sent_at`),
+  KEY `idx_biz_telegram_collection_message_chat` (`chat_id`, `telegram_message_id`),
+  CONSTRAINT `fk_biz_telegram_collection_message_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_biz_telegram_collection_message_department` FOREIGN KEY (`department_id`) REFERENCES `sys_entry` (`id`),
+  CONSTRAINT `fk_biz_telegram_collection_message_task` FOREIGN KEY (`task_id`) REFERENCES `biz_telegram_collection_task` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Telegram 有界历史采集产生的消息文本和附件元数据；文件内容不存入本表';
+
+CREATE TABLE `biz_telegram_media` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Telegram 附件记录内部主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT '附件记录首次进入下载队列的时间',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '附件下载状态或存储引用最后更新时间',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，避免多个工作器覆盖附件状态',
+  `owner_id` BIGINT NOT NULL COMMENT '采集任务发起用户 ID，用于每次读取时复核资源所有权',
+  `department_id` BIGINT NULL COMMENT '采集任务发起部门 ID，用于服务端数据范围检查',
+  `task_id` BIGINT NOT NULL COMMENT '产生该附件的有界 Telegram 采集任务 ID',
+  `message_id` BIGINT NOT NULL COMMENT '附件所属的本地采集消息记录 ID',
+  `attachment_index` INT NOT NULL COMMENT '附件在 TDLib 消息快照中的稳定位置，从 0 开始',
+  `telegram_file_id` INT NOT NULL COMMENT 'TDLib 会话绑定的文件标识，仅供服务端继续下载，不对客户端返回',
+  `kind` VARCHAR(24) NOT NULL COMMENT '附件类别：PHOTO、VIDEO、DOCUMENT、AUDIO、VOICE 或 ANIMATION',
+  `file_name` VARCHAR(255) NULL COMMENT 'Telegram 提供的原始文件名，仅展示，不用于生成磁盘路径',
+  `expected_size` BIGINT NOT NULL DEFAULT 0 COMMENT 'TDLib 预期文件字节数；服务端据此执行单文件上限校验',
+  `actual_size` BIGINT NULL COMMENT '成功写入共享存储后的实际字节数',
+  `media_type` VARCHAR(128) NULL COMMENT '经文件内容签名识别的媒体类型，不信任来源消息声明',
+  `storage_provider` VARCHAR(32) NULL COMMENT '统一文件存储提供方标识，例如 LOCAL 或 S3',
+  `storage_key` VARCHAR(128) NULL COMMENT '服务器生成的随机对象键，不含客户端文件名或路径',
+  `sha256` CHAR(64) NULL COMMENT '已保存二进制的 SHA-256 摘要，用于完整性校验',
+  `status` VARCHAR(24) NOT NULL COMMENT '下载状态：QUEUED、DOWNLOADING、AVAILABLE、FAILED、DELETING 或 EXPIRED；EXPIRED 表示正文已按保留策略清理',
+  `failure_message` VARCHAR(256) NULL COMMENT '经过脱敏的用户可见失败原因，不保存 native 异常正文',
+  `attempt_count` INT NOT NULL DEFAULT 0 COMMENT '自动或用户发起的下载尝试次数，用于限制重试',
+  `lease_owner` VARCHAR(36) NULL COMMENT '当前附件工作器租约标识，阻止过期工作器提交结果',
+  `lease_expires_at` DATETIME(6) NULL COMMENT '工作器租约到期时间，用于崩溃后的安全接管',
+  `stream_ticket_hash` CHAR(64) NULL COMMENT '短时播放能力令牌的 SHA-256 摘要；原始令牌仅返回已授权浏览器一次',
+  `stream_ticket_expires_at` DATETIME(6) NULL COMMENT '短时播放能力令牌的过期时间；每次字节范围请求都会复核所有者当前权限',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_biz_telegram_media_message_attachment` (`message_id`, `attachment_index`),
+  KEY `idx_biz_telegram_media_owner_task` (`owner_id`, `task_id`, `created_at`),
+  KEY `idx_biz_telegram_media_queue` (`status`, `lease_expires_at`, `created_at`),
+  CONSTRAINT `fk_biz_telegram_media_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_biz_telegram_media_department` FOREIGN KEY (`department_id`) REFERENCES `sys_entry` (`id`),
+  CONSTRAINT `fk_biz_telegram_media_task` FOREIGN KEY (`task_id`) REFERENCES `biz_telegram_collection_task` (`id`),
+  CONSTRAINT `fk_biz_telegram_media_message` FOREIGN KEY (`message_id`) REFERENCES `biz_telegram_collection_message` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Telegram 附件下载队列与共享文件存储引用；TDLib 文件 ID 和本地路径只由后端使用';
+
+CREATE TABLE `biz_telegram_video_preview` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '视频预览任务内部主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT '预览任务进入队列的时间',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '预览任务状态最后更新时间',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，避免并行工作器覆盖预览状态',
+  `owner_id` BIGINT NOT NULL COMMENT '发起预览的 Mayday 用户 ID，每次访问时复核权限',
+  `department_id` BIGINT NULL COMMENT '发起预览时的部门 ID，用于数据范围复核',
+  `media_id` BIGINT NOT NULL COMMENT '被处理的 Telegram 视频附件记录 ID；每个原视频最多一个当前预览任务',
+  `status` VARCHAR(24) NOT NULL COMMENT '状态：QUEUED、PROCESSING、READY、FAILED、CANCELLED、DELETING 或 EXPIRED',
+  `duration_seconds` DECIMAL(12,3) NULL COMMENT 'FFprobe 验证的视频时长秒数；超出服务端限制时拒绝处理',
+  `video_codec` VARCHAR(64) NULL COMMENT '探测到的源视频编码名称，仅存技术元数据',
+  `audio_codec` VARCHAR(64) NULL COMMENT '探测到的源音频编码名称；无音轨时为空',
+  `transcoded` TINYINT(1) NULL COMMENT '是否为浏览器兼容性执行过转码；未探测或失败时为空',
+  `failure_message` VARCHAR(256) NULL COMMENT '经过脱敏的预览失败原因，不保存 FFmpeg 原始输出',
+  `attempt_count` INT NOT NULL DEFAULT 0 COMMENT '后台预览处理尝试次数，用于限制崩溃后的重试',
+  `reserved_bytes` BIGINT NOT NULL DEFAULT 0 COMMENT '任务排队或处理中预留的最大输出空间，READY 后改为 0 并以实际资产字节计量',
+  `lease_owner` VARCHAR(36) NULL COMMENT '当前 FFmpeg 工作器的随机租约令牌，用于阻止过期工作器提交结果',
+  `lease_expires_at` DATETIME(6) NULL COMMENT '处理租约到期时间，进程崩溃后允许其他实例接管',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_biz_telegram_preview_media` (`media_id`),
+  KEY `idx_biz_telegram_preview_queue` (`status`, `lease_expires_at`, `created_at`),
+  KEY `idx_biz_telegram_preview_owner` (`owner_id`, `created_at`),
+  CONSTRAINT `fk_biz_telegram_preview_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_biz_telegram_preview_department` FOREIGN KEY (`department_id`) REFERENCES `sys_entry` (`id`),
+  CONSTRAINT `fk_biz_telegram_preview_media` FOREIGN KEY (`media_id`) REFERENCES `biz_telegram_media` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Telegram 视频点播预览的持久化处理任务与受权状态';
+
+CREATE TABLE `biz_telegram_video_preview_asset` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'HLS 资源内部主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT '预览资源上传到文件存储的时间',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '预览资源记录最后更新时间',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，避免资源引用被并行工作器覆盖',
+  `preview_id` BIGINT NOT NULL COMMENT '所属视频预览任务 ID',
+  `asset_name` VARCHAR(128) NOT NULL COMMENT '由服务端生成的 HLS 清单或分片文件名，不含目录或外部 URL',
+  `content_type` VARCHAR(64) NOT NULL COMMENT '经服务端允许列表确定的资源类型：application/vnd.apple.mpegurl 或 video/mp2t',
+  `storage_provider` VARCHAR(32) NOT NULL COMMENT '统一文件存储提供方标识，例如 LOCAL 或 S3',
+  `storage_key` VARCHAR(128) NOT NULL COMMENT '服务器生成的随机对象键，不含分片名或文件系统路径',
+  `actual_size` BIGINT NOT NULL COMMENT '完整写入统一文件存储后的 HLS 资源字节数',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_biz_telegram_preview_asset_name` (`preview_id`, `asset_name`),
+  KEY `idx_biz_telegram_preview_asset_storage` (`storage_provider`, `storage_key`),
+  CONSTRAINT `fk_biz_telegram_preview_asset_preview` FOREIGN KEY (`preview_id`) REFERENCES `biz_telegram_video_preview` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Telegram 点播 HLS 清单与媒体分片的受控文件存储引用';
+
+CREATE TABLE `biz_telegram_video_preview_budget` (
+  `id` TINYINT NOT NULL COMMENT '固定单例行主键，唯一允许的值为 1，用于跨实例串行化视频预览配额预留',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '最近一次预览任务通过配额检查的时间',
+  PRIMARY KEY (`id`),
+  CONSTRAINT `chk_biz_telegram_video_preview_budget_singleton` CHECK (`id` = 1)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Telegram 视频预览预留配额的跨实例互斥锁行';
+
+INSERT INTO `biz_telegram_video_preview_budget` (`id`, `updated_at`) VALUES (1, CURRENT_TIMESTAMP(6));
+
 -- 全部建表及基础资料成功后才登记基线；如前面报错，必须停止，不能跳过失败语句。
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '34', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '47', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
--- 安装完成自检：应得到 68 张业务表、634 个业务字段，缺少注释数均为 0。
+-- 安装完成自检：应得到 77 张业务表、781 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。
 SELECT COUNT(*) AS business_tables, SUM(table_comment = '') AS missing_table_comments
 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history';

@@ -464,6 +464,7 @@ public class ContentService
         }
         publications.deleteByNoticeId(id);
         revisions.deleteByNoticeId(id);
+        notices.deleteTagsByNoticeId(id);
         notices.delete(n);
     }
 
@@ -477,12 +478,19 @@ public class ContentService
             return;
         }
         var now = BusinessTime.now();
+        boolean changed = false;
         if (n.isPublished() && n.getLiveOfflineAt() != null && !n.getLiveOfflineAt().isAfter(now))
         {
             takeOffline(n, "定时下线");
+            changed = true;
         }
         if (n.getScheduledPublishAt() == null || n.getScheduledPublishAt().isAfter(now))
         {
+            // 到期下线的内容通常没有待上线任务；必须先保存状态再返回，不能只关闭内存中的发布快照。
+            if (changed)
+            {
+                notices.save(n);
+            }
             return;
         }
         var actor = users.findById(n.getScheduledActorId()).orElse(null);

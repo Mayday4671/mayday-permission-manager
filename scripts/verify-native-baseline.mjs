@@ -94,6 +94,18 @@ const environment = {
   ...process.env,
   VERIFY_DB_PASSWORD: randomBytes(24).toString("hex"),
   VERIFY_ADMIN_PASSWORD: settings.ADMIN_PASSWORD,
+  MODULE_CONTENT_ENABLED: "true",
+  MODULE_PORTAL_ENABLED: "true",
+  MODULE_NOTIFICATIONS_ENABLED: "true",
+  MODULE_APPROVALS_ENABLED: "true",
+  MODULE_CRAWLER_ENABLED: "true",
+  MODULE_SCHEDULER_ENABLED: "true",
+  MODULE_UDP_ENABLED: "true",
+  MODULE_WORKORDERS_ENABLED: "true",
+  MODULE_FEEDBACK_ENABLED: "true",
+  MODULE_AGENTSCOPE_ENABLED: "false",
+  MODULE_TELEGRAM_ENABLED: "true",
+  API_DOCS_ENABLED: "true",
 };
 // 身份协议只连接本机专用提供方；每轮独立加密密钥，测试身份与日常配置完全分离。
 const identityEnvironment = {
@@ -280,6 +292,10 @@ async function startRuntime(
     DB_PASSWORD: environment.VERIFY_DB_PASSWORD,
     ADMIN_PASSWORD: settings.ADMIN_PASSWORD,
     SEED_DEMO_DATA: "false",
+    // 契约验收必须与构建配置使用相同模块开关，避免漏检按模块注册的 API。
+    ...Object.fromEntries(
+      Object.entries(environment).filter(([key]) => key.startsWith("MODULE_")),
+    ),
     MODULE_WORKORDERS_ENABLED: "true",
     MAYDAY_STORAGE_MODE: "LOCAL",
     MAYDAY_STORAGE_LOCAL_ROOT: files,
@@ -753,6 +769,7 @@ async function apiSuite(label) {
     "workflow-field-activation",
     "identity",
     "shared-execution",
+    "telegram",
   ].map((name) => `tests/${name}.test.mjs`);
   const env = apiEnvironment(label);
   // 在任何写入夹具前证明 CLI、覆盖配置与 SQL 已连到隔离数据库；失败不继续制造状态残留。

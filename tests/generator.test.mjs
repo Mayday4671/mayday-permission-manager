@@ -36,7 +36,7 @@ const files = [
   "backend/mayday-application/pom.xml",
   "backend/mayday-security/src/main/java/com/mayday/security/PermissionCatalog.java",
   "backend/mayday-application/src/main/java/com/mayday/service/NavigationCatalog.java",
-  "backend/mayday-common/src/main/java/com/mayday/common/ModuleSwitches.java",
+  "backend/mayday-common/src/main/java/com/mayday/common/util/ModuleSwitches.java",
   "backend/mayday-application/src/main/resources/application.yml",
   "compose.yaml",
   "compose.verify.yaml",

@@ -245,7 +245,9 @@ public class WorkflowOrchestrator
         {
             if ("PENDING".equals(child.getStatus()))
             {
-                host.finish(requests.lockById(child.getId()).orElseThrow(), "CANCELLED", false);
+                FlowRequest activeChild = requests.lockById(child.getId()).orElseThrow();
+                host.finish(activeChild, "CANCELLED", false);
+                persist(activeChild);
             }
         }
         if (!propagate || request.getParentRequestId() == null)
@@ -269,11 +271,21 @@ public class WorkflowOrchestrator
                     null);
             host.finish(parent,
                     "RETURNED".equals(status) ? "RETURNED" : "REJECTED".equals(status) ? "REJECTED" : "CANCELLED");
+            persist(parent);
             return;
         }
         caller.setStatus("ACTIVE");
         pump(parent, parentState, host);
+        // 子流程自然结束后，父游标、回填字段、新建待办和参与人必须作为同一事务结果落库。
+        persist(parent);
         host.refreshParticipants(parent);
+    }
+
+    /** 将协同推进修改过的申请主行及附件/参与人快照写入当前业务事务。 */
+    private void persist(FlowRequest request)
+    {
+        requests.save(request);
+        requests.syncCollections(request);
     }
 
     private void pump(FlowRequest request, WorkflowExecutionState state, WorkflowEngine host)
@@ -395,6 +407,9 @@ public class WorkflowOrchestrator
             if (!"WAITING".equals(task.getStatus()))
             {
                 host.activate(request, task);
+                // Activation writes the timestamp and any delegation assignment; persist that
+                // evidence immediately.
+                tasks.save(task);
             }
         }
         if ("COPY".equals(node.type()))
@@ -498,6 +513,10 @@ public class WorkflowOrchestrator
         host.record(child, "SUBMIT", null, "由父流程节点启动", null);
         // 子申请始终使用游标运行端，使失败可恢复、完成可唤醒父调用，旧根单线实例仍保持旧语义。
         enter(child, childSpec.startNodeId(), host);
+        // 游标运行期间会更新当前节点、执行状态和实际参与人；主记录与参与人快照必须一并落库，
+        // 否则子申请待办虽然已创建，合法审批人读取详情时仍会被当作非参与者拒绝。
+        requests.save(child);
+        requests.syncCollections(child);
         host.refreshParticipants(child);
     }
 
@@ -506,12 +525,17 @@ public class WorkflowOrchestrator
         tasks.findByRequestIdOrderByIdAsc(request.getId()).stream()
                 .filter(task -> tokenIds.contains(task.getExecutionTokenId())
                         && Set.of("PENDING", "WAITING").contains(task.getStatus()))
-                .forEach(task -> task.setStatus("CANCELLED"));
+                .forEach(task -> {
+                    task.setStatus("CANCELLED");
+                    tasks.save(task);
+                });
         for (var child : requests.findByParentRequestIdOrderByIdAsc(request.getId()))
         {
             if (tokenIds.contains(child.getParentTokenId()) && "PENDING".equals(child.getStatus()))
             {
-                host.finish(requests.lockById(child.getId()).orElseThrow(), "CANCELLED", false);
+                FlowRequest activeChild = requests.lockById(child.getId()).orElseThrow();
+                host.finish(activeChild, "CANCELLED", false);
+                persist(activeChild);
             }
         }
     }

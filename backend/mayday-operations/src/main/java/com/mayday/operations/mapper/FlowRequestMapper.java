@@ -68,8 +68,12 @@ public interface FlowRequestMapper extends EntityMapper<FlowRequest>
 
     default Optional<FlowRequest> lockById(Long id)
     {
-        return Optional
-                .ofNullable(selectOneByQuery(QueryWrapper.create().where(new QueryColumn("id").eq(id)).forUpdate()));
+        FlowRequest request = selectOneByQuery(QueryWrapper.create().where(new QueryColumn("id").eq(id)).forUpdate());
+        // A locked write path must load the same participant and attachment collections
+        // as findById; otherwise
+        // authorization runs against the entity's empty defaults and valid participants
+        // are incorrectly denied.
+        return request == null ? Optional.empty() : Optional.of(load(request));
     }
 
     default boolean existsByDefinitionId(Long id)
@@ -146,7 +150,6 @@ public interface FlowRequestMapper extends EntityMapper<FlowRequest>
      */
     default QueryWrapper listFilter(String keyword, String box, Long userId)
     {
-        QueryWrapper wrapper = QueryWrapper.create();
         String safeTitle = "case when (applicant_id <> ? and status in ('RETURNED','WITHDRAWN','CANCELLED')"
                 + " and private_draft is null and exists (select 1 from ops_flow_decision e"
                 + " where e.request_id = ops_flow_request.id"
@@ -156,9 +159,15 @@ public interface FlowRequestMapper extends EntityMapper<FlowRequest>
                 + " then concat(coalesce(definition_name, '审批'), ' · 申请 #', id)"
                 + " when applicant_id = ? and private_draft is not null"
                 + " then json_unquote(json_extract(private_draft, '$.title')) else title end";
-        wrapper.where(com.mayday.common.persistence.SearchPredicates
-                .containsExpression("lower(" + safeTitle + ")", keyword)
-                .and(new com.mybatisflex.core.query.RawQueryCondition(boxCondition(box), boxParams(box, userId))));
-        return wrapper.orderBy("id desc");
+        String escapedKeyword = com.mayday.common.persistence.SearchPredicates.escapedLiteral(keyword);
+        List<Object> parameters = new ArrayList<>(List.of(userId, userId, "%" + escapedKeyword + "%"));
+        for (Object parameter : boxParams(box, userId))
+        {
+            parameters.add(parameter);
+        }
+        String filter = "lower(" + safeTitle + ") like ? escape '!' AND " + boxCondition(box);
+        return QueryWrapper.create()
+                .where(new com.mybatisflex.core.query.RawQueryCondition(filter, parameters.toArray()))
+                .orderBy("id desc");
     }
 }

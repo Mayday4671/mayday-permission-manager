@@ -108,6 +108,7 @@ public class BootstrapData implements CommandLineRunner
         ensureNavigationPages();
         var categoryDictionary = entry("dictionaries", "内容分类", "content.category", null, "历史内容分类字典", 1);
         categoryDictionary.setValue("公告,产品动态,团队故事,使用指南");
+        entries.save(categoryDictionary);
         int categoryOrder = 0;
         for (String category : List.of("公告", "产品动态", "团队故事", "使用指南"))
         {
@@ -116,10 +117,15 @@ public class BootstrapData implements CommandLineRunner
         }
         var userStatus = entry("dictionaries", "账号状态", "user.status", null, "统一的账号状态字典", 2);
         userStatus.setValue("启用,停用");
+        entries.save(userStatus);
         dictionaryItem(userStatus, "启用", "true", 0);
         dictionaryItem(userStatus, "停用", "false", 1);
-        entry("settings", "平台名称", "site.name", null, "应用展示名称；业务扩展可通过参数服务读取", 1).setValue("Mayday");
-        entry("settings", "联系邮箱", "site.contact", null, "公开联络方式，请勿在参数表保存密钥", 2).setValue("hello@mayday.example");
+        SystemEntry siteName = entry("settings", "平台名称", "site.name", null, "应用展示名称；业务扩展可通过参数服务读取", 1);
+        siteName.setValue("Mayday");
+        entries.save(siteName);
+        SystemEntry siteContact = entry("settings", "联系邮箱", "site.contact", null, "公开联络方式，请勿在参数表保存密钥", 2);
+        siteContact.setValue("hello@mayday.example");
+        entries.save(siteContact);
         portal.initializeCategories();
         article(owner, "你好，Mayday。让每一份协作都有回响。", "产品动态", "一个连接团队、内容与业务的新起点。欢迎来到更有秩序的工作空间。", true,
                 "好的协作，始于一个清晰的工作空间。\n\n" + "Mayday 将团队管理、权限配置和内容发布放在一起，让日常工作更轻松。你可以邀请同事、规划组织结构，也可以把团队的最新动态分享给更多人。\n\n"
@@ -148,6 +154,7 @@ public class BootstrapData implements CommandLineRunner
         ensureNavigationPages();
         var status = entry("dictionaries", "账号状态", "user.status", null, "账号启用状态；与 enabled 布尔字段对应", 0);
         status.setValue("启用,停用");
+        entries.save(status);
         dictionaryItem(status, "启用", "true", 0);
         dictionaryItem(status, "停用", "false", 1);
         int categoryOrder = 0;
@@ -155,7 +162,9 @@ public class BootstrapData implements CommandLineRunner
         {
             entry("categories", name, "category_" + categoryOrder, null, "初始内容分类，可按业务调整", categoryOrder++);
         }
-        entry("settings", "平台名称", "site.name", null, "对外展示名称，请在网站配置中调整", 0).setValue("Mayday");
+        SystemEntry siteName = entry("settings", "平台名称", "site.name", null, "对外展示名称，请在网站配置中调整", 0);
+        siteName.setValue("Mayday");
+        entries.save(siteName);
     }
 
     /**
@@ -189,7 +198,9 @@ public class BootstrapData implements CommandLineRunner
         r.setDescription(description);
         r.setPermissions(new HashSet<>(permissions));
         r.setDataScopes(new HashMap<>(Map.of("users", scope, "notices", scope)));
-        return roles.save(r);
+        SysRole saved = roles.save(r);
+        roles.syncDetails(saved);
+        return saved;
     }
 
     private void dictionaryItem(SystemEntry dictionary, String label, String value, int order)
@@ -229,7 +240,10 @@ public class BootstrapData implements CommandLineRunner
         u.setDepartmentId(department);
         u.setPasswordHash(encoder.encode(password));
         u.setRoles(new HashSet<>(Set.of(role)));
-        return users.save(u);
+        SysUser saved = users.save(u);
+        // Persist the assigned roles in the user-role join table.
+        users.syncCollections(saved);
+        return saved;
     }
 
     private void article(SysUser owner, String title, String category, String summary, boolean published,

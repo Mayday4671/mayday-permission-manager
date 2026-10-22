@@ -60,6 +60,7 @@ public class WorkflowReminders
         }
         events.enqueue(request, candidate.getAssigneeId(), "timeout:task:" + candidate.getId(), "审批任务已超过处理期限，请及时处理");
         candidate.setTimeoutNotifiedAt(now);
+        tasks.save(candidate);
         realtime.changed(java.util.List.of(candidate.getAssigneeId(), request.getApplicantId()), "requests");
     }
 }

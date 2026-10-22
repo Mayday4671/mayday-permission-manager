@@ -1,7 +1,12 @@
 import com.mayday.bulk.BulkResultStore;
 import com.mayday.bulk.BulkSpoolCleanup;
-import com.mayday.common.BusinessException;
+import com.mayday.bulk.mapper.BulkJobMapper;
+import com.mayday.bulk.mapper.BulkResultMapper;
+import com.mayday.operations.cluster.mapper.DurableTaskMapper;
+import com.mayday.common.exception.BusinessException;
+import com.mayday.MaydayApplication;
 import com.mayday.operations.cluster.DurableTasks;
+import com.mybatisflex.core.row.Db;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -11,9 +16,11 @@ import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * 真实 MySQL 的内部租约协议探针，直接使用交付 JAR 的 DurableTasks 类而非复制实现。 只接受本机随机隔离项目；用测试类型和精确主键制造到期条件，不修改日常业务状态。
@@ -31,18 +38,27 @@ public final class ClusterPersistenceProbe {
         System.getenv("CLUSTER_TEST_PROJECT").matches("mayday-check-\\d+-[a-f0-9]{6}"), "不是自有隔离项目");
     String url = System.getenv("DB_URL");
     require(url.matches("jdbc:mysql://127\\.0\\.0\\.1:[0-9]+/mayday_verify\\?.*"), "不是本机隔离数据库");
-    var source =
-        new DriverManagerDataSource(
-            url, System.getenv("DB_USERNAME"), System.getenv("DB_PASSWORD"));
-    var jdbc = new JdbcTemplate(source);
-    var manager = new DataSourceTransactionManager(source);
-    var first = new DurableTasks(jdbc, manager, 15);
-    var second = new DurableTasks(jdbc, manager, 15);
-    if (args.length == 1 && "spool".equals(args[0])) {
-      checkSpool(jdbc);
-      return;
-    }
-    try {
+    try (ConfigurableApplicationContext context =
+        new SpringApplicationBuilder(MaydayApplication.class)
+            .web(WebApplicationType.SERVLET)
+            .properties(
+                "spring.main.banner-mode=off",
+                "server.address=127.0.0.1",
+                "server.port=0")
+            .run()) {
+      JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);
+      PlatformTransactionManager manager = context.getBean(PlatformTransactionManager.class);
+      DurableTaskMapper tasks = context.getBean(DurableTaskMapper.class);
+      BulkResultStore resultStore =
+          new BulkResultStore(context.getBean(BulkResultMapper.class));
+      BulkJobMapper jobs = context.getBean(BulkJobMapper.class);
+      var first = new DurableTasks(tasks, manager, 15);
+      var second = new DurableTasks(tasks, manager, 15);
+      if (args.length == 1 && "spool".equals(args[0])) {
+        checkSpool(jdbc, resultStore, jobs, tasks);
+        return;
+      }
+      try {
       String recoveryKey = UUID.randomUUID().toString();
       first.enqueue(TYPE, recoveryKey, "frozen-input", 3);
       var stale = first.claim(TYPE, recoveryKey);
@@ -62,7 +78,7 @@ public final class ClusterPersistenceProbe {
               first.finish(
                   stale,
                   () -> {
-                    jdbc.update("insert into sys_security_rate values(?,1,9999999999999)", MARKER);
+                    insertMarker();
                     return null;
                   }));
       require(
@@ -74,7 +90,7 @@ public final class ClusterPersistenceProbe {
         second.finish(
             current,
             () -> {
-              jdbc.update("insert into sys_security_rate values(?,1,9999999999999)", MARKER);
+              insertMarker();
               throw new BusinessException("探针模拟结果事务失败");
             });
         throw new AssertionError("结果事务错误被吞掉");
@@ -88,7 +104,7 @@ public final class ClusterPersistenceProbe {
       second.finish(
           current,
           () -> {
-            jdbc.update("insert into sys_security_rate values(?,1,9999999999999)", MARKER);
+            insertMarker();
             return null;
           });
       require("SUCCEEDED".equals(second.state(TYPE, recoveryKey)), "有效工作器未完成");
@@ -141,11 +157,17 @@ public final class ClusterPersistenceProbe {
     } finally {
       jdbc.update("delete from sys_durable_task where task_type=?", TYPE);
       jdbc.update("delete from sys_security_rate where rate_key=?", MARKER);
+      }
     }
   }
 
   /** 对本轮真实硬杀遗留文件执行交付代码的24小时生命周期回收，并验证有效租约、正在读取、 未过期业务缓存、未知文件、子目录和目录外文件都被保护。老化仅改变本轮文件时间，不等待一天。 */
-  private static void checkSpool(JdbcTemplate jdbc) throws Exception {
+  private static void checkSpool(
+      JdbcTemplate jdbc,
+      BulkResultStore results,
+      BulkJobMapper jobs,
+      DurableTaskMapper tasks)
+      throws Exception {
     String project = System.getenv("CLUSTER_TEST_PROJECT");
     Path spool = Path.of(System.getenv("CLUSTER_TEST_SPOOL")).toAbsolutePath().normalize();
     require(
@@ -194,8 +216,8 @@ public final class ClusterPersistenceProbe {
     Path outside = spool.getParent().resolve("qa-outside-" + config + ".csv");
     Path link = spool.resolve(UUID.randomUUID() + ".csv");
     var fixtures = new ArrayList<Path>();
-    var store = new BulkResultStore(jdbc);
-    var cleanup = new BulkSpoolCleanup(jdbc, store, spool.toString());
+    var store = results;
+    var cleanup = new BulkSpoolCleanup(store, jobs, tasks, spool.toString());
     cleanup.initialize();
     boolean links = false;
     try {
@@ -268,7 +290,7 @@ public final class ClusterPersistenceProbe {
       require(!Files.exists(activePart, LinkOption.NOFOLLOW_LINKS), "失效租约文件没有回收");
       require(!Files.exists(readingCache, LinkOption.NOFOLLOW_LINKS), "关闭读取后的过期孤立缓存没有回收");
       require(Files.exists(activeCache, LinkOption.NOFOLLOW_LINKS), "未过期作业缓存被回收");
-      checkBoundedSweep(jdbc, store, spool, old);
+      checkBoundedSweep(jdbc, store, jobs, tasks, spool, old);
       System.out.println(
           "PASS 真实硬杀残留24h回收、有效租约与下载读取保护、禁止越界递归；symbolic-link="
               + (links ? "checked" : "skipped-permission"));
@@ -284,11 +306,17 @@ public final class ClusterPersistenceProbe {
 
   /** 641个自有目录项检验每轮删除上限和跨轮游标公平性；未知文件再多也不能让尾部缓存永久饥饿。 */
   private static void checkBoundedSweep(
-      JdbcTemplate jdbc, BulkResultStore store, Path spool, FileTime old) throws Exception {
+      JdbcTemplate jdbc,
+      BulkResultStore store,
+      BulkJobMapper jobs,
+      DurableTaskMapper tasks,
+      Path spool,
+      FileTime old)
+      throws Exception {
     Path directory = Files.createDirectory(spool.resolve("qa-bounds-" + UUID.randomUUID()));
     var expired = new ArrayList<Path>();
     var unknown = new ArrayList<Path>();
-    var cleanup = new BulkSpoolCleanup(jdbc, store, directory.toString());
+    var cleanup = new BulkSpoolCleanup(store, jobs, tasks, directory.toString());
     cleanup.initialize();
     try {
       for (int index = 0; index < 520; index++) {
@@ -341,5 +369,10 @@ public final class ClusterPersistenceProbe {
 
   private static long count(JdbcTemplate jdbc, String query, Object... values) {
     return jdbc.queryForObject(query, Long.class, values);
+  }
+
+  /** 事务回调写入经 MyBatis-Flex 与租约检查同一数据源，模拟实际业务 Mapper 的提交边界。 */
+  private static void insertMarker() {
+    Db.updateBySql("insert into sys_security_rate values(?,1,9999999999999)", MARKER);
   }
 }

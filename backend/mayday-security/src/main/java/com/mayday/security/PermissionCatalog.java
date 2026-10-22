@@ -51,6 +51,11 @@ public final class PermissionCatalog
                     Map.of("view", "查看自己的会话", "create", "新建会话", "chat", "发送消息", "delete", "删除自己的会话", "configure",
                             "配置模型与密钥"),
                     false),
+            new Group("telegram", "Telegram", Map.ofEntries(Map.entry("view", "查看允许范围内的数据"),
+                    Map.entry("configure", "管理账号与运行配置"), Map.entry("connect", "连接与授权账号"), Map.entry("search", "搜索与翻页"),
+                    Map.entry("collect", "管理采集任务"), Map.entry("download", "读取媒体文件"), Map.entry("extract", "处理压缩包"),
+                    Map.entry("disconnect", "安全关闭账号会话"), Map.entry("logout", "退出 Telegram 账号"),
+                    Map.entry("delete", "清理本地记录与文件"), Map.entry("all", "管理全部账号与任务")), true),
             // generator:permission-groups
             new Group("logs", "操作日志", Map.of("view", "查看", "export", "导出", "delete", "清理历史日志"), false));
 

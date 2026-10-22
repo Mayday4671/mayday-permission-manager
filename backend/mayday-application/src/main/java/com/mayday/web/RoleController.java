@@ -199,6 +199,8 @@ public class RoleController
             throw new BusinessException("角色正在使用，请先解除用户关联");
         }
         changeAudit.record("角色", role.getId(), "删除角色", auditSnapshot(role), Map.of());
+        // 授权关联表保留外键且没有级联删除；先清理指定范围、范围与权限，再删除角色主记录。
+        roles.deleteDetails(id);
         roles.delete(role);
         return ApiResponse.ok(null);
     }

@@ -34,6 +34,9 @@ spring:
   flyway:
     # 分离DDL/DML账号时，先用部署迁移任务升级，再关闭业务进程的自动DDL。
     enabled: ${DB_MIGRATIONS_ENABLED:true}
+    # 历史 V5 的 TRIM (表达式) 在 MySQL 默认模式下会被当作存储函数；仅为 Flyway 连接启用兼容解析模式。
+    init-sqls:
+      - "SET SESSION sql_mode = CONCAT_WS(',', NULLIF(@@SESSION.sql_mode, ''), 'IGNORE_SPACE')"
   jackson:
     time-zone: Asia/Shanghai
 management:
@@ -84,6 +87,7 @@ mayday:
       workorders: ${MODULE_WORKORDERS_ENABLED:false}
       feedback: ${MODULE_FEEDBACK_ENABLED:true}
       agentscope: ${MODULE_AGENTSCOPE_ENABLED:false}
+      telegram: ${MODULE_TELEGRAM_ENABLED:false}
       # generator:module-environment
   agentscope:
     api-key: ${DASHSCOPE_API_KEY:}
@@ -93,6 +97,32 @@ mayday:
     max-message-length: ${MAYDAY_AGENTSCOPE_MAX_MESSAGE_LENGTH:4000}
     max-context-messages: ${MAYDAY_AGENTSCOPE_MAX_CONTEXT_MESSAGES:40}
     system-prompt: ${MAYDAY_AGENTSCOPE_SYSTEM_PROMPT:你是 Mayday 工作空间中的通用助手。请以中文清晰、准确地回答问题；你无法访问平台业务数据或执行外部操作，遇到超出上下文的信息时应如实说明。}
+  telegram:
+    # Telegram 凭据仅从被忽略的本机 .env 或部署环境注入；默认关闭时不会构造客户端或连接网络。
+    api-id: ${TELEGRAM_API_ID:}
+    api-hash: ${TELEGRAM_API_HASH:}
+    session-encryption-key: ${TELEGRAM_SESSION_ENCRYPTION_KEY:}
+    data-directory: ${TELEGRAM_DATA_DIR:./data/telegram}
+    search-bot-username: ${TELEGRAM_SEARCH_BOT_USERNAME:jisou}
+    proxy-enabled: ${TELEGRAM_PROXY_ENABLED:false}
+    proxy-type: ${TELEGRAM_PROXY_TYPE:socks5}
+    proxy-host: ${TELEGRAM_PROXY_HOST:}
+    proxy-port: ${TELEGRAM_PROXY_PORT:0}
+    proxy-username: ${TELEGRAM_PROXY_USERNAME:}
+    proxy-password: ${TELEGRAM_PROXY_PASSWORD:}
+    proxy-secret: ${TELEGRAM_PROXY_SECRET:}
+    max-media-file-bytes: ${TELEGRAM_MAX_MEDIA_FILE_BYTES:52428800}
+    max-stored-media-bytes: ${TELEGRAM_MAX_STORED_MEDIA_BYTES:10737418240}
+    minimum-free-disk-bytes: ${TELEGRAM_MINIMUM_FREE_DISK_BYTES:1073741824}
+    max-media-workers: ${TELEGRAM_MAX_MEDIA_WORKERS:2}
+    media-download-timeout-seconds: ${TELEGRAM_MEDIA_DOWNLOAD_TIMEOUT_SECONDS:600}
+    media-retention-days: ${TELEGRAM_MEDIA_RETENTION_DAYS:90}
+    seven-zip-path: ${TELEGRAM_7ZIP_PATH:7z}
+    ffmpeg-path: ${TELEGRAM_FFMPEG_PATH:ffmpeg}
+    ffprobe-path: ${TELEGRAM_FFPROBE_PATH:ffprobe}
+    max-preview-output-bytes: ${TELEGRAM_MAX_PREVIEW_OUTPUT_BYTES:1073741824}
+    max-preview-duration-seconds: ${TELEGRAM_MAX_PREVIEW_DURATION_SECONDS:7200}
+    preview-timeout-seconds: ${TELEGRAM_PREVIEW_TIMEOUT_SECONDS:1800}
 
 # 契约仅允许管理员读取；生产环境可以通过 API_DOCS_ENABLED=false 彻底关闭。
 springdoc:

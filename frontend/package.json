@@ -23,6 +23,7 @@
     "antd": "6.6.4",
     "dayjs": "^1.11.13",
     "dompurify": "^3.4.15",
+    "hls.js": "^1.7.3",
     "lucide-react": "^0.468.0",
     "openapi-fetch": "0.17.0",
     "react": "19.3.0",
@@ -42,6 +43,6 @@
     "prettier": "^3.9.7",
     "tsx": "^4.23.15",
     "typescript": "~5.9.2",
-    "vite": "8.3.0"
+    "vite": "~8.3.5"
   }
 }

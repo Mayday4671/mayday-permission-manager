@@ -27,7 +27,7 @@ export function documentedSchema() {
     value.replace(/''/g, "'").replace(/\\(['\\])/g, "$1");
   const tables = {};
   const create =
-    /CREATE TABLE `([^`]+)` \(([\s\S]*?)\) (?:ENGINE=[^;]+|DEFAULT CHARACTER SET[^;]+)COMMENT='((?:[^'\\]|\\.|'')*)';/g;
+    /CREATE TABLE `([^`]+)`\s*\(([\s\S]*?)\) (?:ENGINE=[^;]+|DEFAULT CHARACTER SET[^;]+)COMMENT='((?:[^'\\]|\\.|'')*)';/g;
   for (const [, name, body, comment] of source.matchAll(create)) {
     const columns = {};
     for (const line of body.split("\n")) {
@@ -42,6 +42,27 @@ export function documentedSchema() {
     assert(Object.keys(columns).length, `${name} 缺少字段说明`);
     assert(comment.trim(), `${name} 缺少表说明`);
     tables[name] = { comment: unquote(comment), columns };
+  }
+  // V47 retains the historical scope and later Telegram media migrations in the one-file installer.
+  // Include columns added after CREATE TABLE so fresh installation metadata and
+  // migrated-database comment checks describe the same current schema.
+  const alters = /ALTER TABLE `?([^`\s]+)`?([\s\S]*?);/g;
+  for (const [, name, body] of source.matchAll(alters)) {
+    const table = tables[name];
+    if (!table) continue;
+    for (const line of body.split("\n")) {
+      if (!/^\s*ADD COLUMN\s/.test(line)) continue;
+      const column = line.match(
+        /^\s*ADD COLUMN `([^`]+)` .* COMMENT '((?:[^'\\]|\\.|'')*)'/,
+      );
+      assert(
+        column,
+        `${name} 的新增字段必须包含完整中文 COMMENT：${line.trim()}`,
+      );
+      assert(column[2].trim(), `${name}.${column[1]} 注释不能为空`);
+      assert(!(column[1] in table.columns), `${name}.${column[1]} 重复定义`);
+      table.columns[column[1]] = unquote(column[2]);
+    }
   }
   assert(Object.keys(tables).length, "初始化 SQL 未包含业务表");
   return tables;

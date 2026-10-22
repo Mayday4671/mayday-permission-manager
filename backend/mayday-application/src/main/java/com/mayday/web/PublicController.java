@@ -131,15 +131,23 @@ public class PublicController
                 .map(n -> article(n, false)).orElse(null);
     }
 
+    /** 按排序过的主键恢复实体顺序；复杂栏目排序留在 SQL 查询而不是交给不支持子查询的排序白名单。 */
+    private List<Notice> publicNotices(List<Long> orderedIds)
+    {
+        if (orderedIds.isEmpty())
+        {
+            return List.of();
+        }
+        Map<Long, Notice> byId = notices.selectListByIds(orderedIds).stream()
+                .collect(java.util.stream.Collectors.toMap(Notice::getId, notice -> notice));
+        return orderedIds.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
+    }
+
     /** 自动主视觉和公告分别按模板查询，避免其他栏目的大量新内容挤出首页必要入口。 */
     private Map<String, Object> automaticArticle(String template)
     {
-        return notices.selectListByQueryAs(
-                notices.publicArticles().and(new com.mybatisflex.core.query.QueryColumn("pc.template").eq(template))
-                        .orderBy("lr.recommended desc, lr.pinned desc, lr.sort_order desc,"
-                                + " cms_notice.published_at desc, cms_notice.id desc")
-                        .limit(1),
-                com.mayday.content.Notice.class).stream().findFirst().map(n -> article(n, false)).orElse(null);
+        List<Long> ids = notices.publicArticleIds("", "", null, null, null, null, template, true, 1, 0);
+        return publicNotices(ids).stream().findFirst().map(n -> article(n, false)).orElse(null);
     }
 
     /** 首页编排只投影当前公开版本；下线、停用、内部内容不会连同配置 ID 泄露，手动精选保持顺序。 */
@@ -147,12 +155,8 @@ public class PublicController
     public ResponseEntity<?> home()
     {
         var config = portal.home(false);
-        var recent = notices.selectListByQueryAs(
-                notices.publicArticles()
-                        .orderBy("lr.recommended desc, lr.pinned desc, lr.sort_order desc,"
-                                + " cms_notice.published_at desc, cms_notice.id desc")
-                        .limit(12),
-                com.mayday.content.Notice.class).stream().map(n -> article(n, false)).toList();
+        var recent = publicNotices(notices.publicArticleIds("", "", null, null, null, null, null, true, 12, 0)).stream()
+                .map(n -> article(n, false)).toList();
         Map<String, Object> result = new LinkedHashMap<>();
         var automaticHero = config.heroArticleId() == null ? automaticArticle("GUIDE") : null;
         result.put("hero",
@@ -171,7 +175,7 @@ public class PublicController
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ApiResponse.ok(result));
     }
 
-    /** 将公开可见、上线修订和有效期约束合入分页 SQL，置顶排序且响应禁止缓存已下线内容。 */
+    /** 将公开可见状态、栏目分类过滤和稳定排序放入分页 SQL，响应禁止缓存已下线内容。 */
     @GetMapping("/articles")
     public ResponseEntity<?> list(@RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "") String category, @RequestParam(required = false) Long categoryId,
@@ -180,34 +184,15 @@ public class PublicController
             @RequestParam(defaultValue = "9") int size)
     {
         Long channelId = channel == null ? null : portal.publicChannel(channel).getId();
-        var articles = notices.publicArticles()
-                .and(com.mayday.content.mapper.NoticeMapper.portalTitleContains(keyword));
-        if (categoryId != null)
-        {
-            articles.and(new com.mybatisflex.core.query.QueryColumn("lr.category_id").eq(categoryId));
-        }
-        if (channelId != null)
-        {
-            articles.and(new com.mybatisflex.core.query.QueryColumn("lr.portal_channel_id").eq(channelId));
-        }
-        if (!category.isBlank())
-        {
-            articles.and(new com.mybatisflex.core.query.QueryColumn("ce.name").eq(category));
-        }
-        if (tagId != null)
-        {
-            articles.and(com.mayday.content.mapper.NoticeMapper.taggedWith(tagId));
-        }
-        if (recommended != null)
-        {
-            articles.and(new com.mybatisflex.core.query.QueryColumn("lr.recommended").eq(recommended));
-        }
-        var articlePage = notices.paginateAs(Math.max(1, page), Math.max(1, Math.min(100, size)),
-                articles.orderBy(
-                        "lr.pinned desc, lr.sort_order desc, cms_notice.published_at desc, cms_notice.id desc"),
-                com.mayday.content.Notice.class);
+        int normalizedPage = Math.max(1, page);
+        int normalizedSize = Math.max(1, Math.min(100, size));
+        long offset = (long) (normalizedPage - 1) * normalizedSize;
+        long total = notices.countPublicArticles(keyword, category, categoryId, channelId, tagId, recommended);
+        List<Long> ids = notices.publicArticleIds(keyword, category, categoryId, channelId, tagId, recommended, null,
+                false, normalizedSize, offset);
+        List<Map<String, Object>> items = publicNotices(ids).stream().map(notice -> article(notice, false)).toList();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(ApiResponse.ok(PageResult.from(articlePage.map(notice -> article(notice, false)))));
+                .body(ApiResponse.ok(new PageResult<>(items, total, normalizedPage, normalizedSize)));
     }
 
     /** 只返回当前公开上线修订；不存在、内部或未发布的内容统一返回 404，避免探测草稿。 */

@@ -1,0 +1,52 @@
+-- Search request history is user-owned and records external sends; it never stores login challenges.
+CREATE TABLE `biz_telegram_search` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT 'Mayday 创建时间，作为搜索提交时间排序依据',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '最后一次状态或关联信息更新时间',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，防止异步状态覆盖并发更新',
+  `owner_id` BIGINT NOT NULL COMMENT '发起搜索的 Mayday 用户 ID，用于数据范围和资源所有权校验',
+  `department_id` BIGINT NULL COMMENT '创建时的用户部门 ID，用于部门数据范围判断',
+  `keyword` VARCHAR(256) NOT NULL COMMENT '由用户主动提交并实际发送给机器人查询的关键词',
+  `bot_username` VARCHAR(64) NOT NULL COMMENT '服务端配置且经 Telegram 验证的公开机器人用户名',
+  `bot_chat_id` VARCHAR(32) NULL COMMENT '机器人私聊 ID，使用字符串保存以避免精度损失',
+  `sent_message_id` VARCHAR(32) NULL COMMENT 'Telegram 确认发送的查询消息 ID，字符串保存',
+  `status` VARCHAR(24) NOT NULL COMMENT '搜索状态：PENDING、SENDING、WAITING、COMPLETED、TIMEOUT、FAILED、CANCELLED',
+  `parse_status` VARCHAR(24) NOT NULL COMMENT '回复解析状态：UNKNOWN、PARTIAL 或 PARSED；不得将未识别内容伪装为结果',
+  `expires_at` DATETIME(6) NULL COMMENT '等待机器人回复的截止时间，超时任务不会自动重发消息',
+  `status_message` VARCHAR(256) NULL COMMENT '不包含秘密信息的状态说明，供管理页面展示',
+  PRIMARY KEY (`id`),
+  KEY `idx_biz_telegram_search_owner_created` (`owner_id`, `created_at`),
+  KEY `idx_biz_telegram_search_status_expiry` (`status`, `expires_at`),
+  CONSTRAINT `fk_biz_telegram_search_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户主动提交的 Telegram 机器人搜索记录；搜索查询不会在进程重启后被自动重发';
+
+-- This table is a limited projection of the one verified bot chat, not a general Telegram inbox.
+CREATE TABLE `biz_telegram_search_message` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT '该条业务消息投影首次保存时间',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '消息编辑或 TDLib 内容更新后的业务更新时间',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，避免旧更新覆盖新消息内容',
+  `owner_id` BIGINT NOT NULL COMMENT '消息归属的 Mayday 用户 ID；与搜索记录的发起人一致',
+  `department_id` BIGINT NULL COMMENT '搜索创建时的部门 ID，用于部门数据范围判断',
+  `search_id` BIGINT NULL COMMENT '明确关联的搜索记录；无法可靠关联时保持为空',
+  `bot_chat_id` VARCHAR(32) NOT NULL COMMENT '已验证搜索机器人私聊 ID，禁止写入其他聊天消息',
+  `telegram_message_id` VARCHAR(32) NOT NULL COMMENT 'Telegram 消息 ID，字符串保存避免 JavaScript 整数精度丢失',
+  `sender_id` VARCHAR(32) NULL COMMENT 'Telegram 用户发送方 ID；未知或非用户发送方为空',
+  `outgoing` TINYINT(1) NOT NULL COMMENT '是否为本账号发出的机器人查询消息',
+  `update_type` VARCHAR(64) NOT NULL COMMENT '提供本次快照的 TDLib 更新类型',
+  `content_type` VARCHAR(96) NOT NULL COMMENT 'TDLib 消息内容类型名称；未知类型也保留类型标识',
+  `message_text` MEDIUMTEXT NULL COMMENT '消息正文或媒体说明文字；不存储 TdApi 调试字符串',
+  `entities_json` JSON NOT NULL COMMENT '从已知 TDLib 字段构建的文本实体 JSON 投影',
+  `reply_markup_json` JSON NOT NULL COMMENT '已知按钮标签和按钮安全元数据的 JSON 投影',
+  `reply_to_message_id` VARCHAR(32) NULL COMMENT 'Telegram 显式回复指向的消息 ID，用于可靠关联搜索请求',
+  `telegram_sent_at` DATETIME NULL COMMENT 'Telegram 消息发送时间，按时间戳映射为服务端本地时间',
+  `telegram_edited_at` DATETIME NULL COMMENT 'Telegram 消息编辑时间；未编辑时为空',
+  `association_status` VARCHAR(24) NOT NULL COMMENT '关联状态：MATCHED 仅代表存在明确回复关系，UNMATCHED 代表未确认关联',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_biz_telegram_message_chat_message` (`bot_chat_id`, `telegram_message_id`),
+  KEY `idx_biz_telegram_message_owner_created` (`owner_id`, `created_at`),
+  KEY `idx_biz_telegram_message_search_time` (`search_id`, `telegram_sent_at`),
+  KEY `idx_biz_telegram_message_reply` (`reply_to_message_id`),
+  CONSTRAINT `fk_biz_telegram_message_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_biz_telegram_message_search` FOREIGN KEY (`search_id`) REFERENCES `biz_telegram_search` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='当前用户机器人搜索会话的消息快照；只保存指定机器人聊天，不作为完整消息归档';

@@ -118,6 +118,20 @@ class SessionLifecycleTest
     }
 
     @Test
+    void firstLoginDoesNotIssueEmptyBatchDeletes()
+    {
+        var account = user("hash");
+        when(users.lockById(1L)).thenReturn(Optional.of(account));
+        when(sessions.findByUserIdOrderByCreatedAtAscTokenHashAsc(1L)).thenReturn(List.of());
+
+        String token = tokens.issue(account, "127.0.0.1", "test-device");
+
+        assertFalse(token.isBlank());
+        verify(sessions, never()).deleteBatchByIds(any());
+        verify(sessions).save(any(LoginSession.class));
+    }
+
+    @Test
     void passwordResetAndDisabledAccountBlockLateIssuance()
     {
         when(users.lockById(1L)).thenReturn(Optional.of(user("changed")));

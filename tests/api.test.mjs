@@ -872,6 +872,11 @@ test("真实 MySQL 权限与业务回归", async (t) => {
         ...fields,
         permissions: [...fields.permissions, "users:email-write"],
       });
+      const refreshed = await request("/auth/me", { token });
+      assert(refreshed.permissions.includes("users:update"));
+      assert(refreshed.permissions.includes("users:email-write"));
+      assert.deepEqual(refreshed.user.roleIds, [fields.id]);
+      assert.deepEqual(visible.roleIds, [fields.id]);
       const saved = await put(`/system/users/${user.id}`, token, {
         ...visible,
         email: "allowed@test.example",
@@ -2114,7 +2119,9 @@ test("真实 MySQL 权限与业务回归", async (t) => {
     if (cleanupErrors.length)
       throw new AggregateError(
         cleanupErrors,
-        "测试记录清理失败，请检查独立验证库",
+        `测试记录清理失败，请检查独立验证库：${cleanupErrors
+          .map((error) => error.message)
+          .join("；")}`,
       );
   }
 });

@@ -17,6 +17,28 @@ public interface FileStorage
     /** 打开已校验对象键的正文流，调用者负责关闭，不在此存储边界授予业务访问权限。 */
     InputStream open(String key) throws IOException;
 
+    /**
+     * Opens from an offset for browser media range requests; providers should
+     * override when they can seek efficiently.
+     */
+    default InputStream openRange(String key, long offset) throws IOException
+    {
+        if (offset < 0)
+        {
+            throw new IllegalArgumentException("文件偏移量不能小于 0");
+        }
+        InputStream input = open(key);
+        try
+        {
+            input.skipNBytes(offset);
+            return input;
+        } catch (IOException exception)
+        {
+            input.close();
+            throw exception;
+        }
+    }
+
     /** 幂等删除对象，不存在视为已完成；失败必须抛出异常，交由持久化清理意图重试。 */
     void delete(String key) throws IOException;
 }

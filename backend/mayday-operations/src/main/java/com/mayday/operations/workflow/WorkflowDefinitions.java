@@ -429,8 +429,9 @@ public class WorkflowDefinitions
                 } else
                 {
                     node.assigneeIds().forEach(this::validRole);
-                    candidates = users.membersOfRoles(node.assigneeIds()).stream().filter(user -> user.isEnabled()
-                            && access.hasFor(user, approval ? "requests:approve" : "requests:view")).toList();
+                    String permission = approval ? "requests:approve" : "requests:view";
+                    candidates = users.membersOfRolesWithPermission(node.assigneeIds(), permission).stream()
+                            .filter(user -> access.hasFor(user, permission)).toList();
                 }
                 if (candidates.isEmpty() || candidates.size() > 100)
                 {

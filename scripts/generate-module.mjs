@@ -395,7 +395,7 @@ export function createGenerationPlan(root, input) {
     `          page("${resource}", "${label}", "/admin/${resource}"),`,
   );
   const switches =
-    "backend/mayday-common/src/main/java/com/mayday/common/ModuleSwitches.java";
+    "backend/mayday-common/src/main/java/com/mayday/common/util/ModuleSwitches.java";
   patch(switches, "      // generator:module-keys", `      , "${module}"`);
   patch(
     switches,

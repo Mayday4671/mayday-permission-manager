@@ -17,6 +17,7 @@ const pageModules: Record<string, string> = {
   "/admin/udp-relay": "udp",
   "/admin/workorders": "workorders",
   "/admin/agentscope": "agentscope",
+  "/admin/telegram": "telegram",
   "/admin/feedback": "feedback",
   "/admin/scheduler": "scheduler",
   // generator:frontend-modules

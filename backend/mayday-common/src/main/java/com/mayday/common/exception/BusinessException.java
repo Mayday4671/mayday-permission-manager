@@ -8,4 +8,13 @@ public class BusinessException extends RuntimeException
     {
         super(message);
     }
+
+    /**
+     * Preserves an internal failure cause for protected server-side diagnostics
+     * while keeping the public business message free from implementation details.
+     */
+    public BusinessException(String message, Throwable cause)
+    {
+        super(message, cause);
+    }
 }

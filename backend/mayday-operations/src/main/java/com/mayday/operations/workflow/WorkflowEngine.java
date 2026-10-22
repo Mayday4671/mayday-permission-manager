@@ -570,10 +570,9 @@ public class WorkflowEngine implements FileUsage
             request.setCompletedAt(null);
             request.setLastRemindedAt(null);
             request.setSubmittedAt(BusinessTime.now());
-            if (request.getSubmittedFormData() == null)
-            {
-                request.setSubmittedFormData(request.getFormData());
-            }
+            // Each run freezes its own submitted snapshot; prior runs remain in decision
+            // history.
+            request.setSubmittedFormData(request.getFormData());
             request.setStatus("PENDING");
             if (!"GENERAL".equals(request.getBusinessType()))
             {
@@ -596,6 +595,10 @@ public class WorkflowEngine implements FileUsage
             });
             decision.setChangesJson(changes.isEmpty() ? null : json.write(changes));
         }
+        // Persist both private edits and a new run before exposing the resulting
+        // request detail.
+        requests.save(request);
+        requests.syncCollections(request);
         refreshParticipants(request);
         return detail(id);
     }
@@ -817,6 +820,11 @@ public class WorkflowEngine implements FileUsage
                 if (!"WAITING".equals(task.getStatus()))
                 {
                     activate(request, task);
+                    // activation updates the assignment, eligibility timestamp and notification
+                    // evidence in memory;
+                    // MyBatis-Flex has no persistence context, so save the task again before
+                    // returning the instance.
+                    tasks.save(task);
                 }
             }
             if ("COPY".equals(node.type()))
@@ -871,6 +879,9 @@ public class WorkflowEngine implements FileUsage
         };
         events.enqueue(request, request.getApplicantId(), "request:" + request.getId() + ":result:"
                 + request.getRunNumber() + ":" + request.getNodeVisit() + ":" + status, label);
+        // 子流程回调会立即读取其终态并唤醒父游标；MyBatis-Flex 没有托管实体，必须在回调前提交当前申请状态。
+        requests.save(request);
+        requests.syncCollections(request);
         orchestrator.ended(request, status, propagate, this);
     }
 
@@ -1058,6 +1069,7 @@ public class WorkflowEngine implements FileUsage
             {
                 old.setStatus("TRANSFERRED");
                 old.setDecidedAt(BusinessTime.now());
+                tasks.save(old);
                 replacement = new FlowTask();
                 replacement.setRequestId(id);
                 replacement.setNodeId(old.getNodeId());
@@ -1082,6 +1094,9 @@ public class WorkflowEngine implements FileUsage
             if ("PENDING".equals(replacement.getStatus()))
             {
                 activate(request, replacement);
+                // Persist the newly activated handover task after its eligibility timestamp is
+                // assigned.
+                tasks.save(replacement);
             }
         }
         request.setCurrentApproverId(tasks.findByRequestIdOrderByIdAsc(id).stream()
@@ -1089,6 +1104,10 @@ public class WorkflowEngine implements FileUsage
         record(request, "HANDOVER", request.getCurrentNodeId() == null ? null : spec.node(request.getCurrentNodeId()),
                 sourceName + " → " + target.getNickname() + "；" + input.reason().trim(), target);
         request.setUpdatedAt(BusinessTime.now());
+        // Persist the frozen assignment, current version and participant scope
+        // atomically with replacement tasks.
+        requests.save(request);
+        requests.syncCollections(request);
         refreshParticipants(request);
         return detail(id);
     }
@@ -1105,6 +1124,10 @@ public class WorkflowEngine implements FileUsage
             throw new BusinessException("请输入 1 至 300 字恢复说明");
         }
         orchestrator.recover(request, reason.trim(), this);
+        // 恢复可能重新打开固定子流程并创建实际待办；保存执行游标及参与人后再返回详情。
+        requests.save(request);
+        requests.syncCollections(request);
+        refreshParticipants(request);
         return detail(id);
     }
 
@@ -1212,8 +1235,10 @@ public class WorkflowEngine implements FileUsage
     {
         accessible(id, true);
         tasks.findByRequestIdOrderByIdAsc(id).stream().filter(task -> "COPY".equals(task.getKind())
-                && task.getAssigneeId().equals(access.current().getId()) && task.getReadAt() == null)
-                .forEach(task -> task.setReadAt(BusinessTime.now()));
+                && task.getAssigneeId().equals(access.current().getId()) && task.getReadAt() == null).forEach(task -> {
+                    task.setReadAt(BusinessTime.now());
+                    tasks.save(task);
+                });
     }
 
     FlowDecision record(FlowRequest request, String action, Node node, String comment, SysUser target)
@@ -1321,6 +1346,7 @@ public class WorkflowEngine implements FileUsage
             {
                 throw new AccessDeniedException("当前节点不允许此操作");
             }
+            boolean taskPersisted = false;
             if (!Boolean.TRUE.equals(spec.allowSelfApproval()) && userId.equals(request.getApplicantId()))
             {
                 throw new AccessDeniedException("流程不允许自我审批");
@@ -1370,6 +1396,9 @@ public class WorkflowEngine implements FileUsage
                     }
                     task.setStatus("REJECTED");
                     task.setDecidedAt(BusinessTime.now());
+                    // 结束申请会批量取消其他待办；先落当前决定，避免同一任务在结束流程中被重复更新。
+                    tasks.save(task);
+                    taskPersisted = true;
                     finish(request, "REJECTED");
                 }
                 case "RETURN" -> {
@@ -1383,6 +1412,9 @@ public class WorkflowEngine implements FileUsage
                     }
                     task.setStatus("RETURNED");
                     task.setDecidedAt(BusinessTime.now());
+                    // 退回可能立即关闭当前分支或整项申请，必须先保存本节点结果再传播状态。
+                    tasks.save(task);
+                    taskPersisted = true;
                     if (task.getExecutionTokenId() != null)
                     {
                         orchestrator.returned(request, task, input.targetNodeId(), this);
@@ -1407,6 +1439,9 @@ public class WorkflowEngine implements FileUsage
                 case "APPROVE" -> {
                     task.setStatus("APPROVED");
                     task.setDecidedAt(BusinessTime.now());
+                    // 推进到结束节点会扫描并取消仍待处理的任务；先保存当前通过状态，避免版本冲突。
+                    tasks.save(task);
+                    taskPersisted = true;
                     var group = tasks.findByRequestIdOrderByIdAsc(id).stream()
                             .filter(t -> t.getNodeId().equals(node.id()) && t.getNodeVisit() == task.getNodeVisit()
                                     && t.getRunNumber() == task.getRunNumber())
@@ -1421,6 +1456,9 @@ public class WorkflowEngine implements FileUsage
                         {
                             waiting.setStatus("PENDING");
                             activate(request, waiting);
+                            // A serial task was stored as WAITING; persist both its activation and
+                            // status transition.
+                            tasks.save(waiting);
                             request.setCurrentApproverId(waiting.getAssigneeId());
                         }
                     }
@@ -1511,7 +1549,7 @@ public class WorkflowEngine implements FileUsage
                 }
                 default -> throw new BusinessException("不支持的审批动作");
             }
-            if (!input.action().equals("COMMENT"))
+            if (!input.action().equals("COMMENT") && !taskPersisted)
             {
                 tasks.save(task);
             }

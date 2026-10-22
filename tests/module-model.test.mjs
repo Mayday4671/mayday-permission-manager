@@ -11,6 +11,7 @@ test("关闭功能的页面和设计器不能从恢复页签或直接地址进�
     notifications: false,
     udp: false,
     workorders: false,
+    telegram: false,
   };
   for (const path of [
     "/admin/site-settings",
@@ -21,6 +22,7 @@ test("关闭功能的页面和设计器不能从恢复页签或直接地址进�
     "/admin/messages",
     "/admin/crawler",
     "/admin/workorders",
+    "/admin/telegram",
   ])
     assert.equal(pageEnabled(path, disabled), false, path);
   assert.equal(pageEnabled("/admin/users", disabled), true);

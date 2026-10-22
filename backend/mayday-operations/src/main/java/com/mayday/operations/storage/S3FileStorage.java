@@ -86,6 +86,28 @@ public class S3FileStorage implements FileStorage
         }
     }
 
+    /**
+     * Requests a byte-range directly from S3/MinIO so seeking does not download the
+     * preceding video bytes.
+     */
+    @Override
+    public InputStream openRange(String key, long offset) throws IOException
+    {
+        StorageKeys.validate(key);
+        if (offset < 0)
+        {
+            throw new IllegalArgumentException("文件偏移量不能小于 0");
+        }
+        try
+        {
+            return client()
+                    .getObject(request -> request.bucket(settings.bucket()).key(key).range("bytes=" + offset + "-"));
+        } catch (SdkException | IllegalArgumentException exception)
+        {
+            throw new IOException("对象存储范围读取失败，请检查部署配置或稍后重试");
+        }
+    }
+
     @Override
     public void delete(String key) throws IOException
     {

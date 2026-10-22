@@ -19,7 +19,7 @@ import org.springframework.util.AntPathMatcher;
 public class ModuleSwitches
 {
     private static final Set<String> KEYS = Set.of("content", "portal", "notifications", "approvals", "crawler", "udp",
-            "scheduler", "workorders", "feedback", "agentscope"
+            "scheduler", "workorders", "feedback", "agentscope", "telegram"
     // generator:module-keys
     );
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
@@ -63,6 +63,7 @@ public class ModuleSwitches
         {
             case "workorders" -> false;
             case "agentscope" -> false;
+            case "telegram" -> false;
             // generator:module-defaults
             default -> true;
         };
@@ -97,6 +98,7 @@ public class ModuleSwitches
             case "workorders" -> "workorders";
             case "feedback" -> "feedback";
             case "agentscope" -> "agentscope";
+            case "telegram" -> "telegram";
             // generator:permission-modules
             default -> null;
         };
@@ -127,7 +129,7 @@ public class ModuleSwitches
                 Map.entry("/api/operations/scheduler/**", "scheduler"),
                 Map.entry("/api/operations/job-logs/**", "scheduler"), Map.entry("/api/crawler/**", "crawler"),
                 Map.entry("/api/relay/**", "udp"), Map.entry("/api/business/workorders/**", "workorders"),
-                Map.entry("/api/agentscope/**", "agentscope")
+                Map.entry("/api/agentscope/**", "agentscope"), Map.entry("/api/telegram/**", "telegram")
         // generator:api-modules
         );
         return patterns.entrySet().stream()

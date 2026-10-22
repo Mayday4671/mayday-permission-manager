@@ -79,7 +79,8 @@ public class SecurityConfig
                                 "/api/auth/identity/providers", "/api/auth/identity/oidc/start",
                                 "/api/auth/identity/oidc/complete", "/api/auth/identity/mfa/verify",
                                 "/api/platform/features", "/api/public/**", "/actuator/health",
-                                "/actuator/health/liveness", "/actuator/health/readiness", "/error")
+                                "/actuator/health/liveness", "/actuator/health/readiness", "/error",
+                                "/api/telegram/media/*/stream")
                         .permitAll().requestMatchers("/api/platform/openapi", "/api/platform/openapi/**")
                         .access((authentication, context) -> new AuthorizationDecision(
                                 authentication.get().getPrincipal() instanceof SysUser user && user.getRoles().stream()

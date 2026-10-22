@@ -116,8 +116,9 @@ public class UserService
         {
             filter.and(new QueryColumn("department_id").eq(departmentId));
         }
-        return PageResult
-                .from(users.paginate(PageResult.request(page, size), filter.orderBy("id desc")).map(this::view));
+        var results = users.paginate(PageResult.request(page, size), filter.orderBy("id desc"));
+        users.loadRoleSummaries(results.getRecords());
+        return PageResult.from(results.map(this::view));
     }
 
     /** 验证访问目标的范围，同时阻止低权限管理员修改高权限账号。 */
@@ -255,6 +256,8 @@ public class UserService
         externalIdentities.deleteByUser(id);
         // AgentScope 状态表使用框架的 userId/sessionId 复合键，不受 sys_user 外键级联；账号删除时显式清除。
         agentScopeAccountCleanup.deleteAccountData(id);
+        // 岗位和角色关联保留物理外键且没有级联删除；删除账号前按外键顺序清理这两张关联表。
+        users.deleteCollections(id);
         users.delete(u);
     }
 

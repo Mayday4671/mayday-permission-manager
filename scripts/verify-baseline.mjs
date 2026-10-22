@@ -61,6 +61,8 @@ const environment = {
   ...process.env,
   VERIFY_DB_PASSWORD: randomBytes(24).toString("hex"),
   VERIFY_ADMIN_PASSWORD: settings.ADMIN_PASSWORD,
+  // Telegram 真实接口回归只在隔离栈中启用该模块；日常部署仍由 .env 控制开关。
+  MODULE_TELEGRAM_ENABLED: "true",
 };
 const sourceCompose = [
   "compose",
@@ -250,7 +252,7 @@ function verificationSnapshot(service) {
   );
 }
 async function apiSuite(label, port) {
-  const files = [
+  const availableFiles = [
     "tests/api.test.mjs",
     "tests/workflow.test.mjs",
     "tests/workflow-decimal.test.mjs",
@@ -267,7 +269,19 @@ async function apiSuite(label, port) {
     "tests/workflow-orchestration.test.mjs",
     "tests/workflow-field-activation.test.mjs",
     "tests/shared-execution.test.mjs",
+    "tests/telegram.test.mjs",
   ];
+  // 可选筛选只用于快速定位指定接口回归；最终验收仍必须运行完整文件清单。
+  const files = process.env.VERIFY_API_TEST_FILES
+    ? process.env.VERIFY_API_TEST_FILES.split(",")
+        .map((file) => file.trim())
+        .filter(Boolean)
+    : availableFiles;
+  assert(
+    files.length > 0 && files.every((file) => availableFiles.includes(file)),
+    "接口回归筛选只能使用验收脚本登记的测试文件",
+  );
+  const testNamePattern = process.env.VERIFY_API_TEST_NAME_PATTERN;
   const reportPath = join(output, `api-${label}-reporter.json`);
   const diagnosticOptions = apiDiagnosticReporterOptions({
     phase: label,
@@ -277,7 +291,13 @@ async function apiSuite(label, port) {
   // 长 API 套件异步等待退出；保留 600 秒上限、私有 TAP 和原始失败，不重试或阻塞父进程。
   const checked = await runVerificationProcess(
     process.execPath,
-    ["--test", ...diagnosticOptions.args, "--test-concurrency=1", ...files],
+    [
+      "--test",
+      ...diagnosticOptions.args,
+      "--test-concurrency=1",
+      ...(testNamePattern ? ["--test-name-pattern", testNamePattern] : []),
+      ...files,
+    ],
     {
       cwd: root,
       env: {
@@ -304,11 +324,19 @@ async function apiSuite(label, port) {
   );
   try {
     assert(!checked.error && checked.status === 0, "容器 API 子进程失败");
-    assert(
-      counts.tests > 0 && counts.pass === counts.tests,
-      "容器接口回归必须执行全部检查，不以缺失环境条件或跳过替代通过",
-    );
-    assert.equal(counts.skipped, 0, "容器接口条件跳过不得计为通过");
+    if (testNamePattern) {
+      // Node 将顶层 suite 也计入测试数；过滤到 suite 名称时，不能把“所有子测试均跳过”误判为通过。
+      assert(
+        counts.tests > files.length && counts.pass > files.length,
+        "选定接口回归没有执行任何子测试",
+      );
+    } else {
+      assert(
+        counts.tests > 0 && counts.pass === counts.tests,
+        "容器接口回归必须执行全部检查，不以缺失环境条件或跳过替代通过",
+      );
+      assert.equal(counts.skipped, 0, "容器接口条件跳过不得计为通过");
+    }
     assert.equal(counts.fail, 0);
     assert.equal(counts.cancelled, 0);
   } catch {
@@ -331,7 +359,10 @@ async function apiSuite(label, port) {
     console.error("API 回归脱敏失败摘要：" + JSON.stringify(diagnostic));
     throw new Error(`${label}：API 回归未通过，脱敏诊断见 ${failurePath}`);
   }
-  mark(`${label}：真实 MySQL 接口回归`, counts);
+  mark(
+    `${label}：${testNamePattern ? "选定 MySQL 接口回归" : "真实 MySQL 接口回归"}`,
+    counts,
+  );
 }
 
 let createdEnvironment = false;
@@ -620,7 +651,11 @@ try {
   await apiSuite("upgrade", upgradePort);
   await apiSuite("fresh", freshPort);
   execute(process.execPath, ["scripts/verify-module-switches.mjs"], {
-    env: { ...environment, API_TEST_COMPOSE_PROJECT: project },
+    env: {
+      ...environment,
+      API_TEST_COMPOSE_PROJECT: project,
+      VERIFY_MODULE_PORT: process.env.VERIFY_MODULE_PORT ?? "29283",
+    },
     log: "module-switches.log",
   });
   mark("裁剪模块的接口、导航、权限候选与依赖联动通过");

@@ -2,10 +2,13 @@ package com.mayday.operations.storage;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 
 import org.springframework.stereotype.Component;
 
@@ -81,6 +84,30 @@ public class LocalFileStorage implements FileStorage
     public InputStream open(String key) throws IOException
     {
         return Files.newInputStream(resolve(key, false), LinkOption.NOFOLLOW_LINKS);
+    }
+
+    /**
+     * Seeks through the local file channel instead of reading and discarding
+     * earlier video bytes.
+     */
+    @Override
+    public InputStream openRange(String key, long offset) throws IOException
+    {
+        if (offset < 0)
+        {
+            throw new IllegalArgumentException("文件偏移量不能小于 0");
+        }
+        SeekableByteChannel channel = Files.newByteChannel(resolve(key, false), StandardOpenOption.READ,
+                LinkOption.NOFOLLOW_LINKS);
+        try
+        {
+            channel.position(offset);
+            return Channels.newInputStream(channel);
+        } catch (IOException exception)
+        {
+            channel.close();
+            throw exception;
+        }
     }
 
     @Override

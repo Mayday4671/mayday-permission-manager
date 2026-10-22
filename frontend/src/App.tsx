@@ -30,6 +30,11 @@ const UdpRelayPage = lazy(() =>
     default: m.UdpRelayPage,
   })),
 );
+const TelegramPage = lazy(() =>
+  import("./pages/telegram/TelegramPage").then((m) => ({
+    default: m.TelegramPage,
+  })),
+);
 const CrawlDataPage = lazy(() =>
   import("./pages/operations/CrawlDataPage").then((m) => ({
     default: m.CrawlDataPage,
@@ -281,6 +286,7 @@ export default function Application() {
                 workorders: WorkOrderPage,
                 agentscope: AgentScopePage,
                 agentscopeSettings: AgentScopeSettingsPage,
+                telegram: TelegramPage,
                 // generator:frontend-screens
                 workflows: WorkflowsPage,
                 workflowDesigner: WorkflowDesignerPage,

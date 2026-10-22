@@ -15,7 +15,8 @@ assert.match(
   /^mayday-check-[a-z0-9-]+$/,
   "只能在独立基线项目运行模块裁剪验收",
 );
-const port = process.env.VERIFY_MODULE_PORT ?? "18083";
+// 18083 留给 OpenAPI 预览服务，裁剪模块实例使用独立的默认端口。
+const port = process.env.VERIFY_MODULE_PORT ?? "18085";
 assert.match(port, /^\d{4,5}$/);
 const container = `${project}-module-switches`;
 const base = `http://127.0.0.1:${port}/api`;
