@@ -57,7 +57,7 @@ public class TelegramMediaDownloadService
 {
     private static final int MAX_ATTEMPTS = 3;
     private static final java.time.Duration LEASE = java.time.Duration.ofMinutes(10);
-    private static final java.time.Duration STREAM_TICKET_TTL = java.time.Duration.ofMinutes(10);
+    private static final java.time.Duration STREAM_TICKET_TTL = java.time.Duration.ofHours(4);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final TelegramModuleGuard moduleGuard;
@@ -84,7 +84,7 @@ public class TelegramMediaDownloadService
      * Claims at most one bounded media row without holding a database lock during
      * TDLib I/O.
      */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public TelegramMedia claimNext()
     {
         moduleGuard.requireEnabled();
@@ -122,20 +122,28 @@ public class TelegramMediaDownloadService
             media.save(row);
             return null;
         }
-        long reservedBytes = media.reservedStorageBytes(telegramSettings.getMaxMediaFileBytes());
-        long ownReservation = "DOWNLOADING".equals(row.getStatus())
-                ? telegramSettings.getMaxMediaFileBytes()
-                : reservation(row.getExpectedSize());
-        long reservationWithoutClaim = Math.max(0, reservedBytes - ownReservation);
-        long maximumReservation = telegramSettings.getMaxMediaFileBytes();
-        if (reservationWithoutClaim > telegramSettings.getMaxStoredMediaBytes() - maximumReservation)
+        media.lockStorageBudget();
+        long reservedBytes = media.reservedStorageBytes(telegramSettings.getMaxMediaFileBytes())
+                + media.previewStorageBytes();
+        long ownReservation = "DOWNLOADING".equals(row.getStatus()) ? reservation(row) : 0;
+        long available = telegramSettings.getMaxStoredMediaBytes() - Math.max(0, reservedBytes - ownReservation);
+        long limit = Math.min(telegramSettings.getMaxMediaFileBytes(), available);
+        long expected = row.getExpectedSize() == null ? 0 : row.getExpectedSize();
+        if (limit <= 0 || expected > limit)
         {
             row.setStatus("FAILED");
-            row.setFailureMessage("Telegram 媒体总存储配额已满；请清理旧文件或调整服务端配额");
+            row.setFailureMessage(telegramSettings.getConfiguredMaxMediaFileBytes() > 0
+                    && expected > telegramSettings.getConfiguredMaxMediaFileBytes()
+                            ? "附件超过已配置的单文件上限；可在账号与连接中调整媒体设置"
+                            : "Telegram 媒体剩余存储空间不足；请清理旧文件或增加总存储容量后重试");
             clearLease(row);
             media.save(row);
             return null;
         }
+        // TDLib estimates may differ slightly from the final size. The same reservation
+        // bounds the native transfer; unknown sizes reserve the remaining budget.
+        row.setReservedBytes(
+                expected > 0 ? Math.min(limit, expected + Math.max(16L * 1024 * 1024, expected / 20)) : limit);
         row.setStatus("DOWNLOADING");
         row.setAttemptCount((row.getAttemptCount() == null ? 0 : row.getAttemptCount()) + 1);
         row.setLeaseOwner(UUID.randomUUID().toString());
@@ -145,11 +153,9 @@ public class TelegramMediaDownloadService
         return row;
     }
 
-    private long reservation(Long expectedSize)
+    private long reservation(TelegramMedia row)
     {
-        return expectedSize == null || expectedSize < 1
-                ? telegramSettings.getMaxMediaFileBytes()
-                : Math.min(expectedSize, telegramSettings.getMaxMediaFileBytes());
+        return row.getReservedBytes() == null ? telegramSettings.getMaxMediaFileBytes() : row.getReservedBytes();
     }
 
     /**
@@ -165,13 +171,13 @@ public class TelegramMediaDownloadService
             verifyFreeDiskSpace(claim);
             TelegramSessionClient client = sessions.requireMediaClient(claim.getOwnerId());
             TelegramDownloadedFile downloaded = downloadWithTimeout(client, claim);
-            if (downloaded.size() < 1 || downloaded.size() > telegramSettings.getMaxMediaFileBytes())
+            if (downloaded.size() < 1 || downloaded.size() > reservation(claim))
             {
                 throw new SafeMediaException("附件大小超出服务端配置限制");
             }
             String type = detectMediaType(downloaded.path());
-            String digest = sha256(downloaded.path());
-            try (InputStream input = Files.newInputStream(downloaded.path()))
+            String digest = sha256(downloaded.path(), client, claim);
+            try (InputStream input = leasedInput(downloaded.path(), client, claim))
             {
                 storage.write(objectKey, input, downloaded.size(), type);
             }
@@ -200,7 +206,7 @@ public class TelegramMediaDownloadService
     {
         int fileId = claim.getTelegramFileId();
         requireActiveDownload(client, claim);
-        var transfer = client.downloadFile(fileId, telegramSettings.getMaxMediaFileBytes());
+        var transfer = client.downloadFile(fileId, reservation(claim));
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(telegramSettings.getMediaDownloadTimeoutSeconds());
         try
         {
@@ -253,6 +259,34 @@ public class TelegramMediaDownloadService
             cancelUnsharedTransfer(client, claim);
             throw new SafeMediaException("来源采集任务已取消或下载租约已失效，附件下载已停止");
         }
+        if (current.getLeaseExpiresAt().isBefore(BusinessTime.now().plusMinutes(5)) && !mediaStates.renew(claim))
+        {
+            cancelUnsharedTransfer(client, claim);
+            throw new SafeMediaException("下载租约续期失败，附件下载已停止");
+        }
+    }
+
+    /**
+     * Keeps cancellation and lease fencing active during large-file hashing and
+     * storage copies.
+     */
+    private InputStream leasedInput(java.nio.file.Path path, TelegramSessionClient client, TelegramMedia claim)
+            throws IOException
+    {
+        return new FilterInputStream(Files.newInputStream(path)) {
+            private long nextCheck;
+
+            @Override
+            public int read(byte[] buffer, int offset, int length) throws IOException
+            {
+                if (System.nanoTime() >= nextCheck)
+                {
+                    requireActiveDownload(client, claim);
+                    nextCheck = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+                }
+                return in.read(buffer, offset, length);
+            }
+        };
     }
 
     /** TDLib 按文件而非业务任务取消，仍被其他任务使用的文件保持传输。 */
@@ -280,7 +314,7 @@ public class TelegramMediaDownloadService
     {
         try
         {
-            long fileBytes = reservation(claim.getExpectedSize());
+            long fileBytes = reservation(claim);
             long freeReserve = telegramSettings.getMinimumFreeDiskBytes();
             java.nio.file.FileStore sessionStore = fileStoreFor(telegramSettings.getDataDirectory());
             long sessionRequired = Math.addExact(fileBytes, freeReserve);
@@ -344,12 +378,27 @@ public class TelegramMediaDownloadService
     @Transactional
     public TelegramCollectionContracts.MediaStreamTicketView createStreamTicket(Long mediaId)
     {
+        return issueTicket(mediaId, false);
+    }
+
+    /**
+     * Issues a separate private capability so large files bypass browser Blob
+     * buffering.
+     */
+    @Transactional
+    public TelegramCollectionContracts.MediaStreamTicketView createDownloadTicket(Long mediaId)
+    {
+        return issueTicket(mediaId, true);
+    }
+
+    private TelegramCollectionContracts.MediaStreamTicketView issueTicket(Long mediaId, boolean download)
+    {
         moduleGuard.requireEnabled();
         access.require("telegram:download");
         TelegramMedia row = media.lock(mediaId).orElseThrow(() -> new ResourceNotFoundException("Telegram 媒体不存在"));
         access.checkData("telegram", row.getOwnerId(), row.getDepartmentId());
         verifySource(row);
-        if (!List.of("video/mp4", "video/webm").contains(row.getMediaType()))
+        if (!download && !List.of("video/mp4", "video/webm").contains(row.getMediaType()))
         {
             throw new BusinessException("受权原视频打开仅支持 MP4 与 WebM 视频");
         }
@@ -358,11 +407,19 @@ public class TelegramMediaDownloadService
         String ticket = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
         java.util.Arrays.fill(raw, (byte) 0);
         LocalDateTime expiresAt = BusinessTime.now().plus(STREAM_TICKET_TTL);
-        row.setStreamTicketHash(sha256(ticket.getBytes(StandardCharsets.US_ASCII)));
-        row.setStreamTicketExpiresAt(expiresAt);
+        if (download)
+        {
+            row.setDownloadTicketHash(sha256(ticket.getBytes(StandardCharsets.US_ASCII)));
+            row.setDownloadTicketExpiresAt(expiresAt);
+        } else
+        {
+            row.setStreamTicketHash(sha256(ticket.getBytes(StandardCharsets.US_ASCII)));
+            row.setStreamTicketExpiresAt(expiresAt);
+        }
         media.save(row);
         return new TelegramCollectionContracts.MediaStreamTicketView(
-                "/api/telegram/media/" + row.getId() + "/stream?ticket=" + ticket, expiresAt);
+                "/api/telegram/media/" + row.getId() + (download ? "/download?ticket=" : "/stream?ticket=") + ticket,
+                expiresAt);
     }
 
     /**
@@ -371,9 +428,24 @@ public class TelegramMediaDownloadService
      */
     public ResponseEntity<Resource> stream(Long mediaId, String ticket, String rangeHeader)
     {
+        return capabilityContent(mediaId, ticket, rangeHeader, false);
+    }
+
+    /**
+     * Streams an attachment to the browser download manager using a scoped
+     * capability.
+     */
+    public ResponseEntity<Resource> downloadContent(Long mediaId, String ticket, String rangeHeader)
+    {
+        return capabilityContent(mediaId, ticket, rangeHeader, true);
+    }
+
+    private ResponseEntity<Resource> capabilityContent(Long mediaId, String ticket, String rangeHeader,
+            boolean download)
+    {
         moduleGuard.requireEnabled();
         TelegramMedia row = media.findById(mediaId).orElseThrow(() -> new ResourceNotFoundException("Telegram 媒体不存在"));
-        verifyStreamTicket(row, ticket);
+        verifyStreamTicket(row, ticket, download);
         SysUser owner = users.findById(row.getOwnerId()).orElseThrow(() -> new AccessDeniedException("播放票据所有者已不存在"));
         if (!access.hasFor(owner, "telegram:download") || !access.hasFor(owner, "telegram:view")
                 || !access.containsFor(owner, "telegram", row.getOwnerId(), row.getDepartmentId()))
@@ -381,7 +453,7 @@ public class TelegramMediaDownloadService
             throw new AccessDeniedException("播放票据所有者已失去媒体访问权限");
         }
         verifySource(row);
-        return streamContent(row, rangeHeader);
+        return streamContent(row, rangeHeader, download);
     }
 
     private TelegramMedia visibleMedia(Long mediaId)
@@ -407,15 +479,16 @@ public class TelegramMediaDownloadService
         }
     }
 
-    private void verifyStreamTicket(TelegramMedia row, String ticket)
+    private void verifyStreamTicket(TelegramMedia row, String ticket, boolean download)
     {
-        if (ticket == null || !ticket.matches("[A-Za-z0-9_-]{40,64}") || row.getStreamTicketHash() == null
-                || row.getStreamTicketExpiresAt() == null
-                || !row.getStreamTicketExpiresAt().isAfter(BusinessTime.now()))
+        String digest = download ? row.getDownloadTicketHash() : row.getStreamTicketHash();
+        LocalDateTime expiration = download ? row.getDownloadTicketExpiresAt() : row.getStreamTicketExpiresAt();
+        if (ticket == null || !ticket.matches("[A-Za-z0-9_-]{40,64}") || digest == null || expiration == null
+                || !expiration.isAfter(BusinessTime.now()))
         {
             throw new AccessDeniedException("播放票据无效或已过期");
         }
-        byte[] expected = row.getStreamTicketHash().getBytes(StandardCharsets.US_ASCII);
+        byte[] expected = digest.getBytes(StandardCharsets.US_ASCII);
         byte[] actual = sha256(ticket.getBytes(StandardCharsets.US_ASCII)).getBytes(StandardCharsets.US_ASCII);
         if (!MessageDigest.isEqual(expected, actual))
         {
@@ -424,6 +497,11 @@ public class TelegramMediaDownloadService
     }
 
     private ResponseEntity<Resource> streamContent(TelegramMedia row, String rangeHeader)
+    {
+        return streamContent(row, rangeHeader, false);
+    }
+
+    private ResponseEntity<Resource> streamContent(TelegramMedia row, String rangeHeader, boolean download)
     {
         try
         {
@@ -443,7 +521,7 @@ public class TelegramMediaDownloadService
                     : new BoundedInputStream(storage.openRange(row.getStorageKey(), range.start()),
                             range.end() - range.start() + 1);
             String fileName = safeFileName(row.getFileName());
-            boolean inline = row.getMediaType() != null && (row.getMediaType().startsWith("image/")
+            boolean inline = !download && row.getMediaType() != null && (row.getMediaType().startsWith("image/")
                     || List.of("video/mp4", "video/webm").contains(row.getMediaType()));
             ContentDisposition disposition = (inline ? ContentDisposition.inline() : ContentDisposition.attachment())
                     .filename(fileName, java.nio.charset.StandardCharsets.UTF_8).build();
@@ -505,6 +583,8 @@ public class TelegramMediaDownloadService
         row.setSha256(null);
         row.setStreamTicketHash(null);
         row.setStreamTicketExpiresAt(null);
+        row.setDownloadTicketHash(null);
+        row.setDownloadTicketExpiresAt(null);
         if (expired)
         {
             row.setAttemptCount(0);
@@ -580,12 +660,12 @@ public class TelegramMediaDownloadService
         return "application/octet-stream";
     }
 
-    private String sha256(java.nio.file.Path path) throws IOException
+    private String sha256(java.nio.file.Path path, TelegramSessionClient client, TelegramMedia claim) throws IOException
     {
         try
         {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try (InputStream input = Files.newInputStream(path))
+            try (InputStream input = leasedInput(path, client, claim))
             {
                 byte[] buffer = new byte[64 * 1024];
                 for (int count; (count = input.read(buffer)) >= 0;)

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V50）
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V51）
 -- 唯一对外交付 SQL：79 张业务表、806 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
@@ -13,7 +13,7 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V50 的 Flyway BASELINE 标记，不会在空库启动时重复执行 V35–V50 迁移。
+-- 4. 本文件已包含 V51 的 Flyway BASELINE 标记，不会在空库启动时重复执行 V35–V51 迁移。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
@@ -651,7 +651,7 @@ CREATE TABLE `sys_user_role` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='账号与角色多对多关联；联合主键防止重复授权，用户与角色均有物理外键';
 
 
--- Flyway 版本管理表：记录本文件对应的 V50 基线，后续仍按正常增量迁移升级。
+-- Flyway 版本管理表：记录本文件对应的 V51 基线，后续仍按正常增量迁移升级。
 -- BASELINE 声明当前结构已处于版本 48；不伪造历史迁移的执行校验和。
 -- 参考：https://documentation.red-gate.com/flyway/flyway-concepts/baselines
 CREATE TABLE flyway_schema_history (
@@ -1486,6 +1486,7 @@ CREATE TABLE `biz_telegram_media` (
   `kind` VARCHAR(24) NOT NULL COMMENT '附件类别：PHOTO、VIDEO、DOCUMENT、AUDIO、VOICE 或 ANIMATION',
   `file_name` VARCHAR(255) NULL COMMENT 'Telegram 提供的原始文件名，仅展示，不用于生成磁盘路径',
   `expected_size` BIGINT NOT NULL DEFAULT 0 COMMENT 'TDLib 预期文件字节数；服务端据此执行单文件上限校验',
+  `reserved_bytes` bigint DEFAULT NULL COMMENT '本次下载独占预留容量，启动传输前确定，完成或失败后不计入容量',
   `actual_size` BIGINT NULL COMMENT '成功写入共享存储后的实际字节数',
   `media_type` VARCHAR(128) NULL COMMENT '经文件内容签名识别的媒体类型，不信任来源消息声明',
   `storage_provider` VARCHAR(32) NULL COMMENT '统一文件存储提供方标识，例如 LOCAL 或 S3',
@@ -1498,6 +1499,8 @@ CREATE TABLE `biz_telegram_media` (
   `lease_expires_at` DATETIME(6) NULL COMMENT '工作器租约到期时间，用于崩溃后的安全接管',
   `stream_ticket_hash` CHAR(64) NULL COMMENT '短时播放能力令牌的 SHA-256 摘要；原始令牌仅返回已授权浏览器一次',
   `stream_ticket_expires_at` DATETIME(6) NULL COMMENT '短时播放能力令牌的过期时间；每次字节范围请求都会复核所有者当前权限',
+  `download_ticket_hash` varchar(64) DEFAULT NULL COMMENT '浏览器原文件下载能力票据的 SHA-256 摘要，不保存明文',
+  `download_ticket_expires_at` datetime(6) DEFAULT NULL COMMENT '原文件下载票据失效时间，与视频播放票据独立',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_biz_telegram_media_message_attachment` (`message_id`, `attachment_index`),
   KEY `idx_biz_telegram_media_owner_task` (`owner_id`, `task_id`, `created_at`),
@@ -1561,6 +1564,17 @@ CREATE TABLE `biz_telegram_video_preview_budget` (
 
 INSERT INTO `biz_telegram_video_preview_budget` (`id`, `updated_at`) VALUES (1, CURRENT_TIMESTAMP(6));
 
+CREATE TABLE `sys_telegram_media_policy` (
+  `id` bigint NOT NULL COMMENT '媒体策略单例主键，固定为 1',
+  `max_file_bytes` bigint DEFAULT NULL COMMENT '单文件字节上限，0 不单独限制，NULL 使用部署默认值',
+  `max_stored_bytes` bigint DEFAULT NULL COMMENT 'Telegram 原始媒体总存储容量，单位字节',
+  `download_timeout_seconds` int DEFAULT NULL COMMENT '单次附件下载最长等待秒数',
+  `updated_by` bigint DEFAULT NULL COMMENT '最近修改策略的管理员编号',
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '策略最近更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Telegram 媒体容量与下载时限策略，独立于账号凭据';
+INSERT INTO `sys_telegram_media_policy` (`id`) VALUES (1);
+
 CREATE TABLE `sys_telegram_config` (
   `id` TINYINT NOT NULL COMMENT '单例配置主键；固定为 1，不接受客户端指定或创建多个 Telegram 配置',
   `api_id` VARCHAR(10) NOT NULL COMMENT 'Telegram API ID；仅数字公开值，正整数形式由服务校验',
@@ -1585,7 +1599,7 @@ CREATE TABLE `sys_telegram_config` (
 -- 全部建表及基础资料成功后才登记基线；如前面报错，必须停止，不能跳过失败语句。
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '50', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '51', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
 -- 安装完成自检：应得到 79 张业务表、806 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。

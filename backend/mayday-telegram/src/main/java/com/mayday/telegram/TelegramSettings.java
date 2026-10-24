@@ -30,11 +30,11 @@ public class TelegramSettings
     private String proxyPassword = "";
     private String proxySecret = "";
     private Path dataDirectory = Paths.get("data", "telegram");
-    private long maxMediaFileBytes = 50L * 1024 * 1024;
-    private long maxStoredMediaBytes = 10L * 1024 * 1024 * 1024;
+    private volatile long maxMediaFileBytes = 0;
+    private volatile long maxStoredMediaBytes = 10L * 1024 * 1024 * 1024;
     private long minimumFreeDiskBytes = 1024L * 1024 * 1024;
     private int maxMediaWorkers = 2;
-    private int mediaDownloadTimeoutSeconds = 600;
+    private volatile int mediaDownloadTimeoutSeconds = 7200;
     private int mediaRetentionDays = 90;
     private String sevenZipPath = "7z";
     private String ffmpegPath = "ffmpeg";
@@ -305,15 +305,25 @@ public class TelegramSettings
      */
     public long getMaxMediaFileBytes()
     {
-        return maxMediaFileBytes;
+        return maxMediaFileBytes == 0 ? maxStoredMediaBytes : Math.min(maxMediaFileBytes, maxStoredMediaBytes);
     }
 
     /**
-     * Restricts operator configuration to a safe range of 1 MiB through 512 MiB.
+     * Sets the optional per-file cap; zero disables it while the total storage
+     * budget still applies.
      */
     public void setMaxMediaFileBytes(long maxMediaFileBytes)
     {
-        this.maxMediaFileBytes = Math.max(1024L * 1024, Math.min(maxMediaFileBytes, 512L * 1024 * 1024));
+        this.maxMediaFileBytes = Math.max(0, Math.min(maxMediaFileBytes, 2L * 1024 * 1024 * 1024 * 1024));
+    }
+
+    /**
+     * Returns the optional operator-selected cap; zero means no separate
+     * single-file restriction.
+     */
+    public long getConfiguredMaxMediaFileBytes()
+    {
+        return maxMediaFileBytes;
     }
 
     /** Returns the aggregate storage budget reserved for Telegram media bytes. */
@@ -359,10 +369,10 @@ public class TelegramSettings
         return mediaDownloadTimeoutSeconds;
     }
 
-    /** Restricts one download attempt to 30 seconds–1 hour. */
+    /** Restricts one download attempt to 30 seconds–24 hours. */
     public void setMediaDownloadTimeoutSeconds(int mediaDownloadTimeoutSeconds)
     {
-        this.mediaDownloadTimeoutSeconds = Math.max(30, Math.min(mediaDownloadTimeoutSeconds, 3600));
+        this.mediaDownloadTimeoutSeconds = Math.max(30, Math.min(mediaDownloadTimeoutSeconds, 86400));
     }
 
     /**

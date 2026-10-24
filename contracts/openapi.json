@@ -1101,6 +1101,25 @@
         ],
         "type": "object"
       },
+      "ApiResponsePolicy": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Policy"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponsePreviewView": {
         "properties": {
           "data": {
@@ -4043,6 +4062,23 @@
           "newPassword",
           "oldPassword"
         ],
+        "type": "object"
+      },
+      "Policy": {
+        "properties": {
+          "downloadTimeoutSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxFileBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "maxStoredBytes": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
         "type": "object"
       },
       "PreviewView": {
@@ -15317,6 +15353,66 @@
         "x-authorization": "@access.has('telegram:delete')"
       }
     },
+    "/api/telegram/media-policy": {
+      "get": {
+        "operationId": "TelegramController_mediaPolicy",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicy"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:configure')"
+      },
+      "put": {
+        "operationId": "TelegramController_saveMediaPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Policy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicy"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:configure')"
+      }
+    },
     "/api/telegram/media/{id}/archive-entries": {
       "get": {
         "operationId": "TelegramController_archiveEntries",
@@ -15457,6 +15553,96 @@
                 "schema": {
                   "format": "binary",
                   "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:download')"
+      }
+    },
+    "/api/telegram/media/{id}/download": {
+      "get": {
+        "operationId": "TelegramController_downloadAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Range",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ]
+      }
+    },
+    "/api/telegram/media/{id}/download-ticket": {
+      "post": {
+        "operationId": "TelegramController_downloadTicket",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMediaStreamTicketView"
                 }
               }
             },

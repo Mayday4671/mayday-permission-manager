@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Space } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
-import { tokenStore } from "../../lib/api";
+import { api, tokenStore } from "../../lib/api";
 import type { TelegramCollectedMedia } from "./telegram-media-types";
 
 /** 未命名的 Telegram 照片按实际媒体类型补扩展名，不使用 URL 或远端路径作文件名。 */
@@ -41,6 +41,26 @@ export function TelegramAttachmentDownload({
     setDownloading(true);
     setError(undefined);
     try {
+      // Large originals go straight to the browser download manager instead of
+      // allocating a multi-gigabyte Blob or timing out after two minutes.
+      if (
+        (attachment.actualSize ?? attachment.expectedSize ?? 0) >
+        100 * 1024 * 1024
+      ) {
+        const ticket = await api<{ url: string }>(
+          `/telegram/media/${attachment.id}/download-ticket`,
+          { method: "POST", signal: controller.signal },
+        );
+        if (controller.signal.aborted) return;
+        const link = document.createElement("a");
+        link.href = ticket.url;
+        link.download = telegramDownloadName(attachment);
+        link.hidden = true;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return;
+      }
       const token = tokenStore.get();
       const response = await fetch(attachment.contentUrl, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},

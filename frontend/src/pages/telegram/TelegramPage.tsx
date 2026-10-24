@@ -57,6 +57,7 @@ import {
   TelegramMessageMediaPreview,
   TelegramInlineMediaItem,
 } from "./TelegramMessageMediaPreview";
+import { TelegramMediaPolicySettings } from "./TelegramMediaPolicySettings";
 import { TelegramAttachmentDownload } from "./TelegramAttachmentDownload";
 import type {
   TelegramCollectionTask,
@@ -1685,6 +1686,10 @@ export function TelegramPage() {
             </>
           ) : null}
         </Card>
+      )}
+
+      {workspaceTab === "account" && canConfigure && (
+        <TelegramMediaPolicySettings />
       )}
 
       <Modal

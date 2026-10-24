@@ -111,11 +111,11 @@ mayday:
     proxy-username: ${TELEGRAM_PROXY_USERNAME:}
     proxy-password: ${TELEGRAM_PROXY_PASSWORD:}
     proxy-secret: ${TELEGRAM_PROXY_SECRET:}
-    max-media-file-bytes: ${TELEGRAM_MAX_MEDIA_FILE_BYTES:52428800}
+    max-media-file-bytes: ${TELEGRAM_MAX_MEDIA_FILE_BYTES:0}
     max-stored-media-bytes: ${TELEGRAM_MAX_STORED_MEDIA_BYTES:10737418240}
     minimum-free-disk-bytes: ${TELEGRAM_MINIMUM_FREE_DISK_BYTES:1073741824}
     max-media-workers: ${TELEGRAM_MAX_MEDIA_WORKERS:2}
-    media-download-timeout-seconds: ${TELEGRAM_MEDIA_DOWNLOAD_TIMEOUT_SECONDS:600}
+    media-download-timeout-seconds: ${TELEGRAM_MEDIA_DOWNLOAD_TIMEOUT_SECONDS:7200}
     media-retention-days: ${TELEGRAM_MEDIA_RETENTION_DAYS:90}
     seven-zip-path: ${TELEGRAM_7ZIP_PATH:7z}
     ffmpeg-path: ${TELEGRAM_FFMPEG_PATH:ffmpeg}

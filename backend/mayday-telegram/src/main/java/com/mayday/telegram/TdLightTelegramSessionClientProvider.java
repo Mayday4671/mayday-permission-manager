@@ -405,7 +405,7 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             item.put("kind", kind);
             item.put("tdFileId", file.id);
             item.put("size", file.size);
-            item.put("expectedSize", file.expectedSize);
+            item.put("expectedSize", file.size > 0 ? file.size : file.expectedSize);
             item.put("fileName", fileName);
             item.put("width", width);
             item.put("height", height);
@@ -862,8 +862,9 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             {
                 return CompletableFuture.failedFuture(new IllegalArgumentException("Telegram 附件下载参数无效"));
             }
-            long byteLimit = Math.min(maxBytes, 512L * 1024 * 1024);
-            TdApi.DownloadFile request = new TdApi.DownloadFile(fileId, 32, 0, byteLimit + 1, true);
+            long byteLimit = maxBytes;
+            TdApi.DownloadFile request = new TdApi.DownloadFile(fileId, 32, 0,
+                    byteLimit == Long.MAX_VALUE ? byteLimit : byteLimit + 1, true);
             return client.sendAsync(request).thenApply(file -> {
                 try
                 {

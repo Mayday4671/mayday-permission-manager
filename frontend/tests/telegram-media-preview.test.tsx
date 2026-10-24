@@ -464,3 +464,72 @@ test("普通文件和伪装为视频名称的非视频 MIME 不自动请求视�
   }
   assert.equal(calls, 0);
 });
+
+test("大文件直接交给浏览器下载管理器，不读取整文件 Blob", async () => {
+  tokenStore.set("large-file-session");
+  const saved: string[] = [];
+  const originalClick = window.HTMLAnchorElement.prototype.click;
+  window.HTMLAnchorElement.prototype.click = function () {
+    saved.push(this.href);
+  };
+  let requests = 0;
+  try {
+    URL.createObjectURL = () => {
+      throw new Error("大文件不得使用 Blob");
+    };
+    globalThis.fetch = async (url, options) => {
+      requests++;
+      assert.equal(String(url), "/api/telegram/media/9/download-ticket");
+      assert.equal(options?.method, "POST");
+      return reply({
+        url: "/api/telegram/media/9/download?ticket=test-capability",
+      });
+    };
+    mount(
+      <TelegramAttachmentDownload
+        attachment={{
+          ...media("AVAILABLE", "video/mp4"),
+          actualSize: 4 * 1024 ** 3,
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "下载文件" }));
+    await waitFor(() => assert.equal(saved.length, 1));
+    assert(saved[0].includes("/download?ticket="));
+    assert.equal(requests, 1);
+  } finally {
+    window.HTMLAnchorElement.prototype.click = originalClick;
+  }
+});
+
+test("失败附件原地重试，不重建任务或重复下载成功附件", async () => {
+  let retried = false;
+  let recreated = false;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).endsWith("/media/9/retry")) {
+      assert.equal(options?.method, "POST");
+      retried = true;
+      return reply({});
+    }
+    if (String(url).includes("/messages?"))
+      return reply({
+        items: [
+          row([
+            {
+              ...media(retried ? "QUEUED" : "FAILED"),
+              failureMessage: "附件超过服务端配置的单文件大小上限",
+            },
+          ]),
+        ],
+      });
+    return reply({ status: "COMPLETED" });
+  };
+  mount(
+    modal(() => {
+      recreated = true;
+    }),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "重试下载" }));
+  await waitFor(() => assert(retried));
+  assert.equal(recreated, false);
+});

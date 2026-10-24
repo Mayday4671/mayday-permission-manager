@@ -19,6 +19,7 @@ public class TelegramMediaWorker
     private final ModuleSwitches modules;
     private final TelegramMediaDownloadService downloads;
     private final TelegramSettings settings;
+    private final TelegramMediaPolicyService mediaPolicy;
     private final TaskExecutor telegramMediaExecutor;
     private final AtomicInteger activeWorkers = new AtomicInteger();
 
@@ -27,11 +28,13 @@ public class TelegramMediaWorker
      * pool.
      */
     public TelegramMediaWorker(ModuleSwitches modules, TelegramMediaDownloadService downloads,
-            TelegramSettings settings, @Qualifier("telegramMediaExecutor") TaskExecutor telegramMediaExecutor)
+            TelegramSettings settings, TelegramMediaPolicyService mediaPolicy,
+            @Qualifier("telegramMediaExecutor") TaskExecutor telegramMediaExecutor)
     {
         this.modules = modules;
         this.downloads = downloads;
         this.settings = settings;
+        this.mediaPolicy = mediaPolicy;
         this.telegramMediaExecutor = telegramMediaExecutor;
     }
 
@@ -46,6 +49,7 @@ public class TelegramMediaWorker
         {
             return;
         }
+        mediaPolicy.refresh();
         while (activeWorkers.get() < settings.getMaxMediaWorkers())
         {
             TelegramMedia claim = downloads.claimNext();

@@ -3008,6 +3008,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/telegram/media-policy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_mediaPolicy"];
+    put: operations["TelegramController_saveMediaPolicy"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/telegram/media/{id}/archive-entries": {
     parameters: {
       query?: never;
@@ -3050,6 +3066,38 @@ export interface paths {
     get: operations["TelegramController_mediaContent"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/download": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_downloadAttachment"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/media/{id}/download-ticket": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TelegramController_downloadTicket"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3711,6 +3759,11 @@ export interface components {
     };
     ApiResponsePageResultWorkOrderView: {
       data: components["schemas"]["PageResultWorkOrderView"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponsePolicy: {
+      data: components["schemas"]["Policy"];
       message: string;
       success: boolean;
     };
@@ -4654,6 +4707,14 @@ export interface components {
       factor?: string;
       newPassword: string;
       oldPassword: string;
+    };
+    Policy: {
+      /** Format: int32 */
+      downloadTimeoutSeconds?: number;
+      /** Format: int64 */
+      maxFileBytes?: number;
+      /** Format: int64 */
+      maxStoredBytes?: number;
     };
     PreviewView: {
       audioCodec?: string;
@@ -10693,6 +10754,50 @@ export interface operations {
       };
     };
   };
+  TelegramController_mediaPolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePolicy"];
+        };
+      };
+    };
+  };
+  TelegramController_saveMediaPolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Policy"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponsePolicy"];
+        };
+      };
+    };
+  };
   TelegramController_archiveEntries: {
     parameters: {
       query?: {
@@ -10764,6 +10869,54 @@ export interface operations {
         };
         content: {
           "application/json": string;
+        };
+      };
+    };
+  };
+  TelegramController_downloadAttachment: {
+    parameters: {
+      query: {
+        ticket: string;
+      };
+      header?: {
+        Range?: string;
+      };
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string;
+        };
+      };
+    };
+  };
+  TelegramController_downloadTicket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseMediaStreamTicketView"];
         };
       };
     };

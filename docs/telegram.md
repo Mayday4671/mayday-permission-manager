@@ -94,11 +94,11 @@ Telegram 下载配额和自动保留清理由受保护的服务端环境配置�
 - `TELEGRAM_DATA_DIR`：受限访问的持久目录，默认 `./data/telegram`。该目录保存可恢复的账号会话，应使用受控操作系统账户和加密磁盘/备份。
 - `TELEGRAM_SEARCH_BOT_USERNAME`：服务端允许联系的机器人用户名；必须由 Telegram 端验证为机器人后才允许查询。
 - `TELEGRAM_PROXY_ENABLED`、`TELEGRAM_PROXY_TYPE`、`TELEGRAM_PROXY_HOST`、`TELEGRAM_PROXY_PORT`：Telegram TDLib 专用网络代理，默认关闭，支持 `socks5`、`http`、`mtproto`。代理认证由 `TELEGRAM_PROXY_USERNAME` / `TELEGRAM_PROXY_PASSWORD`（SOCKS5/HTTP）或 `TELEGRAM_PROXY_SECRET`（MTProto）注入。启用后会先由 TDLib 添加并启用代理，再提交账号参数；不使用 JVM、Maven、Git 或浏览器代理设置。状态页只显示协议和配置有效性，不回显地址或认证信息。
-- `TELEGRAM_MAX_MEDIA_FILE_BYTES`：单附件下载上限，默认 50 MiB，允许范围 1–512 MiB。
+- `TELEGRAM_MAX_MEDIA_FILE_BYTES`：单附件可选上限，默认 0（不单独限制）。仍受可用磁盘和总存储容量约束；不再写死 50/512 MiB 上限。
 - `TELEGRAM_MAX_STORED_MEDIA_BYTES`：已存正文与在途下载预留的模块上限，默认 10 GiB，允许范围 100 MiB–2 TiB。
 - `TELEGRAM_MINIMUM_FREE_DISK_BYTES`：下载前必须保留的可用空间，默认 1 GiB。
 - `TELEGRAM_MAX_MEDIA_WORKERS`：并发下载数，默认 2，允许范围 1–8。
-- `TELEGRAM_MEDIA_DOWNLOAD_TIMEOUT_SECONDS`：单个 TDLib 附件下载超时，默认 600 秒，允许范围 30–3600 秒。
+- `TELEGRAM_MEDIA_DOWNLOAD_TIMEOUT_SECONDS`：单个 TDLib 附件下载超时，默认 7200 秒，允许范围 30–86400 秒。下载、校验和落盘过程中续租，防止大文件在 10 分钟后失去任务。
 - `TELEGRAM_MEDIA_RETENTION_DAYS`：已下载正文保留天数，默认 90；`0` 禁用自动清理，最大 3650 天。
 - `TELEGRAM_7ZIP_PATH`、`TELEGRAM_FFMPEG_PATH`、`TELEGRAM_FFPROBE_PATH`：归档/视频工具的可信服务端路径；默认分别为 `7z`、`ffmpeg`、`ffprobe`。生产 Docker 镜像自带对应 Linux 包，普通业务 API 不能修改可执行路径。状态页检查工具文件是否存在且具备执行权限，不会运行探测命令，也不返回服务器路径。
 - `TELEGRAM_MAX_PREVIEW_OUTPUT_BYTES`：每个视频预览的 HLS 分片总量上限，默认 1 GiB，配置范围 16 MiB–4 GiB。
@@ -188,3 +188,11 @@ $bytes = New-Object byte[] 32
 - 浅色与暗色分别检查 1440×1000、1920×1080、390×844、844×390：页面宽高未超出视口，会话抽屉可切换，输入区可见；长消息在对话区域内部滚动。展示截图使用普通测试会话，避免把私人搜索历史作为演示内容。记录：`.local/telegram-chat-design/layout.json`。
 - 新版对话消息的图片/视频链接均通过点击、预览、保存检查：创建请求映射到已有真实样本任务 6/8，实际读取后端文件，图片正常解码、视频实际播放，下载字节数分别为 185,822 / 10,837,502。采集详情中图片、视频、PDF 三个真实样本再次通过浏览器保存及 SHA-256 对照。未重新采集来源消息，也未扩大到全部 Telegram 文件格式。
 - 前端生产构建、相关源码格式及差异空白检查通过。本轮未修改后端接口或数据库。
+
+### 大文件与 4K 原始媒体
+
+在 Telegram → 账号与连接 → 媒体下载设置中，选择“不限制单个文件大小”，并按磁盘容量设置总容量和单次下载等待时间。设置持久化到数据库，保存后新下载和显式重试使用新策略，不要求退出 Telegram。已有活动传输使用领取任务时的容量预留；降低容量不会截断已开始的下载。总容量不是单文件产品限制，磁盘不足、账号无权访问或消息禁止保存仍需明确报错。
+
+大于 100 MiB 的原文件通过独立受限票据交给浏览器下载管理器，不再先构造整文件 Blob。支持 64 位 Range 偏移，原文件播放与下载保持原分辨率；浏览器不支持编码时的兼容转码仍有独立输出预算和画质策略，不代表原文件下载被限为低分辨率。预览需先完成服务端采集，不承诺即时在线播放尚未下载的大文件。
+
+此前因容量限制失败的附件，在原预览窗口点击“重试下载”，不会重复创建采集任务或重新下载同组成功文件。下载票据与播放票据分开，均重新校验当前权限、数据范围及消息可保存状态，最长有效 4 小时。

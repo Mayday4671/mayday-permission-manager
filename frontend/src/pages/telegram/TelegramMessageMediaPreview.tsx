@@ -84,6 +84,23 @@ export function TelegramMessageMediaPreview({
     },
     retry: false,
   });
+  const retryAttachments = useMutation({
+    mutationFn: async () => {
+      const failedItems = previewAttachments(result.data?.rows ?? []).filter(
+        (item) => ["FAILED", "EXPIRED"].includes(item.status),
+      );
+      const outcomes = await Promise.allSettled(
+        failedItems.map((item) =>
+          api(`/telegram/media/${item.id}/retry`, { method: "POST" }),
+        ),
+      );
+      const rejected = outcomes.find(
+        (outcome) => outcome.status === "rejected",
+      );
+      if (rejected?.status === "rejected") throw rejected.reason;
+    },
+    onSettled: () => void result.refetch(),
+  });
   const task = result.data?.task;
   // A failed recheck must remove cached players, especially after permission revocation.
   const rows = result.error ? [] : (result.data?.rows ?? []);
@@ -178,12 +195,18 @@ export function TelegramMessageMediaPreview({
               .map((item) => item.failureMessage || "媒体已失效，请重新读取")
               .join("；")}
             action={
-              <Button onClick={onRetry} loading={retrying}>
-                重新读取
+              <Button
+                onClick={() => retryAttachments.mutate()}
+                loading={retryAttachments.isPending}
+              >
+                重试下载
               </Button>
             }
           />
         ) : null}
+        {retryAttachments.error && (
+          <Alert type="error" showIcon title={retryAttachments.error.message} />
+        )}
         {protectedMessage ? (
           <Alert
             type="warning"

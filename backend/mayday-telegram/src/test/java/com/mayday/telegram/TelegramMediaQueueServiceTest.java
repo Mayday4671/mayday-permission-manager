@@ -63,6 +63,21 @@ class TelegramMediaQueueServiceTest
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("附件元数据格式无效");
     }
 
+    @Test
+    void queuesFourGiBVideoWithoutAnOptionalSingleFileCap()
+    {
+        TelegramMediaMapper mapper = mock(TelegramMediaMapper.class);
+        TelegramSettings settings = new TelegramSettings();
+        TelegramMediaQueueService queue = new TelegramMediaQueueService(mapper, new ObjectMapper(), settings);
+        queue.enqueue(task(false, true, false),
+                message("[{\"kind\":\"VIDEO\",\"tdFileId\":42,\"expectedSize\":4294967296}]"));
+        var row = org.mockito.ArgumentCaptor.forClass(TelegramMedia.class);
+        verify(mapper).save(row.capture());
+        assertThat(row.getValue().getStatus()).isEqualTo("QUEUED");
+        assertThat(row.getValue().getExpectedSize()).isEqualTo(4294967296L);
+        assertThat(settings.getConfiguredMaxMediaFileBytes()).isZero();
+    }
+
     private TelegramCollectionTask task(boolean images, boolean videos, boolean documents)
     {
         TelegramCollectionTask task = new TelegramCollectionTask();

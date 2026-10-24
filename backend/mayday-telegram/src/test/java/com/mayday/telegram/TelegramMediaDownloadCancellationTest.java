@@ -60,7 +60,7 @@ class TelegramMediaDownloadCancellationTest
         claim.setTelegramFileId(44);
         claim.setStatus("DOWNLOADING");
         claim.setLeaseOwner("download-worker");
-        claim.setLeaseExpiresAt(BusinessTime.now().plusMinutes(5));
+        claim.setLeaseExpiresAt(BusinessTime.now().plusMinutes(10));
         when(tasks.findById(21L)).thenReturn(Optional.of(task));
         when(media.findById(31L)).thenReturn(Optional.of(claim));
     }
@@ -111,7 +111,7 @@ class TelegramMediaDownloadCancellationTest
         replacement.setTelegramFileId(44);
         replacement.setStatus("DOWNLOADING");
         replacement.setLeaseOwner("replacement-worker");
-        replacement.setLeaseExpiresAt(BusinessTime.now().plusMinutes(5));
+        replacement.setLeaseExpiresAt(BusinessTime.now().plusMinutes(10));
         when(media.findById(31L)).thenReturn(Optional.of(replacement));
 
         assertThatThrownBy(() -> service.downloadWithTimeout(client, claim)).hasMessageContaining("下载租约已失效");

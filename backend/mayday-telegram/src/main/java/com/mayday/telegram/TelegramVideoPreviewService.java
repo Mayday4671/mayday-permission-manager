@@ -75,7 +75,7 @@ public class TelegramVideoPreviewService
     private final ConcurrentHashMap<Long, Process> runningProcesses = new ConcurrentHashMap<>();
 
     /** 排入单媒体预览任务；对总存储配额的预留使用数据库单例行跨实例串行化。 */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public PreviewView request(Long mediaId)
     {
         moduleGuard.requireEnabled();
@@ -416,7 +416,7 @@ public class TelegramVideoPreviewService
             long copied = 0;
             for (int count; (count = input.read(buffer)) >= 0;)
             {
-                if (count > settings.getMaxMediaFileBytes() - copied)
+                if (count > source.getActualSize() - copied)
                 {
                     throw new IOException("源视频超过服务端单文件上限");
                 }

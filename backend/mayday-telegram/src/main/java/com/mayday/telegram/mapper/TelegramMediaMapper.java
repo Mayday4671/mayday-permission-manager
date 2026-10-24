@@ -63,6 +63,9 @@ public interface TelegramMediaMapper extends EntityMapper<TelegramMedia>
             @Result(column = "telegram_file_id", property = "telegramFileId"),
             @Result(column = "file_name", property = "fileName"),
             @Result(column = "expected_size", property = "expectedSize"),
+            @Result(column = "reserved_bytes", property = "reservedBytes"),
+            @Result(column = "download_ticket_hash", property = "downloadTicketHash"),
+            @Result(column = "download_ticket_expires_at", property = "downloadTicketExpiresAt"),
             @Result(column = "actual_size", property = "actualSize"),
             @Result(column = "media_type", property = "mediaType"),
             @Result(column = "storage_provider", property = "storageProvider"),
@@ -118,16 +121,26 @@ public interface TelegramMediaMapper extends EntityMapper<TelegramMedia>
     long otherActiveDownloads(@Param("fileId") int fileId, @Param("mediaId") Long mediaId);
 
     /**
-     * Counts stored objects and conservatively reserves the configured maximum for
-     * every active download, so concurrent workers cannot overbook the module
-     * quota.
+     * Serializes storage reservations across download workers and application
+     * instances.
      */
-    @Select("SELECT COALESCE(SUM(CASE " + "WHEN status IN ('AVAILABLE', 'DELETING') THEN COALESCE(actual_size, 0) "
-            + "WHEN status IN ('QUEUED', 'DOWNLOADING') THEN "
-            + "CASE WHEN status = 'DOWNLOADING' OR COALESCE(expected_size, 0) = 0 "
-            + "THEN #{maxFileBytes} ELSE LEAST(expected_size, #{maxFileBytes}) END "
-            + "ELSE 0 END), 0) FROM biz_telegram_media "
-            + "WHERE status IN ('AVAILABLE', 'DELETING', 'QUEUED', 'DOWNLOADING')")
+    @Select("SELECT id FROM biz_telegram_video_preview_budget WHERE id = 1 FOR UPDATE")
+    Long lockStorageBudget();
+
+    /** Includes compatible-video derivatives in the shared storage budget. */
+    @Select("SELECT COALESCE(SUM(CASE WHEN p.status IN ('READY', 'DELETING') "
+            + "THEN COALESCE(a.actual_size, 0) ELSE p.reserved_bytes END), 0) "
+            + "FROM biz_telegram_video_preview p LEFT JOIN biz_telegram_video_preview_asset a ON a.preview_id = p.id "
+            + "WHERE p.status IN ('QUEUED', 'PROCESSING', 'READY', 'DELETING')")
+    long previewStorageBytes();
+
+    /**
+     * Counts stored bytes and immutable active reservations; queued files reserve
+     * nothing.
+     */
+    @Select("SELECT COALESCE(SUM(CASE WHEN status IN ('AVAILABLE', 'DELETING') "
+            + "THEN COALESCE(actual_size, 0) ELSE COALESCE(reserved_bytes, #{maxFileBytes}) END), 0) "
+            + "FROM biz_telegram_media WHERE status IN ('AVAILABLE', 'DELETING', 'DOWNLOADING')")
     long reservedStorageBytes(@Param("maxFileBytes") long maxFileBytes);
 
     /**

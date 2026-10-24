@@ -58,7 +58,8 @@ public class TelegramMediaQueueService
                 row.setFileName(text(item, "fileName"));
                 row.setExpectedSize(expectedSize);
                 row.setAttemptCount(0);
-                if (expectedSize > settings.getMaxMediaFileBytes())
+                if (settings.getConfiguredMaxMediaFileBytes() > 0
+                        && expectedSize > settings.getConfiguredMaxMediaFileBytes())
                 {
                     row.setStatus("FAILED");
                     row.setFailureMessage("附件超过服务端配置的单文件大小上限");

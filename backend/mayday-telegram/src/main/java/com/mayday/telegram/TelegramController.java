@@ -43,6 +43,47 @@ public class TelegramController
     private final TelegramArchiveService archives;
     private final TelegramVideoPreviewService videoPreviews;
     private final TelegramConfigurationService configuration;
+    private final TelegramMediaPolicyService mediaPolicy;
+
+    /** Reads independently editable attachment download policy. */
+    @GetMapping("/media-policy")
+    @PreAuthorize("@access.has('telegram:configure')")
+    public ApiResponse<TelegramMediaPolicyService.Policy> mediaPolicy()
+    {
+        return ApiResponse.ok(mediaPolicy.read());
+    }
+
+    /**
+     * Saves media policy while keeping an authorized Telegram session connected.
+     */
+    @PutMapping("/media-policy")
+    @PreAuthorize("@access.has('telegram:configure')")
+    public ApiResponse<TelegramMediaPolicyService.Policy> saveMediaPolicy(
+            @RequestBody TelegramMediaPolicyService.Policy policy)
+    {
+        return ApiResponse.ok(mediaPolicy.save(policy));
+    }
+
+    /** Creates a capability for a browser-managed attachment download. */
+    @PostMapping("/media/{id}/download-ticket")
+    @PreAuthorize("@access.has('telegram:download')")
+    public ApiResponse<TelegramCollectionContracts.MediaStreamTicketView> downloadTicket(
+            @org.springframework.web.bind.annotation.PathVariable Long id)
+    {
+        return ApiResponse.ok(mediaDownloads.createDownloadTicket(id));
+    }
+
+    /**
+     * Serves original attachment bytes after validating the download capability and
+     * current access.
+     */
+    @GetMapping("/media/{id}/download")
+    public ResponseEntity<Resource> downloadAttachment(@org.springframework.web.bind.annotation.PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestParam String ticket,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "Range", required = false) String range)
+    {
+        return mediaDownloads.downloadContent(id, ticket, range);
+    }
 
     /**
      * Returns editable Telegram connection settings without returning any secret

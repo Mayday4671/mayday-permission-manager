@@ -24,6 +24,23 @@ public class TelegramMediaStateService
     private final TelegramCollectionTaskMapper tasks;
 
     /**
+     * Renews a live attempt without letting an expired or replaced worker regain
+     * ownership.
+     */
+    @Transactional
+    public boolean renew(TelegramMedia claim)
+    {
+        TelegramMedia current = media.lock(claim.getId()).orElse(null);
+        if (!ownsLease(current, claim) || cancelled(current))
+        {
+            return false;
+        }
+        current.setLeaseExpiresAt(BusinessTime.now().plusMinutes(10));
+        media.save(current);
+        return true;
+    }
+
+    /**
      * Publishes a stored object only while the same live worker still owns the row.
      */
     @Transactional
@@ -134,6 +151,8 @@ public class TelegramMediaStateService
         current.setSha256(null);
         current.setStreamTicketHash(null);
         current.setStreamTicketExpiresAt(null);
+        current.setDownloadTicketHash(null);
+        current.setDownloadTicketExpiresAt(null);
         current.setFailureMessage(null);
         clearLease(current);
         media.save(current);

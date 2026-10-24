@@ -43,6 +43,12 @@ public class TelegramMedia extends BaseEntity
      */
     private Long expectedSize;
 
+    /**
+     * Immutable byte reservation for the active attempt, including unknown-size
+     * files.
+     */
+    private Long reservedBytes;
+
     /** Actual byte count after the complete object is written to shared storage. */
     private Long actualSize;
 
@@ -79,6 +85,12 @@ public class TelegramMedia extends BaseEntity
      * Digest of a short-lived video capability; the raw ticket is never persisted.
      */
     private String streamTicketHash;
+
+    /** Separate capability digest for browser-managed file downloads. */
+    private String downloadTicketHash;
+
+    /** Download capability expiration, independent of the current video player. */
+    private java.time.LocalDateTime downloadTicketExpiresAt;
 
     /** Expiry checked on each anonymous browser Range request. */
     private java.time.LocalDateTime streamTicketExpiresAt;
