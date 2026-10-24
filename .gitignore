@@ -9,6 +9,8 @@ target/
 .idea/
 .vscode/
 .local/
+# 本地上传、Telegram 下载与加密会话属于运行数据，不提交到代码仓库。
+/data/
 test-results/
 playwright-report/
 *.tsbuildinfo

@@ -373,14 +373,13 @@ public class TelegramVideoPreviewService
     private void requirePreviewSource(TelegramMedia source)
     {
         if (!"AVAILABLE".equals(source.getStatus()) || source.getStorageProvider() == null
-                || source.getStorageKey() == null || !List.of("video/mp4", "video/webm").contains(source.getMediaType())
-                || !List.of("VIDEO", "ANIMATION").contains(source.getKind()))
+                || source.getStorageKey() == null || !TelegramVideoMediaPolicy.isPreviewCandidate(source))
         {
-            throw new BusinessException("只有已下载的 MP4 或 WebM 视频可以生成 HLS 预览");
+            throw new BusinessException("只有已下载的 MP4、WebM、MKV 或 MOV 视频文件可以生成兼容预览");
         }
         TelegramCollectionTask task = tasks.findById(source.getTaskId()).orElse(null);
         TelegramCollectedMessage message = messages.findById(source.getMessageId()).orElse(null);
-        if (task == null || message == null || !Boolean.TRUE.equals(task.getDownloadVideos())
+        if (task == null || message == null || !TelegramVideoMediaPolicy.isDownloadAllowed(source, task)
                 || !Boolean.TRUE.equals(message.getCanBeSaved())
                 || !Objects.equals(task.getOwnerId(), source.getOwnerId())
                 || !Objects.equals(message.getOwnerId(), source.getOwnerId())

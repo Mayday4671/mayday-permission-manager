@@ -1,12 +1,18 @@
 package com.mayday.telegram;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import com.mayday.common.persistence.PageResult;
 import com.mayday.common.web.ApiResponse;
 import com.mayday.telegram.TelegramCollectionContracts.CollectedMessageView;
 import com.mayday.telegram.TelegramCollectionContracts.TaskView;
 import com.mayday.telegram.TelegramSearchContracts.CallbackAnswerView;
+import com.mayday.telegram.TelegramSearchContracts.ConversationTurnView;
 import com.mayday.telegram.TelegramSearchContracts.MessageView;
 import com.mayday.telegram.TelegramSearchContracts.ParsedMessageView;
 import com.mayday.telegram.TelegramSearchContracts.SearchView;
@@ -16,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,6 +42,55 @@ public class TelegramController
     private final TelegramMediaDownloadService mediaDownloads;
     private final TelegramArchiveService archives;
     private final TelegramVideoPreviewService videoPreviews;
+    private final TelegramConfigurationService configuration;
+
+    /**
+     * Returns editable Telegram connection settings without returning any secret
+     * value.
+     */
+    @org.springframework.web.bind.annotation.GetMapping("/configuration")
+    @PreAuthorize("@access.has('telegram:configure')")
+    public ApiResponse<TelegramConfigurationService.SettingsView> configuration()
+    {
+        return ApiResponse.ok(configuration.getSettings());
+    }
+
+    /**
+     * Persists an authorized settings update and applies it immediately for the
+     * next Telegram connection.
+     */
+    @PutMapping("/configuration")
+    @PreAuthorize("@access.has('telegram:configure')")
+    public ApiResponse<TelegramConfigurationService.SettingsView> saveConfiguration(
+            @Valid @RequestBody ConfigurationRequest request)
+    {
+        return ApiResponse.ok(configuration.save(new TelegramConfigurationService.SettingsRequest(request.apiId(),
+                request.apiHash(), request.proxyEnabled(), request.proxyType(), request.proxyHost(),
+                request.proxyPort(), request.proxyUsername(), request.proxyPassword(), request.proxySecret())));
+    }
+
+    /**
+     * Input limits mirror the service validation; secret fields are write-only and
+     * blank values retain existing data.
+     */
+    public record ConfigurationRequest(@NotBlank @Pattern(regexp = "[1-9][0-9]{0,9}") String apiId,
+            @Size(max = 512) String apiHash, boolean proxyEnabled,
+            @NotBlank @Pattern(regexp = "(?i)socks5|http|mtproto") String proxyType, @Size(max = 253) String proxyHost,
+            @Min(0) @Max(65535) int proxyPort, @Size(max = 255) String proxyUsername,
+            @Size(max = 255) String proxyPassword, @Size(max = 512) String proxySecret) {
+
+        /**
+         * Prevents diagnostic rendering from including write-only API or proxy
+         * credentials.
+         */
+        @Override
+        public String toString()
+        {
+            return "ConfigurationRequest[apiId=" + apiId + ", apiHash=<redacted>, proxyEnabled=" + proxyEnabled
+                    + ", proxyType=" + proxyType + ", proxyHost=" + proxyHost + ", proxyPort=" + proxyPort
+                    + ", proxyUsername=" + proxyUsername + ", proxyPassword=<redacted>, proxySecret=<redacted>]";
+        }
+    }
 
     /**
      * Queues browser-compatible HLS generation for one downloaded video attachment.
@@ -183,6 +239,14 @@ public class TelegramController
         return ApiResponse.ok(collections.list(page, size));
     }
 
+    /** Reports task failures and progress separately from an empty message page. */
+    @GetMapping("/collections/{id}")
+    @PreAuthorize("@access.has('telegram:view')")
+    public ApiResponse<TaskView> collection(@org.springframework.web.bind.annotation.PathVariable Long id)
+    {
+        return ApiResponse.ok(collections.detail(id));
+    }
+
     /** Returns saved text and safe attachment metadata for one visible task. */
     @GetMapping("/collections/{id}/messages")
     @PreAuthorize("@access.has('telegram:view')")
@@ -242,6 +306,52 @@ public class TelegramController
     }
 
     /**
+     * Lists owner-scoped conversation sessions for the Telegram sidebar.
+     */
+    @GetMapping("/conversations")
+    @PreAuthorize("@access.has('telegram:view')")
+    public ApiResponse<PageResult<TelegramConversationView>> conversations(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "1") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "50") int size)
+    {
+        return ApiResponse.ok(searches.listConversations(page, size));
+    }
+
+    /** Creates an empty, owner-scoped search conversation. */
+    @PostMapping("/conversations")
+    @PreAuthorize("@access.has('telegram:search')")
+    public ApiResponse<TelegramConversationView> createConversation()
+    {
+        return ApiResponse.ok(searches.createConversation());
+    }
+
+    /**
+     * Deletes one idle conversation and its associated local search/message
+     * history.
+     */
+    @org.springframework.web.bind.annotation.DeleteMapping("/conversations/{id}")
+    @PreAuthorize("@access.has('telegram:delete')")
+    public ApiResponse<Void> deleteConversation(@org.springframework.web.bind.annotation.PathVariable Long id)
+    {
+        searches.deleteConversation(id);
+        return ApiResponse.ok(null);
+    }
+
+    /**
+     * Returns one paginated owner-scoped conversation. Each turn includes its
+     * request, associated bot messages, and links parsed from those same messages.
+     */
+    @GetMapping("/conversation")
+    @PreAuthorize("@access.has('telegram:view')")
+    public ApiResponse<PageResult<ConversationTurnView>> conversation(
+            @org.springframework.web.bind.annotation.RequestParam Long conversationId,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "1") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size)
+    {
+        return ApiResponse.ok(searches.listConversation(conversationId, page, size));
+    }
+
+    /**
      * Starts one user-requested search against the bot selected by server
      * configuration.
      */
@@ -249,7 +359,7 @@ public class TelegramController
     @PreAuthorize("@access.has('telegram:search')")
     public ApiResponse<SearchView> search(@Valid @RequestBody TelegramSearchRequest request)
     {
-        return ApiResponse.ok(searches.create(request.keyword()));
+        return ApiResponse.ok(searches.create(request.keyword(), request.conversationId()));
     }
 
     /**
@@ -338,6 +448,17 @@ public class TelegramController
     public ApiResponse<TelegramSessionCoordinator.TelegramStatusView> status()
     {
         return ApiResponse.ok(sessions.status());
+    }
+
+    /**
+     * Reads the active Telegram account and configured search-bot peer state
+     * without sending a test message or changing account settings.
+     */
+    @GetMapping("/session/bot-diagnostic")
+    @PreAuthorize("@access.has('telegram:view')")
+    public ApiResponse<TelegramBotSessionDiagnostic> botSessionDiagnostic()
+    {
+        return ApiResponse.ok(sessions.inspectSearchBotSession());
     }
 
     /**

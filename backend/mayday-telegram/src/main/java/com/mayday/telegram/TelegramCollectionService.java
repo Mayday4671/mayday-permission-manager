@@ -48,7 +48,7 @@ public class TelegramCollectionService
     private final TelegramCollectedMessageMapper messages;
     private final TelegramMediaQueueService mediaQueue;
     private final com.mayday.telegram.mapper.TelegramMediaMapper media;
-    private final com.mayday.operations.storage.StoredFileContent storedFiles;
+    private final TelegramCollectionCleanupService cleanup;
 
     /** Persists an explicit collection request without contacting Telegram. */
     @Transactional
@@ -62,6 +62,11 @@ public class TelegramCollectionService
         if (hasLink == hasChannel)
         {
             throw new BusinessException("请选择一个 Telegram 消息链接或已加入的频道作为采集来源");
+        }
+        if (request.includeAlbum() && (!hasLink || request.fromDate() != null || request.toDate() != null
+                || request.maxMessages() > TelegramMessageAlbumReader.MAX_ALBUM_MESSAGES))
+        {
+            throw new BusinessException("相册预览仅支持消息链接，不支持日期筛选，且单次最多 10 条同组消息");
         }
         if (request.fromDate() != null && request.toDate() != null && request.fromDate().isAfter(request.toDate()))
         {
@@ -112,6 +117,7 @@ public class TelegramCollectionService
         task.setOwnerId(owner.getId());
         task.setDepartmentId(owner.getDepartmentId());
         task.setMessageLink(link);
+        task.setIncludeAlbum(request.includeAlbum());
         task.setSourceTitle(channel == null ? null : channel.title());
         task.setFromDate(request.fromDate());
         task.setToDate(request.toDate());
@@ -131,7 +137,7 @@ public class TelegramCollectionService
         task.setStatus("QUEUED");
         task.setStatusMessage("采集请求已排队；读取消息需要当前 Telegram 账号仍可访问所选来源");
         tasks.save(task);
-        return TaskView.from(task);
+        return taskView(task);
     }
 
     /**
@@ -164,7 +170,15 @@ public class TelegramCollectionService
         access.require("telegram:view");
         QueryWrapper filter = access.filter("telegram", "owner_id");
         return PageResult.of(tasks.paginate(PageResult.request(page, Math.min(size, 100)),
-                filter.orderBy(new QueryColumn("id").desc())), TaskView::from);
+                filter.orderBy(new QueryColumn("id").desc())), this::taskView);
+    }
+
+    /** Returns current task progress only after enforcing its owner data scope. */
+    public TaskView detail(Long taskId)
+    {
+        moduleGuard.requireEnabled();
+        access.require("telegram:view");
+        return taskView(visibleTask(taskId));
     }
 
     /** Reads only messages belonging to one task visible to the current user. */
@@ -226,7 +240,7 @@ public class TelegramCollectionService
             task.setLiveStatusMessage("定期拉取已停止；已保存的消息和历史回填游标保留");
         }
         tasks.save(task);
-        return TaskView.from(task);
+        return taskView(task);
     }
 
     /**
@@ -246,7 +260,7 @@ public class TelegramCollectionService
         task.setLeaseExpiresAt(null);
         task.setStatusMessage("任务已暂停；已保存的消息与进度会保留");
         tasks.save(task);
-        return TaskView.from(task);
+        return taskView(task);
     }
 
     /** Resumes a persisted task from the last committed message cursor. */
@@ -261,7 +275,7 @@ public class TelegramCollectionService
         task.setStatus("QUEUED");
         task.setStatusMessage("任务已恢复，等待采集线程继续处理");
         tasks.save(task);
-        return TaskView.from(task);
+        return taskView(task);
     }
 
     /**
@@ -271,17 +285,21 @@ public class TelegramCollectionService
     public TaskView cancel(Long taskId)
     {
         TelegramCollectionTask task = mutableTask(taskId);
-        if (List.of("COMPLETED", "FAILED", "CANCELLED").contains(task.getStatus()))
+        if ("CANCELLED".equals(task.getStatus())
+                || List.of("COMPLETED", "FAILED").contains(task.getStatus()) && media.pendingCountForTask(taskId) == 0)
         {
             throw new BusinessException("任务已经结束");
         }
         task.setStatus("CANCELLED");
         task.setLeaseOwner(null);
         task.setLeaseExpiresAt(null);
-        task.setStatusMessage("任务已取消；已经保存的消息保留");
+        task.setTrackingEnabled(false);
+        task.setLiveLeaseOwner(null);
+        task.setLiveLeaseExpiresAt(null);
+        task.setStatusMessage("任务和剩余附件下载已取消；已经保存的消息和文件保留");
         tasks.save(task);
         media.cancelQueuedForTask(task.getId());
-        return TaskView.from(task);
+        return taskView(task);
     }
 
     /**
@@ -289,43 +307,10 @@ public class TelegramCollectionService
      * tasks must be cancelled first so a worker cannot recreate deleted rows after
      * the cleanup transaction commits.
      */
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public void delete(Long taskId)
     {
-        moduleGuard.requireEnabled();
-        access.require("telegram:delete");
-        TelegramCollectionTask task = tasks.lock(taskId)
-                .orElseThrow(() -> new ResourceNotFoundException("Telegram 采集任务不存在"));
-        access.checkData("telegram", task.getOwnerId(), task.getDepartmentId());
-        if (!List.of("COMPLETED", "FAILED", "CANCELLED").contains(task.getStatus()))
-        {
-            throw new BusinessException("请先取消或等待任务结束，再清理采集记录");
-        }
-        List<TelegramMedia> attachments = media.lockForTask(task.getId());
-        if (attachments.stream()
-                .anyMatch(row -> List.of("QUEUED", "DOWNLOADING", "DELETING").contains(row.getStatus())))
-        {
-            throw new BusinessException("附件下载或清理仍在处理中，请等待完成后再删除任务");
-        }
-        for (TelegramMedia attachment : attachments)
-        {
-            if ("AVAILABLE".equals(attachment.getStatus()) && attachment.getStorageKey() != null
-                    && attachment.getStorageProvider() != null)
-            {
-                try
-                {
-                    storedFiles.storage(attachment.getStorageProvider()).delete(attachment.getStorageKey());
-                } catch (java.io.IOException exception)
-                {
-                    throw new BusinessException("附件清理失败，任务记录已保留；请检查存储服务后重试");
-                }
-            }
-        }
-        media.deleteByQuery(QueryWrapper.create().where(new QueryColumn("task_id").eq(task.getId()))
-                .and(new QueryColumn("owner_id").eq(task.getOwnerId())));
-        messages.deleteByQuery(QueryWrapper.create().where(new QueryColumn("task_id").eq(task.getId()))
-                .and(new QueryColumn("owner_id").eq(task.getOwnerId())));
-        tasks.deleteById(task.getId());
+        cleanup.delete(taskId);
     }
 
     /** Claims the oldest eligible task with a short database row lock and lease. */
@@ -492,25 +477,33 @@ public class TelegramCollectionService
     {
         moduleGuard.requireEnabled();
         TelegramSessionClient client = sessions.requireTaskClient(task.getOwnerId());
-        TelegramMessageLink link;
-        if (task.getChatId() == null)
+        if (task.getChatId() == null || Boolean.TRUE.equals(task.getIncludeAlbum()))
         {
-            link = client.resolveMessageLink(task.getMessageLink()).join();
+            TelegramMessageLink link = client.resolveMessageLink(task.getMessageLink()).join();
             task.setChatId(link.chatId());
             task.setStartMessageId(link.messageId());
             task.setCursorMessageId(link.messageId());
-        } else
-        {
-            String initialMessageId = task.getStartMessageId() == null ? "0" : task.getStartMessageId();
-            link = new TelegramMessageLink(task.getChatId(), initialMessageId, true);
+            // Link lookup already returns the selected message. Commit it before
+            // paging older history; a one-message preview must never depend on it.
+            TelegramMessageSnapshot snapshot = link.message();
+            if (snapshot == null || !link.chatId().equals(snapshot.chatId())
+                    || !link.messageId().equals(snapshot.messageId()))
+            {
+                throw new IllegalArgumentException("Telegram 链接解析未返回匹配的原消息");
+            }
+            if (Boolean.TRUE.equals(task.getIncludeAlbum()))
+            {
+                return client.getMessageAlbum(snapshot).join();
+            }
+            return List.of(snapshot);
         }
-        String cursor = task.getCursorMessageId() == null ? link.messageId() : task.getCursorMessageId();
+        String cursor = task.getCursorMessageId() == null ? "0" : task.getCursorMessageId();
         int remaining = MAX_SCANNED_MESSAGES - java.util.Objects.requireNonNullElse(task.getScannedMessages(), 0);
         if (remaining <= 0)
         {
             return List.of();
         }
-        return client.getChatHistory(link.chatId(), cursor, Math.min(MAX_PAGE_SIZE, remaining)).join();
+        return client.getChatHistory(task.getChatId(), cursor, Math.min(MAX_PAGE_SIZE, remaining)).join();
     }
 
     /**
@@ -549,10 +542,11 @@ public class TelegramCollectionService
         boolean linkSource = task.getMessageLink() != null;
         boolean firstLinkPage = linkSource && saved == 0 && task.getStartMessageId() == null;
         boolean firstChannelPage = !linkSource && saved == 0 && "0".equals(persistedCursor);
+        boolean albumPreview = Boolean.TRUE.equals(task.getIncludeAlbum());
         String nextCursor = firstChannelPage ? null : persistedCursor;
         long currentCursor = parseId(persistedCursor);
-        if (firstLinkPage && (startMessageId == null
-                || snapshotPage.stream().noneMatch(item -> startMessageId.equals(item.messageId()))))
+        if (firstLinkPage && (startMessageId == null || snapshotPage.stream().noneMatch(
+                item -> java.util.Objects.equals(chatId, item.chatId()) && startMessageId.equals(item.messageId()))))
         {
             task.setStatus("FAILED");
             task.setStatusMessage("Telegram 未返回链接指定的消息，任务已停止以避免采集错误范围");
@@ -560,8 +554,43 @@ public class TelegramCollectionService
             tasks.save(task);
             return;
         }
+        List<TelegramMessageSnapshot> acceptedPage = snapshotPage;
+        if (albumPreview)
+        {
+            TelegramMessageSnapshot anchor = snapshotPage.stream()
+                    .filter(item -> java.util.Objects.equals(chatId, item.chatId())
+                            && java.util.Objects.equals(startMessageId, item.messageId()))
+                    .findFirst().orElse(null);
+            if (anchor == null)
+            {
+                task.setStatus("FAILED");
+                task.setStatusMessage("Telegram 相册缺少所选原消息，已停止采集");
+                clearLease(task);
+                tasks.save(task);
+                return;
+            }
+            // Recheck the adapter result at the transaction boundary. Neither a
+            // neighboring post nor a reused album ID from another chat may be saved.
+            var album = new java.util.LinkedHashMap<String, TelegramMessageSnapshot>();
+            album.put(anchor.messageId(), anchor);
+            if (anchor.albumId() != null && !anchor.albumId().isBlank() && !"0".equals(anchor.albumId()))
+            {
+                snapshotPage.stream().filter(
+                        item -> anchor.chatId().equals(item.chatId()) && anchor.albumId().equals(item.albumId()))
+                        .forEach(item -> album.putIfAbsent(item.messageId(), item));
+            }
+            if (album.size() > Math.min(task.getMaxMessages(), TelegramMessageAlbumReader.MAX_ALBUM_MESSAGES))
+            {
+                task.setStatus("FAILED");
+                task.setStatusMessage("相册成员超过本次条数上限，请将上限调整为 10 后重新预览");
+                clearLease(task);
+                tasks.save(task);
+                return;
+            }
+            acceptedPage = List.copyOf(album.values());
+        }
         boolean reachedDateStart = false;
-        for (TelegramMessageSnapshot snapshot : snapshotPage)
+        for (TelegramMessageSnapshot snapshot : acceptedPage)
         {
             if (!java.util.Objects.equals(chatId, snapshot.chatId()))
             {
@@ -570,7 +599,9 @@ public class TelegramCollectionService
             long messageId = parseId(snapshot.messageId());
             // Include the exact message selected by the user on page one. For later pages,
             // exclude the cursor itself because TDLib history ranges are inclusive.
-            if (firstLinkPage ? messageId > parseId(startMessageId) : !firstChannelPage && messageId >= currentCursor)
+            if (!albumPreview && (firstLinkPage
+                    ? messageId > parseId(startMessageId)
+                    : !firstChannelPage && messageId >= currentCursor))
             {
                 continue;
             }
@@ -627,7 +658,12 @@ public class TelegramCollectionService
                     task.getLiveCursorMessageId() == null ? "0" : task.getLiveCursorMessageId());
             task.setLiveCursorMessageId(Long.toString(Math.max(previousLiveCursor, newestScannedId)));
         }
-        if (saved >= task.getMaxMessages() || snapshotPage.isEmpty() || reachedDateStart
+        if (albumPreview)
+        {
+            task.setStatus("COMPLETED");
+            task.setStatusMessage("所选消息及可访问的同组附件已保存，任务完成");
+            clearLease(task);
+        } else if (saved >= task.getMaxMessages() || snapshotPage.isEmpty() || reachedDateStart
                 || scanned + scannedOnPage >= MAX_SCANNED_MESSAGES)
         {
             task.setStatus("COMPLETED");
@@ -705,9 +741,15 @@ public class TelegramCollectionService
 
     private boolean sameLease(TelegramCollectionTask task, TelegramCollectionTask claimed)
     {
-        return "RUNNING".equals(task.getStatus())
+        return task != null && "RUNNING".equals(task.getStatus())
                 && java.util.Objects.equals(task.getLeaseOwner(), claimed.getLeaseOwner())
                 && task.getLeaseExpiresAt() != null && task.getLeaseExpiresAt().isAfter(BusinessTime.now());
+    }
+
+    /** 将消息进度和独立附件队列进度组合为页面需要的安全摘要。 */
+    private TaskView taskView(TelegramCollectionTask task)
+    {
+        return TaskView.from(task, media.pendingCountForTask(task.getId()));
     }
 
     private void clearLease(TelegramCollectionTask task)

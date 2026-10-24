@@ -36,6 +36,8 @@ class TelegramCollectionServiceTest
     private AccessPolicy access;
     private UserMapper users;
     private TelegramCollectionService service;
+    private TelegramSessionCoordinator sessions;
+    private TelegramCollectionCleanupService cleanup;
     private TelegramCollectionTask persisted;
     private TelegramCollectionTask claimed;
 
@@ -49,9 +51,10 @@ class TelegramCollectionServiceTest
         tasks = mock(TelegramCollectionTaskMapper.class);
         messages = mock(TelegramCollectedMessageMapper.class);
         media = mock(TelegramMediaMapper.class);
-        service = new TelegramCollectionService(new TelegramModuleGuard(switches), access, users, null, tasks, messages,
-                mock(TelegramMediaQueueService.class), media,
-                mock(com.mayday.operations.storage.StoredFileContent.class));
+        sessions = mock(TelegramSessionCoordinator.class);
+        cleanup = mock(TelegramCollectionCleanupService.class);
+        service = new TelegramCollectionService(new TelegramModuleGuard(switches), access, users, sessions, tasks,
+                messages, mock(TelegramMediaQueueService.class), media, cleanup);
 
         SysUser owner = new SysUser();
         owner.setId(7L);
@@ -80,6 +83,173 @@ class TelegramCollectionServiceTest
         claimed.setChatId("55");
         claimed.setStartMessageId("10");
         claimed.setCursorMessageId("10");
+    }
+
+    @Test
+    void singleMessagePreviewUsesResolvedSnapshotWithoutReadingChannelHistory()
+    {
+        TelegramSessionClient client = mock(TelegramSessionClient.class);
+        when(sessions.requireTaskClient(7L)).thenReturn(client);
+        TelegramMessageSnapshot linked = snapshot("10");
+        when(client.resolveMessageLink(persisted.getMessageLink())).thenReturn(java.util.concurrent.CompletableFuture
+                .completedFuture(new TelegramMessageLink("55", "10", true, linked)));
+        persisted.setMaxMessages(1);
+        TelegramCollectionTask request = new TelegramCollectionTask();
+        request.setId(21L);
+        request.setOwnerId(7L);
+        request.setMessageLink(persisted.getMessageLink());
+        request.setLeaseOwner("lease-token");
+        request.setStatus("RUNNING");
+
+        List<TelegramMessageSnapshot> page = service.readNextPage(request);
+        service.commitPage(request, page);
+
+        assertThat(page).containsExactly(linked);
+        assertThat(persisted.getStatus()).isEqualTo("COMPLETED");
+        assertThat(persisted.getCollectedMessages()).isEqualTo(1);
+        verify(client, never()).getChatHistory(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void remainingHistoryContinuesBeforeTheSavedLinkAnchor()
+    {
+        TelegramSessionClient client = mock(TelegramSessionClient.class);
+        when(sessions.requireTaskClient(7L)).thenReturn(client);
+        when(client.getChatHistory("55", "10", 100)).thenReturn(
+                java.util.concurrent.CompletableFuture.completedFuture(List.of(snapshot("10"), snapshot("9"))));
+        persisted.setChatId("55");
+        persisted.setStartMessageId("10");
+        persisted.setCursorMessageId("10");
+        persisted.setCollectedMessages(1);
+
+        service.commitPage(claimed, service.readNextPage(claimed));
+
+        assertThat(persisted.getCollectedMessages()).isEqualTo(2);
+        assertThat(persisted.getCursorMessageId()).isEqualTo("9");
+        verify(messages, never())
+                .save(org.mockito.ArgumentMatchers.argThat(row -> "10".equals(row.getTelegramMessageId())));
+    }
+
+    @Test
+    void albumPreviewSavesBothNewerAndOlderMembersThenStopsHistory()
+    {
+        TelegramSessionClient client = mock(TelegramSessionClient.class);
+        when(sessions.requireTaskClient(7L)).thenReturn(client);
+        TelegramMessageSnapshot anchor = albumSnapshot("55", "10", "700");
+        when(client.resolveMessageLink(persisted.getMessageLink())).thenReturn(java.util.concurrent.CompletableFuture
+                .completedFuture(new TelegramMessageLink("55", "10", true, anchor)));
+        when(client.getMessageAlbum(anchor)).thenReturn(java.util.concurrent.CompletableFuture
+                .completedFuture(List.of(anchor, albumSnapshot("55", "9", "700"), albumSnapshot("55", "11", "700"))));
+        persisted.setIncludeAlbum(true);
+        claimed.setMessageLink(persisted.getMessageLink());
+        claimed.setIncludeAlbum(true);
+
+        service.commitPage(claimed, service.readNextPage(claimed));
+
+        assertThat(persisted.getStatus()).isEqualTo("COMPLETED");
+        assertThat(persisted.getCollectedMessages()).isEqualTo(3);
+        assertThat(persisted.getScannedMessages()).isEqualTo(3);
+        verify(messages).save(org.mockito.ArgumentMatchers.argThat(row -> "11".equals(row.getTelegramMessageId())));
+        verify(client, never()).getChatHistory(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void albumCommitRechecksChatAndAlbumScopeAndDeduplicatesMembers()
+    {
+        persisted.setIncludeAlbum(true);
+
+        service.commitPage(claimed, List.of(albumSnapshot("55", "10", "700"), albumSnapshot("55", "9", "700"),
+                albumSnapshot("55", "9", "700"), albumSnapshot("55", "8", "600"), albumSnapshot("66", "11", "700")));
+
+        assertThat(persisted.getStatus()).isEqualTo("COMPLETED");
+        assertThat(persisted.getCollectedMessages()).isEqualTo(2);
+        verify(messages, never()).save(org.mockito.ArgumentMatchers
+                .argThat(row -> "8".equals(row.getTelegramMessageId()) || "66".equals(row.getChatId())));
+    }
+
+    @Test
+    void albumPreviewOfStandaloneMessageNeverCollectsUnrelatedPosts()
+    {
+        persisted.setIncludeAlbum(true);
+
+        service.commitPage(claimed, List.of(snapshot("10"), snapshot("9"), snapshot("11")));
+
+        assertThat(persisted.getStatus()).isEqualTo("COMPLETED");
+        assertThat(persisted.getCollectedMessages()).isEqualTo(1);
+        verify(messages).save(org.mockito.ArgumentMatchers.argThat(row -> "10".equals(row.getTelegramMessageId())));
+    }
+
+    @Test
+    void albumModeRejectsAnIncompleteLimitInsteadOfSilentlyDroppingMembers()
+    {
+        persisted.setIncludeAlbum(true);
+        persisted.setMaxMessages(1);
+
+        service.commitPage(claimed, List.of(albumSnapshot("55", "10", "700"), albumSnapshot("55", "11", "700")));
+
+        assertThat(persisted.getStatus()).isEqualTo("FAILED");
+        assertThat(persisted.getCollectedMessages()).isZero();
+        assertThat(persisted.getStatusMessage()).contains("上限调整为 10");
+        verify(messages, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void albumModeRequiresMessageLinkAndBoundedUnfilteredScope()
+    {
+        assertThatThrownBy(
+                () -> service.create(new TelegramCollectionRequest(null, "55", null, null, 10, true, true, true, true)))
+                .hasMessageContaining("仅支持消息链接");
+        assertThatThrownBy(() -> service.create(new TelegramCollectionRequest("https://t.me/example/10", null,
+                LocalDate.now(), null, 10, true, true, true, true))).hasMessageContaining("不支持日期筛选");
+        assertThatThrownBy(() -> service.create(
+                new TelegramCollectionRequest("https://t.me/example/10", null, null, null, 11, true, true, true, true)))
+                .hasMessageContaining("最多 10 条");
+    }
+
+    @Test
+    void newAlbumTaskPersistsItsScopeForWorkerRestart()
+    {
+        SysUser owner = new SysUser();
+        owner.setId(7L);
+        owner.setDepartmentId(3L);
+        when(access.current()).thenReturn(owner);
+
+        service.create(
+                new TelegramCollectionRequest("https://t.me/example/10", null, null, null, 10, true, true, true, true));
+
+        verify(tasks).save(org.mockito.ArgumentMatchers.argThat(task -> Boolean.TRUE.equals(task.getIncludeAlbum())
+                && task.getMaxMessages() == 10 && "QUEUED".equals(task.getStatus())));
+    }
+
+    @Test
+    void existingApiRequestsKeepOrdinaryHistoryModeWhenAlbumFlagIsAbsent()
+    {
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        TelegramCollectionRequest request = mapper.readValue("""
+                {"messageLink":"https://t.me/example/10","maxMessages":5,
+                 "downloadImages":true,"downloadVideos":true,"downloadDocuments":false}
+                """, TelegramCollectionRequest.class);
+
+        assertThat(request.includeAlbum()).isFalse();
+    }
+
+    @Test
+    void nullAlbumFlagCannotEnablePreviewModeOrFailByUnboxing()
+    {
+        TelegramCollectionRequest request = new TelegramCollectionRequest("https://t.me/example/10", null, null, null,
+                5, true, true, false, null);
+
+        assertThat(request.includeAlbum()).isFalse();
+    }
+
+    @Test
+    void taskStatusCannotBypassOwnerScope()
+    {
+        when(tasks.findById(21L)).thenReturn(Optional.of(persisted));
+        doThrow(new AccessDeniedException("scope")).when(access).checkData("telegram", 7L, 3L);
+        assertThatThrownBy(() -> service.detail(21L)).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
@@ -156,12 +326,14 @@ class TelegramCollectionServiceTest
     }
 
     @Test
-    void refusesToDeleteAnActiveTask()
+    void cancelledAndDeletedTaskIgnoresTheLastInFlightPage()
     {
-        assertThatThrownBy(() -> service.delete(21L)).hasMessageContaining("请先取消或等待任务结束");
+        when(tasks.lock(21L)).thenReturn(Optional.empty());
 
-        verify(messages, never()).deleteByQuery(org.mockito.ArgumentMatchers.any());
-        verify(tasks, never()).deleteById(21L);
+        service.commitPage(claimed, List.of(snapshot("10")));
+
+        verify(messages, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(tasks, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -175,39 +347,51 @@ class TelegramCollectionServiceTest
     }
 
     @Test
-    void deletesOnlyStoppedTaskMessagesUnderTheExplicitCleanupPermission()
+    void completedHistoryCanCancelRemainingMediaAndStopsTracking()
     {
-        persisted.setStatus("CANCELLED");
+        persisted.setStatus("COMPLETED");
+        persisted.setTrackingEnabled(true);
+        persisted.setLiveLeaseOwner("tracking-worker");
+        persisted.setLiveLeaseExpiresAt(com.mayday.common.util.BusinessTime.now().plusMinutes(1));
+        when(media.pendingCountForTask(21L)).thenReturn(2L);
 
+        service.cancel(21L);
+
+        assertThat(persisted.getStatus()).isEqualTo("CANCELLED");
+        assertThat(persisted.getTrackingEnabled()).isFalse();
+        assertThat(persisted.getLiveLeaseOwner()).isNull();
+        verify(media).cancelQueuedForTask(21L);
+    }
+
+    @Test
+    void completedHistoryWithoutPendingMediaStillRefusesCancellation()
+    {
+        persisted.setStatus("COMPLETED");
+
+        assertThatThrownBy(() -> service.cancel(21L)).hasMessageContaining("任务已经结束");
+
+        verify(media, never()).cancelQueuedForTask(21L);
+    }
+
+    @Test
+    void taskDetailIncludesPendingMediaSeparatelyFromHistoryStatus()
+    {
+        persisted.setStatus("COMPLETED");
+        when(tasks.findById(21L)).thenReturn(Optional.of(persisted));
+        when(media.pendingCountForTask(21L)).thenReturn(3L);
+
+        var response = service.detail(21L);
+
+        assertThat(response.status()).isEqualTo("COMPLETED");
+        assertThat(response.pendingMediaCount()).isEqualTo(3);
+    }
+
+    @Test
+    void delegatesDeletionToTheDurableCleanupBoundary()
+    {
         service.delete(21L);
 
-        verify(messages).deleteByQuery(org.mockito.ArgumentMatchers.any());
-        verify(tasks).deleteById(21L);
-    }
-
-    @Test
-    void refusesToDeleteTaskWhileAnExpiredAttachmentIsBeingCleaned()
-    {
-        persisted.setStatus("CANCELLED");
-        TelegramMedia attachment = new TelegramMedia();
-        attachment.setStatus("DELETING");
-        when(media.lockForTask(21L)).thenReturn(List.of(attachment));
-
-        assertThatThrownBy(() -> service.delete(21L)).hasMessageContaining("清理仍在处理中");
-
-        verify(messages, never()).deleteByQuery(org.mockito.ArgumentMatchers.any());
-        verify(tasks, never()).deleteById(21L);
-    }
-
-    @Test
-    void refusesToDeleteTaskOutsideCurrentDataScope()
-    {
-        persisted.setStatus("CANCELLED");
-        doThrow(new org.springframework.security.access.AccessDeniedException("数据范围外")).when(access)
-                .checkData("telegram", 7L, 3L);
-
-        assertThatThrownBy(() -> service.delete(21L)).isInstanceOf(AccessDeniedException.class);
-
+        verify(cleanup).delete(21L);
         verify(messages, never()).deleteByQuery(org.mockito.ArgumentMatchers.any());
         verify(tasks, never()).deleteById(21L);
     }
@@ -297,16 +481,22 @@ class TelegramCollectionServiceTest
         claimed.setStatus("COMPLETED");
     }
 
+    private TelegramMessageSnapshot albumSnapshot(String chatId, String messageId, String albumId)
+    {
+        return new TelegramMessageSnapshot(chatId, messageId, null, false, "history", "PHOTO", "caption", "[]", "[]",
+                null, 1L, null, true, albumId, null, "[]", null, null, null);
+    }
+
     private TelegramMessageSnapshot snapshot(String messageId)
     {
         return new TelegramMessageSnapshot("55", messageId, null, false, "history", "TEXT", "message", "[]", "[]", null,
-                1L, null, true, null, null, "[]");
+                1L, null, true, null, null, "[]", null, null, null);
     }
 
     private TelegramMessageSnapshot snapshotAt(String messageId, LocalDate date)
     {
         long timestamp = date.atTime(12, 0).atZone(ZoneId.of("Asia/Shanghai")).toEpochSecond();
         return new TelegramMessageSnapshot("55", messageId, null, false, "history", "TEXT", "message", "[]", "[]", null,
-                timestamp, null, true, null, null, "[]");
+                timestamp, null, true, null, null, "[]", null, null, null);
     }
 }

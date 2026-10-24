@@ -186,6 +186,28 @@ test("停止核对完整运行参数和创建时间，不以目录包含关系�
   assertDevelopmentProcess(record, "backend", information, root);
   assertDevelopmentProcess({}, "backend", information, root);
   assertDevelopmentProcess(record, "backend", null, root);
+  record.identities.backend.createdAt = "2026-10-05T00:00:00.24143Z";
+  assertDevelopmentProcess(
+    record,
+    "backend",
+    {
+      ...information,
+      CreatedAt: "2026-10-05T00:00:00.2414300Z",
+    },
+    root,
+  );
+  assert.throws(() =>
+    assertDevelopmentProcess(
+      record,
+      "backend",
+      {
+        ...information,
+        CreatedAt: "2026-10-05T00:00:00.2414301Z",
+      },
+      root,
+    ),
+  );
+  record.identities.backend.createdAt = information.CreatedAt;
   for (const changed of [
     { Name: "node.exe" },
     { CommandLine: `java.exe -jar "${jar}-other"` },

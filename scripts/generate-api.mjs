@@ -11,6 +11,7 @@ import openapiTS, {
 } from "../frontend/node_modules/openapi-typescript/dist/index.mjs";
 import { format } from "../frontend/node_modules/prettier/index.mjs";
 import { loginWithCaptcha } from "../tests/support/captcha.mjs";
+import { assertCompleteContractSource } from "./api-contract-source.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const schemaFile = join(root, "contracts/openapi.json");
@@ -97,6 +98,13 @@ else {
   const password = process.env.ADMIN_PASSWORD ?? settings.ADMIN_PASSWORD;
   if (!password) throw new Error("缺少 ADMIN_PASSWORD，不能读取管理员接口契约");
   const base = process.env.API_BASE ?? "http://127.0.0.1:18080/api";
+  // 先验证公开模块清单，再创建管理员会话，避免把裁剪实例的契约写入完整源码仓库。
+  const featureResponse = await fetch(base + "/platform/features", {
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!featureResponse.ok)
+    throw new Error(`模块清单读取失败：HTTP ${featureResponse.status}`);
+  assertCompleteContractSource(await featureResponse.json());
   const session = await loginWithCaptcha(base, "admin", password);
   try {
     const response = await fetch(base + "/platform/openapi", {

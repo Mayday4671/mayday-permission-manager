@@ -73,6 +73,38 @@ public final class TelegramSearchContracts
     }
 
     /**
+     * One incoming bot message, conservative source candidates, and safe inline
+     * text links projected from that exact message. Returning them together lets
+     * the conversation renderer preserve Telegram's original text and link its
+     * visible anchor ranges without mixing results from adjacent replies.
+     */
+    public record ConversationMessageView(Long id, String telegramMessageId, String contentType, String messageText,
+            String replyMarkupJson, LocalDateTime telegramSentAt, LocalDateTime telegramEditedAt,
+            String associationStatus, java.util.List<TelegramResultParser.SourceLink> sourceLinks,
+            java.util.List<TelegramResultParser.InlineTextLink> inlineLinks) {
+
+        /**
+         * Builds the public projection without exposing owner, department, or bot chat
+         * identifiers.
+         */
+        public static ConversationMessageView from(TelegramSearchMessage entity, TelegramResultParser parser)
+        {
+            MessageView message = MessageView.from(entity);
+            return new ConversationMessageView(message.id(), message.telegramMessageId(), message.contentType(),
+                    message.messageText(), message.replyMarkupJson(), message.telegramSentAt(),
+                    message.telegramEditedAt(), message.associationStatus(), parser.parse(entity),
+                    parser.inlineLinks(entity));
+        }
+    }
+
+    /**
+     * A single user keyword and its associated bot replies, presented as one
+     * chronological turn inside the user's continuous bot conversation.
+     */
+    public record ConversationTurnView(SearchView search, java.util.List<ConversationMessageView> messages) {
+    }
+
+    /**
      * Safe callback answer returned after the user activates a stored bot button.
      */
     public record CallbackAnswerView(String text, boolean showAlert, String url) {

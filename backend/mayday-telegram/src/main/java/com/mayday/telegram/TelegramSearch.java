@@ -11,8 +11,10 @@ import lombok.Setter;
  * A user-initiated search request sent to the configured Telegram bot.
  *
  * <p>
- * Messages are correlated only by Telegram's explicit reply-to relationship. A
- * time-window guess is not treated as a match.
+ * Messages are first correlated by Telegram's explicit reply-to relationship.
+ * When a bot omits that relation, the service may associate a message with the
+ * single unexpired search in the verified bot chat and labels that association
+ * as inferred.
  */
 @Getter
 @Setter
@@ -26,6 +28,12 @@ public class TelegramSearch extends BaseEntity
 
     /** Department captured at creation for role-based department scopes. */
     private Long departmentId;
+
+    /**
+     * Mayday conversation that groups this search turn; ownership remains
+     * duplicated for row-scope checks.
+     */
+    private Long conversationId;
 
     /**
      * The exact normalized keyword sent by the user; length is limited by the

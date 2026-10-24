@@ -61,6 +61,7 @@ const environment = {
   ...process.env,
   VERIFY_DB_PASSWORD: randomBytes(24).toString("hex"),
   VERIFY_ADMIN_PASSWORD: settings.ADMIN_PASSWORD,
+  MAYDAY_IDENTITY_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
   // Telegram 真实接口回归只在隔离栈中启用该模块；日常部署仍由 .env 控制开关。
   MODULE_TELEGRAM_ENABLED: "true",
 };

@@ -9,6 +9,8 @@ import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -52,6 +54,27 @@ public interface TelegramMediaMapper extends EntityMapper<TelegramMedia>
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)
+    // Native SQL needs explicit mappings; otherwise cleanup loses storage keys and
+    // owner metadata.
+    @Results(
+    {@Result(column = "owner_id", property = "ownerId"), @Result(column = "department_id", property = "departmentId"),
+            @Result(column = "task_id", property = "taskId"), @Result(column = "message_id", property = "messageId"),
+            @Result(column = "attachment_index", property = "attachmentIndex"),
+            @Result(column = "telegram_file_id", property = "telegramFileId"),
+            @Result(column = "file_name", property = "fileName"),
+            @Result(column = "expected_size", property = "expectedSize"),
+            @Result(column = "actual_size", property = "actualSize"),
+            @Result(column = "media_type", property = "mediaType"),
+            @Result(column = "storage_provider", property = "storageProvider"),
+            @Result(column = "storage_key", property = "storageKey"),
+            @Result(column = "failure_message", property = "failureMessage"),
+            @Result(column = "attempt_count", property = "attemptCount"),
+            @Result(column = "lease_owner", property = "leaseOwner"),
+            @Result(column = "lease_expires_at", property = "leaseExpiresAt"),
+            @Result(column = "stream_ticket_hash", property = "streamTicketHash"),
+            @Result(column = "stream_ticket_expires_at", property = "streamTicketExpiresAt"),
+            @Result(column = "created_at", property = "createdAt"),
+            @Result(column = "updated_at", property = "updatedAt")})
     TelegramMedia lockExpired(@Param("expiredBefore") LocalDateTime expiredBefore);
 
     /**
@@ -78,6 +101,21 @@ public interface TelegramMediaMapper extends EntityMapper<TelegramMedia>
         return selectListByQuery(QueryWrapper.create().where(new QueryColumn("task_id").eq(taskId))
                 .orderBy(new QueryColumn("id").asc()).forUpdate());
     }
+
+    /** 统计任务尚未完成的附件下载，消息采集完成不代表媒体传输已经结束。 */
+    default long pendingCountForTask(Long taskId)
+    {
+        return selectCountByQuery(QueryWrapper.create().where(new QueryColumn("task_id").eq(taskId))
+                .and(new QueryColumn("status").in("QUEUED", "DOWNLOADING")));
+    }
+
+    /** 同一 TDLib 文件可能被多个采集任务共享，取消其中一个任务不得打断其他活跃传输。 */
+    @Select("""
+            SELECT COUNT(*) FROM biz_telegram_media
+            WHERE telegram_file_id = #{fileId} AND id <> #{mediaId}
+              AND status = 'DOWNLOADING' AND lease_expires_at > CURRENT_TIMESTAMP(6)
+            """)
+    long otherActiveDownloads(@Param("fileId") int fileId, @Param("mediaId") Long mediaId);
 
     /**
      * Counts stored objects and conservatively reserves the configured maximum for

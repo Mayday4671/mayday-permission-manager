@@ -7,6 +7,8 @@ import com.mayday.telegram.TelegramCollectionTask;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 
 /** MyBatis-Flex mapper for persisted, bounded Telegram collection tasks. */
@@ -35,5 +37,34 @@ public interface TelegramCollectionTaskMapper extends EntityMapper<TelegramColle
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)
+    // Tracking must retain owner, channel, cursor and download policy when
+    // underscore mapping is disabled.
+    @Results(
+    {@Result(column = "owner_id", property = "ownerId"), @Result(column = "department_id", property = "departmentId"),
+            @Result(column = "message_link", property = "messageLink"),
+            @Result(column = "include_album", property = "includeAlbum"),
+            @Result(column = "source_title", property = "sourceTitle"),
+            @Result(column = "from_date", property = "fromDate"), @Result(column = "to_date", property = "toDate"),
+            @Result(column = "chat_id", property = "chatId"),
+            @Result(column = "cursor_message_id", property = "cursorMessageId"),
+            @Result(column = "start_message_id", property = "startMessageId"),
+            @Result(column = "max_messages", property = "maxMessages"),
+            @Result(column = "collected_messages", property = "collectedMessages"),
+            @Result(column = "scanned_messages", property = "scannedMessages"),
+            @Result(column = "download_images", property = "downloadImages"),
+            @Result(column = "download_videos", property = "downloadVideos"),
+            @Result(column = "download_documents", property = "downloadDocuments"),
+            @Result(column = "status_message", property = "statusMessage"),
+            @Result(column = "lease_owner", property = "leaseOwner"),
+            @Result(column = "lease_expires_at", property = "leaseExpiresAt"),
+            @Result(column = "tracking_enabled", property = "trackingEnabled"),
+            @Result(column = "live_cursor_message_id", property = "liveCursorMessageId"),
+            @Result(column = "live_scanned_messages", property = "liveScannedMessages"),
+            @Result(column = "live_checked_at", property = "liveCheckedAt"),
+            @Result(column = "live_status_message", property = "liveStatusMessage"),
+            @Result(column = "live_lease_owner", property = "liveLeaseOwner"),
+            @Result(column = "live_lease_expires_at", property = "liveLeaseExpiresAt"),
+            @Result(column = "created_at", property = "createdAt"),
+            @Result(column = "updated_at", property = "updatedAt")})
     TelegramCollectionTask lockNextTracking();
 }

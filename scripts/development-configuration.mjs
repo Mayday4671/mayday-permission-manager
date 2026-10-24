@@ -196,10 +196,17 @@ export function assertDevelopmentProcess(record, role, information, root) {
       : tokens.some((token) => normalize(token) === normalize(expectedPath));
   assert(matched, `${role} 运行路径与当前项目不一致`);
   const identity = record.identities?.[role];
+  // CIM and saved JSON can differ only in trailing fractional zeros. Preserve
+  // submillisecond precision when comparing so reused PIDs still fail closed.
+  const canonicalCreatedAt = (value) =>
+    String(value)
+      .replace(/(\.\d*?[1-9])0+Z$/, "$1Z")
+      .replace(/\.0+Z$/, "Z");
   if (identity)
     assert(
       identity.pid === information.ProcessId &&
-        identity.createdAt === information.CreatedAt &&
+        canonicalCreatedAt(identity.createdAt) ===
+          canonicalCreatedAt(information.CreatedAt) &&
         normalize(identity.executable) ===
           normalize(information.ExecutablePath),
       `${role} 进程身份已变化，拒绝停止`,

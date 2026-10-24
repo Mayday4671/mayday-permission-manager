@@ -41,7 +41,12 @@ class TelegramVideoPreviewWorker
             }
         } catch (RuntimeException exception)
         {
-            LOGGER.warn("Telegram video preview worker poll failed; it will retry on the next scheduler turn");
+            // Class names and code locations aid diagnosis without exposing SQL parameters,
+            // native exception messages, storage URLs or account credentials.
+            StackTraceElement location = java.util.Arrays.stream(exception.getStackTrace())
+                    .filter(frame -> frame.getClassName().startsWith("com.mayday.")).findFirst().orElse(null);
+            LOGGER.warn("Telegram video preview worker poll failed; type={}, location={}; retrying next turn",
+                    exception.getClass().getSimpleName(), location);
         }
     }
 }

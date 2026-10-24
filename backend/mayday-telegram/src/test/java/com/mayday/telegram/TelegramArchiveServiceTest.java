@@ -144,6 +144,36 @@ class TelegramArchiveServiceTest
         assertThat(entries.get(1).symbolicLink()).isTrue();
     }
 
+    @Test
+    void recognizesUnixRarLinksAndFractionalModifiedTimeFromRealSevenZipListing()
+    {
+        String listing = "7-Zip 26.05\n----------\n"
+                + "Path = testlink\nFolder = -\nSize = 8\nAttributes =  lrwxrwxrwx\n\n"
+                + "Path = test.txt\nFolder = -\nSize = 20\nAttributes =  -rw-r--r--\n"
+                + "Modified = 2011-06-26 14:53:46.0000000\n";
+
+        List<SevenZipArchiveTool.ArchiveToolEntry> entries = SevenZipArchiveTool.parseListing(listing);
+
+        assertThat(entries.get(0).symbolicLink()).isTrue();
+        assertThat(entries.get(1).symbolicLink()).isFalse();
+        assertThat(entries.get(1).modifiedAt()).isGreaterThan(0);
+    }
+
+    @Test
+    void parsesWindowsRecordsWithEmptyFinalFieldsAndAttributeOnlyDirectories()
+    {
+        String listing = "7-Zip 26.05\r\n----------\r\n"
+                + "Path = docs\r\nSize = 0\r\nAttributes = D\r\nBlock = \r\n\r\n"
+                + "Path = docs/test.txt\r\nSize = 20\r\nAttributes = A\r\nVolume Index = \r\n";
+
+        List<SevenZipArchiveTool.ArchiveToolEntry> entries = SevenZipArchiveTool.parseListing(listing);
+
+        assertThat(entries).singleElement().satisfies(entry -> {
+            assertThat(entry.name()).isEqualTo("docs/test.txt");
+            assertThat(entry.size()).isEqualTo(20);
+        });
+    }
+
     private void prepareAvailableArchive(byte[] zip)
     {
         prepareAvailableArchive(zip, "application/zip");

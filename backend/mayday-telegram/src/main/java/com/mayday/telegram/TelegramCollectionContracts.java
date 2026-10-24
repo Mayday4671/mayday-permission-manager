@@ -18,17 +18,23 @@ public final class TelegramCollectionContracts
     /** Task status and progress without lease internals or file identifiers. */
     public record TaskView(Long id, @Nullable String messageLink, @Nullable String sourceTitle,
             @Nullable LocalDate fromDate, @Nullable LocalDate toDate, String status, String statusMessage,
-            Integer maxMessages, Integer collectedMessages, Integer scannedMessages, boolean trackingEnabled,
-            @Nullable LocalDateTime liveCheckedAt, @Nullable String liveStatusMessage, LocalDateTime createdAt,
-            LocalDateTime updatedAt) {
+            Integer maxMessages, Integer collectedMessages, Integer scannedMessages, boolean includeAlbum,
+            boolean trackingEnabled, @Nullable LocalDateTime liveCheckedAt, @Nullable String liveStatusMessage,
+            LocalDateTime createdAt, LocalDateTime updatedAt, long pendingMediaCount) {
         /** Converts the persistent task into a safe response. */
         public static TaskView from(TelegramCollectionTask task)
         {
+            return from(task, 0);
+        }
+
+        /** 附件队列与消息采集分别结束，单独返回待下载数量供页面提供停止入口。 */
+        public static TaskView from(TelegramCollectionTask task, long pendingMediaCount)
+        {
             return new TaskView(task.getId(), task.getMessageLink(), task.getSourceTitle(), task.getFromDate(),
                     task.getToDate(), task.getStatus(), task.getStatusMessage(), task.getMaxMessages(),
-                    task.getCollectedMessages(), task.getScannedMessages(),
+                    task.getCollectedMessages(), task.getScannedMessages(), Boolean.TRUE.equals(task.getIncludeAlbum()),
                     Boolean.TRUE.equals(task.getTrackingEnabled()), task.getLiveCheckedAt(),
-                    task.getLiveStatusMessage(), task.getCreatedAt(), task.getUpdatedAt());
+                    task.getLiveStatusMessage(), task.getCreatedAt(), task.getUpdatedAt(), pendingMediaCount);
         }
     }
 

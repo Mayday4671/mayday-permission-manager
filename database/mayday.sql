@@ -1,6 +1,6 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V47）
--- 唯一对外交付 SQL：77 张业务表、781 个业务字段、索引/外键及必要基础资料。
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V50）
+-- 唯一对外交付 SQL：79 张业务表、806 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
 
@@ -13,7 +13,7 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V47 的 Flyway BASELINE 标记，不会在空库启动时重复执行 V35–V47 迁移。
+-- 4. 本文件已包含 V50 的 Flyway BASELINE 标记，不会在空库启动时重复执行 V35–V50 迁移。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
@@ -651,12 +651,12 @@ CREATE TABLE `sys_user_role` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='账号与角色多对多关联；联合主键防止重复授权，用户与角色均有物理外键';
 
 
--- Flyway 版本管理表：记录本文件对应的 V47 基线，后续仍按正常增量迁移升级。
--- BASELINE 声明当前结构已处于版本 47；不伪造历史迁移的执行校验和。
+-- Flyway 版本管理表：记录本文件对应的 V50 基线，后续仍按正常增量迁移升级。
+-- BASELINE 声明当前结构已处于版本 48；不伪造历史迁移的执行校验和。
 -- 参考：https://documentation.red-gate.com/flyway/flyway-concepts/baselines
 CREATE TABLE flyway_schema_history (
   installed_rank INT NOT NULL COMMENT '安装记录顺序；由 Flyway 后续维护',
-  version VARCHAR(50) DEFAULT NULL COMMENT '数据库迁移版本；本初始化基线为 47',
+  version VARCHAR(50) DEFAULT NULL COMMENT '数据库迁移版本；本初始化基线为 48',
   description VARCHAR(200) NOT NULL COMMENT '迁移描述或基线标记',
   type VARCHAR(20) NOT NULL COMMENT '记录类型；BASELINE 表示导入后的结构起点，后续 SQL 表示增量迁移',
   script VARCHAR(1000) NOT NULL COMMENT '迁移脚本名或标准基线标记',
@@ -1325,6 +1325,23 @@ WHERE u.username = 'admin'
   );
 
 -- Search request history is user-owned and records external sends; it never stores login challenges.
+CREATE TABLE `biz_telegram_conversation` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '会话主键，由数据库生成',
+  `created_at` DATETIME(6) NOT NULL COMMENT '会话首次创建时间，用于稳定展示历史顺序',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '会话最近一次提交关键词的时间，用于侧栏排序',
+  `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，避免并发搜索覆盖会话摘要',
+  `owner_id` BIGINT NOT NULL COMMENT '创建会话的 Mayday 用户 ID，决定会话资源所有权',
+  `department_id` BIGINT NULL COMMENT '创建时所属部门 ID，用于保持平台配置的数据范围边界',
+  `title` VARCHAR(120) NOT NULL COMMENT '侧栏会话标题；首次搜索后由首个关键词生成',
+  `last_keyword` VARCHAR(256) NULL COMMENT '最近一次实际提交给已验证机器人的关键词预览',
+  `search_count` INT NOT NULL DEFAULT 0 COMMENT '此会话包含的搜索轮数，不代表 Telegram 返回消息数',
+  PRIMARY KEY (`id`),
+  KEY `idx_biz_telegram_conversation_owner_updated` (`owner_id`, `updated_at`, `id`),
+  KEY `idx_biz_telegram_conversation_department` (`department_id`),
+  CONSTRAINT `fk_biz_telegram_conversation_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_biz_telegram_conversation_department` FOREIGN KEY (`department_id`) REFERENCES `sys_entry` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Mayday Telegram 搜索会话；每个会话包含多轮搜索，按用户及部门数据范围隔离';
+
 CREATE TABLE `biz_telegram_search` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键，由数据库生成',
   `created_at` DATETIME(6) NOT NULL COMMENT 'Mayday 创建时间，作为搜索提交时间排序依据',
@@ -1332,6 +1349,7 @@ CREATE TABLE `biz_telegram_search` (
   `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本，防止异步状态覆盖并发更新',
   `owner_id` BIGINT NOT NULL COMMENT '发起搜索的 Mayday 用户 ID，用于数据范围和资源所有权校验',
   `department_id` BIGINT NULL COMMENT '创建时的用户部门 ID，用于部门数据范围判断',
+  `conversation_id` BIGINT NOT NULL COMMENT '所属 Mayday Telegram 会话；多轮搜索共享同一会话',
   `keyword` VARCHAR(256) NOT NULL COMMENT '由用户主动提交并实际发送给机器人查询的关键词',
   `bot_username` VARCHAR(64) NOT NULL COMMENT '服务端配置且经 Telegram 验证的公开机器人用户名',
   `bot_chat_id` VARCHAR(32) NULL COMMENT '机器人私聊 ID，使用字符串保存以避免精度损失',
@@ -1342,8 +1360,10 @@ CREATE TABLE `biz_telegram_search` (
   `status_message` VARCHAR(256) NULL COMMENT '不包含秘密信息的状态说明，供管理页面展示',
   PRIMARY KEY (`id`),
   KEY `idx_biz_telegram_search_owner_created` (`owner_id`, `created_at`),
+  KEY `idx_biz_telegram_search_conversation` (`conversation_id`, `id`),
   KEY `idx_biz_telegram_search_status_expiry` (`status`, `expires_at`),
-  CONSTRAINT `fk_biz_telegram_search_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`)
+  CONSTRAINT `fk_biz_telegram_search_owner` FOREIGN KEY (`owner_id`) REFERENCES `sys_user` (`id`),
+  CONSTRAINT `fk_biz_telegram_search_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `biz_telegram_conversation` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户主动提交的 Telegram 机器人搜索记录；搜索查询不会在进程重启后被自动重发';
 
 -- This table is a limited projection of the one verified bot chat, not a general Telegram inbox.
@@ -1391,6 +1411,7 @@ CREATE TABLE `biz_telegram_collection_task` (
   `owner_id` BIGINT NOT NULL COMMENT '主动创建任务的 Mayday 用户 ID，用于任务及消息访问控制',
   `department_id` BIGINT NULL COMMENT '创建时用户部门 ID，用于 Telegram 数据范围授权',
   `message_link` VARCHAR(2048) NULL COMMENT '用户提供的 HTTPS Telegram 消息链接；频道来源任务为空，真实 chat/message 由 TDLib 验证',
+  `include_album` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否仅采集所选链接消息及同聊天同相册的相邻成员；0 保持普通历史分页，1 最多读取 10 条同组消息后结束且不得扩展到其他帖子',
   `chat_id` VARCHAR(32) NULL COMMENT 'TDLib 验证后的聊天 ID，字符串保存以避免 64 位精度损失',
   `cursor_message_id` VARCHAR(32) NULL COMMENT '已提交历史分页游标；后续页面只读取更早的消息',
   `start_message_id` VARCHAR(32) NULL COMMENT 'TDLib 从来源链接解析得到的起始消息 ID',
@@ -1540,12 +1561,33 @@ CREATE TABLE `biz_telegram_video_preview_budget` (
 
 INSERT INTO `biz_telegram_video_preview_budget` (`id`, `updated_at`) VALUES (1, CURRENT_TIMESTAMP(6));
 
+CREATE TABLE `sys_telegram_config` (
+  `id` TINYINT NOT NULL COMMENT '单例配置主键；固定为 1，不接受客户端指定或创建多个 Telegram 配置',
+  `api_id` VARCHAR(10) NOT NULL COMMENT 'Telegram API ID；仅数字公开值，正整数形式由服务校验',
+  `api_hash_cipher` TEXT NOT NULL COMMENT 'Telegram API Hash 的 AES-256-GCM 密文；随机 IV 和认证标签包含在密文中，绝不保存明文',
+  `session_encryption_key_cipher` TEXT NOT NULL COMMENT 'TDLib 本地会话数据库加密密钥的 AES-256-GCM 密文；应用首次保存时可安全生成，绝不返回浏览器',
+  `proxy_enabled` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否让 TDLib 使用本记录维护的网络代理；关闭时不读取代理地址发起连接',
+  `proxy_type` VARCHAR(16) NOT NULL DEFAULT 'socks5' COMMENT 'TDLib 支持的代理类型：socks5、http 或 mtproto',
+  `proxy_host` VARCHAR(253) NOT NULL DEFAULT '' COMMENT '代理服务器主机名或 IP；不允许包含协议、路径或用户信息',
+  `proxy_port` SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '代理服务器 TCP 端口；启用代理时必须在 1 至 65535 之间',
+  `proxy_username` VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'SOCKS5/HTTP 代理可选用户名；不作为接口密钥返回',
+  `proxy_password_cipher` TEXT NULL COMMENT 'SOCKS5/HTTP 代理密码的 AES-256-GCM 密文；空值表示未设置',
+  `proxy_secret_cipher` TEXT NULL COMMENT 'MTProto 代理 Secret 的 AES-256-GCM 密文；空值表示未设置',
+  `updated_by` BIGINT NULL COMMENT '最近修改配置的后台管理员账号；账号删除后保留配置并清空此引用',
+  `created_at` DATETIME(6) NOT NULL COMMENT '配置首次保存时间；使用 Asia/Shanghai 会话时区和微秒精度',
+  `updated_at` DATETIME(6) NOT NULL COMMENT '配置最近保存时间；使用 Asia/Shanghai 会话时区和微秒精度',
+  PRIMARY KEY (`id`),
+  KEY `idx_telegram_config_updated_by` (`updated_by`),
+  CONSTRAINT `ck_telegram_config_singleton` CHECK (`id` = 1),
+  CONSTRAINT `fk_telegram_config_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `sys_user` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Telegram 管理员运行配置；API Hash、TDLib 会话密钥和代理口令只存 AES-256-GCM 密文，变更需 telegram:configure 权限';
+
 -- 全部建表及基础资料成功后才登记基线；如前面报错，必须停止，不能跳过失败语句。
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '47', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '50', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
--- 安装完成自检：应得到 77 张业务表、781 个业务字段，缺少注释数均为 0。
+-- 安装完成自检：应得到 79 张业务表、806 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。
 SELECT COUNT(*) AS business_tables, SUM(table_comment = '') AS missing_table_comments
 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history';

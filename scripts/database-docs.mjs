@@ -43,7 +43,7 @@ export function documentedSchema() {
     assert(comment.trim(), `${name} 缺少表说明`);
     tables[name] = { comment: unquote(comment), columns };
   }
-  // V47 retains the historical scope and later Telegram media migrations in the one-file installer.
+  // V50 adds opt-in message-album collection to the one-file installer.
   // Include columns added after CREATE TABLE so fresh installation metadata and
   // migrated-database comment checks describe the same current schema.
   const alters = /ALTER TABLE `?([^`\s]+)`?([\s\S]*?);/g;

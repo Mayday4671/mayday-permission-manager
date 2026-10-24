@@ -2,6 +2,12 @@ package com.mayday.telegram;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 
 import com.mayday.common.exception.BusinessException;
@@ -10,15 +16,20 @@ import com.mayday.common.persistence.PageResult;
 import com.mayday.common.util.BusinessTime;
 import com.mayday.security.AccessPolicy;
 import com.mayday.telegram.TelegramSearchContracts.CallbackAnswerView;
+import com.mayday.telegram.TelegramSearchContracts.ConversationMessageView;
+import com.mayday.telegram.TelegramSearchContracts.ConversationTurnView;
 import com.mayday.telegram.TelegramSearchContracts.MessageView;
 import com.mayday.telegram.TelegramSearchContracts.ParsedMessageView;
 import com.mayday.telegram.TelegramSearchContracts.SearchView;
 import com.mayday.telegram.mapper.TelegramAccountMapper;
+import com.mayday.telegram.mapper.TelegramConversationMapper;
 import com.mayday.telegram.mapper.TelegramSearchMapper;
 import com.mayday.telegram.mapper.TelegramSearchMessageMapper;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -32,14 +43,17 @@ import org.springframework.transaction.support.TransactionTemplate;
  * projection of the configured bot chat.
  *
  * <p>
- * Only explicit Telegram reply-to relationships complete a search; unmatched
- * messages remain visible as unmatched.
+ * Telegram reply-to relationships are preferred. Some bots do not set reply-to
+ * metadata, so an incoming message can also complete the sole unexpired search
+ * in that verified bot chat; the inferred association is stored separately.
  */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TelegramSearchService
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TelegramSearchService.class);
+
     private static final int MESSAGE_PAGE_SIZE = 30;
     private static final int SEARCH_WAIT_SECONDS = 120;
 
@@ -48,6 +62,7 @@ public class TelegramSearchService
     private final AccessPolicy access;
     private final TelegramSessionCoordinator sessions;
     private final TelegramAccountMapper accounts;
+    private final TelegramConversationMapper conversations;
     private final TelegramSearchMapper searches;
     private final TelegramSearchMessageMapper messages;
     private final TelegramResultParser resultParser;
@@ -59,6 +74,17 @@ public class TelegramSearchService
      */
     @Transactional
     public SearchView create(String keyword)
+    {
+        return create(keyword, null);
+    }
+
+    /**
+     * Creates one search turn inside the caller's conversation. When an older API
+     * client omits the conversation ID, the most recently used conversation owned
+     * by the caller is reused; a new one is created only when none exists.
+     */
+    @Transactional
+    public SearchView create(String keyword, Long conversationId)
     {
         moduleGuard.requireEnabled();
         access.require("telegram:search");
@@ -77,6 +103,9 @@ public class TelegramSearchService
         }
         TelegramSessionClient client = sessions.requireReadyClient("telegram:search");
         access.checkData("telegram", access.current().getId(), access.current().getDepartmentId());
+        TelegramConversation conversation = conversationId == null
+                ? currentConversationOrCreate()
+                : visibleConversation(conversationId);
         LocalDateTime now = BusinessTime.now();
         QueryWrapper active = QueryWrapper.create().where(new QueryColumn("status").in("PENDING", "SENDING", "WAITING"))
                 .and(new QueryColumn("expires_at").gt(now));
@@ -93,7 +122,10 @@ public class TelegramSearchService
         search.setParseStatus("UNKNOWN");
         search.setExpiresAt(now.plusSeconds(SEARCH_WAIT_SECONDS));
         search.setStatusMessage("已创建，正在连接已配置的搜索机器人");
+        search.setConversationId(conversation.getId());
         search = searches.save(search);
+
+        updateConversationPreview(conversation, normalized);
 
         Long searchId = search.getId();
         Runnable sendAfterCommit = () -> client.resolveBot(verifiedBotUsername).thenCompose(bot -> {
@@ -124,6 +156,63 @@ public class TelegramSearchService
         return SearchView.from(search);
     }
 
+    /** Creates and returns an empty conversation for the authenticated user. */
+    @Transactional
+    public TelegramConversationView createConversation()
+    {
+        moduleGuard.requireEnabled();
+        access.require("telegram:search");
+        access.checkData("telegram", access.current().getId(), access.current().getDepartmentId());
+        return TelegramConversationView.from(createConversationEntity());
+    }
+
+    /**
+     * Returns a bounded, most-recent-first list of conversations visible to the
+     * caller.
+     */
+    public PageResult<TelegramConversationView> listConversations(int page, int size)
+    {
+        moduleGuard.requireEnabled();
+        access.require("telegram:view");
+        return PageResult.of(conversations.paginate(PageResult.request(page, Math.min(size, 50)),
+                access.filter("telegram", "owner_id").and(new QueryColumn("owner_id").eq(access.current().getId()))
+                        .orderBy(new QueryColumn("updated_at").desc(), new QueryColumn("id").desc())),
+                TelegramConversationView::from);
+    }
+
+    /**
+     * Deletes one idle conversation and all search/message snapshots grouped in it.
+     * A pending bot request prevents deletion until it completes or times out, so
+     * an asynchronous Telegram reply cannot recreate data after the user deletes
+     * it.
+     */
+    @Transactional
+    public void deleteConversation(Long conversationId)
+    {
+        moduleGuard.requireEnabled();
+        access.require("telegram:delete");
+        TelegramConversation conversation = visibleConversation(conversationId);
+        QueryWrapper searchFilter = access.filter("telegram", "owner_id")
+                .and(new QueryColumn("owner_id").eq(access.current().getId()))
+                .and(new QueryColumn("conversation_id").eq(conversation.getId()));
+        List<TelegramSearch> conversationSearches = searches.selectListByQuery(searchFilter);
+        boolean hasPendingSearch = conversationSearches.stream()
+                .anyMatch(search -> List.of("PENDING", "SENDING", "WAITING").contains(search.getStatus())
+                        && search.getExpiresAt() != null && search.getExpiresAt().isAfter(BusinessTime.now()));
+        if (hasPendingSearch)
+        {
+            throw new BusinessException("会话中仍有搜索正在等待机器人回复，请完成或超时后再删除");
+        }
+        if (!conversationSearches.isEmpty())
+        {
+            List<Long> searchIds = conversationSearches.stream().map(TelegramSearch::getId).toList();
+            messages.deleteByQuery(QueryWrapper.create().where(new QueryColumn("search_id").in(searchIds)));
+            searches.deleteByQuery(QueryWrapper.create().where(new QueryColumn("id").in(searchIds))
+                    .and(new QueryColumn("conversation_id").eq(conversation.getId())));
+        }
+        conversations.deleteById(conversation.getId());
+    }
+
     /**
      * Returns the caller's visible searches with all range filtering performed in
      * SQL.
@@ -136,6 +225,51 @@ public class TelegramSearchService
         return PageResult.of(
                 searches.paginate(PageResult.request(page, size), filter.orderBy(new QueryColumn("id").desc())),
                 SearchView::from);
+    }
+
+    /**
+     * Returns recent searches as conversation turns, with each bot reply and its
+     * parsed links in the same message projection. Search rows remain separate
+     * internally for auditability and Telegram correlation, but are not presented
+     * as separate conversations to the user.
+     *
+     * <p>
+     * The search page is capped at twenty turns. Messages are fetched in one
+     * owner-scoped query for that page, preventing an N+1 request pattern and
+     * ensuring replies cannot be mixed across owners or search IDs. Only incoming
+     * messages explicitly associated with a search appear here; uncertain updates
+     * remain in the separate unmatched-message view.
+     */
+    public PageResult<ConversationTurnView> listConversation(Long conversationId, int page, int size)
+    {
+        moduleGuard.requireEnabled();
+        access.require("telegram:view");
+        TelegramConversation conversation = visibleConversation(conversationId);
+
+        var searchPage = searches.paginate(PageResult.request(page, Math.min(size, 20)),
+                access.filter("telegram", "owner_id").and(new QueryColumn("owner_id").eq(access.current().getId()))
+                        .and(new QueryColumn("conversation_id").eq(conversation.getId()))
+                        .orderBy(new QueryColumn("id").desc()));
+        List<TelegramSearch> searchRows = searchPage.getRecords();
+        Map<Long, List<ConversationMessageView>> messagesBySearchId = new HashMap<>();
+
+        if (!searchRows.isEmpty())
+        {
+            List<Long> searchIds = searchRows.stream().map(TelegramSearch::getId).toList();
+            List<TelegramSearchMessage> messageRows = messages.selectListByQuery(
+                    access.filter("telegram", "owner_id").and(new QueryColumn("owner_id").eq(access.current().getId()))
+                            .and(new QueryColumn("search_id").in(searchIds)).and(new QueryColumn("outgoing").eq(false))
+                            .orderBy(new QueryColumn("telegram_sent_at").asc(), new QueryColumn("id").asc()));
+
+            for (TelegramSearchMessage message : messageRows)
+            {
+                messagesBySearchId.computeIfAbsent(message.getSearchId(), ignored -> new ArrayList<>())
+                        .add(ConversationMessageView.from(message, resultParser));
+            }
+        }
+
+        return PageResult.of(searchPage, search -> new ConversationTurnView(SearchView.from(search),
+                messagesBySearchId.getOrDefault(search.getId(), List.of())));
     }
 
     /**
@@ -213,9 +347,11 @@ public class TelegramSearchService
             TelegramCallbackAnswer answer = client
                     .activateCallback(message.getBotChatId(), message.getTelegramMessageId(), callbackData).join();
             return new CallbackAnswerView(answer.text(), answer.showAlert(), answer.url());
-        } catch (CompletionException exception)
+        } catch (CompletionException | CancellationException exception)
         {
-            throw new BusinessException("Telegram 按钮请求未能完成，请检查账号连接或机器人状态");
+            String diagnosticLabel = TelegramCallbackFeedback.diagnosticLabel(exception);
+            LOGGER.warn("Telegram inline button activation failed ({})", diagnosticLabel);
+            throw new BusinessException(TelegramCallbackFeedback.failed(exception));
         } finally
         {
             java.util.Arrays.fill(callbackData, (byte) 0);
@@ -230,7 +366,8 @@ public class TelegramSearchService
     {
         moduleGuard.requireEnabled();
         access.require("telegram:view");
-        QueryWrapper filter = access.filter("telegram", "owner_id").and(new QueryColumn("search_id").isNull());
+        QueryWrapper filter = access.filter("telegram", "owner_id").and(new QueryColumn("search_id").isNull())
+                .and(new QueryColumn("outgoing").eq(false));
         return PageResult.of(
                 messages.paginate(PageResult.request(page, Math.min(size, MESSAGE_PAGE_SIZE)),
                         filter.orderBy(new QueryColumn("telegram_sent_at").desc(), new QueryColumn("id").desc())),
@@ -251,7 +388,8 @@ public class TelegramSearchService
         {
             return;
         }
-        TelegramSearchMessage entity = messages.findMessage(snapshot.chatId(), snapshot.messageId())
+        TelegramSearchMessage entity = messages
+                .findMessageForUpdate(snapshot.chatId(), snapshot.messageId(), snapshot.previousMessageId())
                 .orElseGet(TelegramSearchMessage::new);
         Long previouslyMatchedSearchId = entity.getSearchId();
         LocalDateTime incomingEditTime = toBusinessTime(snapshot.editedAtEpochSeconds());
@@ -278,12 +416,36 @@ public class TelegramSearchService
         entity.setAssociationStatus("UNMATCHED");
         if (snapshot.outgoing())
         {
-            searches.findBySentMessage(snapshot.chatId(), snapshot.messageId()).ifPresent(search -> {
+            String priorMessageId = snapshot.previousMessageId();
+            java.util.Optional<TelegramSearch> request = priorMessageId == null
+                    ? searches.findBySentMessage(snapshot.chatId(), snapshot.messageId())
+                    : searches.findBySentMessage(snapshot.chatId(), priorMessageId);
+            if (request.isEmpty() && ("UpdateMessageSendSucceeded".equals(snapshot.updateType())
+                    || "UpdateMessageSendFailed".equals(snapshot.updateType())))
+            {
+                request = searches.findActiveForBot(snapshot.chatId(), BusinessTime.now());
+            }
+            if (request.isPresent())
+            {
+                TelegramSearch search = request.get();
                 entity.setOwnerId(search.getOwnerId());
                 entity.setSearchId(search.getId());
                 entity.setDepartmentId(search.getDepartmentId());
                 entity.setAssociationStatus("MATCHED");
-            });
+                if ("UpdateMessageSendSucceeded".equals(snapshot.updateType()))
+                {
+                    search.setSentMessageId(snapshot.messageId());
+                    search.setStatus("WAITING");
+                    search.setExpiresAt(BusinessTime.now().plusSeconds(SEARCH_WAIT_SECONDS));
+                    search.setStatusMessage("Telegram 已确认发送关键词，正在等待机器人回复");
+                    searches.save(search);
+                } else if ("UpdateMessageSendFailed".equals(snapshot.updateType()))
+                {
+                    search.setStatus("FAILED");
+                    search.setStatusMessage(sendFailureMessage(snapshot.sendErrorCode(), snapshot.sendErrorName()));
+                    searches.save(search);
+                }
+            }
         } else if (snapshot.replyToMessageId() != null)
         {
             searches.findBySentMessage(snapshot.chatId(), snapshot.replyToMessageId()).ifPresent(search -> {
@@ -296,18 +458,20 @@ public class TelegramSearchService
                 search.setStatusMessage("已收到与本次查询明确关联的机器人回复；内容尚未被解析");
                 searches.save(search);
             });
-        } else if (previouslyMatchedSearchId != null)
+        } else
         {
-            // An edit/content update for the same Telegram message has no new
-            // reply-to edge. Preserve the already verified association rather than
-            // downgrading this message to an unrelated inbox item.
-            searches.findById(previouslyMatchedSearchId).ifPresent(search -> {
+            java.util.Optional<TelegramSearch> activeSearch = previouslyMatchedSearchId == null
+                    ? searches.findActiveForBot(snapshot.chatId(), BusinessTime.now())
+                    : searches.findById(previouslyMatchedSearchId);
+            activeSearch.ifPresent(search -> {
                 entity.setOwnerId(search.getOwnerId());
                 entity.setSearchId(search.getId());
                 entity.setDepartmentId(search.getDepartmentId());
-                entity.setAssociationStatus("MATCHED");
+                entity.setAssociationStatus(previouslyMatchedSearchId == null ? "INFERRED" : "MATCHED");
                 search.setStatus("COMPLETED");
-                search.setStatusMessage("机器人更新了与本次查询关联的消息");
+                search.setParseStatus("UNKNOWN");
+                search.setStatusMessage(
+                        previouslyMatchedSearchId == null ? "机器人未提供回复引用；系统将该消息关联到当前唯一待处理查询" : "机器人更新了与本次查询关联的消息");
                 searches.save(search);
             });
         }
@@ -335,13 +499,72 @@ public class TelegramSearchService
     }
 
     /**
+     * Resolves a conversation and enforces its owner and configured department data
+     * scope.
+     */
+    private TelegramConversation visibleConversation(Long id)
+    {
+        TelegramConversation conversation = conversations.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Telegram 会话不存在"));
+        // Conversations contain a user's private Telegram searches. Platform-wide
+        // data scopes must not turn them into shared transcripts for other users.
+        if (!Objects.equals(access.current().getId(), conversation.getOwnerId()))
+        {
+            throw new ResourceNotFoundException("Telegram 会话不存在");
+        }
+        access.checkData("telegram", conversation.getOwnerId(), conversation.getDepartmentId());
+        return conversation;
+    }
+
+    /**
+     * Builds a new-session entity from the authenticated Mayday user's current
+     * ownership context.
+     */
+    private TelegramConversation createConversationEntity()
+    {
+        TelegramConversation conversation = new TelegramConversation();
+        conversation.setOwnerId(access.current().getId());
+        conversation.setDepartmentId(access.current().getDepartmentId());
+        conversation.setTitle("新会话");
+        conversation.setSearchCount(0);
+        return conversations.save(conversation);
+    }
+
+    /**
+     * Reuses the newest owned session for clients predating the conversation-ID
+     * field.
+     */
+    private TelegramConversation currentConversationOrCreate()
+    {
+        TelegramConversation existing = conversations.selectOneByQuery(
+                access.filter("telegram", "owner_id").and(new QueryColumn("owner_id").eq(access.current().getId()))
+                        .orderBy(new QueryColumn("updated_at").desc(), new QueryColumn("id").desc()).limit(1));
+        return existing == null ? createConversationEntity() : existing;
+    }
+
+    /**
+     * Updates the sidebar preview and first-turn title inside the search
+     * transaction.
+     */
+    private void updateConversationPreview(TelegramConversation conversation, String keyword)
+    {
+        if (conversation.getSearchCount() == null || conversation.getSearchCount() == 0)
+        {
+            conversation.setTitle(keyword.length() <= 60 ? keyword : keyword.substring(0, 60));
+        }
+        conversation.setLastKeyword(keyword);
+        conversation.setSearchCount((conversation.getSearchCount() == null ? 0 : conversation.getSearchCount()) + 1);
+        conversations.save(conversation);
+    }
+
+    /**
      * Changes the row to SENDING after the configured bot has been resolved and
      * verified.
      */
     void markSending(Long id, String chatId)
     {
         transactionTemplate.executeWithoutResult(status -> {
-            TelegramSearch search = searches.findById(id).orElse(null);
+            TelegramSearch search = searches.lock(id).orElse(null);
             if (search != null && "PENDING".equals(search.getStatus()))
             {
                 search.setBotChatId(chatId);
@@ -359,14 +582,17 @@ public class TelegramSearchService
     void markWaiting(Long id, String chatId, String messageId)
     {
         transactionTemplate.executeWithoutResult(status -> {
-            TelegramSearch search = searches.findById(id).orElse(null);
-            if (search != null && "SENDING".equals(search.getStatus()))
+            TelegramSearch search = searches.lock(id).orElse(null);
+            if (search != null && ("SENDING".equals(search.getStatus()) || "WAITING".equals(search.getStatus())))
             {
                 search.setBotChatId(chatId);
-                search.setSentMessageId(messageId);
+                if (search.getSentMessageId() == null)
+                {
+                    search.setSentMessageId(messageId);
+                }
                 search.setStatus("WAITING");
                 search.setExpiresAt(BusinessTime.now().plusSeconds(SEARCH_WAIT_SECONDS));
-                search.setStatusMessage("查询已发送，等待机器人回复");
+                search.setStatusMessage("请求已交给 Telegram，等待发送确认和机器人回复");
                 searches.save(search);
                 messages.findMessage(chatId, messageId).ifPresent(outgoing -> {
                     outgoing.setOwnerId(search.getOwnerId());
@@ -397,8 +623,8 @@ public class TelegramSearchService
     void markFailed(Long id)
     {
         transactionTemplate.executeWithoutResult(status -> {
-            TelegramSearch search = searches.findById(id).orElse(null);
-            if (search != null && !"COMPLETED".equals(search.getStatus()))
+            TelegramSearch search = searches.lock(id).orElse(null);
+            if (search != null && !"COMPLETED".equals(search.getStatus()) && !"FAILED".equals(search.getStatus()))
             {
                 search.setStatus("FAILED");
                 search.setStatusMessage("搜索机器人未能接受请求，请检查账号连接与机器人配置");
@@ -416,6 +642,29 @@ public class TelegramSearchService
         return timestamp == null
                 ? null
                 : LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), BusinessTime.zone());
+    }
+
+    /**
+     * Returns actionable, non-sensitive feedback using a numeric code and a small
+     * allow-list of symbolic Telegram errors.
+     */
+    static String sendFailureMessage(Integer errorCode, String errorName)
+    {
+        if ("YOU_BLOCKED_USER".equals(errorName))
+        {
+            return "Telegram 拒绝了关键词发送（YOU_BLOCKED_USER）。请核对 Mayday 当前配置的机器人是否与 Telegram 客户端中使用的机器人一致，再重试；无需重新登录账号。";
+        }
+        if (Integer.valueOf(429).equals(errorCode))
+        {
+            return "Telegram 暂时限制了发送频率，请稍后再试";
+        }
+        if (Integer.valueOf(400).equals(errorCode) || Integer.valueOf(403).equals(errorCode))
+        {
+            return "Telegram 拒绝了当前绑定账号的发送请求（错误代码 " + errorCode + "）。请检查账号状态、机器人会话和服务端配置";
+        }
+        return errorCode == null
+                ? "Telegram 未能发送关键词；请检查账号连接与机器人状态"
+                : "Telegram 未能发送关键词（错误代码 " + errorCode + "）；请检查机器人会话后重试";
     }
 
 }

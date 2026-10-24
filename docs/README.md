@@ -8,7 +8,7 @@
 - [多实例与持久任务](cluster.md)：共享验证码/限流、跨节点即时提示、租约隔离、重试取消恢复和集群验证入口。
 - [AgentScope 独立智能体模块](agentscope.md)：稳定版本、独立开关、MySQL 会话状态、权限隔离、模型密钥和复用边界。
 - [Telegram 模块部署与使用](telegram.md)：模块开关、环境配置、权限、频道采集、媒体/HLS/归档功能和真实账号边界。
-- [Telegram 模块开发计划与最终复验](telegram-development-plan.md)：独立模块设计、TDLib 生命周期、极搜异步消息、V47 自动化验收结果及外部联调边界。
+- [Telegram 模块开发计划与复验记录](telegram-development-plan.md)：独立模块设计、TDLib 生命周期、管理员页面配置、自动化验收结果及外部联调边界。
 - [AgentScope 模块验收记录](agentscope-validation-20261018/README.md)：V32 模块隔离验收，以及 V33/V34 模型配置界面和旧菜单整合验收。
 - [完整功能追加记录](full-functions-validation-20261004/README.md)：E1–E6的实现、真实检查与尚未完成的验收项。
 - [2026-10-04 企业交付检查](enterprise-validation-20261004/README.md)：本轮补齐、全量回归与页面验收状态，不把自动检查等同于全部产品验收。

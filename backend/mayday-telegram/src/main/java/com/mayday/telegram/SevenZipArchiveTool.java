@@ -7,7 +7,9 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,7 +33,9 @@ class SevenZipArchiveTool
     private static final int MAX_ARCHIVE_ENTRIES = 5_000;
     private static final int MAX_ERROR_BYTES = 4 * 1024;
     private static final long PROCESS_TIMEOUT_SECONDS = 180;
-    private static final DateTimeFormatter SEVEN_ZIP_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter SEVEN_ZIP_DATE = new DateTimeFormatterBuilder()
+            .appendPattern("yyyy-MM-dd HH:mm:ss").optionalStart().appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+            .optionalEnd().toFormatter();
 
     private final TelegramSettings settings;
 
@@ -104,10 +108,13 @@ class SevenZipArchiveTool
         {
             throw new BusinessException("压缩包目录格式无法识别");
         }
-        String entriesText = listing.substring(firstEntry + "----------".length());
+        // Normalize CRLF first: regex backtracking must not split a single Windows
+        // newline into two record separators.
+        String entriesText = listing.substring(firstEntry + "----------".length()).replace("\r\n", "\n").replace('\r',
+                '\n');
         List<ArchiveToolEntry> result = new ArrayList<>();
         int totalEntries = 0;
-        for (String block : entriesText.split("\\R\\s*\\R"))
+        for (String block : entriesText.split("\n[\t ]*\n"))
         {
             String normalizedBlock = block.strip();
             if (normalizedBlock.isBlank())
@@ -124,13 +131,15 @@ class SevenZipArchiveTool
             {
                 throw new BusinessException("压缩包目录条目数超过安全上限");
             }
-            if ("+".equals(properties.get("Folder")))
+            String attributes = properties.getOrDefault("Attributes", "");
+            if ("+".equals(properties.get("Folder")) || attributes.strip().startsWith("D")
+                    || hasUnixMode(attributes, 'd'))
             {
                 continue;
             }
             boolean symbolicLink = properties.containsKey("Symbolic Link") || properties.containsKey("Hard Link")
-                    || properties.containsKey("Reparse Point")
-                    || properties.getOrDefault("Attributes", "").contains("L");
+                    || properties.containsKey("Reparse Point") || attributes.contains("L")
+                    || hasUnixMode(attributes, 'l');
             boolean encrypted = "+".equals(properties.get("Encrypted"));
             final long size;
             try
@@ -145,9 +154,24 @@ class SevenZipArchiveTool
                 throw new BusinessException("压缩包目录包含未知文件大小");
             }
             long modifiedAt = parseModifiedAt(properties.get("Modified"));
-            result.add(new ArchiveToolEntry(name, size, modifiedAt, encrypted, symbolicLink));
+            // Windows 版 7-Zip 使用反斜杠显示目录；统一 API 路径后仍由业务层检查越界和重名。
+            String normalizedName = java.io.File.separatorChar == '\\' ? name.replace('\\', '/') : name;
+            result.add(new ArchiveToolEntry(normalizedName, size, modifiedAt, encrypted, symbolicLink));
         }
         return List.copyOf(result);
+    }
+
+    /** Unix 目录和符号链接可能只通过权限属性表示，不能依赖可选的 Folder/Link 字段。 */
+    private static boolean hasUnixMode(String attributes, char type)
+    {
+        for (String mode : attributes.strip().split("\\s+"))
+        {
+            if (mode.length() == 10 && mode.charAt(0) == type)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Map<String, String> properties(String block)
@@ -155,13 +179,17 @@ class SevenZipArchiveTool
         Map<String, String> result = new LinkedHashMap<>();
         for (String line : block.split("\\R"))
         {
-            int separator = line.indexOf(" = ");
-            if (separator <= 0)
+            int separator = line.indexOf(" =");
+            int valueStart = separator + 2;
+            if (separator <= 0 || (valueStart < line.length() && line.charAt(valueStart) != ' '))
             {
                 throw new BusinessException("压缩包目录字段无法识别");
             }
             String key = line.substring(0, separator);
-            if (result.putIfAbsent(key, line.substring(separator + 3)) != null)
+            // The final field can be empty; stripping the record removes its trailing
+            // delimiter space.
+            String value = valueStart == line.length() ? "" : line.substring(valueStart + 1);
+            if (result.putIfAbsent(key, value) != null)
             {
                 throw new BusinessException("压缩包目录含有歧义字段");
             }

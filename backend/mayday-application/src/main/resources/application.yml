@@ -135,5 +135,8 @@ springdoc:
 
 # 故障定位只关联随机请求标识，不把请求正文、令牌或查询参数放进关联字段。
 logging:
+  # TDLib INFO 日志会输出授权请求参数；提高其级别，避免手机号等敏感值进入应用日志。
+  level:
+    it.tdlight: WARN
   pattern:
     level: "%5p [requestId:%X{requestId}]"

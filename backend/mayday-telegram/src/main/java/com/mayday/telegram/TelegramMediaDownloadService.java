@@ -164,7 +164,7 @@ public class TelegramMediaDownloadService
         {
             verifyFreeDiskSpace(claim);
             TelegramSessionClient client = sessions.requireMediaClient(claim.getOwnerId());
-            TelegramDownloadedFile downloaded = downloadWithTimeout(client, claim.getTelegramFileId());
+            TelegramDownloadedFile downloaded = downloadWithTimeout(client, claim);
             if (downloaded.size() < 1 || downloaded.size() > telegramSettings.getMaxMediaFileBytes())
             {
                 throw new SafeMediaException("附件大小超出服务端配置限制");
@@ -195,23 +195,39 @@ public class TelegramMediaDownloadService
         }
     }
 
-    /**
-     * Waits only for the configured interval, then asks TDLib to stop the transfer.
-     */
-    private TelegramDownloadedFile downloadWithTimeout(TelegramSessionClient client, int fileId)
+    /** 每秒复核取消与租约；即使消息采集已完成，用户仍可停止后台的附件传输。 */
+    TelegramDownloadedFile downloadWithTimeout(TelegramSessionClient client, TelegramMedia claim)
     {
+        int fileId = claim.getTelegramFileId();
+        requireActiveDownload(client, claim);
+        var transfer = client.downloadFile(fileId, telegramSettings.getMaxMediaFileBytes());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(telegramSettings.getMediaDownloadTimeoutSeconds());
         try
         {
-            return client.downloadFile(fileId, telegramSettings.getMaxMediaFileBytes())
-                    .get(telegramSettings.getMediaDownloadTimeoutSeconds(), TimeUnit.SECONDS);
-        } catch (TimeoutException exception)
-        {
-            client.cancelDownloadFile(fileId);
-            throw new SafeMediaException("附件下载超时；请检查网络后重试");
+            while (true)
+            {
+                requireActiveDownload(client, claim);
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0)
+                {
+                    cancelUnsharedTransfer(client, claim);
+                    throw new SafeMediaException("附件下载超时；请检查网络后重试");
+                }
+                try
+                {
+                    TelegramDownloadedFile downloaded = transfer.get(Math.min(remaining, TimeUnit.SECONDS.toNanos(1)),
+                            TimeUnit.NANOSECONDS);
+                    requireActiveDownload(client, claim);
+                    return downloaded;
+                } catch (TimeoutException exception)
+                {
+                    // 短等待仅用于复核任务状态，单次下载的总超时仍由 deadline 控制。
+                }
+            }
         } catch (InterruptedException exception)
         {
             Thread.currentThread().interrupt();
-            client.cancelDownloadFile(fileId);
+            cancelUnsharedTransfer(client, claim);
             throw new SafeMediaException("附件下载已中断");
         } catch (ExecutionException exception)
         {
@@ -221,6 +237,38 @@ public class TelegramMediaDownloadService
                 throw runtimeException;
             }
             throw new SafeMediaException("附件下载失败；可稍后重试");
+        }
+    }
+
+    /** 失去任务或租约后禁止继续传输和发布；检查不持有跨网络等待的数据库事务。 */
+    private void requireActiveDownload(TelegramSessionClient client, TelegramMedia claim)
+    {
+        TelegramCollectionTask task = tasks.findById(claim.getTaskId()).orElse(null);
+        TelegramMedia current = media.findById(claim.getId()).orElse(null);
+        if (task == null || "CANCELLED".equals(task.getStatus()) || current == null
+                || !"DOWNLOADING".equals(current.getStatus())
+                || !java.util.Objects.equals(current.getLeaseOwner(), claim.getLeaseOwner())
+                || current.getLeaseExpiresAt() == null || !current.getLeaseExpiresAt().isAfter(BusinessTime.now()))
+        {
+            cancelUnsharedTransfer(client, claim);
+            throw new SafeMediaException("来源采集任务已取消或下载租约已失效，附件下载已停止");
+        }
+    }
+
+    /** TDLib 按文件而非业务任务取消，仍被其他任务使用的文件保持传输。 */
+    private void cancelUnsharedTransfer(TelegramSessionClient client, TelegramMedia claim)
+    {
+        TelegramMedia current = media.findById(claim.getId()).orElse(null);
+        // 同一记录也可能已被新工作器接管；按其他记录统计共享下载无法覆盖此情形。
+        if (current != null && "DOWNLOADING".equals(current.getStatus()) && current.getLeaseOwner() != null
+                && !java.util.Objects.equals(current.getLeaseOwner(), claim.getLeaseOwner())
+                && current.getLeaseExpiresAt() != null && current.getLeaseExpiresAt().isAfter(BusinessTime.now()))
+        {
+            return;
+        }
+        if (media.otherActiveDownloads(claim.getTelegramFileId(), claim.getId()) == 0)
+        {
+            client.cancelDownloadFile(claim.getTelegramFileId());
         }
     }
 

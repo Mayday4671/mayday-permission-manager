@@ -31,6 +31,12 @@ public class TelegramCollectionTask extends BaseEntity
     private String messageLink;
 
     /**
+     * Explicit link-preview mode: collect only the selected message and its album,
+     * then stop instead of continuing into older channel history.
+     */
+    private Boolean includeAlbum;
+
+    /**
      * Server-verified channel title for channel-based tasks; null for link-based
      * tasks.
      */

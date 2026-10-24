@@ -138,15 +138,13 @@ class TelegramVideoPreviewStateService
                 || !Objects.equals(preview.getOwnerId(), source.getOwnerId())
                 || !Objects.equals(preview.getDepartmentId(), source.getDepartmentId())
                 || !"AVAILABLE".equals(source.getStatus()) || source.getStorageKey() == null
-                || source.getStorageProvider() == null
-                || !List.of("video/mp4", "video/webm").contains(source.getMediaType())
-                || !List.of("VIDEO", "ANIMATION").contains(source.getKind()))
+                || source.getStorageProvider() == null || !TelegramVideoMediaPolicy.isPreviewCandidate(source))
         {
             return false;
         }
         TelegramCollectionTask task = tasks.findById(source.getTaskId()).orElse(null);
         TelegramCollectedMessage message = messages.findById(source.getMessageId()).orElse(null);
-        return task != null && message != null && Boolean.TRUE.equals(task.getDownloadVideos())
+        return task != null && message != null && TelegramVideoMediaPolicy.isDownloadAllowed(source, task)
                 && Boolean.TRUE.equals(message.getCanBeSaved()) && !"CANCELLED".equals(task.getStatus())
                 && Objects.equals(task.getOwnerId(), source.getOwnerId())
                 && Objects.equals(message.getOwnerId(), source.getOwnerId())

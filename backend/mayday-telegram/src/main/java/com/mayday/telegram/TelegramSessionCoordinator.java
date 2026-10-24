@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.function.Supplier;
 
 import jakarta.annotation.PreDestroy;
 
@@ -53,6 +54,22 @@ public class TelegramSessionCoordinator
     private FileLock sessionLock;
 
     /**
+     * Runs a configuration update under the same lock used by connection startup,
+     * preventing a mid-connect change.
+     */
+    <T> T whileDisconnected(Supplier<T> update)
+    {
+        synchronized (mutex)
+        {
+            if (client != null)
+            {
+                throw new BusinessException("请先关闭 Telegram 连接，再修改运行配置");
+            }
+            return update.get();
+        }
+    }
+
+    /**
      * Returns account and environment readiness without exposing credentials, full
      * phone number or session path.
      *
@@ -67,20 +84,50 @@ public class TelegramSessionCoordinator
         {
             requireAccountVisibility(account);
         }
+        boolean sessionActive = client != null;
         TelegramAuthorizationState state = account == null
                 ? TelegramAuthorizationState.NOT_CONNECTED
-                : client == null ? parseStoredState(account.getAuthorizationState()) : liveState;
-        if (client == null && state == TelegramAuthorizationState.READY)
-        {
-            state = TelegramAuthorizationState.CLOSED;
-        }
+                : sessionActive ? liveState : parseStoredState(account.getAuthorizationState());
+        state = stateForStatus(sessionActive, state);
         return new TelegramStatusView(modules.isEnabled("telegram"), settings.credentialsConfigured(),
                 settings.sessionEncryptionKeyConfigured(), settings.isProxyEnabled(),
                 settings.proxyConfigurationReady(), settings.getProxyType(), settings.archiveToolAvailable(),
-                settings.ffmpegAvailable() && settings.ffprobeAvailable(), account != null, client != null,
-                state.name(), liveMessage == null ? stateMessage(state) : liveMessage,
+                settings.ffmpegAvailable() && settings.ffprobeAvailable(), account != null, sessionActive, state.name(),
+                liveMessage == null ? stateMessage(state) : liveMessage,
                 account == null ? null : account.getMaskedPhoneNumber(),
                 account == null || account.getTelegramUserId() == null ? null : account.getTelegramUserId().toString());
+    }
+
+    /**
+     * Reads the current TDLib user and the configured bot's existing block-list
+     * state, enforcing the same account visibility boundary as the status page.
+     * This diagnostic does not send messages or change Telegram settings.
+     *
+     * @return safe identifiers and read-only block-list information
+     */
+    public TelegramBotSessionDiagnostic inspectSearchBotSession()
+    {
+        moduleGuard.requireEnabled();
+        access.require("telegram:view");
+        TelegramAccount account = accounts.findPrimary().orElseThrow(() -> new BusinessException("请先连接 Telegram 账号"));
+        requireAccountVisibility(account);
+        TelegramSessionClient currentClient;
+        synchronized (mutex)
+        {
+            if (client == null || liveState != TelegramAuthorizationState.READY)
+            {
+                throw new BusinessException("请先完成 Telegram 账号授权并保持连接");
+            }
+            currentClient = client;
+        }
+        try
+        {
+            return currentClient.inspectBotSession(settings.getSearchBotUsername())
+                    .orTimeout(15, java.util.concurrent.TimeUnit.SECONDS).join();
+        } catch (java.util.concurrent.CompletionException exception)
+        {
+            throw new BusinessException("读取 Telegram 搜索机器人状态失败，请检查当前连接与机器人配置");
+        }
     }
 
     /**
@@ -224,7 +271,15 @@ public class TelegramSessionCoordinator
         {
             requireExpectedState(TelegramAuthorizationState.WAITING_FOR_PHONE);
             TelegramAccount account = requireOwnedAccount();
-            client.submitPhoneNumber(phoneNumber);
+            liveMessage = "手机号已提交，正在等待 Telegram 返回授权结果；验证码可能发送到已登录的 Telegram 客户端。";
+            try
+            {
+                client.submitPhoneNumber(phoneNumber);
+            } catch (RuntimeException exception)
+            {
+                liveMessage = null;
+                throw exception;
+            }
             updateAccount(account, liveState, maskPhoneNumber(phoneNumber), account.getTelegramUserId());
             return status();
         }
@@ -432,6 +487,33 @@ public class TelegramSessionCoordinator
         {
             throw new BusinessException("Telegram 授权状态已变化，请刷新页面后重试");
         }
+    }
+
+    /**
+     * Prevents a persisted challenge from being presented as actionable after a
+     * process restart, when its TDLib client is no longer running. The next
+     * explicit reconnect lets TDLib restore and publish the real authorization
+     * step.
+     *
+     * @param sessionActive
+     *            whether the current process owns an active TDLib client
+     * @param state
+     *            stored or live authorization state
+     * @return the safe state that the status API should expose
+     */
+    static TelegramAuthorizationState stateForStatus(boolean sessionActive, TelegramAuthorizationState state)
+    {
+        if (sessionActive)
+        {
+            return state;
+        }
+        return switch (state)
+        {
+            case INITIALIZING, WAITING_FOR_PHONE, WAITING_FOR_CODE, WAITING_FOR_PASSWORD, WAITING_FOR_EMAIL_ADDRESS,
+                    WAITING_FOR_EMAIL_CODE, WAITING_FOR_REGISTRATION, WAITING_FOR_DEVICE_CONFIRMATION, READY, CLOSING ->
+                TelegramAuthorizationState.CLOSED;
+            default -> state;
+        };
     }
 
     /**

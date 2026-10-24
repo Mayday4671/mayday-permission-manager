@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   App,
   Alert,
@@ -7,6 +7,7 @@ import {
   Checkbox,
   DatePicker,
   Descriptions,
+  Drawer,
   Form,
   Input,
   InputNumber,
@@ -15,25 +16,58 @@ import {
   Space,
   Table,
   Tag,
+  Tabs,
   Typography,
 } from "antd";
 import {
+  ArrowDownOutlined,
+  ArrowUpOutlined,
   CheckCircleOutlined,
+  CopyOutlined,
+  EditOutlined,
+  MenuOutlined,
+  ClockCircleOutlined,
+  CustomerServiceOutlined,
   DisconnectOutlined,
+  FilterOutlined,
+  FolderOutlined,
+  LeftOutlined,
   LockOutlined,
   LoginOutlined,
   LogoutOutlined,
+  MessageOutlined,
+  NotificationOutlined,
+  PictureOutlined,
   ReloadOutlined,
+  RightOutlined,
+  RobotOutlined,
+  ScanOutlined,
   SearchOutlined,
+  SettingOutlined,
+  TeamOutlined,
+  VideoCameraOutlined,
 } from "@ant-design/icons";
 import { Radio, Select } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, tokenStore } from "../../lib/api";
+import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import type { ColumnsType } from "antd/es/table";
-import { useMemo } from "react";
 import dayjs, { type Dayjs } from "dayjs";
-import Hls from "hls.js";
+import {
+  TelegramMessageMediaPreview,
+  TelegramInlineMediaItem,
+} from "./TelegramMessageMediaPreview";
+import { TelegramAttachmentDownload } from "./TelegramAttachmentDownload";
+import type {
+  TelegramCollectionTask,
+  TelegramCollectedMessage,
+  TelegramCollectedMedia,
+} from "./telegram-media-types";
+import {
+  TelegramConversationSidebar,
+  type TelegramConversationSummary,
+} from "./TelegramConversationSidebar";
+import { TelegramArchiveBrowser } from "./TelegramArchiveBrowser";
+import "./telegram-page.css";
 
 interface TelegramSearch {
   id: number;
@@ -70,31 +104,28 @@ interface TelegramSourceLink {
   publicChat: string | null;
 }
 
-interface ParsedTelegramMessage {
-  id: number;
-  telegramMessageId: string;
-  messageText: string | null;
-  sourceLinks: TelegramSourceLink[];
-  telegramSentAt: string | null;
-  telegramEditedAt: string | null;
+interface TelegramInlineTextLink {
+  offset: number;
+  length: number;
+  url: string;
 }
 
-interface TelegramCollectionTask {
+interface TelegramConversationMessage {
   id: number;
-  messageLink: string | null;
-  sourceTitle: string | null;
-  fromDate: string | null;
-  toDate: string | null;
-  status: string;
-  statusMessage: string;
-  maxMessages: number;
-  collectedMessages: number;
-  scannedMessages: number;
-  trackingEnabled: boolean;
-  liveCheckedAt: string | null;
-  liveStatusMessage: string | null;
-  createdAt: string;
-  updatedAt: string;
+  telegramMessageId: string;
+  contentType: string;
+  messageText: string | null;
+  replyMarkupJson: string;
+  telegramSentAt: string | null;
+  telegramEditedAt: string | null;
+  associationStatus: string;
+  sourceLinks: TelegramSourceLink[];
+  inlineLinks: TelegramInlineTextLink[];
+}
+
+interface TelegramConversationTurn {
+  search: TelegramSearch;
+  messages: TelegramConversationMessage[];
 }
 
 interface TelegramChannelOption {
@@ -103,274 +134,17 @@ interface TelegramChannelOption {
   username: string | null;
 }
 
-interface TelegramCollectedMessage {
-  id: number;
-  telegramMessageId: string;
-  senderId: string | null;
-  contentType: string | null;
-  messageText: string | null;
-  canBeSaved: boolean;
-  albumId: string | null;
-  topicId: string | null;
-  metadataJson: string;
-  telegramSentAt: string | null;
-  telegramEditedAt: string | null;
-  media: TelegramCollectedMedia[];
-}
-
-interface TelegramCollectedMedia {
-  id: number;
-  kind: string;
-  fileName: string | null;
-  expectedSize: number | null;
-  actualSize: number | null;
-  mediaType: string | null;
-  status: string;
-  contentUrl: string | null;
-  failureMessage: string | null;
-}
-
-interface TelegramVideoPreviewStatus {
-  id: number;
-  mediaId: number;
-  status: string;
-  statusMessage: string;
-  durationSeconds: number | null;
-  videoCodec: string | null;
-  audioCodec: string | null;
-  transcoded: boolean | null;
-  manifestUrl: string | null;
-  updatedAt: string;
-}
-
-/** HLS 资源需要带后台 Bearer 会话；只允许从当前站点加载清单和分片。 */
-function AuthenticatedHlsVideo({
-  manifestUrl,
-  mediaId,
-}: {
-  manifestUrl: string;
-  mediaId: number;
-}) {
-  const video = useRef<HTMLVideoElement>(null);
-  const [error, setError] = useState<string>();
-  const [originalUrl, setOriginalUrl] = useState<string>();
-  const [ticketPending, setTicketPending] = useState(false);
-
-  useEffect(() => {
-    const element = video.current;
-    if (!element) return;
-    if (!Hls.isSupported()) {
-      setError("当前浏览器未提供受支持的安全 HLS 播放能力");
-      return;
-    }
-
-    const player = new Hls({
-      xhrSetup: (request, url) => {
-        const target = new URL(url, window.location.href);
-        if (target.origin !== window.location.origin) {
-          request.abort();
-          return;
-        }
-        const token = tokenStore.get();
-        if (token) request.setRequestHeader("Authorization", `Bearer ${token}`);
-      },
-    });
-    player.on(Hls.Events.ERROR, (_event, data) => {
-      if (data.fatal) setError("视频播放失败；请刷新任务状态后重试");
-    });
-    player.loadSource(manifestUrl);
-    player.attachMedia(element);
-    return () => player.destroy();
-  }, [manifestUrl]);
-
-  const openOriginal = async () => {
-    setTicketPending(true);
-    try {
-      const ticket = await api<{ url: string }>(
-        `/telegram/media/${mediaId}/stream-ticket`,
-        { method: "POST" },
-      );
-      setOriginalUrl(ticket.url);
-    } catch (ticketError) {
-      setError(
-        ticketError instanceof Error
-          ? ticketError.message
-          : "无法创建受权原视频访问链接",
-      );
-    } finally {
-      setTicketPending(false);
-    }
-  };
-
-  return (
-    <Space direction="vertical" size={4}>
-      <video ref={video} controls preload="metadata" width={240} />
-      {error ? <Typography.Text type="danger">{error}</Typography.Text> : null}
-      {originalUrl ? (
-        <a href={originalUrl} target="_blank" rel="noopener noreferrer">
-          在新窗口打开原视频
-        </a>
-      ) : (
-        <Button
-          size="small"
-          loading={ticketPending}
-          onClick={() => void openOriginal()}
-        >
-          获取受权原视频链接
-        </Button>
-      )}
-    </Space>
-  );
-}
-
-/** Loads protected media with the current session token and revokes each temporary browser URL on unmount. */
+/** 采集详情复用同一鉴权预览，避免普通文件在用户点击下载前被自动读取。 */
 function TelegramMediaPreview({
   attachment,
 }: {
   attachment: TelegramCollectedMedia;
 }) {
-  const [source, setSource] = useState<string>();
-  const [previewRequested, setPreviewRequested] = useState(false);
-  const queryClient = useQueryClient();
-  const previewKey = ["telegram", "video-preview", attachment.id];
-  const videoPreview = useQuery({
-    queryKey: previewKey,
-    queryFn: () =>
-      api<TelegramVideoPreviewStatus>(
-        `/telegram/media/${attachment.id}/video-preview`,
-      ),
-    enabled: previewRequested,
-    refetchInterval: (query) =>
-      ["QUEUED", "PROCESSING"].includes(query.state.data?.status ?? "")
-        ? 1500
-        : false,
-    retry: false,
-  });
-  const requestPreview = useMutation({
-    mutationFn: () =>
-      api<TelegramVideoPreviewStatus>(
-        `/telegram/media/${attachment.id}/video-preview`,
-        { method: "POST" },
-      ),
-    onSuccess: (result) => {
-      setPreviewRequested(true);
-      queryClient.setQueryData(previewKey, result);
-    },
-  });
-  const cancelPreview = useMutation({
-    mutationFn: () =>
-      api<TelegramVideoPreviewStatus>(
-        `/telegram/media/${attachment.id}/video-preview/cancel`,
-        { method: "POST" },
-      ),
-    onSuccess: (result) => queryClient.setQueryData(previewKey, result),
-  });
-
-  useEffect(() => {
-    if (
-      !attachment.contentUrl ||
-      attachment.mediaType === "video/mp4" ||
-      attachment.mediaType === "video/webm"
-    )
-      return;
-    const controller = new AbortController();
-    let objectUrl: string | undefined;
-    const token = tokenStore.get();
-    void fetch(attachment.contentUrl, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("附件尚不可读取");
-        const blob = await response.blob();
-        objectUrl = URL.createObjectURL(blob);
-        setSource(objectUrl);
-      })
-      .catch(() => setSource(undefined));
-    return () => {
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [attachment.contentUrl]);
-
-  if (!attachment.contentUrl) return null;
-  if (
-    attachment.mediaType === "video/mp4" ||
-    attachment.mediaType === "video/webm"
-  ) {
-    const task = videoPreview.data;
-    if (task?.status === "READY" && task.manifestUrl) {
-      return (
-        <AuthenticatedHlsVideo
-          manifestUrl={task.manifestUrl}
-          mediaId={attachment.id}
-        />
-      );
-    }
-    if (["QUEUED", "PROCESSING"].includes(task?.status ?? "")) {
-      return (
-        <Space direction="vertical" size={2}>
-          <Typography.Text type="secondary">
-            {task?.statusMessage}
-          </Typography.Text>
-          <Button
-            size="small"
-            onClick={() => cancelPreview.mutate()}
-            loading={cancelPreview.isPending}
-          >
-            取消预览
-          </Button>
-        </Space>
-      );
-    }
-    return (
-      <Space direction="vertical" size={2}>
-        <Button
-          size="small"
-          loading={requestPreview.isPending}
-          onClick={() => requestPreview.mutate()}
-        >
-          生成安全预览
-        </Button>
-        {task?.statusMessage ? (
-          <Typography.Text type="secondary">
-            {task.statusMessage}
-          </Typography.Text>
-        ) : null}
-        {requestPreview.error || videoPreview.error ? (
-          <Typography.Text type="danger">
-            {(requestPreview.error ?? videoPreview.error)?.message}
-          </Typography.Text>
-        ) : null}
-        {["FAILED", "EXPIRED", "CANCELLED"].includes(task?.status ?? "") ? (
-          <Button
-            size="small"
-            type="link"
-            onClick={() => requestPreview.mutate()}
-          >
-            重新生成
-          </Button>
-        ) : null}
-      </Space>
-    );
-  }
-  if (!source)
-    return <Typography.Text type="secondary">正在读取附件…</Typography.Text>;
-  if (attachment.mediaType?.startsWith("image/")) {
-    return (
-      <Image
-        width={76}
-        height={60}
-        style={{ objectFit: "cover", borderRadius: 6 }}
-        src={source}
-        alt={attachment.fileName ?? "Telegram 图片"}
-      />
-    );
-  }
+  if (attachment.status !== "AVAILABLE" || !attachment.contentUrl) return null;
   return (
-    <a href={source} download={attachment.fileName ?? "telegram-media"}>
-      下载附件
-    </a>
+    <div style={{ width: 240, maxWidth: "100%" }}>
+      <TelegramInlineMediaItem attachment={attachment} />
+    </div>
   );
 }
 
@@ -378,6 +152,92 @@ interface InlineButton {
   text: string;
   type: string;
   url?: string;
+}
+
+type SearchResourceType =
+  | "groups"
+  | "channels"
+  | "videos"
+  | "images"
+  | "music"
+  | "chats"
+  | "bots"
+  | "files";
+
+interface SearchResourceOption {
+  value: SearchResourceType;
+  label: string;
+  icon: ReactNode;
+  buttonAliases: string[];
+}
+
+/**
+ * Mirrors the resource categories shown by the configured search bot.
+ * Bot labels can vary by language and may include emoji, so aliases are used
+ * only to recognize the callback button; the interface supplies its own icon.
+ */
+const SEARCH_RESOURCE_TYPES: SearchResourceOption[] = [
+  {
+    value: "groups",
+    label: "群组",
+    icon: <TeamOutlined />,
+    buttonAliases: ["👥", "群组"],
+  },
+  {
+    value: "channels",
+    label: "频道",
+    icon: <NotificationOutlined />,
+    buttonAliases: ["📢", "频道"],
+  },
+  {
+    value: "videos",
+    label: "视频",
+    icon: <VideoCameraOutlined />,
+    buttonAliases: ["🎬", "视频"],
+  },
+  {
+    value: "images",
+    label: "图片",
+    icon: <PictureOutlined />,
+    buttonAliases: ["🏞", "🖼", "📷", "图片"],
+  },
+  {
+    value: "music",
+    label: "音乐",
+    icon: <CustomerServiceOutlined />,
+    buttonAliases: ["🎧", "音乐"],
+  },
+  {
+    value: "chats",
+    label: "聊天",
+    icon: <MessageOutlined />,
+    buttonAliases: ["💬", "聊天"],
+  },
+  {
+    value: "bots",
+    label: "机器人",
+    icon: <RobotOutlined />,
+    buttonAliases: ["🤖", "机器人"],
+  },
+  {
+    value: "files",
+    label: "文件",
+    icon: <FolderOutlined />,
+    buttonAliases: ["📁", "文件"],
+  },
+];
+/** Waits longer for Telegram callback answers than for ordinary API requests. */
+const TELEGRAM_CALLBACK_TIMEOUT_MS = 60_000;
+
+interface PositionedInlineButton {
+  button: InlineButton;
+  row: number;
+  column: number;
+}
+
+interface GroupedInlineKeyboard {
+  resourceTypeButtons: PositionedInlineButton[];
+  actionButtonRows: PositionedInlineButton[][];
 }
 
 interface CallbackAnswer {
@@ -393,157 +253,7 @@ interface PageResult<T> {
   size: number;
 }
 
-interface TelegramArchiveEntry {
-  name: string;
-  size: number;
-  modifiedAt: number;
-  withinExtractionLimit: boolean;
-  encrypted: boolean;
-}
-
-/** Lists archive contents on demand and fetches one bounded entry only after selection. */
-function TelegramArchiveBrowser({ mediaId }: { mediaId: number }) {
-  const [open, setOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<TelegramArchiveEntry>();
-  const [previewUrl, setPreviewUrl] = useState<string>();
-  const entries = useQuery({
-    queryKey: ["telegram", "archive-entries", mediaId, page],
-    queryFn: () =>
-      api<PageResult<TelegramArchiveEntry>>(
-        `/telegram/media/${mediaId}/archive-entries?page=${page}&size=50`,
-      ),
-    enabled: open,
-    retry: false,
-  });
-
-  useEffect(() => {
-    if (!open || !selected) return;
-    const controller = new AbortController();
-    let objectUrl: string | undefined;
-    const token = tokenStore.get();
-    const url = `/api/telegram/media/${mediaId}/archive-entry?name=${encodeURIComponent(selected.name)}`;
-    void fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("无法安全读取所选压缩包条目");
-        objectUrl = URL.createObjectURL(await response.blob());
-        setPreviewUrl(objectUrl);
-      })
-      .catch(() => setPreviewUrl(undefined));
-    return () => {
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [mediaId, open, selected]);
-
-  const close = () => {
-    setOpen(false);
-    setSelected(undefined);
-    setPreviewUrl(undefined);
-  };
-
-  return (
-    <>
-      <Button size="small" onClick={() => setOpen(true)}>
-        浏览压缩包
-      </Button>
-      <Modal
-        title="压缩包内容"
-        open={open}
-        onCancel={close}
-        footer={<Button onClick={close}>关闭</Button>}
-        width={760}
-        destroyOnHidden
-      >
-        <Typography.Paragraph type="secondary">
-          支持 ZIP、RAR 与
-          7z。加密条目、符号链接和超出单文件上限的条目不可提取；原归档路径不会写入服务器目录。
-        </Typography.Paragraph>
-        {entries.error ? (
-          <Alert type="error" showIcon message={entries.error.message} />
-        ) : null}
-        <Table<TelegramArchiveEntry>
-          rowKey="name"
-          size="small"
-          loading={entries.isLoading}
-          dataSource={entries.data?.items ?? []}
-          pagination={{
-            current: page,
-            pageSize: 50,
-            total: entries.data?.total ?? 0,
-            showSizeChanger: false,
-            onChange: (nextPage) => {
-              setPage(nextPage);
-              setSelected(undefined);
-              setPreviewUrl(undefined);
-            },
-          }}
-          columns={[
-            { title: "文件路径", dataIndex: "name", ellipsis: true },
-            {
-              title: "大小",
-              dataIndex: "size",
-              width: 110,
-              render: (value: number) => `${(value / 1024).toFixed(1)} KB`,
-            },
-            {
-              title: "操作",
-              width: 150,
-              render: (_value, entry) => (
-                <Space>
-                  {entry.encrypted ? <Tag color="warning">加密</Tag> : null}
-                  <Button
-                    type="link"
-                    size="small"
-                    disabled={!entry.withinExtractionLimit}
-                    onClick={() => {
-                      setPreviewUrl(undefined);
-                      setSelected(entry);
-                    }}
-                  >
-                    预览 / 提取
-                  </Button>
-                </Space>
-              ),
-            },
-          ]}
-        />
-        {selected ? (
-          <Card size="small" title={selected.name} style={{ marginTop: 16 }}>
-            {!previewUrl ? (
-              <Typography.Text type="secondary">
-                正在按需读取所选条目…
-              </Typography.Text>
-            ) : selected.name.match(/\.(png|jpe?g|gif|webp)$/i) ? (
-              <Image
-                src={previewUrl}
-                alt={selected.name}
-                style={{ maxWidth: "100%" }}
-              />
-            ) : selected.name.match(/\.mp4$/i) ? (
-              <video
-                controls
-                preload="metadata"
-                src={previewUrl}
-                style={{ maxWidth: "100%" }}
-              />
-            ) : (
-              <a
-                href={previewUrl}
-                download={selected.name.split("/").at(-1) ?? "archive-entry"}
-              >
-                下载所选文件
-              </a>
-            )}
-          </Card>
-        ) : null}
-      </Modal>
-    </>
-  );
-}
+type TelegramWorkspaceTab = "search" | "collection" | "account";
 
 interface TelegramStatus {
   enabled: boolean;
@@ -562,6 +272,45 @@ interface TelegramStatus {
   telegramUserId: string | null;
 }
 
+/** Safe identity and peer-state details returned by the read-only bot diagnostic. */
+interface TelegramBotSessionDiagnostic {
+  telegramUserId: string;
+  botUsername: string;
+  botUserId: string;
+  botChatId: string;
+  cachedBlockListType: string;
+  onlineMainBlockListStatus: "BLOCKED" | "NOT_BLOCKED" | "INCOMPLETE";
+}
+
+/** Safe operator configuration view; credentials are represented by presence flags only. */
+interface TelegramConfigurationView {
+  apiId: string;
+  apiHashConfigured: boolean;
+  sessionKeyConfigured: boolean;
+  proxyEnabled: boolean;
+  proxyType: string;
+  proxyHost: string;
+  proxyPort: number;
+  proxyUsername: string;
+  proxyPasswordConfigured: boolean;
+  proxySecretConfigured: boolean;
+  encryptionAvailable: boolean;
+  databaseOverride: boolean;
+}
+
+/** Write-only Telegram secret inputs; blank values leave their existing server-side values unchanged. */
+interface TelegramConfigurationForm {
+  apiId: string;
+  apiHash?: string;
+  proxyEnabled: boolean;
+  proxyType: string;
+  proxyHost: string;
+  proxyPort: number;
+  proxyUsername: string;
+  proxyPassword?: string;
+  proxySecret?: string;
+}
+
 type Challenge = {
   endpoint: string;
   label: string;
@@ -572,7 +321,7 @@ type Challenge = {
 const CHALLENGES: Record<string, Challenge> = {
   WAITING_FOR_PHONE: {
     endpoint: "/session/phone",
-    label: "手机号",
+    label: "Telegram 账号手机号",
     placeholder: "国际区号格式，例如 +8613800000000",
   },
   WAITING_FOR_CODE: {
@@ -630,26 +379,217 @@ function searchStatusLabel(state: string): string {
   return labels[state] ?? "状态未知";
 }
 
+/** 采集状态与搜索状态分别命名，避免把消息保存完成显示成机器人回复完成。 */
+function collectionStatusLabel(state: string): string {
+  const labels: Record<string, string> = {
+    QUEUED: "等待采集",
+    RUNNING: "采集中",
+    PAUSED: "已暂停",
+    WAITING_ACCOUNT: "等待账号连接",
+    COMPLETED: "已完成",
+    FAILED: "失败",
+    CANCELLED: "已取消",
+  };
+  return labels[state] ?? "状态未知";
+}
+
 /** Parses only the server's allow-listed, non-secret inline button projection. */
-function inlineKeyboard(markup: string): InlineButton[][] {
+function inlineKeyboard(markup: string): (InlineButton | null)[][] {
   try {
     const parsed: unknown = JSON.parse(markup);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((row) =>
       Array.isArray(row)
-        ? row.filter((button): button is InlineButton =>
+        ? row.map((button): InlineButton | null =>
             Boolean(
               button &&
               typeof button === "object" &&
               typeof button.text === "string" &&
               typeof button.type === "string" &&
               (button.type !== "URL" || isSafeHttpsUrl(button.url)),
-            ),
+            )
+              ? button
+              : null,
           )
         : [],
     );
   } catch {
     return [];
+  }
+}
+
+/** Maps only categories explicitly exposed by the configured bot's callback keyboard. */
+function resourceTypeFromButton(text: string): SearchResourceType | null {
+  const resourceType = SEARCH_RESOURCE_TYPES.find((item) =>
+    item.buttonAliases.some((alias) =>
+      text.toLocaleLowerCase().includes(alias.toLocaleLowerCase()),
+    ),
+  );
+  return resourceType?.value ?? null;
+}
+
+/** Returns the canonical category label while leaving non-category action labels untouched. */
+function callbackButtonLabel(text: string): string {
+  const type = resourceTypeFromButton(text);
+  return type
+    ? (SEARCH_RESOURCE_TYPES.find((item) => item.value === type)?.label ?? text)
+    : text;
+}
+
+/** Adds familiar icons to the search bot's actions without changing callback payloads. */
+function callbackButtonIcon(text: string): ReactNode {
+  const resourceType = resourceTypeFromButton(text);
+  if (resourceType) {
+    return SEARCH_RESOURCE_TYPES.find((item) => item.value === resourceType)
+      ?.icon;
+  }
+
+  if (/最新|\bnewest?\b/i.test(text)) return <ClockCircleOutlined />;
+  if (/过滤|\bfilter\b/i.test(text)) return <FilterOutlined />;
+  if (/下一页|\bnext\b/i.test(text)) return <RightOutlined />;
+  if (/上一页|\bprevious\b/i.test(text)) return <LeftOutlined />;
+
+  return undefined;
+}
+
+/**
+ * Places all resource filters in one visual row while retaining each button's
+ * original row and column. Those coordinates are required by the server to
+ * resolve the matching callback data from the saved Telegram message.
+ */
+function groupInlineKeyboard(markup: string): GroupedInlineKeyboard {
+  const resourceTypeButtons: PositionedInlineButton[] = [];
+  const actionButtonRows: PositionedInlineButton[][] = [];
+
+  inlineKeyboard(markup).forEach((buttonRow, row) => {
+    const actionButtons: PositionedInlineButton[] = [];
+
+    buttonRow.forEach((button, column) => {
+      // 无效按钮保留空位，不能改变 Telegram 回调所使用的原始列号。
+      if (!button) return;
+      const positionedButton = { button, row, column };
+      if (button.type === "CALLBACK" && resourceTypeFromButton(button.text)) {
+        resourceTypeButtons.push(positionedButton);
+      } else {
+        actionButtons.push(positionedButton);
+      }
+    });
+
+    if (actionButtons.length) actionButtonRows.push(actionButtons);
+  });
+
+  return { resourceTypeButtons, actionButtonRows };
+}
+
+/** Renders the original Telegram text and turns only its matching link ranges into anchors. */
+function renderMessageText(
+  text: string | null,
+  inlineLinks: TelegramInlineTextLink[] | undefined,
+  sourceLinks: TelegramSourceLink[],
+  onTelegramPostClick?: (url: string) => void,
+) {
+  if (!text) return "";
+
+  const ranges = [...(inlineLinks ?? [])]
+    .filter(
+      (link) =>
+        Number.isInteger(link.offset) &&
+        Number.isInteger(link.length) &&
+        link.offset >= 0 &&
+        link.length > 0 &&
+        link.offset + link.length <= text.length &&
+        isSafeMessageLink(link.url),
+    )
+    .map((link) => ({
+      offset: link.offset,
+      length: link.length,
+      url: link.url,
+    }));
+
+  // Old stored responses may predate inlineLinks; link literal URLs without changing text.
+  if (!ranges.length) {
+    for (const link of sourceLinks) {
+      if (!isSafeMessageLink(link.url)) continue;
+      const offset = text.indexOf(link.url);
+      if (offset >= 0)
+        ranges.push({ offset, length: link.url.length, url: link.url });
+    }
+  }
+
+  const orderedRanges = ranges
+    .sort((left, right) => left.offset - right.offset)
+    .filter((range, index, items) => {
+      const previous = items[index - 1];
+      return !previous || range.offset >= previous.offset + previous.length;
+    });
+  if (!orderedRanges.length) return text;
+
+  const nodes = [];
+  let cursor = 0;
+  for (const [index, range] of orderedRanges.entries()) {
+    if (range.offset > cursor) {
+      nodes.push(
+        <Fragment key={`text-${cursor}`}>
+          {text.slice(cursor, range.offset)}
+        </Fragment>,
+      );
+    }
+    nodes.push(
+      <a
+        href={range.url}
+        key={`link-${index}-${range.offset}`}
+        onClick={(event) => {
+          if (onTelegramPostClick && isTelegramPostLink(range.url)) {
+            event.preventDefault();
+            onTelegramPostClick(range.url);
+          }
+        }}
+        rel="noopener noreferrer"
+        target="_blank"
+        title={range.url}
+      >
+        {text.slice(range.offset, range.offset + range.length)}
+      </a>,
+    );
+    cursor = range.offset + range.length;
+  }
+  if (cursor < text.length) {
+    nodes.push(
+      <Fragment key={`text-${cursor}`}>{text.slice(cursor)}</Fragment>,
+    );
+  }
+  return nodes;
+}
+
+/** Accepts only absolute HTTP(S) message links without embedded credentials. */
+function isSafeMessageLink(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      Boolean(url.hostname) &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Recognizes public Telegram post URLs, excluding channel roots, invites and bot commands. */
+function isTelegramPostLink(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || !["t.me", "telegram.me"].includes(host)) {
+      return false;
+    }
+    const segments = url.pathname.split("/").filter(Boolean);
+    if (segments[0]?.toLowerCase() === "s") segments.shift();
+    return segments.length >= 2 && /^\d+$/.test(segments.at(-1) ?? "");
+  } catch {
+    return false;
   }
 }
 
@@ -671,7 +611,31 @@ export function TelegramPage() {
   const [value, setValue] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [keyword, setKeyword] = useState("");
+  // 草稿只保留在当前页面内存中；不同会话互不覆盖，也不持久化搜索内容。
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const [conversationDrawerOpen, setConversationDrawerOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showScrollLatest, setShowScrollLatest] = useState(false);
+  const followLatestRef = useRef(true);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const [appliedTypeFilters, setAppliedTypeFilters] = useState<
+    Record<number, SearchResourceType>
+  >({});
+  const [conversationPage, setConversationPage] = useState(1);
+  const [conversationListPage, setConversationListPage] = useState(1);
+  const [selectedConversationId, setSelectedConversationId] =
+    useState<number>();
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const keyword = selectedConversationId
+    ? (drafts[selectedConversationId] ?? "")
+    : "";
+  const setKeyword = (value: string) => {
+    if (selectedConversationId) {
+      setDrafts((current) => ({ ...current, [selectedConversationId]: value }));
+    }
+  };
+  const [workspaceTab, setWorkspaceTab] =
+    useState<TelegramWorkspaceTab>("search");
   const [collectionSource, setCollectionSource] = useState<"link" | "channel">(
     "link",
   );
@@ -688,14 +652,23 @@ export function TelegramPage() {
   const [downloadDocuments, setDownloadDocuments] = useState(false);
   const [selectedCollection, setSelectedCollection] =
     useState<TelegramCollectionTask | null>(null);
+  const [inlineMediaPreview, setInlineMediaPreview] = useState<{
+    taskId: number;
+    messageLink: string;
+  } | null>(null);
+  const mediaPreviewGeneration = useRef(0);
+  // A closed or replaced preview must not be reopened by an older request.
+  useEffect(
+    () => () => {
+      mediaPreviewGeneration.current += 1;
+      message.destroy("telegram-media-preview");
+    },
+    [message],
+  );
   const [collectionTaskPage, setCollectionTaskPage] = useState(1);
   const [collectionPage, setCollectionPage] = useState(1);
-  const [messageSearch, setMessageSearch] = useState<TelegramSearch | null>(
-    null,
-  );
-  const [messagePage, setMessagePage] = useState(1);
-  const [parsedMessagePage, setParsedMessagePage] = useState(1);
-  const [searchPage, setSearchPage] = useState(1);
+  const [configurationOpen, setConfigurationOpen] = useState(false);
+  const [configurationForm] = Form.useForm<TelegramConfigurationForm>();
 
   /** Runs callbacks only by pointing to a button already captured from this search. */
   const callback = useMutation({
@@ -709,16 +682,120 @@ export function TelegramPage() {
       messageId: number;
       row: number;
       column: number;
+      resourceType?: SearchResourceType;
     }) =>
       api<CallbackAnswer>(
         `/telegram/searches/${searchId}/messages/${messageId}/buttons/${row}/${column}`,
         { method: "POST" },
+        TELEGRAM_CALLBACK_TIMEOUT_MS,
       ),
-    onSuccess: async (answer) => {
+    onSuccess: async (answer, request) => {
+      const resourceType = request.resourceType;
+      if (resourceType) {
+        setAppliedTypeFilters((current) => ({
+          ...current,
+          [request.searchId]: resourceType,
+        }));
+      }
       message.info(answer.text || "机器人已处理按钮请求");
       await queryClient.invalidateQueries({
-        queryKey: ["telegram", "search-messages", messageSearch?.id],
+        queryKey: ["telegram", "conversation"],
       });
+    },
+    onError: (error: Error) => message.error(error.message),
+  });
+
+  /** Loads persistent, owner-scoped Mayday conversations for the left sidebar. */
+  const conversationList = useQuery({
+    queryKey: ["telegram", "conversations", conversationListPage],
+    queryFn: () =>
+      api<PageResult<TelegramConversationSummary>>(
+        `/telegram/conversations?page=${conversationListPage}&size=50`,
+      ),
+    enabled: can("telegram:view"),
+    retry: false,
+  });
+
+  /** Creates one empty sidebar conversation without sending a Telegram message. */
+  const createConversation = useMutation({
+    mutationFn: () =>
+      api<TelegramConversationSummary>("/telegram/conversations", {
+        method: "POST",
+      }),
+    onSuccess: async (created) => {
+      setConversationListPage(1);
+      setConversationPage(1);
+      setSelectedConversationId(created.id);
+      setConversationDrawerOpen(false);
+      queryClient.setQueryData<PageResult<TelegramConversationSummary>>(
+        ["telegram", "conversations", 1],
+        (previous) =>
+          previous
+            ? {
+                ...previous,
+                items: [
+                  created,
+                  ...previous.items.filter((item) => item.id !== created.id),
+                ].slice(0, 50),
+                total: previous.total + 1,
+              }
+            : { items: [created], total: 1, page: 1, size: 50 },
+      );
+      await queryClient.invalidateQueries({
+        queryKey: ["telegram", "conversations"],
+      });
+    },
+    onError: (error: Error) => message.error(error.message),
+  });
+
+  /** Deletes only the selected owner's session after explicit user confirmation. */
+  const deleteConversation = useMutation({
+    mutationFn: (id: number) =>
+      api<void>(`/telegram/conversations/${id}`, { method: "DELETE" }),
+    onSuccess: async (_, deletedId) => {
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[deletedId];
+        return next;
+      });
+      const listKey = [
+        "telegram",
+        "conversations",
+        conversationListPage,
+      ] as const;
+      const current =
+        queryClient.getQueryData<PageResult<TelegramConversationSummary>>(
+          listKey,
+        );
+      const remaining =
+        current?.items.filter((item) => item.id !== deletedId) ?? [];
+      if (selectedConversationId === deletedId) {
+        setSelectedConversationId(remaining[0]?.id);
+        setConversationPage(1);
+      }
+      if (!remaining.length && conversationListPage > 1) {
+        setConversationListPage((page) => Math.max(1, page - 1));
+      }
+      queryClient.setQueryData<PageResult<TelegramConversationSummary>>(
+        listKey,
+        (previous) =>
+          previous
+            ? {
+                ...previous,
+                items: previous.items.filter((item) => item.id !== deletedId),
+                total: Math.max(0, previous.total - 1),
+              }
+            : previous,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["telegram", "conversations"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["telegram", "conversation"],
+        }),
+      ]);
+      message.success("会话及其本地搜索记录已删除");
     },
     onError: (error: Error) => message.error(error.message),
   });
@@ -728,6 +805,13 @@ export function TelegramPage() {
     queryFn: () => api<TelegramStatus>("/telegram/status"),
     retry: false,
     refetchInterval: 2500,
+  });
+
+  /** Reads the active TDLib identity and bot block state only when requested. */
+  const botDiagnostic = useMutation({
+    mutationFn: () =>
+      api<TelegramBotSessionDiagnostic>("/telegram/session/bot-diagnostic"),
+    onError: (error: Error) => message.error(error.message),
   });
 
   const action = useMutation({
@@ -744,18 +828,78 @@ export function TelegramPage() {
             ? { body: JSON.stringify(request.body) }
             : {}),
       }),
-    onSuccess: async (next) => {
-      setValue("");
+    onSuccess: async (next, request) => {
+      const phoneNumberStillPending =
+        request.endpoint === "/session/phone" &&
+        next.state === "WAITING_FOR_PHONE";
+      if (!phoneNumberStillPending) {
+        setValue("");
+      }
       setFirstName("");
       setLastName("");
       queryClient.setQueryData(["telegram", "status"], next);
       await queryClient.invalidateQueries({ queryKey: ["telegram", "status"] });
-      message.success(next.message);
+      if (phoneNumberStillPending) {
+        message.info(
+          "手机号已提交，正在等待 Telegram 返回授权结果；号码会保留，便于出错后修改重试。",
+        );
+      } else {
+        message.success(next.message);
+      }
     },
     onError: (error: Error) => message.error(error.message),
   });
 
   const view = status.data;
+  const authorizationState = view?.state;
+  useEffect(() => {
+    // A credential is kept only while Telegram remains on the same challenge, so
+    // a rejected phone can be corrected but never carries over into the code step.
+    setValue("");
+    setFirstName("");
+    setLastName("");
+  }, [authorizationState]);
+  const canConfigure = can("telegram:configure");
+  const configuration = useQuery({
+    queryKey: ["telegram", "configuration"],
+    queryFn: () => api<TelegramConfigurationView>("/telegram/configuration"),
+    enabled: configurationOpen && canConfigure,
+    retry: false,
+  });
+  const saveConfiguration = useMutation({
+    mutationFn: (values: TelegramConfigurationForm) =>
+      api<TelegramConfigurationView>("/telegram/configuration", {
+        method: "PUT",
+        body: JSON.stringify(values),
+      }),
+    onSuccess: async () => {
+      message.success("Telegram 配置已保存，将立即用于下一次连接");
+      setConfigurationOpen(false);
+      configurationForm.resetFields();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["telegram", "status"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["telegram", "configuration"],
+        }),
+      ]);
+    },
+    onError: (error: Error) => message.error(error.message),
+  });
+
+  useEffect(() => {
+    if (!configurationOpen || !configuration.data) return;
+    configurationForm.setFieldsValue({
+      apiId: configuration.data.apiId,
+      apiHash: "",
+      proxyEnabled: configuration.data.proxyEnabled,
+      proxyType: configuration.data.proxyType,
+      proxyHost: configuration.data.proxyHost,
+      proxyPort: configuration.data.proxyPort,
+      proxyUsername: configuration.data.proxyUsername,
+      proxyPassword: "",
+      proxySecret: "",
+    });
+  }, [configuration.data, configurationOpen, configurationForm]);
   const challenge = view ? CHALLENGES[view.state] : undefined;
   const canConnect = can("telegram:connect");
   const canClose = can("telegram:disconnect");
@@ -789,17 +933,91 @@ export function TelegramPage() {
     staleTime: 15_000,
   });
 
-  /** Keeps search history server-paged and scoped to the current authorized user. */
-  const searchHistory = useQuery({
-    queryKey: ["telegram", "searches", searchPage],
+  /** Selects the newest session on first load, while preserving the user's current selection. */
+  useEffect(() => {
+    if (!conversationList.isSuccess) return;
+    const conversations = conversationList.data.items;
+    if (!conversations.length) {
+      setSelectedConversationId(undefined);
+      return;
+    }
+    if (!conversations.some((item) => item.id === selectedConversationId)) {
+      setSelectedConversationId(conversations[0].id);
+      setConversationPage(1);
+    }
+  }, [
+    conversationList.data,
+    conversationList.isSuccess,
+    selectedConversationId,
+  ]);
+
+  /** Loads one selected session page, including reply-specific links, without mixing other sessions. */
+  const conversation = useQuery({
+    queryKey: [
+      "telegram",
+      "conversation",
+      selectedConversationId,
+      conversationPage,
+    ],
     queryFn: () =>
-      api<PageResult<TelegramSearch>>(
-        `/telegram/searches?page=${searchPage}&size=20`,
+      api<PageResult<TelegramConversationTurn>>(
+        `/telegram/conversation?conversationId=${selectedConversationId}&page=${conversationPage}&size=20`,
       ),
-    enabled: Boolean(view && can("telegram:view")),
-    refetchInterval: 3000,
+    enabled: Boolean(view && can("telegram:view") && selectedConversationId),
+    refetchInterval: (query) =>
+      query.state.data?.items.some((turn) =>
+        ["PENDING", "SENDING", "WAITING"].includes(turn.search.status),
+      )
+        ? 2500
+        : false,
     retry: false,
   });
+
+  /** 高度随可用视口调整，保留外部导航与页脚；只让消息区域滚动。 */
+  useEffect(() => {
+    const workspace = workspaceRef.current;
+    if (!workspace || workspaceTab !== "search") return;
+    const updateHeight = () => {
+      const top = workspace.getBoundingClientRect().top + window.scrollY;
+      const footer = document.querySelector(".admin-footer");
+      const footerHeight = footer?.getBoundingClientRect().height ?? 40;
+      const viewportHeight =
+        window.visualViewport?.height ?? window.innerHeight;
+      workspace.style.setProperty(
+        "--telegram-workspace-height",
+        `${Math.max(140, viewportHeight - top - footerHeight - 28)}px`,
+      );
+    };
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    window.visualViewport?.addEventListener("resize", updateHeight);
+    return () => {
+      window.removeEventListener("resize", updateHeight);
+      window.visualViewport?.removeEventListener("resize", updateHeight);
+    };
+  }, [workspaceTab, can("telegram:view")]);
+
+  /** 切换会话定位到最新消息；翻阅历史时保持当前位置，避免轮询抢走阅读焦点。 */
+  useEffect(() => {
+    followLatestRef.current = conversationPage === 1;
+    setShowScrollLatest(false);
+    if (transcriptRef.current) transcriptRef.current.scrollTop = 0;
+  }, [selectedConversationId, conversationPage, workspaceTab]);
+
+  const newestTurn = conversation.data?.items[0];
+  useEffect(() => {
+    const transcript = transcriptRef.current;
+    if (!transcript || conversationPage !== 1 || !newestTurn) return;
+    if (followLatestRef.current) {
+      transcript.scrollTop = transcript.scrollHeight;
+      setShowScrollLatest(false);
+    }
+  }, [
+    conversationPage,
+    selectedConversationId,
+    conversation.data,
+    workspaceTab,
+  ]);
 
   /** Shows durable, owner-scoped history tasks and refreshes only while work remains. */
   const collectionTasks = useQuery({
@@ -875,6 +1093,67 @@ export function TelegramPage() {
     },
     onError: (error: Error) => message.error(error.message),
   });
+
+  /** Previews the linked post and its album without collecting unrelated channel history. */
+  const createInlineMediaPreview = useMutation({
+    onMutate: () => ++mediaPreviewGeneration.current,
+    mutationFn: (link: string) =>
+      api<TelegramCollectionTask>("/telegram/collections", {
+        method: "POST",
+        body: JSON.stringify({
+          messageLink: link,
+          maxMessages: 10,
+          includeAlbum: true,
+          downloadImages: true,
+          downloadVideos: true,
+          downloadDocuments: true,
+        }),
+      }),
+    onSuccess: (task, link, generation) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["telegram", "collections"],
+      });
+      if (generation !== mediaPreviewGeneration.current) return;
+      message.destroy("telegram-media-preview");
+      setInlineMediaPreview({
+        taskId: task.id,
+        messageLink: task.messageLink ?? link,
+      });
+      setCollectionTaskPage(1);
+    },
+    onError: (error: Error, _link, generation) => {
+      if (generation !== mediaPreviewGeneration.current) return;
+      message.destroy("telegram-media-preview");
+      message.error(error.message);
+    },
+  });
+
+  /** Enforces account and permission checks before turning a Telegram post link into a local preview. */
+  const previewTelegramPost = (link: string) => {
+    if (!view?.connected) {
+      message.warning("请先连接 Telegram 账号，再预览帖子媒体");
+      return;
+    }
+    if (
+      !can("telegram:view") ||
+      !can("telegram:collect") ||
+      !can("telegram:download")
+    ) {
+      message.warning(
+        "预览媒体需要“查看”、“采集”和“下载”权限，请联系管理员配置",
+      );
+      return;
+    }
+    if (createInlineMediaPreview.isPending || inlineMediaPreview) {
+      return;
+    }
+    message.loading({
+      content: "正在准备图片 / 视频预览…",
+      key: "telegram-media-preview",
+      duration: 0,
+    });
+    createInlineMediaPreview.mutate(link);
+  };
 
   /** Controls only the selected task and lets the backend re-check owner, scope and state. */
   const collectionAction = useMutation({
@@ -956,108 +1235,36 @@ export function TelegramPage() {
     retry: false,
   });
 
-  /** Loads captured bot updates only for the search explicitly selected by the user. */
-  const rawMessages = useQuery({
-    queryKey: ["telegram", "search-messages", messageSearch?.id, messagePage],
-    queryFn: () =>
-      api<PageResult<TelegramMessage>>(
-        `/telegram/searches/${messageSearch!.id}/messages?page=${messagePage}&size=30`,
-      ),
-    enabled: Boolean(messageSearch && can("telegram:view")),
-    refetchInterval: messageSearch?.status === "WAITING" ? 2500 : false,
-    retry: false,
-  });
-
-  /** Keeps parser candidates paged by the source message that produced them. */
-  const parsedMessages = useQuery({
-    queryKey: [
-      "telegram",
-      "search-results",
-      messageSearch?.id,
-      parsedMessagePage,
-    ],
-    queryFn: () =>
-      api<PageResult<ParsedTelegramMessage>>(
-        `/telegram/searches/${messageSearch!.id}/results?page=${parsedMessagePage}&size=30`,
-      ),
-    enabled: Boolean(messageSearch && can("telegram:view")),
-    refetchInterval: messageSearch?.status === "WAITING" ? 2500 : false,
-    retry: false,
-  });
-
-  /** Search history only displays fixed server states; reply bodies are opened separately. */
-  const searchColumns = useMemo<ColumnsType<TelegramSearch>>(
-    () => [
-      { title: "关键词", dataIndex: "keyword", ellipsis: true },
-      {
-        title: "机器人",
-        dataIndex: "botUsername",
-        render: (name: string) => `@${name}`,
-      },
-      {
-        title: "状态",
-        dataIndex: "status",
-        render: (state: string) => (
-          <Tag
-            color={
-              state === "COMPLETED"
-                ? "success"
-                : state === "FAILED"
-                  ? "error"
-                  : "processing"
-            }
-          >
-            {searchStatusLabel(state)}
-          </Tag>
-        ),
-      },
-      { title: "创建时间", dataIndex: "createdAt", width: 180 },
-      {
-        title: "操作",
-        key: "action",
-        width: 120,
-        render: (_, row) => (
-          <Button
-            type="link"
-            onClick={() => {
-              setMessagePage(1);
-              setParsedMessagePage(1);
-              setMessageSearch(row);
-            }}
-          >
-            查看原始回复
-          </Button>
-        ),
-      },
-    ],
-    [],
-  );
-
   /** Sends one deliberate search only after the user confirms the keyword in this page. */
   const search = useMutation({
-    mutationFn: (query: string) =>
+    mutationFn: ({
+      query,
+      conversationId,
+    }: {
+      query: string;
+      conversationId: number;
+    }) =>
       api<TelegramSearch>("/telegram/searches", {
         method: "POST",
-        body: JSON.stringify({ keyword: query }),
+        body: JSON.stringify({ keyword: query, conversationId }),
       }),
-    onSuccess: async (created) => {
-      setKeyword("");
-      queryClient.setQueryData<PageResult<TelegramSearch>>(
-        ["telegram", "searches", searchPage],
-        (current) => ({
-          items: [
-            created,
-            ...(current?.items ?? []).filter((item) => item.id !== created.id),
-          ].slice(0, 20),
-          total: (current?.total ?? 0) + 1,
-          page: 1,
-          size: 20,
-        }),
+    onSuccess: async (_created, request) => {
+      // 只清除本次已发送的草稿，不误清切换会话后输入的新内容。
+      setDrafts((current) =>
+        current[request.conversationId]?.trim() === request.query
+          ? { ...current, [request.conversationId]: "" }
+          : current,
       );
+      if (selectedConversationId === request.conversationId) {
+        followLatestRef.current = true;
+        setConversationPage(1);
+      }
       await queryClient.invalidateQueries({
-        queryKey: ["telegram", "searches"],
+        queryKey: ["telegram", "conversation"],
       });
-      message.success("搜索请求已提交；机器人回复会异步出现在记录中");
+      await queryClient.invalidateQueries({
+        queryKey: ["telegram", "conversations"],
+      });
     },
     onError: (error: Error) => message.error(error.message),
   });
@@ -1076,129 +1283,500 @@ export function TelegramPage() {
     });
   }
 
+  /** Submits a user-confirmed keyword to the configured Telegram search bot. */
+  function submitSearch() {
+    const query = keyword.trim();
+    if (!query || search.isPending) return;
+    if (!selectedConversationId) {
+      message.info("请先新建或选择一个会话");
+      return;
+    }
+    search.mutate({ query, conversationId: selectedConversationId });
+  }
+
+  const selectedConversation = conversationList.data?.items.find(
+    (item) => item.id === selectedConversationId,
+  );
+  const sidebar = (
+    <TelegramConversationSidebar
+      items={conversationList.data?.items ?? []}
+      total={conversationList.data?.total ?? 0}
+      page={conversationListPage}
+      selectedId={selectedConversationId}
+      loading={conversationList.isPending}
+      error={
+        conversationList.isError ? conversationList.error.message : undefined
+      }
+      canCreate={can("telegram:search")}
+      canDelete={can("telegram:delete")}
+      creating={createConversation.isPending}
+      deletingId={
+        deleteConversation.isPending ? deleteConversation.variables : undefined
+      }
+      onCreate={() => createConversation.mutate()}
+      onSelect={(id) => {
+        setSelectedConversationId(id);
+        setConversationPage(1);
+        setConversationDrawerOpen(false);
+      }}
+      onDelete={(item) =>
+        modal.confirm({
+          title: "删除这个对话？",
+          content:
+            "将删除这个对话的本地搜索记录和回复，Telegram 中的消息不受影响。",
+          okText: "删除对话",
+          cancelText: "取消",
+          okButtonProps: { danger: true },
+          onOk: () => deleteConversation.mutateAsync(item.id),
+        })
+      }
+      onRetry={() => void conversationList.refetch()}
+      onPageChange={setConversationListPage}
+    />
+  );
+
   return (
-    <Space direction="vertical" size={16} style={{ display: "flex" }}>
-      <Card
-        title="Telegram 账号"
-        extra={
-          <Button
-            aria-label="刷新 Telegram 状态"
-            icon={<ReloadOutlined />}
-            onClick={() => void status.refetch()}
-          />
-        }
+    <Space
+      className="telegram-page"
+      direction="vertical"
+      size={16}
+      style={{ display: "flex" }}
+    >
+      <Tabs
+        className="telegram-workspace-tabs"
+        activeKey={workspaceTab}
+        onChange={(key) => setWorkspaceTab(key as TelegramWorkspaceTab)}
+        items={[
+          { key: "search", label: "极搜" },
+          { key: "collection", label: "消息采集" },
+          { key: "account", label: "账号与连接" },
+        ]}
+      />
+
+      {workspaceTab === "account" && (
+        <Card
+          title="Telegram 账号"
+          extra={
+            <Space>
+              {canConfigure ? (
+                <Button
+                  icon={<SettingOutlined />}
+                  onClick={() => setConfigurationOpen(true)}
+                >
+                  配置
+                </Button>
+              ) : null}
+              <Button
+                aria-label="刷新 Telegram 状态"
+                icon={<ReloadOutlined />}
+                onClick={() => void status.refetch()}
+              />
+            </Space>
+          }
+        >
+          {status.isPending ? (
+            <Typography.Text type="secondary">
+              正在读取 Telegram 状态…
+            </Typography.Text>
+          ) : status.isError ? (
+            <Alert
+              type="error"
+              showIcon
+              message="无法读取 Telegram 状态"
+              description="请确认模块已启用，并且当前账号拥有 Telegram 查看权限。"
+            />
+          ) : view ? (
+            <>
+              <Alert
+                type={
+                  view.state === "READY"
+                    ? "success"
+                    : view.state === "ERROR"
+                      ? "error"
+                      : "info"
+                }
+                showIcon
+                message={view.message}
+                description="验证码、两步验证密码和邮箱验证内容仅用于当前请求，不会保存到数据库或浏览器本地存储。"
+              />
+              <Descriptions
+                column={{ xs: 1, sm: 2, lg: 3 }}
+                style={{ marginTop: 20 }}
+                items={[
+                  {
+                    key: "module",
+                    label: "模块状态",
+                    children: (
+                      <Tag color={view.enabled ? "green" : "default"}>
+                        {view.enabled ? "已启用" : "已关闭"}
+                      </Tag>
+                    ),
+                  },
+                  {
+                    key: "account",
+                    label: "账号状态",
+                    children: (
+                      <Tag color={view.connected ? "green" : "blue"}>
+                        {STATE_LABELS[view.state] ?? "未知状态"}
+                      </Tag>
+                    ),
+                  },
+                  {
+                    key: "phone",
+                    label: "账号标识",
+                    children: view.maskedPhoneNumber ?? "尚未绑定",
+                  },
+                  {
+                    key: "api",
+                    label: "API 凭据",
+                    children: view.credentialsConfigured
+                      ? "已配置"
+                      : canConfigure
+                        ? "点击配置"
+                        : "请联系管理员配置",
+                  },
+                  {
+                    key: "encryption",
+                    label: "会话加密",
+                    children: view.encryptionKeyConfigured
+                      ? "密钥已配置"
+                      : canConfigure
+                        ? "保存配置时自动生成"
+                        : "请联系管理员配置",
+                  },
+                  {
+                    key: "proxy",
+                    label: "Telegram 网络代理",
+                    children: view.proxyEnabled
+                      ? view.proxyConfigured
+                        ? `${view.proxyType.toUpperCase()} 已配置`
+                        : "配置无效，无法连接"
+                      : "未启用",
+                  },
+                  {
+                    key: "archiveTool",
+                    label: "RAR / 7z 支持",
+                    children: view.archiveToolAvailable
+                      ? "已检测到 7-Zip"
+                      : "未检测到 7-Zip",
+                  },
+                  {
+                    key: "videoTools",
+                    label: "视频预览工具",
+                    children: view.videoPreviewToolsAvailable
+                      ? "已检测到 FFmpeg / FFprobe"
+                      : "未检测到 FFmpeg / FFprobe",
+                  },
+                  {
+                    key: "user",
+                    label: "Telegram 用户 ID",
+                    children: view.telegramUserId ?? "授权后显示",
+                  },
+                ]}
+              />
+              {view.connected &&
+              view.state === "READY" &&
+              can("telegram:view") ? (
+                <Space
+                  direction="vertical"
+                  size={12}
+                  style={{ display: "flex", marginTop: 20 }}
+                >
+                  <Space wrap>
+                    <Button
+                      icon={<ScanOutlined />}
+                      loading={botDiagnostic.isPending}
+                      onClick={() => botDiagnostic.mutate()}
+                    >
+                      检查机器人会话
+                    </Button>
+                    <Typography.Text type="secondary">
+                      只读取当前账号、机器人身份和 Telegram 在线屏蔽列表；
+                      不会发送消息、显示其他屏蔽对象或更改设置。
+                    </Typography.Text>
+                  </Space>
+                  {botDiagnostic.data ? (
+                    <Alert
+                      type={
+                        botDiagnostic.data.onlineMainBlockListStatus ===
+                        "BLOCKED"
+                          ? "warning"
+                          : "info"
+                      }
+                      showIcon
+                      message={
+                        botDiagnostic.data.onlineMainBlockListStatus ===
+                        "BLOCKED"
+                          ? "Telegram 在线主屏蔽列表包含该机器人"
+                          : botDiagnostic.data.onlineMainBlockListStatus ===
+                              "NOT_BLOCKED"
+                            ? "Telegram 在线主屏蔽列表未包含该机器人"
+                            : "未能完整核对 Telegram 在线主屏蔽列表"
+                      }
+                      description={
+                        <Space direction="vertical" size={10}>
+                          {botDiagnostic.data.onlineMainBlockListStatus ===
+                          "BLOCKED" ? (
+                            <Typography.Paragraph style={{ marginBottom: 0 }}>
+                              已定位极搜发送失败的原因：当前 Telegram
+                              账号的在线屏蔽列表包含 @
+                              {botDiagnostic.data.botUsername}。请在 Telegram
+                              打开该机器人的私聊并解除屏蔽，然后回到此页重新检查并搜索。解除前，Mayday
+                              无法代替 Telegram 发送关键词。
+                            </Typography.Paragraph>
+                          ) : null}
+                          <Descriptions
+                            size="small"
+                            column={{ xs: 1, sm: 2, lg: 3 }}
+                            items={[
+                              {
+                                key: "currentUser",
+                                label: "当前 Telegram 用户 ID",
+                                children: botDiagnostic.data.telegramUserId,
+                              },
+                              {
+                                key: "botUsername",
+                                label: "配置的机器人",
+                                children: `@${botDiagnostic.data.botUsername}`,
+                              },
+                              {
+                                key: "botUser",
+                                label: "机器人用户 ID",
+                                children: botDiagnostic.data.botUserId,
+                              },
+                              {
+                                key: "botChat",
+                                label: "机器人私聊 ID",
+                                children: botDiagnostic.data.botChatId,
+                              },
+                              {
+                                key: "onlineBlockList",
+                                label: "在线主屏蔽列表核对",
+                                children:
+                                  botDiagnostic.data
+                                    .onlineMainBlockListStatus === "BLOCKED"
+                                    ? "包含该机器人"
+                                    : botDiagnostic.data
+                                          .onlineMainBlockListStatus ===
+                                        "NOT_BLOCKED"
+                                      ? "不包含该机器人"
+                                      : "检查范围达到安全上限，结果不完整",
+                              },
+                              {
+                                key: "cachedBlockList",
+                                label: "TDLib 本地聊天缓存",
+                                children:
+                                  botDiagnostic.data.cachedBlockListType,
+                              },
+                            ]}
+                          />
+                        </Space>
+                      }
+                    />
+                  ) : null}
+                </Space>
+              ) : null}
+            </>
+          ) : null}
+        </Card>
+      )}
+
+      <Modal
+        title="Telegram 连接配置"
+        open={configurationOpen}
+        width={680}
+        destroyOnHidden
+        confirmLoading={saveConfiguration.isPending}
+        okText="保存配置"
+        cancelText="取消"
+        onCancel={() => {
+          setConfigurationOpen(false);
+          configurationForm.resetFields();
+        }}
+        onOk={() => void configurationForm.submit()}
       >
-        {status.isPending ? (
-          <Typography.Text type="secondary">
-            正在读取 Telegram 状态…
-          </Typography.Text>
-        ) : status.isError ? (
-          <Alert
-            type="error"
-            showIcon
-            message="无法读取 Telegram 状态"
-            description="请确认模块已启用，并且当前账号拥有 Telegram 查看权限。"
-          />
-        ) : view ? (
+        {configuration.isLoading ? (
+          <Typography.Text type="secondary">正在读取安全配置…</Typography.Text>
+        ) : configuration.error ? (
+          <Alert type="error" showIcon message={configuration.error.message} />
+        ) : configuration.data ? (
           <>
             <Alert
-              type={
-                view.state === "READY"
-                  ? "success"
-                  : view.state === "ERROR"
-                    ? "error"
-                    : "info"
-              }
+              type={configuration.data.encryptionAvailable ? "info" : "warning"}
               showIcon
-              message={view.message}
-              description="验证码、两步验证密码和邮箱验证内容仅用于当前请求，不会保存到数据库或浏览器本地存储。"
+              style={{ marginBottom: 20 }}
+              message="密钥只提交和加密保存，不会回显"
+              description={
+                configuration.data.encryptionAvailable
+                  ? "API Hash、代理密码和 MTProto Secret 会使用平台加密密钥加密存入数据库；留空表示保持现有值。会话数据库密钥在首次保存时由服务端生成。"
+                  : "服务端尚未配置 MAYDAY_IDENTITY_ENCRYPTION_KEY；请先完成部署加密密钥配置，才能安全保存凭据。"
+              }
             />
-            <Descriptions
-              column={{ xs: 1, sm: 2, lg: 3 }}
-              style={{ marginTop: 20 }}
-              items={[
-                {
-                  key: "module",
-                  label: "模块状态",
-                  children: (
-                    <Tag color={view.enabled ? "green" : "default"}>
-                      {view.enabled ? "已启用" : "已关闭"}
-                    </Tag>
-                  ),
-                },
-                {
-                  key: "account",
-                  label: "账号状态",
-                  children: (
-                    <Tag color={view.connected ? "green" : "blue"}>
-                      {STATE_LABELS[view.state] ?? "未知状态"}
-                    </Tag>
-                  ),
-                },
-                {
-                  key: "phone",
-                  label: "账号标识",
-                  children: view.maskedPhoneNumber ?? "尚未绑定",
-                },
-                {
-                  key: "api",
-                  label: "API 凭据",
-                  children: view.credentialsConfigured
-                    ? "已配置"
-                    : "待部署人员配置",
-                },
-                {
-                  key: "encryption",
-                  label: "会话加密",
-                  children: view.encryptionKeyConfigured
-                    ? "密钥已配置"
-                    : "待部署人员配置",
-                },
-                {
-                  key: "proxy",
-                  label: "Telegram 网络代理",
-                  children: view.proxyEnabled
-                    ? view.proxyConfigured
-                      ? `${view.proxyType.toUpperCase()} 已配置`
-                      : "配置无效，无法连接"
-                    : "未启用",
-                },
-                {
-                  key: "archiveTool",
-                  label: "RAR / 7z 支持",
-                  children: view.archiveToolAvailable
-                    ? "已检测到 7-Zip"
-                    : "未检测到 7-Zip",
-                },
-                {
-                  key: "videoTools",
-                  label: "视频预览工具",
-                  children: view.videoPreviewToolsAvailable
-                    ? "已检测到 FFmpeg / FFprobe"
-                    : "未检测到 FFmpeg / FFprobe",
-                },
-                {
-                  key: "user",
-                  label: "Telegram 用户 ID",
-                  children: view.telegramUserId ?? "授权后显示",
-                },
-              ]}
-            />
+            <Form<TelegramConfigurationForm>
+              form={configurationForm}
+              layout="vertical"
+              onFinish={(values) => saveConfiguration.mutate(values)}
+              disabled={
+                saveConfiguration.isPending ||
+                !configuration.data.encryptionAvailable
+              }
+            >
+              <Form.Item
+                name="apiId"
+                label="Telegram API ID"
+                rules={[
+                  { required: true, message: "请输入 Telegram API ID" },
+                  {
+                    pattern: /^[1-9][0-9]{0,9}$/,
+                    message: "API ID 必须是正整数",
+                  },
+                ]}
+              >
+                <Input
+                  inputMode="numeric"
+                  placeholder="从 Telegram 开发者页面获取"
+                />
+              </Form.Item>
+              <Form.Item
+                name="apiHash"
+                label="Telegram API Hash"
+                extra={
+                  configuration.data.apiHashConfigured
+                    ? "已保存；留空保持当前值，输入新值即可替换。"
+                    : "必填；保存后不会再次显示。"
+                }
+                rules={[
+                  { max: 512, message: "API Hash 长度不能超过 512 个字符" },
+                ]}
+              >
+                <Input.Password
+                  autoComplete="new-password"
+                  placeholder={
+                    configuration.data.apiHashConfigured
+                      ? "留空保持当前 API Hash"
+                      : "输入 Telegram API Hash"
+                  }
+                />
+              </Form.Item>
+              <Form.Item name="proxyEnabled" valuePropName="checked">
+                <Checkbox>通过 Telegram 代理连接</Checkbox>
+              </Form.Item>
+              <Form.Item noStyle shouldUpdate>
+                {({ getFieldValue }) =>
+                  getFieldValue("proxyEnabled") ? (
+                    <>
+                      <Form.Item
+                        name="proxyType"
+                        label="代理类型"
+                        rules={[{ required: true }]}
+                      >
+                        <Select
+                          options={[
+                            { value: "socks5", label: "SOCKS5" },
+                            { value: "http", label: "HTTP CONNECT" },
+                            { value: "mtproto", label: "MTProto" },
+                          ]}
+                        />
+                      </Form.Item>
+                      <Space style={{ display: "flex" }} align="start">
+                        <Form.Item
+                          name="proxyHost"
+                          label="代理主机"
+                          style={{ flex: 1 }}
+                          rules={[
+                            { required: true, message: "请输入代理主机" },
+                          ]}
+                        >
+                          <Input placeholder="proxy.example.com" />
+                        </Form.Item>
+                        <Form.Item
+                          name="proxyPort"
+                          label="端口"
+                          rules={[
+                            { required: true, message: "请输入代理端口" },
+                          ]}
+                        >
+                          <InputNumber
+                            min={1}
+                            max={65535}
+                            style={{ width: 120 }}
+                          />
+                        </Form.Item>
+                      </Space>
+                      {getFieldValue("proxyType") === "mtproto" ? (
+                        <Form.Item
+                          name="proxySecret"
+                          label="MTProto Secret"
+                          extra={
+                            configuration.data.proxySecretConfigured
+                              ? "已保存；留空保持当前值。"
+                              : undefined
+                          }
+                          rules={[
+                            {
+                              max: 512,
+                              message: "Secret 长度不能超过 512 个字符",
+                            },
+                          ]}
+                        >
+                          <Input.Password
+                            autoComplete="new-password"
+                            placeholder="输入 MTProto Secret"
+                          />
+                        </Form.Item>
+                      ) : (
+                        <>
+                          <Form.Item name="proxyUsername" label="代理用户名">
+                            <Input autoComplete="off" />
+                          </Form.Item>
+                          <Form.Item
+                            name="proxyPassword"
+                            label="代理密码"
+                            extra={
+                              configuration.data.proxyPasswordConfigured
+                                ? "已保存；留空保持当前值。"
+                                : undefined
+                            }
+                            rules={[
+                              {
+                                max: 255,
+                                message: "代理密码长度不能超过 255 个字符",
+                              },
+                            ]}
+                          >
+                            <Input.Password
+                              autoComplete="new-password"
+                              placeholder="输入代理密码（可选）"
+                            />
+                          </Form.Item>
+                        </>
+                      )}
+                    </>
+                  ) : null
+                }
+              </Form.Item>
+            </Form>
           </>
         ) : null}
-      </Card>
+      </Modal>
 
-      {view &&
+      {workspaceTab === "account" &&
+        view &&
         (!view.credentialsConfigured || !view.encryptionKeyConfigured) && (
           <Alert
             type="warning"
             showIcon
             message="还不能发起账号授权"
-            description="请由部署人员在服务端私有环境配置 Telegram API 凭据和会话加密密钥，然后重启服务。敏感值不会在本页面编辑或回显。"
+            description={
+              canConfigure
+                ? "点击本页顶部“配置”填写 Telegram API 凭据；会话加密密钥由服务端自动生成并安全保存。"
+                : "请联系拥有 Telegram 配置权限的管理员完成 API 凭据设置。"
+            }
           />
         )}
 
-      {view &&
+      {workspaceTab === "account" &&
+        view &&
         canConnect &&
         view.credentialsConfigured &&
         view.encryptionKeyConfigured && (
@@ -1210,7 +1788,15 @@ export function TelegramPage() {
                 style={{ maxWidth: 560 }}
                 autoComplete="off"
               >
-                <Form.Item label={challenge.label} required>
+                <Form.Item
+                  label={challenge.label}
+                  required
+                  extra={
+                    view.state === "WAITING_FOR_PHONE"
+                      ? "用于登录 Telegram 用户账号，不是 Mayday 的手机号验证；验证码由 Telegram 决定发送方式。"
+                      : undefined
+                  }
+                >
                   {challenge.password ? (
                     <Input.Password
                       value={value}
@@ -1227,14 +1813,29 @@ export function TelegramPage() {
                     />
                   )}
                 </Form.Item>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={isBusy}
-                  disabled={!value.trim()}
-                >
-                  提交并继续
-                </Button>
+                {/* 授权挑战期间保留安全断开入口，便于调整代理等运行配置；关闭连接不会退出账号。 */}
+                <Space wrap>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={isBusy}
+                    disabled={!value.trim()}
+                  >
+                    提交并继续
+                  </Button>
+                  {view.connected && canClose && (
+                    <Button
+                      htmlType="button"
+                      icon={<DisconnectOutlined />}
+                      loading={isBusy}
+                      onClick={() =>
+                        action.mutate({ endpoint: "/session/close" })
+                      }
+                    >
+                      关闭连接并保留会话
+                    </Button>
+                  )}
+                </Space>
                 {view.state === "WAITING_FOR_CODE" && (
                   <Typography.Paragraph
                     type="secondary"
@@ -1344,54 +1945,529 @@ export function TelegramPage() {
           </Card>
         )}
 
-      {view?.connected && can("telegram:search") && (
-        <Card title="极搜消息">
-          <Space.Compact style={{ width: "100%", maxWidth: 720 }}>
-            <Input
-              value={keyword}
-              maxLength={256}
-              placeholder="输入关键词，发送给服务端配置的搜索机器人"
-              onChange={(event) => setKeyword(event.target.value)}
-              onPressEnter={() =>
-                keyword.trim() && search.mutate(keyword.trim())
-              }
-            />
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              loading={search.isPending}
-              disabled={!keyword.trim()}
-              onClick={() => search.mutate(keyword.trim())}
-            >
-              搜索
-            </Button>
-          </Space.Compact>
+      {workspaceTab === "search" &&
+        (!can("telegram:view") ? (
           <Alert
-            type="info"
+            type="warning"
             showIcon
-            style={{ marginTop: 12 }}
-            message="只有点击搜索后才会向配置的 Telegram 机器人发送关键词。系统按 Telegram 明确的回复关系关联消息，不会把无关消息猜成搜索结果。"
+            message="当前账号没有查看 Telegram 消息的权限"
+            description="请联系管理员授予 Telegram 查看权限。"
           />
-          <Table<TelegramSearch>
-            rowKey="id"
-            style={{ marginTop: 16 }}
-            columns={searchColumns}
-            dataSource={searchHistory.data?.items ?? []}
-            loading={searchHistory.isPending}
-            pagination={{
-              current: searchPage,
-              pageSize: 20,
-              total: searchHistory.data?.total ?? 0,
-              hideOnSinglePage: true,
-              onChange: setSearchPage,
-            }}
-            locale={{ emptyText: "暂无搜索记录" }}
-          />
-        </Card>
-      )}
+        ) : (
+          <div
+            className={`telegram-chat-workspace${sidebarCollapsed ? " is-sidebar-collapsed" : ""}`}
+            ref={workspaceRef}
+          >
+            <div className="telegram-chat-desktop-sidebar">{sidebar}</div>
+            <Drawer
+              title="对话"
+              placement="left"
+              width="min(320px, 90vw)"
+              open={conversationDrawerOpen}
+              onClose={() => setConversationDrawerOpen(false)}
+              rootClassName="telegram-conversation-drawer"
+              styles={{ body: { padding: 0 } }}
+            >
+              {sidebar}
+            </Drawer>
+            <section className="telegram-chat-panel" aria-label="极搜对话">
+              <header className="telegram-chat-header">
+                <div className="telegram-chat-heading">
+                  <Button
+                    type="text"
+                    className="telegram-chat-desktop-toggle"
+                    icon={<MenuOutlined />}
+                    aria-label={
+                      sidebarCollapsed ? "展开对话列表" : "收起对话列表"
+                    }
+                    title={sidebarCollapsed ? "展开对话列表" : "收起对话列表"}
+                    onClick={() => setSidebarCollapsed((value) => !value)}
+                  />
+                  <Button
+                    type="text"
+                    className="telegram-chat-mobile-toggle"
+                    icon={<MenuOutlined />}
+                    aria-label="打开对话列表"
+                    onClick={() => setConversationDrawerOpen(true)}
+                  />
+                  <div className="telegram-chat-heading-copy">
+                    <Typography.Text strong ellipsis>
+                      {selectedConversation?.title ?? "极搜"}
+                    </Typography.Text>
+                    <span className="telegram-chat-connection">
+                      <span className={view?.connected ? "is-connected" : ""} />
+                      {view?.connected
+                        ? newestTurn?.search.botUsername
+                          ? `@${newestTurn.search.botUsername}`
+                          : "Telegram 已连接"
+                        : "未连接 Telegram"}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  type="text"
+                  icon={<EditOutlined />}
+                  aria-label="新建对话"
+                  title="新建对话"
+                  loading={createConversation.isPending}
+                  disabled={!can("telegram:search")}
+                  onClick={() => createConversation.mutate()}
+                />
+              </header>
+              {!view?.connected ? (
+                <Alert
+                  className="telegram-chat-error"
+                  type="info"
+                  showIcon
+                  message="连接 Telegram 后即可发起极搜"
+                  description="历史会话仍可查看。完成账号授权后，可在当前会话中继续搜索。"
+                  action={
+                    <Button onClick={() => setWorkspaceTab("account")}>
+                      前往账号与连接
+                    </Button>
+                  }
+                />
+              ) : !can("telegram:search") ? (
+                <Alert
+                  className="telegram-chat-error"
+                  type="warning"
+                  showIcon
+                  message="当前账号仅可查看历史对话"
+                  description="如需发起搜索或操作机器人按钮，请联系管理员授予 Telegram 搜索权限。"
+                />
+              ) : null}
 
-      {view && can("telegram:view") && (
-        <Card title="消息采集">
+              {conversation.isError ? (
+                <Alert
+                  className="telegram-chat-error"
+                  type="error"
+                  showIcon
+                  message="对话读取失败"
+                  description={conversation.error.message}
+                  action={
+                    <Button
+                      size="small"
+                      onClick={() => void conversation.refetch()}
+                    >
+                      重试
+                    </Button>
+                  }
+                />
+              ) : null}
+
+              <div
+                className={`telegram-chat-transcript${conversation.data?.items.length ? "" : " is-empty"}`}
+                aria-label="对话消息"
+                ref={transcriptRef}
+                onScroll={(event) => {
+                  const node = event.currentTarget;
+                  const nearBottom =
+                    node.scrollHeight - node.scrollTop - node.clientHeight < 80;
+                  followLatestRef.current = nearBottom;
+                  setShowScrollLatest(!nearBottom);
+                }}
+              >
+                {!selectedConversationId ? (
+                  <div className="telegram-chat-empty">
+                    <div className="telegram-chat-empty-icon">
+                      <MessageOutlined />
+                    </div>
+                    <h2>想找点什么？</h2>
+                    <p>搜索频道、图片、视频和文件，结果都留在对话里。</p>
+                    <Button
+                      type="primary"
+                      icon={<EditOutlined />}
+                      disabled={!can("telegram:search")}
+                      loading={createConversation.isPending}
+                      onClick={() => createConversation.mutate()}
+                    >
+                      新建对话
+                    </Button>
+                  </div>
+                ) : conversation.isPending ? (
+                  <Typography.Text type="secondary">
+                    正在读取对话…
+                  </Typography.Text>
+                ) : conversation.data?.items.length ? (
+                  <>
+                    {conversation.data.items
+                      .slice()
+                      .reverse()
+                      .map((turn) => (
+                        <article
+                          className="telegram-chat-turn"
+                          key={turn.search.id}
+                        >
+                          <div className="telegram-chat-turn-heading">
+                            <time>
+                              {dayjs(turn.search.createdAt).format(
+                                "YYYY-MM-DD HH:mm",
+                              )}
+                            </time>
+                            {appliedTypeFilters[turn.search.id] ? (
+                              <Tag>
+                                已筛选
+                                {SEARCH_RESOURCE_TYPES.find(
+                                  (item) =>
+                                    item.value ===
+                                    appliedTypeFilters[turn.search.id],
+                                )?.label ?? "所选类型"}
+                              </Tag>
+                            ) : null}
+                          </div>
+
+                          <div className="telegram-chat-message is-outgoing">
+                            <div className="telegram-chat-bubble">
+                              {turn.search.keyword}
+                            </div>
+                          </div>
+
+                          {turn.messages.map((row) => {
+                            const keyboard = groupInlineKeyboard(
+                              row.replyMarkupJson,
+                            );
+                            const sentAt =
+                              row.telegramEditedAt ?? row.telegramSentAt;
+                            const hasKeyboard =
+                              keyboard.resourceTypeButtons.length > 0 ||
+                              keyboard.actionButtonRows.length > 0;
+                            const renderButton = ({
+                              button,
+                              row: buttonRow,
+                              column,
+                            }: PositionedInlineButton) => {
+                              const key = `${row.id}-${buttonRow}-${column}`;
+
+                              if (button.type === "CALLBACK") {
+                                const selectedType = resourceTypeFromButton(
+                                  button.text,
+                                );
+                                const isPending =
+                                  callback.isPending &&
+                                  callback.variables?.searchId ===
+                                    turn.search.id &&
+                                  callback.variables.messageId === row.id &&
+                                  callback.variables.row === buttonRow &&
+                                  callback.variables.column === column;
+
+                                return (
+                                  <Button
+                                    key={key}
+                                    className={
+                                      selectedType
+                                        ? "telegram-chat-resource-button"
+                                        : undefined
+                                    }
+                                    aria-pressed={
+                                      selectedType
+                                        ? appliedTypeFilters[turn.search.id] ===
+                                          selectedType
+                                        : undefined
+                                    }
+                                    title={
+                                      selectedType
+                                        ? `筛选这条回复中的${callbackButtonLabel(button.text)}`
+                                        : undefined
+                                    }
+                                    size="small"
+                                    aria-label={callbackButtonLabel(
+                                      button.text,
+                                    )}
+                                    icon={callbackButtonIcon(button.text)}
+                                    loading={isPending}
+                                    disabled={
+                                      !view?.connected ||
+                                      !can("telegram:search") ||
+                                      callback.isPending
+                                    }
+                                    onClick={() =>
+                                      callback.mutate({
+                                        searchId: turn.search.id,
+                                        messageId: row.id,
+                                        row: buttonRow,
+                                        column,
+                                        ...(selectedType
+                                          ? { resourceType: selectedType }
+                                          : {}),
+                                      })
+                                    }
+                                  >
+                                    {callbackButtonLabel(button.text)}
+                                  </Button>
+                                );
+                              }
+
+                              if (
+                                button.type === "URL" &&
+                                isSafeHttpsUrl(button.url)
+                              ) {
+                                return (
+                                  <Button
+                                    key={key}
+                                    size="small"
+                                    href={button.url}
+                                    onClick={(event) => {
+                                      if (isTelegramPostLink(button.url!)) {
+                                        event.preventDefault();
+                                        previewTelegramPost(button.url!);
+                                      }
+                                    }}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    {button.text}
+                                  </Button>
+                                );
+                              }
+
+                              return null;
+                            };
+                            return (
+                              <div
+                                className="telegram-chat-message is-incoming"
+                                key={row.id}
+                              >
+                                <div className="telegram-chat-message-label">
+                                  <span className="telegram-chat-bot-avatar">
+                                    <SearchOutlined />
+                                  </span>
+                                  <strong>极搜</strong>
+                                  <span>@{turn.search.botUsername}</span>
+                                  {sentAt ? (
+                                    <time>{dayjs(sentAt).format("HH:mm")}</time>
+                                  ) : null}
+                                </div>
+                                <div className="telegram-chat-bubble">
+                                  <Typography.Paragraph className="telegram-chat-message-content">
+                                    {renderMessageText(
+                                      row.messageText,
+                                      row.inlineLinks,
+                                      row.sourceLinks,
+                                      previewTelegramPost,
+                                    ) || `（${row.contentType}，无文本内容）`}
+                                  </Typography.Paragraph>
+
+                                  {hasKeyboard ? (
+                                    <div className="telegram-chat-inline-keyboard">
+                                      {keyboard.resourceTypeButtons.length ? (
+                                        <div
+                                          aria-label="资源类型筛选"
+                                          className="telegram-chat-inline-keyboard-row telegram-chat-resource-buttons"
+                                          role="group"
+                                        >
+                                          {keyboard.resourceTypeButtons.map(
+                                            renderButton,
+                                          )}
+                                        </div>
+                                      ) : null}
+                                      {keyboard.actionButtonRows.map(
+                                        (buttonRow, index) => (
+                                          <div
+                                            aria-label="回复操作"
+                                            className="telegram-chat-inline-keyboard-row"
+                                            key={`${row.id}-actions-${index}`}
+                                            role="group"
+                                          >
+                                            {buttonRow.map(renderButton)}
+                                          </div>
+                                        ),
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </div>
+                                {row.messageText ? (
+                                  <div className="telegram-chat-message-actions">
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={<CopyOutlined />}
+                                      aria-label="复制回复"
+                                      title="复制回复"
+                                      onClick={() => {
+                                        void navigator.clipboard
+                                          .writeText(row.messageText!)
+                                          .then(
+                                            () => message.success("已复制回复"),
+                                            () =>
+                                              message.error(
+                                                "复制失败，请选中文字复制",
+                                              ),
+                                          );
+                                      }}
+                                    />
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+
+                          {["PENDING", "SENDING", "WAITING"].includes(
+                            turn.search.status,
+                          ) ? (
+                            <div
+                              className="telegram-chat-waiting"
+                              role="status"
+                            >
+                              <span
+                                className="telegram-chat-typing-indicator"
+                                aria-hidden="true"
+                              />
+                              <span>
+                                {turn.search.statusMessage ||
+                                  "正在等待 Telegram 机器人回复…"}
+                              </span>
+                            </div>
+                          ) : ["FAILED", "TIMEOUT"].includes(
+                              turn.search.status,
+                            ) ? (
+                            <Typography.Text
+                              className="telegram-chat-status-message"
+                              type="danger"
+                            >
+                              {turn.search.statusMessage ||
+                                searchStatusLabel(turn.search.status)}
+                            </Typography.Text>
+                          ) : null}
+                        </article>
+                      ))}
+                  </>
+                ) : (
+                  <div className="telegram-chat-empty">
+                    <div className="telegram-chat-empty-icon">
+                      <SearchOutlined />
+                    </div>
+                    <h2>想找点什么？</h2>
+                    <p>输入关键词开始搜索，收到回复后可按资源类型筛选。</p>
+                    <div
+                      className="telegram-chat-empty-types"
+                      aria-label="可搜索的资源"
+                    >
+                      <span>
+                        <TeamOutlined />
+                        群组与频道
+                      </span>
+                      <span>
+                        <PictureOutlined />
+                        图片
+                      </span>
+                      <span>
+                        <VideoCameraOutlined />
+                        视频
+                      </span>
+                      <span>
+                        <FolderOutlined />
+                        文件
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {conversation.data && conversation.data.total > 20 ? (
+                <div className="telegram-chat-pagination">
+                  <Typography.Text type="secondary">
+                    第 {conversationPage} 页 · 共 {conversation.data.total}{" "}
+                    次搜索
+                  </Typography.Text>
+                  <Space>
+                    <Button
+                      disabled={conversationPage <= 1}
+                      onClick={() =>
+                        setConversationPage((page) => Math.max(1, page - 1))
+                      }
+                    >
+                      较新消息
+                    </Button>
+                    <Button
+                      disabled={
+                        conversationPage * 20 >= conversation.data.total
+                      }
+                      onClick={() => setConversationPage((page) => page + 1)}
+                    >
+                      更早消息
+                    </Button>
+                  </Space>
+                </div>
+              ) : null}
+
+              <div className="telegram-chat-composer">
+                {showScrollLatest && (
+                  <Button
+                    className="telegram-chat-scroll-latest"
+                    shape="circle"
+                    icon={<ArrowDownOutlined />}
+                    aria-label="滚动到最新消息"
+                    title="滚动到最新消息"
+                    onClick={() => {
+                      const transcript = transcriptRef.current;
+                      if (transcript)
+                        transcript.scrollTop = transcript.scrollHeight;
+                      followLatestRef.current = true;
+                      setShowScrollLatest(false);
+                    }}
+                  />
+                )}
+                <div className="telegram-chat-composer-box">
+                  <Input.TextArea
+                    aria-label="极搜关键词"
+                    value={keyword}
+                    maxLength={256}
+                    autoSize={{ minRows: 1, maxRows: 4 }}
+                    variant="borderless"
+                    placeholder="发送关键词给极搜…"
+                    onChange={(event) => setKeyword(event.target.value)}
+                    disabled={
+                      !view?.connected ||
+                      !can("telegram:search") ||
+                      !selectedConversationId
+                    }
+                    onPressEnter={(event) => {
+                      if (event.shiftKey || event.nativeEvent.isComposing)
+                        return;
+                      event.preventDefault();
+                      submitSearch();
+                    }}
+                  />
+                  <div className="telegram-chat-composer-tools">
+                    <span>
+                      <SearchOutlined />
+                      极搜搜索
+                    </span>
+                    <div className="telegram-chat-send-tools">
+                      <span className="telegram-chat-shortcut">Enter 发送</span>
+                      <Button
+                        type="primary"
+                        shape="circle"
+                        aria-label="发送"
+                        title="发送"
+                        icon={<ArrowUpOutlined />}
+                        loading={search.isPending}
+                        disabled={
+                          !keyword.trim() ||
+                          search.isPending ||
+                          !view?.connected ||
+                          !can("telegram:search") ||
+                          !selectedConversationId
+                        }
+                        onClick={submitSearch}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="telegram-chat-disclosure">
+                  {!view?.connected
+                    ? "连接 Telegram 后即可搜索"
+                    : !can("telegram:search")
+                      ? "当前账号只有对话查看权限"
+                      : "结果来自 Telegram · 图片、视频和文件可点击预览"}
+                </div>
+              </div>
+            </section>
+          </div>
+        ))}
+
+      {workspaceTab === "collection" && view && can("telegram:view") && (
+        <Card title="消息采集" className="telegram-collection-panel">
           <Alert
             type="info"
             showIcon
@@ -1524,8 +2600,16 @@ export function TelegramPage() {
             </Space>
           ) : null}
           <Table<TelegramCollectionTask>
+            className="telegram-collection-table"
             rowKey="id"
             columns={[
+              {
+                title: "序号",
+                width: 64,
+                align: "center",
+                render: (_, _task, index) =>
+                  (collectionTaskPage - 1) * 10 + index + 1,
+              },
               {
                 title: "采集来源",
                 dataIndex: "sourceTitle",
@@ -1567,7 +2651,7 @@ export function TelegramPage() {
               {
                 title: "状态",
                 dataIndex: "status",
-                width: 150,
+                width: 100,
                 render: (status: string) => (
                   <Tag
                     color={
@@ -1575,14 +2659,22 @@ export function TelegramPage() {
                         ? "success"
                         : status === "FAILED"
                           ? "error"
-                          : "processing"
+                          : ["PAUSED", "CANCELLED"].includes(status)
+                            ? "default"
+                            : "processing"
                     }
                   >
-                    {status}
+                    {collectionStatusLabel(status)}
                   </Tag>
                 ),
               },
-              { title: "创建时间", dataIndex: "createdAt", width: 190 },
+              {
+                title: "创建时间",
+                dataIndex: "createdAt",
+                width: 165,
+                render: (value: string) =>
+                  dayjs(value).format("YYYY-MM-DD HH:mm"),
+              },
               {
                 title: "进度说明",
                 dataIndex: "statusMessage",
@@ -1594,7 +2686,7 @@ export function TelegramPage() {
                       <Typography.Text type="secondary" ellipsis>
                         {task.liveStatusMessage ?? "定期追赶尚未启用"}
                         {task.liveCheckedAt
-                          ? ` · 最近检查 ${task.liveCheckedAt}`
+                          ? ` · 最近检查 ${dayjs(task.liveCheckedAt).format("MM-DD HH:mm")}`
                           : ""}
                       </Typography.Text>
                     ) : null}
@@ -1603,17 +2695,33 @@ export function TelegramPage() {
               },
               {
                 title: "操作",
-                width: 340,
+                width: 240,
                 render: (_, task) => (
                   <Space size={4}>
                     <Button
                       type="link"
                       onClick={() => {
+                        if (
+                          task.messageLink &&
+                          (task.maxMessages === 1 || task.includeAlbum) &&
+                          can("telegram:download")
+                        ) {
+                          mediaPreviewGeneration.current += 1;
+                          setInlineMediaPreview({
+                            taskId: task.id,
+                            messageLink: task.messageLink,
+                          });
+                          return;
+                        }
                         setCollectionPage(1);
                         setSelectedCollection(task);
                       }}
                     >
-                      查看消息
+                      {task.messageLink &&
+                      (task.maxMessages === 1 || task.includeAlbum) &&
+                      can("telegram:download")
+                        ? "预览媒体"
+                        : "查看消息"}
                     </Button>
                     {can("telegram:collect") &&
                     !task.messageLink &&
@@ -1662,9 +2770,11 @@ export function TelegramPage() {
                       </Button>
                     ) : null}
                     {can("telegram:collect") &&
-                    !["COMPLETED", "FAILED", "CANCELLED"].includes(
+                    (!["COMPLETED", "FAILED", "CANCELLED"].includes(
                       task.status,
-                    ) ? (
+                    ) ||
+                      (task.status !== "CANCELLED" &&
+                        task.pendingMediaCount > 0)) ? (
                       <Button
                         type="link"
                         danger
@@ -1675,7 +2785,9 @@ export function TelegramPage() {
                           })
                         }
                       >
-                        取消
+                        {["COMPLETED", "FAILED"].includes(task.status)
+                          ? "停止附件下载"
+                          : "取消"}
                       </Button>
                     ) : null}
                     {can("telegram:delete") &&
@@ -1781,6 +2893,9 @@ export function TelegramPage() {
                                 size={2}
                               >
                                 <TelegramMediaPreview attachment={attachment} />
+                                <TelegramAttachmentDownload
+                                  attachment={attachment}
+                                />
                                 {attachment.status === "AVAILABLE" &&
                                 [
                                   "application/zip",
@@ -1869,195 +2984,24 @@ export function TelegramPage() {
         )}
       </Modal>
 
-      {view?.connected && can("telegram:view") && (
-        <Card title="未匹配的机器人消息">
-          <Typography.Paragraph type="secondary">
-            这些消息来自已验证的搜索机器人私聊，但没有 Telegram
-            明确的回复关联。它们不会被拼接到某次搜索或伪装为搜索结果。
-          </Typography.Paragraph>
-          <Table<TelegramMessage>
-            rowKey="id"
-            columns={[
-              { title: "类型", dataIndex: "contentType", width: 200 },
-              {
-                title: "内容",
-                dataIndex: "messageText",
-                render: (text: string | null) => (
-                  <Typography.Paragraph
-                    ellipsis={{ rows: 2 }}
-                    style={{ marginBottom: 0 }}
-                  >
-                    {text || "（无文本内容）"}
-                  </Typography.Paragraph>
-                ),
-              },
-              {
-                title: "到达时间",
-                dataIndex: "telegramSentAt",
-                width: 200,
-                render: (value: string | null) => value ?? "—",
-              },
-            ]}
-            dataSource={unmatchedMessages.data?.items ?? []}
-            loading={unmatchedMessages.isPending}
-            pagination={false}
-            locale={{ emptyText: "目前没有未匹配的机器人消息" }}
-          />
-        </Card>
-      )}
-
-      <Modal
-        title={
-          messageSearch
-            ? `“${messageSearch.keyword}”的原始机器人消息`
-            : "原始机器人消息"
-        }
-        open={Boolean(messageSearch)}
-        width={920}
-        onCancel={() => setMessageSearch(null)}
-        footer={<Button onClick={() => setMessageSearch(null)}>关闭</Button>}
-        destroyOnHidden
-      >
-        {messageSearch && (
-          <>
-            <Alert
-              type={
-                messageSearch.parseStatus === "UNKNOWN" ? "warning" : "info"
-              }
-              showIcon
-              message={messageSearch.statusMessage}
-            />
+      {workspaceTab === "account" &&
+        view?.connected &&
+        can("telegram:view") && (
+          <Card title="未匹配的机器人消息">
+            <Typography.Paragraph type="secondary">
+              这些消息来自已验证的搜索机器人私聊，但没有 Telegram
+              明确的回复关联。它们不会被拼接到某次搜索或伪装为搜索结果。
+            </Typography.Paragraph>
             <Table<TelegramMessage>
               rowKey="id"
-              style={{ marginTop: 16 }}
               columns={[
+                { title: "类型", dataIndex: "contentType", width: 200 },
                 {
-                  title: "方向",
-                  dataIndex: "outgoing",
-                  width: 90,
-                  render: (outgoing: boolean) => (outgoing ? "发出" : "收到"),
-                },
-                { title: "消息类型", dataIndex: "contentType", width: 180 },
-                {
-                  title: "回复关联",
-                  dataIndex: "associationStatus",
-                  width: 120,
-                  render: (value: string) =>
-                    value === "MATCHED" ? (
-                      <Tag color="success">明确关联</Tag>
-                    ) : (
-                      <Tag>未匹配</Tag>
-                    ),
-                },
-                {
-                  title: "消息正文",
-                  dataIndex: "messageText",
-                  render: (text: string | null, row: TelegramMessage) => {
-                    const keyboard = inlineKeyboard(row.replyMarkupJson);
-                    return (
-                      <Space
-                        direction="vertical"
-                        size={8}
-                        style={{ width: "100%" }}
-                      >
-                        <Typography.Paragraph
-                          style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}
-                          ellipsis={{
-                            rows: 5,
-                            expandable: true,
-                            symbol: "展开",
-                          }}
-                        >
-                          {text || "（无文本内容）"}
-                        </Typography.Paragraph>
-                        {row.outgoing || keyboard.length === 0 ? null : (
-                          <Space direction="vertical" size={4}>
-                            {keyboard.map((buttons, rowIndex) => (
-                              <Space
-                                key={`${row.id}-${rowIndex}`}
-                                wrap
-                                size={4}
-                              >
-                                {buttons.map((button, columnIndex) =>
-                                  button.type === "CALLBACK" ? (
-                                    <Button
-                                      key={`${row.id}-${rowIndex}-${columnIndex}`}
-                                      size="small"
-                                      loading={callback.isPending}
-                                      disabled={
-                                        !messageSearch ||
-                                        !can("telegram:search")
-                                      }
-                                      onClick={() =>
-                                        messageSearch &&
-                                        callback.mutate({
-                                          searchId: messageSearch.id,
-                                          messageId: row.id,
-                                          row: rowIndex,
-                                          column: columnIndex,
-                                        })
-                                      }
-                                    >
-                                      {button.text}
-                                    </Button>
-                                  ) : button.type === "URL" &&
-                                    isSafeHttpsUrl(button.url) ? (
-                                    <Typography.Link
-                                      key={`${row.id}-${rowIndex}-${columnIndex}`}
-                                      href={button.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      {button.text}
-                                    </Typography.Link>
-                                  ) : null,
-                                )}
-                              </Space>
-                            ))}
-                          </Space>
-                        )}
-                      </Space>
-                    );
-                  },
-                },
-                {
-                  title: "更新时间",
-                  dataIndex: "telegramEditedAt",
-                  width: 180,
-                  render: (value: string | null, row: TelegramMessage) =>
-                    value ?? row.telegramSentAt ?? "—",
-                },
-              ]}
-              dataSource={rawMessages.data?.items ?? []}
-              loading={rawMessages.isPending}
-              pagination={{
-                current: messagePage,
-                pageSize: 30,
-                total: rawMessages.data?.total ?? 0,
-                onChange: setMessagePage,
-                showSizeChanger: false,
-              }}
-              locale={{
-                emptyText:
-                  "尚无可展示的机器人消息；未知或未匹配消息不会被伪装成结果",
-              }}
-            />
-            <Typography.Title level={5} style={{ marginTop: 24 }}>
-              识别到的链接候选
-            </Typography.Title>
-            <Typography.Paragraph type="secondary">
-              仅从本次已关联回复的文字中提取链接，不推断标题、媒体类型或频道权限；请先核对来源消息。
-            </Typography.Paragraph>
-            <Table<ParsedTelegramMessage>
-              rowKey="id"
-              size="small"
-              columns={[
-                {
-                  title: "来源消息",
+                  title: "内容",
                   dataIndex: "messageText",
                   render: (text: string | null) => (
                     <Typography.Paragraph
-                      ellipsis={{ rows: 2, expandable: true, symbol: "展开" }}
+                      ellipsis={{ rows: 2 }}
                       style={{ marginBottom: 0 }}
                     >
                       {text || "（无文本内容）"}
@@ -2065,76 +3009,55 @@ export function TelegramPage() {
                   ),
                 },
                 {
-                  title: "链接",
-                  dataIndex: "sourceLinks",
-                  width: 360,
-                  render: (links: TelegramSourceLink[]) =>
-                    links.length ? (
-                      <Space direction="vertical" size={4}>
-                        {links.map((link, index) => (
-                          <Typography.Link
-                            key={`${link.sourceMessageId}-${index}`}
-                            href={
-                              isSafeHttpsUrl(link.url) ? link.url : undefined
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {link.sourceType === "TELEGRAM_MESSAGE"
-                              ? `Telegram · ${link.publicChat}`
-                              : link.host}
-                          </Typography.Link>
-                        ))}
-                      </Space>
-                    ) : (
-                      <Typography.Text type="secondary">
-                        未发现可识别链接
-                      </Typography.Text>
-                    ),
-                },
-                {
-                  title: "时间",
-                  dataIndex: "telegramEditedAt",
-                  width: 180,
-                  render: (
-                    editedAt: string | null,
-                    row: ParsedTelegramMessage,
-                  ) => editedAt ?? row.telegramSentAt ?? "—",
+                  title: "到达时间",
+                  dataIndex: "telegramSentAt",
+                  width: 200,
+                  render: (value: string | null) => value ?? "—",
                 },
               ]}
-              dataSource={parsedMessages.data?.items ?? []}
-              loading={parsedMessages.isPending}
-              pagination={{
-                current: parsedMessagePage,
-                pageSize: 30,
-                total: parsedMessages.data?.total ?? 0,
-                onChange: setParsedMessagePage,
-                showSizeChanger: false,
-              }}
-              locale={{
-                emptyText: "收到与查询关联的消息后，会在这里提取可核对的链接",
-              }}
+              dataSource={unmatchedMessages.data?.items ?? []}
+              loading={unmatchedMessages.isPending}
+              pagination={false}
+              locale={{ emptyText: "目前没有未匹配的机器人消息" }}
             />
-          </>
+          </Card>
         )}
-      </Modal>
 
-      <Card title="连接说明">
-        <Space direction="vertical" size={8}>
-          <Typography.Text>
-            连接会创建加密的本地 TDLib
-            会话；模块关闭时不加载原生库，也不发起连接。
-          </Typography.Text>
-          <Typography.Text>
-            “关闭连接”保留已授权会话；“退出 Telegram
-            账号”会删除复用授权，两者操作分开。
-          </Typography.Text>
-          <Typography.Text type="secondary">
-            <LockOutlined /> 当前页面以分页方式呈现 Telegram
-            消息快照；未识别的消息仅作为原始消息展示，不生成虚构的搜索条目。
-          </Typography.Text>
-        </Space>
-      </Card>
+      {workspaceTab === "account" && (
+        <Card title="连接说明">
+          <Space direction="vertical" size={8}>
+            <Typography.Text>
+              连接会创建加密的本地 TDLib
+              会话；模块关闭时不加载原生库，也不发起连接。
+            </Typography.Text>
+            <Typography.Text>
+              “关闭连接”保留已授权会话；“退出 Telegram
+              账号”会删除复用授权，两者操作分开。
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              <LockOutlined /> 当前页面以分页方式呈现 Telegram
+              消息快照；未识别的消息仅作为原始消息展示，不生成虚构的搜索条目。
+            </Typography.Text>
+          </Space>
+        </Card>
+      )}
+
+      {inlineMediaPreview ? (
+        <TelegramMessageMediaPreview
+          key={inlineMediaPreview.taskId}
+          onRetry={() =>
+            createInlineMediaPreview.mutate(inlineMediaPreview.messageLink)
+          }
+          retrying={createInlineMediaPreview.isPending}
+          taskId={inlineMediaPreview.taskId}
+          messageLink={inlineMediaPreview.messageLink}
+          onClose={() => {
+            mediaPreviewGeneration.current += 1;
+            message.destroy("telegram-media-preview");
+            setInlineMediaPreview(null);
+          }}
+        />
+      ) : null}
     </Space>
   );
 }

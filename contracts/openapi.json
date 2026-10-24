@@ -854,6 +854,25 @@
         ],
         "type": "object"
       },
+      "ApiResponsePageResultConversationTurnView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResultConversationTurnView"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponsePageResultConversationView": {
         "properties": {
           "data": {
@@ -1010,6 +1029,25 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PageResultTaskView"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
+      "ApiResponsePageResultTelegramConversationView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResultTelegramConversationView"
           },
           "message": {
             "type": "string"
@@ -1238,6 +1276,44 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/TaskView"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
+      "ApiResponseTelegramBotSessionDiagnostic": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TelegramBotSessionDiagnostic"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
+      "ApiResponseTelegramConversationView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TelegramConversationView"
           },
           "message": {
             "type": "string"
@@ -1806,6 +1882,59 @@
         },
         "type": "object"
       },
+      "ConfigurationRequest": {
+        "properties": {
+          "apiHash": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string"
+          },
+          "apiId": {
+            "minLength": 1,
+            "pattern": "[1-9][0-9]{0,9}",
+            "type": "string"
+          },
+          "proxyEnabled": {
+            "type": "boolean"
+          },
+          "proxyHost": {
+            "maxLength": 253,
+            "minLength": 0,
+            "type": "string"
+          },
+          "proxyPassword": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          },
+          "proxyPort": {
+            "format": "int32",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "proxySecret": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string"
+          },
+          "proxyType": {
+            "minLength": 1,
+            "pattern": "(?i)socks5|http|mtproto",
+            "type": "string"
+          },
+          "proxyUsername": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "apiId",
+          "proxyType"
+        ],
+        "type": "object"
+      },
       "ContentDraft": {
         "properties": {
           "attachmentIds": {
@@ -1933,6 +2062,64 @@
         "required": [
           "version"
         ],
+        "type": "object"
+      },
+      "ConversationMessageView": {
+        "properties": {
+          "associationStatus": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "inlineLinks": {
+            "items": {
+              "$ref": "#/components/schemas/InlineTextLink"
+            },
+            "type": "array"
+          },
+          "messageText": {
+            "type": "string"
+          },
+          "replyMarkupJson": {
+            "type": "string"
+          },
+          "sourceLinks": {
+            "items": {
+              "$ref": "#/components/schemas/SourceLink"
+            },
+            "type": "array"
+          },
+          "telegramEditedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "telegramMessageId": {
+            "type": "string"
+          },
+          "telegramSentAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConversationTurnView": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessageView"
+            },
+            "type": "array"
+          },
+          "search": {
+            "$ref": "#/components/schemas/SearchView"
+          }
+        },
         "type": "object"
       },
       "ConversationView": {
@@ -2849,6 +3036,22 @@
         ],
         "type": "object"
       },
+      "InlineTextLink": {
+        "properties": {
+          "length": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "offset": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "JobExecution": {
         "properties": {
           "attempts": {
@@ -3438,6 +3641,29 @@
         },
         "type": "object"
       },
+      "PageResultConversationTurnView": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationTurnView"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "PageResultConversationView": {
         "properties": {
           "items": {
@@ -3627,6 +3853,29 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/TaskView"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PageResultTelegramConversationView": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TelegramConversationView"
             },
             "type": "array"
           },
@@ -4346,41 +4595,42 @@
       },
       "SettingsView": {
         "properties": {
-          "apiSecretConfigured": {
+          "apiHashConfigured": {
             "type": "boolean"
           },
-          "apiSecretOverrideStored": {
-            "type": "boolean"
-          },
-          "configurationSource": {
+          "apiId": {
             "type": "string"
           },
-          "maxContextMessages": {
+          "databaseOverride": {
+            "type": "boolean"
+          },
+          "encryptionAvailable": {
+            "type": "boolean"
+          },
+          "proxyEnabled": {
+            "type": "boolean"
+          },
+          "proxyHost": {
+            "type": "string"
+          },
+          "proxyPasswordConfigured": {
+            "type": "boolean"
+          },
+          "proxyPort": {
             "format": "int32",
             "type": "integer"
           },
-          "maxMessageLength": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "model": {
-            "type": "string"
-          },
-          "modelReady": {
+          "proxySecretConfigured": {
             "type": "boolean"
           },
-          "moduleEnabled": {
+          "proxyType": {
+            "type": "string"
+          },
+          "proxyUsername": {
+            "type": "string"
+          },
+          "sessionKeyConfigured": {
             "type": "boolean"
-          },
-          "requestTimeoutSeconds": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "sdkVersion": {
-            "type": "string"
-          },
-          "systemPrompt": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -4670,6 +4920,9 @@
             "format": "int64",
             "type": "integer"
           },
+          "includeAlbum": {
+            "type": "boolean"
+          },
           "liveCheckedAt": {
             "format": "date-time",
             "type": "string"
@@ -4683,6 +4936,10 @@
           },
           "messageLink": {
             "type": "string"
+          },
+          "pendingMediaCount": {
+            "format": "int64",
+            "type": "integer"
           },
           "scannedMessages": {
             "format": "int32",
@@ -4706,6 +4963,29 @@
           },
           "updatedAt": {
             "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TelegramBotSessionDiagnostic": {
+        "properties": {
+          "botChatId": {
+            "type": "string"
+          },
+          "botUserId": {
+            "type": "string"
+          },
+          "botUsername": {
+            "type": "string"
+          },
+          "cachedBlockListType": {
+            "type": "string"
+          },
+          "onlineMainBlockListStatus": {
+            "type": "string"
+          },
+          "telegramUserId": {
             "type": "string"
           }
         },
@@ -4745,6 +5025,9 @@
             "format": "date",
             "type": "string"
           },
+          "includeAlbum": {
+            "type": "boolean"
+          },
           "maxMessages": {
             "format": "int32",
             "maximum": 500,
@@ -4758,6 +5041,33 @@
           },
           "toDate": {
             "format": "date",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TelegramConversationView": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastKeyword": {
+            "type": "string"
+          },
+          "searchCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
             "type": "string"
           }
         },
@@ -4796,6 +5106,10 @@
       },
       "TelegramSearchRequest": {
         "properties": {
+          "conversationId": {
+            "format": "int64",
+            "type": "integer"
+          },
           "keyword": {
             "maxLength": 256,
             "minLength": 0,
@@ -5368,6 +5682,252 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/agentscope/conversations": {
+      "get": {
+        "operationId": "AgentScopeController_conversations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResultConversationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:view')"
+      },
+      "post": {
+        "operationId": "AgentScopeController_createConversation",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseConversationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:create')"
+      }
+    },
+    "/api/agentscope/conversations/{id}": {
+      "delete": {
+        "operationId": "AgentScopeController_deleteConversation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:delete')"
+      }
+    },
+    "/api/agentscope/conversations/{id}/messages": {
+      "get": {
+        "operationId": "AgentScopeController_messages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResultMessageView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:view')"
+      },
+      "post": {
+        "operationId": "AgentScopeController_send",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTurnView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:view') and @access.has('agentscope:chat')"
+      }
+    },
+    "/api/agentscope/status": {
+      "get": {
+        "operationId": "AgentScopeController_status",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStatusView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "agent-scope-controller"
+        ],
+        "x-authorization": "@access.has('agentscope:view')"
+      }
+    },
     "/api/auth/captcha/challenge": {
       "post": {
         "operationId": "CaptchaController_challenge",
@@ -14279,6 +14839,41 @@
           "telegram-controller"
         ],
         "x-authorization": "@access.has('telegram:delete')"
+      },
+      "get": {
+        "operationId": "TelegramController_collection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTaskView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:view')"
       }
     },
     "/api/telegram/collections/{id}/cancel": {
@@ -14494,6 +15089,232 @@
           "telegram-controller"
         ],
         "x-authorization": "@access.has('telegram:collect')"
+      }
+    },
+    "/api/telegram/configuration": {
+      "get": {
+        "operationId": "TelegramController_configuration",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:configure')"
+      },
+      "put": {
+        "operationId": "TelegramController_saveConfiguration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSettingsView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:configure')"
+      }
+    },
+    "/api/telegram/conversation": {
+      "get": {
+        "operationId": "TelegramController_conversation",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResultConversationTurnView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:view')"
+      }
+    },
+    "/api/telegram/conversations": {
+      "get": {
+        "operationId": "TelegramController_conversations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResultTelegramConversationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:view')"
+      },
+      "post": {
+        "operationId": "TelegramController_createConversation",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTelegramConversationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:search')"
+      }
+    },
+    "/api/telegram/conversations/{id}": {
+      "delete": {
+        "operationId": "TelegramController_deleteConversation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:delete')"
       }
     },
     "/api/telegram/media/{id}/archive-entries": {
@@ -15264,6 +16085,32 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponsePageResultParsedMessageView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:view')"
+      }
+    },
+    "/api/telegram/session/bot-diagnostic": {
+      "get": {
+        "operationId": "TelegramController_botSessionDiagnostic",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTelegramBotSessionDiagnostic"
                 }
               }
             },

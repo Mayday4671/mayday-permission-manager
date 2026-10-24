@@ -91,6 +91,15 @@ public class TelegramSettings
         }
     }
 
+    /**
+     * Returns the raw Base64 key only to the configuration owner for encrypted
+     * persistence; never serialize or log it.
+     */
+    public String getSessionEncryptionKey()
+    {
+        return sessionEncryptionKey;
+    }
+
     /** 判断本机 TDLib 会话密钥是否为至少 256 位的有效 Base64 配置。 */
     public boolean sessionEncryptionKeyConfigured()
     {

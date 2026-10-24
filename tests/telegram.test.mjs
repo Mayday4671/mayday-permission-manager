@@ -52,6 +52,11 @@ test("Telegram 模块状态、权限、分页与无会话任务可控", async (t
   assert.equal("apiHash" in status.data, false);
   assert.equal("sessionDirectory" in status.data, false);
 
+  const initialConfiguration = await request("/telegram/configuration", token);
+  assert.equal(initialConfiguration.data.encryptionAvailable, true);
+  assert.equal("apiHash" in initialConfiguration.data, false);
+  assert.equal("sessionEncryptionKey" in initialConfiguration.data, false);
+
   const invalid = await request("/telegram/collections", token, {
     method: "POST",
     body: {
@@ -187,4 +192,46 @@ test("Telegram 模块状态、权限、分页与无会话任务可控", async (t
   );
   assert.equal(trackingDisabled.data.trackingEnabled, false);
   assert.match(trackingDisabled.data.liveStatusMessage, /已停止/);
+
+  // Dummy credentials verify page configuration persistence and ciphertext shape;
+  // this isolated stack never connects a Telegram client or contacts Telegram.
+  const savedConfiguration = await request("/telegram/configuration", token, {
+    method: "PUT",
+    body: {
+      apiId: "123456789",
+      apiHash: "isolated-api-hash-test-value",
+      proxyEnabled: true,
+      proxyType: "socks5",
+      proxyHost: "127.0.0.1",
+      proxyPort: 1080,
+      proxyUsername: "isolated-user",
+      proxyPassword: "isolated-proxy-password",
+      proxySecret: "",
+    },
+  });
+  assert.equal(savedConfiguration.data.apiId, "123456789");
+  assert.equal(savedConfiguration.data.apiHashConfigured, true);
+  assert.equal(savedConfiguration.data.sessionKeyConfigured, true);
+  assert.equal(savedConfiguration.data.proxyPasswordConfigured, true);
+  assert.equal(savedConfiguration.data.databaseOverride, true);
+  assert.equal("apiHash" in savedConfiguration.data, false);
+  assert.equal("sessionEncryptionKey" in savedConfiguration.data, false);
+
+  const encryptedConfiguration = isolatedSql(
+    `SELECT LEFT(api_hash_cipher, 3), LEFT(session_encryption_key_cipher, 3),
+            LEFT(proxy_password_cipher, 3),
+            LOCATE('isolated-api-hash-test-value', api_hash_cipher),
+            LOCATE('isolated-proxy-password', proxy_password_cipher)
+       FROM sys_telegram_config WHERE id = 1;`,
+    { raw: true },
+  )
+    .trim()
+    .split("\t");
+  assert.deepEqual(encryptedConfiguration, ["v1.", "v1.", "v1.", "0", "0"]);
+
+  const reloadedConfiguration = await request("/telegram/configuration", token);
+  assert.equal(reloadedConfiguration.data.apiId, "123456789");
+  assert.equal(reloadedConfiguration.data.apiHashConfigured, true);
+  assert.equal(reloadedConfiguration.data.proxyPasswordConfigured, true);
+  assert.equal("apiHash" in reloadedConfiguration.data, false);
 });

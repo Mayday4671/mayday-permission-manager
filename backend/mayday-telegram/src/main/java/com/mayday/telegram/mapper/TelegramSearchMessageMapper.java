@@ -22,6 +22,30 @@ public interface TelegramSearchMessageMapper extends EntityMapper<TelegramSearch
     }
 
     /**
+     * Resolves a TDLib message update across the temporary-to-final ID change
+     * emitted after an outgoing message is accepted by Telegram. Reusing the
+     * temporary row keeps one transcript entry for one sent message.
+     */
+    default Optional<TelegramSearchMessage> findMessageForUpdate(String chatId, String messageId,
+            String previousMessageId)
+    {
+        Optional<TelegramSearchMessage> current = findMessage(chatId, messageId);
+        if (previousMessageId == null || previousMessageId.equals(messageId))
+        {
+            return current;
+        }
+
+        Optional<TelegramSearchMessage> previous = findMessage(chatId, previousMessageId);
+        if (current.isPresent())
+        {
+            previous.filter(message -> !message.getId().equals(current.get().getId()))
+                    .ifPresent(message -> deleteById(message.getId()));
+            return current;
+        }
+        return previous;
+    }
+
+    /**
      * Reads early bot replies that arrived before SendMessage returned its final
      * message ID.
      */

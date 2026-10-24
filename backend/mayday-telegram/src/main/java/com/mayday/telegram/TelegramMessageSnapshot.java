@@ -8,5 +8,6 @@ package com.mayday.telegram;
 public record TelegramMessageSnapshot(String chatId, String messageId, String senderId, boolean outgoing,
         String updateType, String contentType, String text, String entitiesJson, String replyMarkupJson,
         String replyToMessageId, Long sentAtEpochSeconds, Long editedAtEpochSeconds, boolean canBeSaved, String albumId,
-        String topicId, String attachmentMetadataJson) {
+        String topicId, String attachmentMetadataJson, String previousMessageId, Integer sendErrorCode,
+        String sendErrorName) {
 }

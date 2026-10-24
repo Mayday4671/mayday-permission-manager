@@ -19,6 +19,17 @@ public interface TelegramSessionClient
     CompletableFuture<TelegramBotChat> resolveBot(String username);
 
     /**
+     * Reads the active account identity and configured bot peer state without
+     * sending a message or changing Telegram account settings.
+     *
+     * @param username
+     *            configured public bot username
+     * @return safe peer identifiers and the bot chat's current TDLib block-list
+     *         state
+     */
+    CompletableFuture<TelegramBotSessionDiagnostic> inspectBotSession(String username);
+
+    /**
      * Searches only channels already visible in the authorized user's Telegram chat
      * list.
      */
@@ -45,6 +56,12 @@ public interface TelegramSessionClient
 
     /** Resolves an accessible public/private Telegram message URL through TDLib. */
     CompletableFuture<TelegramMessageLink> resolveMessageLink(String messageLink);
+
+    /**
+     * Reads the selected snapshot and adjacent members of its nonzero media album.
+     * Never joins a chat, follows other albums or expands into general history.
+     */
+    CompletableFuture<java.util.List<TelegramMessageSnapshot>> getMessageAlbum(TelegramMessageSnapshot anchor);
 
     /**
      * Reads one bounded page of history at or before the supplied message cursor.

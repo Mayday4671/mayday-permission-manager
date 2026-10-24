@@ -10,8 +10,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +43,13 @@ import tools.jackson.databind.ObjectMapper;
 public class TdLightTelegramSessionClientProvider implements TelegramSessionClientProvider
 {
     private static final long REQUEST_TIMEOUT_SECONDS = 15;
+    /**
+     * Lets TDLib return Telegram's callback-query timeout before the local guard
+     * fires.
+     */
+    private static final long CALLBACK_ANSWER_TIMEOUT_SECONDS = 45;
+    private static final int BLOCK_LIST_PAGE_SIZE = 100;
+    private static final int BLOCK_LIST_SCAN_LIMIT = 1_000;
     private final ObjectMapper objectMapper;
 
     /**
@@ -120,6 +129,8 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         private final Consumer<TelegramMessageSnapshot> messageListener;
         private final ObjectMapper objectMapper;
         private final AtomicBoolean parametersInitializing = new AtomicBoolean();
+        private final Map<String, CompletableFuture<Void>> startedBots = new ConcurrentHashMap<>();
+        private final Set<String> botStartMessageIds = ConcurrentHashMap.newKeySet();
         private final ThreadPoolExecutor messageEvents = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(256), runnable -> {
                     Thread thread = new Thread(runnable, "mayday-telegram-message-events");
@@ -181,7 +192,11 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                 enqueueSnapshot(newMessage.message, update.getClass().getSimpleName());
             } else if (update instanceof TdApi.UpdateMessageSendSucceeded sent)
             {
-                enqueueSnapshot(sent.message, update.getClass().getSimpleName());
+                enqueueSnapshot(sent.message, update.getClass().getSimpleName(), Long.toString(sent.oldMessageId));
+            } else if (update instanceof TdApi.UpdateMessageSendFailed failed)
+            {
+                enqueueSnapshot(failed.message, update.getClass().getSimpleName(), Long.toString(failed.oldMessageId),
+                        failed.error == null ? null : failed.error.code, sendErrorName(failed.error));
             } else if (update instanceof TdApi.UpdateMessageContent content)
             {
                 reloadAndCapture(content.chatId, content.messageId, update.getClass().getSimpleName());
@@ -204,6 +219,10 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             client.sendAsync(new TdApi.GetMessage(chatId, messageId)).whenComplete((message, error) -> {
                 if (error == null && message != null)
                 {
+                    if (botStartMessageIds.contains(Long.toString(message.id)))
+                    {
+                        return;
+                    }
                     enqueueSnapshot(message, updateType);
                 }
             });
@@ -214,7 +233,38 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
          */
         private void enqueueSnapshot(TdApi.Message message, String updateType)
         {
-            if (message == null || !isVerifiedBotChat(message.chatId))
+            enqueueSnapshot(message, updateType, null);
+        }
+
+        /**
+         * Moves message projection work away from TDLib's update thread and retains the
+         * temporary ID needed to correlate send success/failure updates.
+         */
+        private void enqueueSnapshot(TdApi.Message message, String updateType, String previousMessageId)
+        {
+            enqueueSnapshot(message, updateType, previousMessageId, null);
+        }
+
+        /**
+         * Enqueues an allow-listed message snapshot and numeric send error code. Raw
+         * TDLib error text is intentionally omitted because it may contain private
+         * request details.
+         */
+        private void enqueueSnapshot(TdApi.Message message, String updateType, String previousMessageId,
+                Integer sendErrorCode)
+        {
+            enqueueSnapshot(message, updateType, previousMessageId, sendErrorCode, null);
+        }
+
+        /**
+         * Queues a message with a sanitized symbolic error name for send failures.
+         * TDLib error messages are never copied into persistence or user-visible text.
+         */
+        private void enqueueSnapshot(TdApi.Message message, String updateType, String previousMessageId,
+                Integer sendErrorCode, String sendErrorName)
+        {
+            if (message == null || !isVerifiedBotChat(message.chatId)
+                    || isInternalBotStartMessage(message, previousMessageId))
             {
                 return;
             }
@@ -223,7 +273,8 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                 messageEvents.execute(() -> {
                     try
                     {
-                        messageListener.accept(toSnapshot(message, updateType));
+                        messageListener.accept(
+                                toSnapshot(message, updateType, previousMessageId, sendErrorCode, sendErrorName));
                     } catch (RuntimeException exception)
                     {
                         emit(TelegramAuthorizationState.ERROR, null, "Telegram 消息记录失败，请检查服务端状态");
@@ -246,10 +297,20 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         }
 
         /**
+         * Keeps the internal TDLib bot-start message out of a user's search transcript.
+         */
+        private boolean isInternalBotStartMessage(TdApi.Message message, String previousMessageId)
+        {
+            return message.isOutgoing && (botStartMessageIds.contains(Long.toString(message.id))
+                    || previousMessageId != null && botStartMessageIds.contains(previousMessageId));
+        }
+
+        /**
          * Builds an explicit allow-listed projection instead of serializing TDLib debug
          * output.
          */
-        private TelegramMessageSnapshot toSnapshot(TdApi.Message message, String updateType)
+        private TelegramMessageSnapshot toSnapshot(TdApi.Message message, String updateType, String previousMessageId,
+                Integer sendErrorCode, String sendErrorName)
         {
             TdApi.MessageReplyToMessage reply = message.replyTo instanceof TdApi.MessageReplyToMessage value
                     ? value
@@ -264,7 +325,22 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                     reply == null ? null : Long.toString(reply.messageId), (long) message.date,
                     message.editDate == 0 ? null : (long) message.editDate, message.canBeSaved,
                     message.mediaAlbumId == 0 ? null : Long.toString(message.mediaAlbumId), topicId(message),
-                    writeJson(attachmentMetadata(message.content)));
+                    writeJson(attachmentMetadata(message.content)), previousMessageId, sendErrorCode, sendErrorName);
+        }
+
+        /** Converts a history result that has no send-update temporary ID. */
+        private TelegramMessageSnapshot toSnapshot(TdApi.Message message, String updateType)
+        {
+            return toSnapshot(message, updateType, null, null, null);
+        }
+
+        /**
+         * Allows only known symbolic errors into a message snapshot; the raw TDLib
+         * message can contain request details and must never be persisted.
+         */
+        private String sendErrorName(TdApi.Error error)
+        {
+            return error != null && "YOU_BLOCKED_USER".equals(error.message) ? "YOU_BLOCKED_USER" : null;
         }
 
         /**
@@ -468,16 +544,123 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                 {
                     return CompletableFuture.failedFuture(new IllegalStateException("配置的搜索账号不是私聊机器人"));
                 }
-                return client.sendAsync(new TdApi.GetUser(privateChat.userId)).thenApply(user -> {
+                return client.sendAsync(new TdApi.GetUser(privateChat.userId)).thenCompose(user -> {
                     if (!(user.type instanceof TdApi.UserTypeBot))
                     {
-                        throw new IllegalStateException("配置的搜索账号不是 Telegram 机器人");
+                        return CompletableFuture.failedFuture(new IllegalStateException("配置的搜索账号不是 Telegram 机器人"));
                     }
                     String verifiedChatId = Long.toString(chat.id);
-                    botChatId = verifiedChatId;
-                    return new TelegramBotChat(verifiedChatId, normalized);
+                    String botUserId = Long.toString(privateChat.userId);
+                    return ensureBotStarted(verifiedChatId, botUserId).thenApply(ignored -> {
+                        // Publish the bot chat only after TDLib finishes its dedicated
+                        // /start request; its own update must never match a user search.
+                        botChatId = verifiedChatId;
+                        return new TelegramBotChat(verifiedChatId, normalized, botUserId);
+                    });
                 });
             }).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        }
+
+        /**
+         * Reads the active Telegram user, verifies the configured public bot and
+         * inspects its existing chat state. This diagnostic never starts the bot, sends
+         * a message or changes the account's block list.
+         */
+        @Override
+        public CompletableFuture<TelegramBotSessionDiagnostic> inspectBotSession(String username)
+        {
+            String normalized = normalizeUsername(username);
+            return client.sendAsync(new TdApi.GetMe()).thenCompose(currentUser -> {
+                return client.sendAsync(new TdApi.SearchPublicChat(normalized)).thenCompose(chat -> {
+                    if (!(chat.type instanceof TdApi.ChatTypePrivate privateChat))
+                    {
+                        return CompletableFuture.failedFuture(new IllegalStateException("配置的搜索账号不是私聊机器人"));
+                    }
+                    return client.sendAsync(new TdApi.GetUser(privateChat.userId)).thenCompose(bot -> {
+                        if (!(bot.type instanceof TdApi.UserTypeBot))
+                        {
+                            return CompletableFuture.failedFuture(new IllegalStateException("配置的搜索账号不是 Telegram 机器人"));
+                        }
+                        return client.sendAsync(new TdApi.GetChat(chat.id)).thenCompose(currentChat -> {
+                            if (!(currentChat.type instanceof TdApi.ChatTypePrivate currentPrivateChat)
+                                    || currentPrivateChat.userId != bot.id)
+                            {
+                                throw new IllegalStateException("Telegram 返回的机器人私聊身份不一致");
+                            }
+                            String cachedBlockListType = currentChat.blockList == null
+                                    ? "NONE"
+                                    : currentChat.blockList.getClass().getSimpleName();
+                            return findMainBlockListStatus(bot.id, 0).thenApply(onlineBlockListStatus -> {
+                                return new TelegramBotSessionDiagnostic(Long.toString(currentUser.id), normalized,
+                                        Long.toString(bot.id), Long.toString(currentChat.id), cachedBlockListType,
+                                        onlineBlockListStatus);
+                            });
+                        });
+                    });
+                });
+            }).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        }
+
+        /**
+         * Checks whether one verified bot ID appears in the current account's online
+         * main block list. Only the match result leaves this method; blocked sender IDs
+         * are never persisted or returned to the caller.
+         *
+         * <p>
+         * Telegram returns the list in pages of at most 100 senders. The scan is
+         * bounded to 1,000 entries so a very large personal block list cannot make the
+         * page diagnostic unbounded. An incomplete scan is reported explicitly.
+         *
+         * @param botUserId
+         *            the verified configured bot ID to check
+         * @param offset
+         *            number of senders already inspected
+         * @return BLOCKED, NOT_BLOCKED, or INCOMPLETE
+         */
+        private CompletableFuture<String> findMainBlockListStatus(long botUserId, int offset)
+        {
+            TdApi.GetBlockedMessageSenders request = new TdApi.GetBlockedMessageSenders(new TdApi.BlockListMain(),
+                    offset, BLOCK_LIST_PAGE_SIZE);
+            return client.sendAsync(request).thenCompose(page -> {
+                TdApi.MessageSender[] senders = page.senders == null ? new TdApi.MessageSender[0] : page.senders;
+                for (TdApi.MessageSender sender : senders)
+                {
+                    if (sender instanceof TdApi.MessageSenderUser blockedUser && blockedUser.userId == botUserId)
+                    {
+                        return CompletableFuture.completedFuture("BLOCKED");
+                    }
+                }
+                int nextOffset = offset + senders.length;
+                if (nextOffset >= page.totalCount)
+                {
+                    return CompletableFuture.completedFuture("NOT_BLOCKED");
+                }
+                if (senders.length == 0 || nextOffset >= BLOCK_LIST_SCAN_LIMIT)
+                {
+                    return CompletableFuture.completedFuture("INCOMPLETE");
+                }
+                return findMainBlockListStatus(botUserId, nextOffset);
+            });
+        }
+
+        /**
+         * Starts the verified bot once per local TDLib session before exposing its chat
+         * to the search-message listener. The cached future prevents duplicate start
+         * commands from concurrent searches.
+         */
+        private CompletableFuture<Void> ensureBotStarted(String chatId, String botUserId)
+        {
+            return startedBots.computeIfAbsent(chatId, ignored -> client
+                    .sendAsync(new TdApi.SendBotStartMessage(Long.parseLong(botUserId), Long.parseLong(chatId), ""))
+                    .orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS).thenApply(message -> {
+                        botStartMessageIds.add(Long.toString(message.id));
+                        return (Void) null;
+                    }).whenComplete((ignoredResult, error) -> {
+                        if (error != null)
+                        {
+                            startedBots.remove(chatId);
+                        }
+                    }));
         }
 
         /**
@@ -576,7 +759,7 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             byte[] payload = callbackData.clone();
             TdApi.GetCallbackQueryAnswer request = new TdApi.GetCallbackQueryAnswer(verifiedChatId, verifiedMessageId,
                     new TdApi.CallbackQueryPayloadData(payload));
-            return client.sendAsync(request).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            return client.sendAsync(request).orTimeout(CALLBACK_ANSWER_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                     .thenApply(answer -> new TelegramCallbackAnswer(answer.text, answer.showAlert, answer.url))
                     .whenComplete((answer, error) -> Arrays.fill(payload, (byte) 0));
         }
@@ -590,13 +773,24 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         {
             TdApi.GetMessageLinkInfo request = new TdApi.GetMessageLinkInfo(messageLink);
             return client.sendAsync(request).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS).thenApply(info -> {
-                if (info.message == null || !info.message.canBeSaved)
+                if (info.message == null)
                 {
-                    throw new IllegalArgumentException("链接没有指向可访问且允许保存的 Telegram 消息");
+                    throw new IllegalArgumentException("LINK_MESSAGE_UNAVAILABLE");
+                }
+                if (!info.message.canBeSaved)
+                {
+                    throw new IllegalArgumentException("LINK_MESSAGE_PROTECTED");
                 }
                 return new TelegramMessageLink(Long.toString(info.message.chatId), Long.toString(info.message.id),
-                        info.isPublic);
+                        info.isPublic, toSnapshot(info.message, "GetMessageLinkInfo"));
             });
+        }
+
+        /** Resolves one album without replacing the authoritative link snapshot. */
+        @Override
+        public CompletableFuture<List<TelegramMessageSnapshot>> getMessageAlbum(TelegramMessageSnapshot anchor)
+        {
+            return TelegramMessageAlbumReader.read(this, anchor).orTimeout(40, TimeUnit.SECONDS);
         }
 
         /**
@@ -778,6 +972,9 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             }
             if (settings.isProxyEnabled())
             {
+                // TDLib queues AddProxy while it is waiting for SetTdlibParameters.
+                // Do not wait for that queued request here: sending the parameters is
+                // what lets TDLib finish initialization and process the proxy request.
                 TdApi.Proxy proxy = configuredProxy(settings);
                 client.sendAsync(new TdApi.AddProxy(proxy, true, ""))
                         .orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS).whenComplete((addedProxy, error) -> {
@@ -786,14 +983,15 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                                 emit(TelegramAuthorizationState.ERROR, null, "Telegram 代理未能连接，请检查部署代理地址、端口和认证信息");
                                 return;
                             }
-                            sendTdlibParameters();
                         });
-                return;
             }
             sendTdlibParameters();
         }
 
-        /** Sends encrypted TDLib parameters after any required proxy is active. */
+        /**
+         * Sends encrypted initialization parameters, allowing TDLib to process queued
+         * preauthorization requests.
+         */
         private void sendTdlibParameters()
         {
             TdApi.SetTdlibParameters parameters = new TdApi.SetTdlibParameters();
@@ -853,7 +1051,10 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                     .whenComplete((response, error) -> {
                         if (error != null || response instanceof TdApi.Error)
                         {
-                            emit(currentState, null, "Telegram 未接受本次授权信息，请核对后重试");
+                            String feedback = response instanceof TdApi.Error telegramError
+                                    ? TelegramAuthorizationFeedback.rejected(telegramError.code, telegramError.message)
+                                    : TelegramAuthorizationFeedback.failed(error);
+                            emit(currentState, null, feedback);
                         }
                     });
         }
@@ -982,6 +1183,8 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             {
                 closing = true;
                 messageEvents.shutdown();
+                startedBots.clear();
+                botStartMessageIds.clear();
                 client.sendAsync(new TdApi.Close()).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                         .whenComplete((ignored, error) -> releaseFactoryAfterClose());
             }

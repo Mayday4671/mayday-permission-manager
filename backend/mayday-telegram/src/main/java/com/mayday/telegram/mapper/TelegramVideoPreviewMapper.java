@@ -7,6 +7,9 @@ import com.mayday.telegram.TelegramVideoPreview;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -40,6 +43,22 @@ public interface TelegramVideoPreviewMapper extends EntityMapper<TelegramVideoPr
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)
+    // Native @Select statements do not use MyBatis-Flex's generated entity mapping.
+    // Explicit mappings keep worker ownership and lease checks valid with
+    // underscore mapping disabled.
+    @Results(id = "previewTask", value =
+    {@Result(column = "owner_id", property = "ownerId"), @Result(column = "department_id", property = "departmentId"),
+            @Result(column = "media_id", property = "mediaId"),
+            @Result(column = "duration_seconds", property = "durationSeconds"),
+            @Result(column = "video_codec", property = "videoCodec"),
+            @Result(column = "audio_codec", property = "audioCodec"),
+            @Result(column = "failure_message", property = "failureMessage"),
+            @Result(column = "attempt_count", property = "attemptCount"),
+            @Result(column = "reserved_bytes", property = "reservedBytes"),
+            @Result(column = "lease_owner", property = "leaseOwner"),
+            @Result(column = "lease_expires_at", property = "leaseExpiresAt"),
+            @Result(column = "created_at", property = "createdAt"),
+            @Result(column = "updated_at", property = "updatedAt")})
     TelegramVideoPreview lockNext();
 
     /** 锁定固定预算行，使总空间聚合检查在并发创建预览时保持串行。 */
@@ -72,6 +91,7 @@ public interface TelegramVideoPreviewMapper extends EntityMapper<TelegramVideoPr
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """)
+    @ResultMap("previewTask")
     TelegramVideoPreview lockExpired();
 
     /** 保守统计可用与队列中预览占用的文件空间，供模块级配额决策使用。 */

@@ -4,6 +4,7 @@ import java.util.concurrent.CompletionException;
 
 import com.mayday.common.util.ModuleSwitches;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class TelegramTaskWorker
 {
     private final ModuleSwitches modules;
@@ -44,7 +46,9 @@ public class TelegramTaskWorker
             collections.fail(task, "任务所有者已停用或失去 Telegram 采集权限，任务已停止");
         } catch (CompletionException | IllegalArgumentException exception)
         {
-            collections.fail(task, "消息链接不可访问、已失效或当前账号无权读取；请核对来源后重新创建任务");
+            log.warn("Telegram collection task {} failed: {}", task.getId(),
+                    TelegramCallbackFeedback.diagnosticLabel(exception));
+            collections.fail(task, TelegramCollectionFeedback.failed(exception));
         } catch (RuntimeException exception)
         {
             collections.fail(task, "Telegram 历史读取失败；已保留此前保存的消息，可核对账号连接后重试");
