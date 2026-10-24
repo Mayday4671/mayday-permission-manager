@@ -29,6 +29,7 @@ import {
   ClockCircleOutlined,
   CustomerServiceOutlined,
   DisconnectOutlined,
+  DownloadOutlined,
   FilterOutlined,
   FolderOutlined,
   LeftOutlined,
@@ -487,6 +488,7 @@ function renderMessageText(
   inlineLinks: TelegramInlineTextLink[] | undefined,
   sourceLinks: TelegramSourceLink[],
   onTelegramPostClick?: (url: string) => void,
+  renderCollectionAction?: (url: string, label: string) => ReactNode,
 ) {
   if (!text) return "";
 
@@ -535,21 +537,28 @@ function renderMessageText(
       );
     }
     nodes.push(
-      <a
-        href={range.url}
-        key={`link-${index}-${range.offset}`}
-        onClick={(event) => {
-          if (onTelegramPostClick && isTelegramPostLink(range.url)) {
-            event.preventDefault();
-            onTelegramPostClick(range.url);
-          }
-        }}
-        rel="noopener noreferrer"
-        target="_blank"
-        title={range.url}
-      >
-        {text.slice(range.offset, range.offset + range.length)}
-      </a>,
+      <Fragment key={`result-${index}-${range.offset}`}>
+        <a
+          href={range.url}
+          key={`link-${index}-${range.offset}`}
+          onClick={(event) => {
+            if (onTelegramPostClick && isTelegramPostLink(range.url)) {
+              event.preventDefault();
+              onTelegramPostClick(range.url);
+            }
+          }}
+          rel="noopener noreferrer"
+          target="_blank"
+          title={range.url}
+        >
+          {text.slice(range.offset, range.offset + range.length)}
+        </a>
+        {isTelegramPostLink(range.url) &&
+          renderCollectionAction?.(
+            range.url,
+            text.slice(range.offset, range.offset + range.length),
+          )}
+      </Fragment>,
     );
     cursor = range.offset + range.length;
   }
@@ -657,6 +666,12 @@ export function TelegramPage() {
     messageLink: string;
   } | null>(null);
   const mediaPreviewGeneration = useRef(0);
+  const [resultCollections, setResultCollections] = useState<
+    Record<string, TelegramCollectionTask>
+  >({});
+  const [collectingResult, setCollectingResult] = useState<string | null>(null);
+  // The ref also blocks a second click before React has rendered the pending state.
+  const resultCollectionInFlight = useRef(false);
   // A closed or replaced preview must not be reopened by an older request.
   useEffect(
     () => () => {
@@ -1110,6 +1125,7 @@ export function TelegramPage() {
         }),
       }),
     onSuccess: (task, link, generation) => {
+      setResultCollections((current) => ({ ...current, [link]: task }));
       void queryClient.invalidateQueries({
         queryKey: ["telegram", "collections"],
       });
@@ -1128,6 +1144,69 @@ export function TelegramPage() {
     },
   });
 
+  /** Collects one search result and its album directly, leaving the conversation in place. */
+  const collectSearchResult = useMutation({
+    mutationFn: (link: string) =>
+      api<TelegramCollectionTask>("/telegram/collections", {
+        method: "POST",
+        body: JSON.stringify({
+          messageLink: link,
+          maxMessages: 10,
+          includeAlbum: true,
+          downloadImages: true,
+          downloadVideos: true,
+          downloadDocuments: true,
+        }),
+      }),
+    onSuccess: (task, link) => {
+      setResultCollections((current) => ({ ...current, [link]: task }));
+      setCollectionTaskPage(1);
+      void queryClient.invalidateQueries({
+        queryKey: ["telegram", "collections"],
+      });
+      message.success("已加入采集，可点击“查看采集”查看进度和附件");
+    },
+    onError: (error: Error) => message.error(error.message),
+    onSettled: () => {
+      resultCollectionInFlight.current = false;
+      setCollectingResult(null);
+    },
+  });
+
+  /** Provides a visible action only for message links; channel roots never imply a history crawl. */
+  const renderResultCollectionAction = (link: string, label: string) => {
+    if (!can("telegram:collect") || !can("telegram:download")) return null;
+    const task = resultCollections[link];
+    return (
+      <Button
+        className="telegram-result-collect"
+        type="text"
+        size="small"
+        icon={task ? <CheckCircleOutlined /> : <DownloadOutlined />}
+        loading={collectingResult === link}
+        disabled={
+          !view?.connected ||
+          Boolean(collectingResult && collectingResult !== link) ||
+          createInlineMediaPreview.isPending
+        }
+        aria-label={`${task ? "查看采集" : "采集"}：${label}`}
+        title="保存该消息及同一相册的图片、视频和文件"
+        onClick={() => {
+          if (task) {
+            setInlineMediaPreview({ taskId: task.id, messageLink: link });
+            return;
+          }
+          if (resultCollectionInFlight.current) return;
+          resultCollectionInFlight.current = true;
+          setCollectingResult(link);
+          collectSearchResult.mutate(link);
+        }}
+      >
+        {task ? "查看采集" : "采集"}
+      </Button>
+    );
+  };
+
   /** Enforces account and permission checks before turning a Telegram post link into a local preview. */
   const previewTelegramPost = (link: string) => {
     if (!view?.connected) {
@@ -1144,7 +1223,16 @@ export function TelegramPage() {
       );
       return;
     }
-    if (createInlineMediaPreview.isPending || inlineMediaPreview) {
+    if (
+      createInlineMediaPreview.isPending ||
+      inlineMediaPreview ||
+      resultCollectionInFlight.current
+    ) {
+      return;
+    }
+    const existingTask = resultCollections[link];
+    if (existingTask) {
+      setInlineMediaPreview({ taskId: existingTask.id, messageLink: link });
       return;
     }
     message.loading({
@@ -1200,6 +1288,11 @@ export function TelegramPage() {
       api<void>(`/telegram/collections/${id}`, { method: "DELETE" }),
     onSuccess: async (_, id) => {
       if (selectedCollection?.id === id) setSelectedCollection(null);
+      setResultCollections((current) =>
+        Object.fromEntries(
+          Object.entries(current).filter(([, task]) => task.id !== id),
+        ),
+      );
       await queryClient.invalidateQueries({
         queryKey: ["telegram", "collections"],
       });
@@ -2202,21 +2295,28 @@ export function TelegramPage() {
                                 isSafeHttpsUrl(button.url)
                               ) {
                                 return (
-                                  <Button
-                                    key={key}
-                                    size="small"
-                                    href={button.url}
-                                    onClick={(event) => {
-                                      if (isTelegramPostLink(button.url!)) {
-                                        event.preventDefault();
-                                        previewTelegramPost(button.url!);
-                                      }
-                                    }}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    {button.text}
-                                  </Button>
+                                  <Fragment key={key}>
+                                    <Button
+                                      key={key}
+                                      size="small"
+                                      href={button.url}
+                                      onClick={(event) => {
+                                        if (isTelegramPostLink(button.url!)) {
+                                          event.preventDefault();
+                                          previewTelegramPost(button.url!);
+                                        }
+                                      }}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      {button.text}
+                                    </Button>
+                                    {isTelegramPostLink(button.url!) &&
+                                      renderResultCollectionAction(
+                                        button.url!,
+                                        button.text,
+                                      )}
+                                  </Fragment>
                                 );
                               }
 
@@ -2244,6 +2344,7 @@ export function TelegramPage() {
                                       row.inlineLinks,
                                       row.sourceLinks,
                                       previewTelegramPost,
+                                      renderResultCollectionAction,
                                     ) || `（${row.contentType}，无文本内容）`}
                                   </Typography.Paragraph>
 

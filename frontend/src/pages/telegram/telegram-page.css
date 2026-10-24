@@ -313,6 +313,17 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* Keep collection attached to its result without disrupting Telegram's original text layout. */
+.telegram-chat-message-content .telegram-result-collect {
+  margin-inline-start: 8px;
+  padding-inline: 6px;
+  height: 24px;
+  font-size: 12px;
+  color: var(--app-primary-text);
+  vertical-align: baseline;
+  white-space: nowrap;
+}
 .telegram-chat-message-content a:focus-visible {
   outline: 2px solid var(--app-primary);
   outline-offset: 2px;
