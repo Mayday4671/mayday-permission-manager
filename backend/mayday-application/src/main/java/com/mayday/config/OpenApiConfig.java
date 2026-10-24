@@ -65,7 +65,8 @@ public class OpenApiConfig
             api.getPaths().entrySet().removeIf(entry -> !modules.pathEnabled(entry.getKey()));
             api.getPaths().forEach((path, item) -> {
                 boolean publicEndpoint = path.startsWith("/api/public/") || path.equals("/api/platform/features")
-                        || path.equals("/api/auth/login") || path.startsWith("/api/auth/captcha/");
+                        || path.equals("/api/auth/login-policy") || path.equals("/api/auth/login")
+                        || path.startsWith("/api/auth/captcha/");
                 item.readOperations().forEach(operation -> operation.setSecurity(
                         publicEndpoint ? List.of() : List.of(new SecurityRequirement().addList("bearerAuth"))));
             });

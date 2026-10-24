@@ -46,11 +46,11 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [credentials, setCredentials] = useState<LoginCredentials | null>(null);
   const submitting = useRef(false);
+  const checkingPolicy = useRef(false);
   const [form] = Form.useForm<LoginCredentials>();
   /** 凭证只在内存中传递给一次登录；验证失败、取消或密码错误均须重新验证。 */
-  const verifiedLogin = async (captchaToken: string) => {
-    if (!credentials || submitting.current) return;
-    const values = credentials;
+  const submitLogin = async (values: LoginCredentials, captchaToken = "") => {
+    if (submitting.current) return;
     submitting.current = true;
     setCredentials(null);
     setLoading(true);
@@ -112,9 +112,30 @@ export function LoginPage() {
               form={form}
               layout="vertical"
               onFinish={async (values) => {
-                if (loading || credentials) return;
+                if (
+                  loading ||
+                  credentials ||
+                  submitting.current ||
+                  checkingPolicy.current
+                )
+                  return;
+                checkingPolicy.current = true;
                 setError("");
-                setCredentials(values);
+                setLoading(true);
+                try {
+                  // Re-read on every attempt so an already-open login page follows admin changes.
+                  const policy = await api<{ captchaEnabled: boolean }>(
+                    "/auth/login-policy",
+                    { cache: "no-store" },
+                  );
+                  if (policy.captchaEnabled) setCredentials(values);
+                  else await submitLogin(values);
+                } catch (failure) {
+                  setError((failure as Error).message);
+                } finally {
+                  checkingPolicy.current = false;
+                  setLoading(false);
+                }
               }}
               requiredMark={false}
             >
@@ -179,7 +200,7 @@ export function LoginPage() {
             username={credentials?.username ?? ""}
             onCancel={() => setCredentials(null)}
             onVerified={(token) => {
-              void verifiedLogin(token);
+              if (credentials) void submitLogin(credentials, token);
             }}
           />
         </div>

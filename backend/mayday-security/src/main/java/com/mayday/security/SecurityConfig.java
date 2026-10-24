@@ -75,11 +75,11 @@ public class SecurityConfig
                 .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorizationRules -> authorizationRules
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
-                        .requestMatchers("/api/auth/login", "/api/auth/captcha/challenge", "/api/auth/captcha/verify",
-                                "/api/auth/identity/providers", "/api/auth/identity/oidc/start",
-                                "/api/auth/identity/oidc/complete", "/api/auth/identity/mfa/verify",
-                                "/api/platform/features", "/api/public/**", "/actuator/health",
-                                "/actuator/health/liveness", "/actuator/health/readiness", "/error",
+                        .requestMatchers("/api/auth/login", "/api/auth/login-policy", "/api/auth/captcha/challenge",
+                                "/api/auth/captcha/verify", "/api/auth/identity/providers",
+                                "/api/auth/identity/oidc/start", "/api/auth/identity/oidc/complete",
+                                "/api/auth/identity/mfa/verify", "/api/platform/features", "/api/public/**",
+                                "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness", "/error",
                                 "/api/telegram/media/*/stream", "/api/telegram/media/*/download")
                         .permitAll().requestMatchers("/api/platform/openapi", "/api/platform/openapi/**")
                         .access((authentication, context) -> new AuthorizationDecision(

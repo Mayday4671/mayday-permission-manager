@@ -11,6 +11,7 @@ import com.mayday.security.LoginThrottle;
 import com.mayday.security.PermissionCatalog;
 import com.mayday.security.SlideCaptchaService;
 import com.mayday.security.TokenService;
+import com.mayday.service.SettingService;
 import com.mayday.service.UserService;
 import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.mapper.UserMapper;
@@ -24,6 +25,7 @@ import com.mayday.web.Contracts.ProfileRequest;
 import com.mayday.web.Contracts.SessionView;
 import com.mayday.web.Contracts.UserView;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,8 +51,26 @@ public class AuthController
     private final SlideCaptchaService captcha;
     private final EntryMapper entries;
     private final MfaService mfa;
+    private final SettingService settings;
 
-    /** 消费账号及来源绑定的滑块凭证，限流并验证密码/启用状态后签发不透明会话令牌。 */
+    /**
+     * Exposes only the login captcha flag, never the internal system parameter
+     * collection.
+     */
+    @GetMapping("/login-policy")
+    public ResponseEntity<ApiResponse<LoginPolicy>> loginPolicy()
+    {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(ApiResponse.ok(new LoginPolicy(settings.loginCaptchaEnabled())));
+    }
+
+    /**
+     * Public login UI policy; the login endpoint always reads the database again.
+     */
+    public record LoginPolicy(boolean captchaEnabled) {
+    }
+
+    /** 根据全局策略校验滑块凭证，再验证密码、账号状态及 MFA；登录限流始终有效。 */
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginView>> login(@Valid @RequestBody LoginRequest body,
             HttpServletRequest request)
@@ -60,8 +80,11 @@ public class AuthController
         {
             return ResponseEntity.status(429).body(ApiResponse.error("尝试次数过多，请 15 分钟后重试"));
         }
-        // 必须由服务端消费绑定账号/来源的一次性验证凭证；不能只依赖页面滑块状态。
-        captcha.consume(body.captchaToken(), body.username(), request.getRemoteAddr());
+        // 开启时由服务端消费绑定账号/来源的一次性凭证，不能只依赖页面滑块状态。
+        if (settings.loginCaptchaEnabled())
+        {
+            captcha.consume(body.captchaToken(), body.username(), request.getRemoteAddr());
+        }
         SysUser account = users.findByUsername(body.username()).orElse(null);
         // 未知账号使用固定的 BCrypt 散列进行比较，使错误账号和错误密码的耗时接近。
         String dummyHash = "$2a$12$8ZpvwmMhLv.sRn3dDrsmEeCXuqbzLtQdNlSNdLfRjDWoZeYmEDmea";

@@ -1,6 +1,6 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V51）
--- 唯一对外交付 SQL：79 张业务表、806 个业务字段、索引/外键及必要基础资料。
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V52）
+-- 唯一对外交付 SQL：80 张业务表、815 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
 
@@ -13,7 +13,7 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V51 的 Flyway BASELINE 标记，不会在空库启动时重复执行 V35–V51 迁移。
+-- 4. 本文件已包含 V52 的 Flyway BASELINE 标记，不会在空库启动时重复执行 V35–V52 迁移。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
@@ -651,8 +651,8 @@ CREATE TABLE `sys_user_role` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='账号与角色多对多关联；联合主键防止重复授权，用户与角色均有物理外键';
 
 
--- Flyway 版本管理表：记录本文件对应的 V51 基线，后续仍按正常增量迁移升级。
--- BASELINE 声明当前结构已处于版本 48；不伪造历史迁移的执行校验和。
+-- Flyway 版本管理表：记录本文件对应的 V52 基线，后续仍按正常增量迁移升级。
+-- BASELINE 声明当前结构已处于版本 52；不伪造历史迁移的执行校验和。
 -- 参考：https://documentation.red-gate.com/flyway/flyway-concepts/baselines
 CREATE TABLE flyway_schema_history (
   installed_rank INT NOT NULL COMMENT '安装记录顺序；由 Flyway 后续维护',
@@ -1597,11 +1597,16 @@ CREATE TABLE `sys_telegram_config` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Telegram 管理员运行配置；API Hash、TDLib 会话密钥和代理口令只存 AES-256-GCM 密文，变更需 telegram:configure 权限';
 
 -- 全部建表及基础资料成功后才登记基线；如前面报错，必须停止，不能跳过失败语句。
+-- Global login policy is opt-out and remains enabled for existing deployments.
+INSERT INTO sys_entry(kind, name, code, value, description, group_name, value_type, built_in, sort_order, enabled, created_at, updated_at, version)
+SELECT 'settings', '登录验证码', 'security.loginCaptchaEnabled', 'true', '开启后账号密码登录必须完成滑块验证；关闭后直接验证账号密码。保存立即生效，不影响 MFA 与登录失败限流。', '登录安全', 'BOOLEAN', 1, 0, 1, NOW(6), NOW(6), 0
+WHERE NOT EXISTS (SELECT 1 FROM sys_entry WHERE kind = 'settings' AND code = 'security.loginCaptchaEnabled');
+
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '51', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '52', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
--- 安装完成自检：应得到 79 张业务表、806 个业务字段，缺少注释数均为 0。
+-- 安装完成自检：应得到 80 张业务表、815 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。
 SELECT COUNT(*) AS business_tables, SUM(table_comment = '') AS missing_table_comments
 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history';

@@ -682,6 +682,25 @@
         ],
         "type": "object"
       },
+      "ApiResponseLoginPolicy": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LoginPolicy"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponseLoginView": {
         "properties": {
           "data": {
@@ -3185,6 +3204,14 @@
         ],
         "type": "object"
       },
+      "LoginPolicy": {
+        "properties": {
+          "captchaEnabled": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "captchaToken": {
@@ -3204,7 +3231,6 @@
           }
         },
         "required": [
-          "captchaToken",
           "password",
           "username"
         ],
@@ -6501,6 +6527,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseLoginView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [],
+        "tags": [
+          "auth-controller"
+        ]
+      }
+    },
+    "/api/auth/login-policy": {
+      "get": {
+        "operationId": "AuthController_loginPolicy",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLoginPolicy"
                 }
               }
             },

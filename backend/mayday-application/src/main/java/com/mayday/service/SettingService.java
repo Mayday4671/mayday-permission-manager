@@ -25,6 +25,12 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class SettingService
 {
+    /**
+     * Database-backed password-login captcha policy; it is not a public portal
+     * setting.
+     */
+    public static final String LOGIN_CAPTCHA_KEY = "security.loginCaptchaEnabled";
+
     public static final List<Definition> SITE_FIELDS = List.of(
             new Definition("site.name", "站点名称", "TEXT", 40, "Mayday"),
             new Definition("site.description", "站点简介", "TEXT", 500, "团队公告、产品动态与使用指南"),
@@ -55,6 +61,10 @@ public class SettingService
         if ("content.requireApproval".equals(code) && !"BOOLEAN".equals(type))
         {
             throw new BusinessException("内容审核参数必须使用 BOOLEAN 类型");
+        }
+        if (LOGIN_CAPTCHA_KEY.equals(code) && !"BOOLEAN".equals(type))
+        {
+            throw new BusinessException("登录验证码开关必须使用 BOOLEAN 类型");
         }
         String text = Objects.toString(value, "");
         var definition = SITE_KEYS.get(code);
@@ -119,6 +129,17 @@ public class SettingService
         entries.findByKindOrderBySortOrderAscIdAsc("settings").stream().filter(SystemEntry::isEnabled)
                 .forEach(entry -> loaded.put(entry.getCode(), Objects.toString(entry.getValue(), "")));
         return Collections.unmodifiableMap(loaded);
+    }
+
+    /**
+     * Reads committed policy on every login; absent, disabled or malformed settings
+     * retain verification.
+     */
+    public boolean loginCaptchaEnabled()
+    {
+        return entries.findByKindOrderBySortOrderAscIdAsc("settings").stream()
+                .filter(entry -> LOGIN_CAPTCHA_KEY.equals(entry.getCode())).noneMatch(entry -> entry.isEnabled()
+                        && "BOOLEAN".equals(entry.getValueType()) && "false".equals(entry.getValue()));
     }
 
     /** 仅返回SITE_FIELDS登记的公开字段，缺省使用安全默认值；内部审核开关等后台参数不会通过门户泄露。 */

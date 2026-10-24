@@ -48,7 +48,7 @@ public class SlideCaptchaService
     private final Clock clock;
     private final SecurityState state;
 
-    /** Spring 只装配数据库共享状态，不存在生产内存回退或关闭验证码的配置入口。 */
+    /** Spring 只装配数据库共享状态；登录入口依据系统配置决定是否消费验证凭证。 */
     @Autowired
     public SlideCaptchaService(SecurityStateStore state)
     {

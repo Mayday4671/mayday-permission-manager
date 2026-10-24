@@ -320,6 +320,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/auth/login-policy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AuthController_loginPolicy"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/logout": {
     parameters: {
       query?: never;
@@ -3650,6 +3666,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseLoginPolicy: {
+      data: components["schemas"]["LoginPolicy"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseLoginView: {
       data: components["schemas"]["LoginView"];
       message: string;
@@ -4404,8 +4425,11 @@ export interface components {
       /** Format: int64 */
       totalRows: number;
     };
+    LoginPolicy: {
+      captchaEnabled?: boolean;
+    };
     LoginRequest: {
-      captchaToken: string;
+      captchaToken?: string;
       password: string;
       username: string;
     };
@@ -5746,6 +5770,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponseLoginView"];
+        };
+      };
+    };
+  };
+  AuthController_loginPolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseLoginPolicy"];
         };
       };
     };

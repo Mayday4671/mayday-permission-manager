@@ -31,7 +31,7 @@ public final class Contracts
 
     /** 登录输入包含一次性滑块凭证；密码只参与校验，不能进入响应、持久化明文或审计正文。 */
     public record LoginRequest(@NotBlank @Size(max = 64) String username, @NotBlank @Size(max = 72) String password,
-            @NotBlank(message = "请先完成滑动验证") @Size(max = 64) String captchaToken) {
+            @Size(max = 64) String captchaToken) {
     }
 
     /** MFA 账号首因素通过只返回短期挑战；验证完成才返回会话，客户端不能把挑战当作 Bearer。 */

@@ -126,6 +126,10 @@ public class EntryController
             {
                 throw new BusinessException("内置参数编码不能修改");
             }
+            if (SettingService.LOGIN_CAPTCHA_KEY.equals(request.code()) && !request.enabled())
+            {
+                throw new BusinessException("请通过登录验证码参数值开关控制验证，不要停用这条配置");
+            }
             var definition = SettingService.SITE_KEYS.get(request.code());
             String type = request.valueType() != null
                     ? request.valueType()
@@ -134,7 +138,8 @@ public class EntryController
             entity.setValueType(type);
             entity.setGroupName(
                     request.groupName() == null || request.groupName().isBlank() ? "通用" : request.groupName());
-            entity.setBuiltIn(definition != null || entity.isBuiltIn());
+            entity.setBuiltIn(definition != null || SettingService.LOGIN_CAPTCHA_KEY.equals(request.code())
+                    || entity.isBuiltIn());
             settings.invalidateAfterCommit();
         }
         if ("dictionaries".equals(kind) && id != null && "user.status".equals(entity.getCode())
