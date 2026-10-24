@@ -2,6 +2,15 @@
 
 final result: passed
 
+## 输入框聚焦补充复核（2026-10-24）
+
+- 用户真源：`C:/Users/40526/AppData/Local/Temp/codex-clipboard-1f4bd39b-8a27-46ed-bf8f-5ca6741d552e.png`，1920 × 911，暗色空会话、输入框聚焦。
+- P2：Ant Design 的 borderless textarea 仍有 1px focus outline，与外层 focus-within 边框叠加。只在 Telegram 输入框内去掉 textarea 的焦点轮廓，保留外框的可见聚焦状态，未取消按钮/其他控件的键盘焦点。
+- 桌面空会话将欢迎内容和输入框作为相邻整体排列；已有对话、手机和矮屏继续采用底部输入布局。
+- 同一次图像输入对照 `.local/telegram-composer/before-dark-1920.png` 与 `after-dark-1920.png`，同尺寸、同焦点状态、像素密度 1。内层细框已消失；字体、配色、现有图标、文案保持不变，仅调整焦点与空态间距。
+- 真实页面加隔离空会话夹具验证浅色/暗色 × 1920/390px 四组；计算样式确认内层 outline 为 none、border 为 0、无阴影。Shift+Enter 换行、Tab 到发送按钮、无横向溢出、无浏览器页面错误均通过。未发送外部搜索请求。生产构建通过。
+- 证据：`.local/telegram-composer/after.json` 与同目录截图。该补充无未解决 P0/P1/P2。
+
 范围：本轮仅对照用户给定的 ChatGPT 截图调整 Telegram 会话列表密度、选中态、新对话入口与回复类型按钮；保留现有后台导航、主题、消息正文和业务操作，不宣称复刻整个 ChatGPT 产品。以下旧门户报告保留作历史记录。
 
 ## 真源、状态与比较证据

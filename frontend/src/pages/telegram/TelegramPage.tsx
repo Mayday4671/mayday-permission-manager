@@ -2076,7 +2076,10 @@ export function TelegramPage() {
             >
               {sidebar}
             </Drawer>
-            <section className="telegram-chat-panel" aria-label="极搜对话">
+            <section
+              className={`telegram-chat-panel${conversation.isSuccess && !conversation.data.items.length ? " is-empty-conversation" : ""}`}
+              aria-label="极搜对话"
+            >
               <header className="telegram-chat-header">
                 <div className="telegram-chat-heading">
                   <Button

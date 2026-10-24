@@ -478,6 +478,11 @@
   resize: none;
   box-shadow: none !important;
 }
+/* The outer composer owns focus indication; Ant's borderless textarea still adds an outline. */
+.telegram-chat-composer-box textarea.ant-input:focus,
+.telegram-chat-composer-box textarea.ant-input:focus-visible {
+  outline: none;
+}
 .telegram-chat-composer-tools,
 .telegram-chat-send-tools {
   display: flex;
@@ -541,6 +546,17 @@
 @media (min-width: 1800px) {
   .telegram-chat-workspace {
     grid-template-columns: 248px minmax(0, 1fr);
+  }
+}
+/* On an empty desktop chat, keep the invitation and input together; active chats stay bottom-aligned. */
+@media (min-width: 901px) and (min-height: 700px) {
+  .telegram-chat-panel.is-empty-conversation .telegram-chat-transcript {
+    flex: 0 0 auto;
+    margin-top: auto;
+    padding-bottom: 4px;
+  }
+  .telegram-chat-panel.is-empty-conversation .telegram-chat-composer {
+    margin-bottom: auto;
   }
 }
 @media (max-width: 900px) {
