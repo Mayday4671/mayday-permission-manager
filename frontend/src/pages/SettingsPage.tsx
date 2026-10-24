@@ -72,6 +72,11 @@ export function SettingsPage() {
         hasExtraFilters={Boolean(group)}
         onResetFilters={() => setGroup("")}
         defaults={{ groupName: "通用", valueType: "TEXT" }}
+        // 排序未显示为表单字段，提交时需保留原值；新增参数使用默认排序。
+        beforeSave={(values, record) => ({
+          ...values,
+          sortOrder: record?.sortOrder ?? 0,
+        })}
         canDelete={(record) => !record.builtIn}
         extraFilters={
           <Input
