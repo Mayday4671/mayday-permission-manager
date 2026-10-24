@@ -194,7 +194,7 @@ const SEARCH_RESOURCE_TYPES: SearchResourceOption[] = [
     value: "videos",
     label: "视频",
     icon: <VideoCameraOutlined />,
-    buttonAliases: ["🎬", "视频"],
+    buttonAliases: ["🎬", "🎞", "📹", "视频"],
   },
   {
     value: "images",
@@ -432,6 +432,12 @@ function resourceTypeFromButton(text: string): SearchResourceType | null {
 /** Returns the canonical category label while leaving non-category action labels untouched. */
 function callbackButtonLabel(text: string): string {
   const type = resourceTypeFromButton(text);
+  if (!type) {
+    if (/最新|\bnewest?\b/i.test(text)) return "最新";
+    if (/过滤|\bfilter\b/i.test(text)) return "过滤";
+    if (/时长/.test(text)) return "时长";
+    if (/^🔄\uFE0F?$/.test(text.trim())) return "切换";
+  }
   return type
     ? (SEARCH_RESOURCE_TYPES.find((item) => item.value === type)?.label ?? text)
     : text;
@@ -446,6 +452,8 @@ function callbackButtonIcon(text: string): ReactNode {
   }
 
   if (/最新|\bnewest?\b/i.test(text)) return <ClockCircleOutlined />;
+  if (/时长/.test(text)) return <ClockCircleOutlined />;
+  if (/^🔄\uFE0F?$/.test(text.trim())) return <ReloadOutlined />;
   if (/过滤|\bfilter\b/i.test(text)) return <FilterOutlined />;
   if (/下一页|\bnext\b/i.test(text)) return <RightOutlined />;
   if (/上一页|\bprevious\b/i.test(text)) return <LeftOutlined />;
@@ -464,12 +472,17 @@ function groupInlineKeyboard(markup: string): GroupedInlineKeyboard {
 
   inlineKeyboard(markup).forEach((buttonRow, row) => {
     const actionButtons: PositionedInlineButton[] = [];
+    // Keep alternate/selected icons in their original filter row even when the bot changes their label.
+    const isResourceRow = buttonRow.some(
+      (button) =>
+        button?.type === "CALLBACK" && resourceTypeFromButton(button.text),
+    );
 
     buttonRow.forEach((button, column) => {
       // 无效按钮保留空位，不能改变 Telegram 回调所使用的原始列号。
       if (!button) return;
       const positionedButton = { button, row, column };
-      if (button.type === "CALLBACK" && resourceTypeFromButton(button.text)) {
+      if (isResourceRow && button.type === "CALLBACK") {
         resourceTypeButtons.push(positionedButton);
       } else {
         actionButtons.push(positionedButton);

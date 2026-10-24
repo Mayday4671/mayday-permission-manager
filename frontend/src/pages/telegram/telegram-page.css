@@ -23,7 +23,7 @@
   --chat-soft: color-mix(in srgb, var(--app-text) 3%, var(--app-surface));
   --chat-line: color-mix(in srgb, var(--app-text) 9%, var(--app-surface));
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   min-width: 0;
   height: var(--telegram-workspace-height, calc(100dvh - 236px));
   min-height: 140px;
@@ -54,8 +54,7 @@
 .telegram-chat-sidebar-header {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 20px 14px 12px;
+  padding: 12px 8px 8px;
 }
 .telegram-chat-sidebar-header > div {
   display: flex;
@@ -68,6 +67,9 @@
 }
 .telegram-chat-sidebar-header .ant-btn {
   height: 38px;
+  justify-content: flex-start;
+  padding-inline: 12px;
+  font-size: 14px;
   border-radius: 8px;
   box-shadow: none;
 }
@@ -77,7 +79,7 @@
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  gap: 4px;
+  gap: 2px;
   padding: 0 8px 12px;
 }
 .telegram-chat-session {
@@ -91,15 +93,15 @@
   background: color-mix(in srgb, var(--app-text) 5%, transparent);
 }
 .telegram-chat-session.is-selected {
-  background: color-mix(in srgb, var(--app-primary) 9%, var(--app-surface));
+  background: color-mix(in srgb, var(--app-text) 8%, var(--app-surface));
 }
 .telegram-chat-session-select {
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 8px;
+  align-items: center;
+  height: 36px;
+  padding: 8px 12px;
   border: 0;
   background: transparent;
   color: var(--app-text);
@@ -111,10 +113,6 @@
   outline-offset: -2px;
   border-radius: 8px;
 }
-.telegram-chat-session-icon {
-  padding-top: 3px;
-  color: var(--app-text-secondary);
-}
 .telegram-chat-session-copy {
   display: flex;
   flex-direction: column;
@@ -122,13 +120,19 @@
   min-width: 0;
 }
 .telegram-chat-session-title {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
   max-width: 100%;
 }
-.telegram-chat-session-date {
-  font-size: 11px;
-  color: var(--app-text-tertiary);
+.telegram-chat-session-group {
+  margin: 18px 12px 6px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--app-text-secondary);
+}
+.telegram-chat-session-group:first-child {
+  margin-top: 8px;
 }
 .telegram-chat-session-delete {
   opacity: 0;
@@ -349,6 +353,8 @@
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  width: 100%;
+  min-width: 0;
 }
 .telegram-chat-inline-keyboard .ant-btn {
   min-height: 30px;
