@@ -2,6 +2,9 @@ package com.mayday.telegram;
 
 import com.mayday.common.web.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +23,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class TelegramChannelController
 {
     private final TelegramChannelBrowserService browser;
+
+    /**
+     * Returns authenticated raster bytes, never native file identifiers or disk
+     * paths.
+     */
+    @GetMapping(value = "/{chatId}/messages/{messageId}/thumbnail", produces =
+    {"image/jpeg", "image/png", "image/webp"})
+    @PreAuthorize("@access.has('telegram:collect') and @access.has('telegram:view') and @access.has('telegram:download')")
+    public ResponseEntity<byte[]> thumbnail(@PathVariable String chatId, @PathVariable String messageId)
+    {
+        byte[] bytes = browser.thumbnail(chatId, messageId);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .contentType(MediaType.parseMediaType(TelegramChannelThumbnail.contentType(bytes)))
+                .header("X-Content-Type-Options", "nosniff").body(bytes);
+    }
 
     /** Reads one directory batch without requiring a search term. */
     @GetMapping

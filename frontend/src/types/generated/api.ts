@@ -2880,6 +2880,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/telegram/channels/{chatId}/messages/{messageId}/thumbnail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramChannelController_thumbnail"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/telegram/channels/{chatId}/search": {
     parameters: {
       query?: never;
@@ -4059,6 +4075,7 @@ export interface components {
       contentType?: string;
       hasMedia?: boolean;
       id?: string;
+      media?: components["schemas"]["TelegramChannelMediaPreview"];
       /** Format: int64 */
       sentAt?: number;
       text?: string;
@@ -5151,6 +5168,19 @@ export interface components {
       cachedBlockListType?: string;
       onlineMainBlockListStatus?: string;
       telegramUserId?: string;
+    };
+    TelegramChannelMediaPreview: {
+      /** Format: int32 */
+      durationSeconds?: number;
+      fileName?: string;
+      hasThumbnail?: boolean;
+      /** Format: int32 */
+      height?: number;
+      kind?: string;
+      /** Format: int64 */
+      size?: number;
+      /** Format: int32 */
+      width?: number;
     };
     TelegramChannelOption: {
       chatId?: string;
@@ -10596,6 +10626,31 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponseString"];
+        };
+      };
+    };
+  };
+  TelegramChannelController_thumbnail: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        chatId: string;
+        messageId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "image/jpeg": string;
+          "image/png": string;
+          "image/webp": string;
         };
       };
     };

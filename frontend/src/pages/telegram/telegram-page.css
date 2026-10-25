@@ -896,9 +896,6 @@
   line-height: 1.8;
   margin: 12px 0;
 }
-.telegram-channel-media {
-  margin-top: 12px;
-}
 .telegram-channel-post-actions {
   display: flex;
   justify-content: flex-end;
@@ -948,4 +945,86 @@
   .telegram-channel-transcript {
     padding: 12px;
   }
+}
+.telegram-channel-media-card {
+  margin-top: 12px;
+  width: min(100%, 440px);
+}
+.telegram-channel-media-open {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  overflow: hidden;
+  color: var(--app-text);
+  background: color-mix(in srgb, var(--app-primary) 7%, var(--app-surface));
+  text-align: left;
+  cursor: pointer;
+}
+.telegram-channel-media-open:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: 2px;
+}
+.telegram-channel-media-open:disabled {
+  cursor: wait;
+}
+.is-visual .telegram-channel-media-open {
+  padding: 0;
+  max-height: 360px;
+  justify-content: center;
+  background: color-mix(in srgb, var(--app-text) 5%, var(--app-surface));
+}
+.telegram-channel-media-open > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.telegram-channel-media-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--app-text-secondary);
+  font-size: 12px;
+}
+.telegram-channel-media-placeholder > .anticon,
+.telegram-channel-file-icon {
+  font-size: 36px;
+  color: var(--app-primary-text);
+}
+.telegram-channel-play {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  inset: 0;
+  color: #fff;
+  font-size: 56px;
+  filter: drop-shadow(0 2px 10px #0008);
+}
+.telegram-channel-media-badges {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 28px 12px 10px;
+  color: #fff;
+  font-size: 12px;
+  background: linear-gradient(transparent, #0009);
+}
+.telegram-channel-file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.telegram-channel-file-info strong {
+  overflow-wrap: anywhere;
+}
+.telegram-channel-file-info small {
+  color: var(--app-text-secondary);
 }

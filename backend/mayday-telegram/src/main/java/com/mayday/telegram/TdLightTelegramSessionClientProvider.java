@@ -1,7 +1,6 @@
 package com.mayday.telegram;
 
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +41,8 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class TdLightTelegramSessionClientProvider implements TelegramSessionClientProvider
 {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory
+            .getLogger(TdLightTelegramSessionClientProvider.class);
     private static final long REQUEST_TIMEOUT_SECONDS = 15;
     /**
      * Lets TDLib return Telegram's callback-query timeout before the local guard
@@ -390,6 +391,10 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             {
                 addFile(result, "ANIMATION", animation.animation.animation, animation.animation.fileName,
                         animation.animation.width, animation.animation.height, animation.animation.duration, false);
+            }
+            if (!result.isEmpty())
+            {
+                result.getFirst().put("hasThumbnail", TelegramChannelThumbnail.available(content));
             }
             return result;
         }
@@ -783,6 +788,55 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         }
 
         /**
+         * Fetches a source thumbnail only; browsing never queues a collection or a full
+         * media transfer.
+         */
+        @Override
+        public CompletableFuture<byte[]> channelThumbnail(String chatId, String messageId)
+        {
+            return client.sendAsync(new TdApi.GetMessage(Long.parseLong(chatId), Long.parseLong(messageId)))
+                    .thenCompose(message -> {
+                        if (!message.canBeSaved)
+                        {
+                            return CompletableFuture.failedFuture(new IllegalArgumentException("原消息限制读取媒体"));
+                        }
+                        TdApi.File thumbnail = TelegramChannelThumbnail.fileFor(message.content);
+                        if (thumbnail == null)
+                        {
+                            byte[] embedded = TelegramChannelThumbnail.embedded(message.content);
+                            return embedded == null
+                                    ? CompletableFuture.failedFuture(new IllegalArgumentException("原消息没有缩略图"))
+                                    : CompletableFuture.completedFuture(embedded);
+                        }
+                        return downloadFile(thumbnail.id, TelegramChannelThumbnail.MAX_BYTES, true).thenApply(file -> {
+                            try
+                            {
+                                return Files.readAllBytes(file.path());
+                            } catch (java.io.IOException exception)
+                            {
+                                throw new IllegalStateException("缩略图读取失败", exception);
+                            }
+                        });
+                    }).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS).whenComplete((bytes, failure) -> {
+                        if (failure == null)
+                            return;
+                        Throwable cause = failure;
+                        while (cause.getCause() != null)
+                            cause = cause.getCause();
+                        String reason = cause.getMessage();
+                        boolean known = reason != null && (reason.matches("[A-Z_]{1,80}")
+                                || List.of("原消息限制读取媒体", "原消息没有缩略图", "Telegram 附件未能完整下载", "Telegram 返回的附件路径不在受控目录内",
+                                        "Telegram 附件超过本机单文件大小限制").contains(reason));
+                        // Log only an allow-listed failure code, never message contents or private file
+                        // paths.
+                        LOG.warn("Channel thumbnail failed: type={}, code={}, reason={}",
+                                cause.getClass().getSimpleName(),
+                                cause instanceof it.tdlight.client.TelegramError error ? error.getErrorCode() : 0,
+                                known ? reason : "UNCLASSIFIED");
+                    });
+        }
+
+        /**
          * Verifies that a selected identifier is a channel in the user's accessible
          * chat list.
          */
@@ -998,6 +1052,11 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         @Override
         public CompletableFuture<TelegramDownloadedFile> downloadFile(int fileId, long maxBytes)
         {
+            return downloadFile(fileId, maxBytes, false);
+        }
+
+        private CompletableFuture<TelegramDownloadedFile> downloadFile(int fileId, long maxBytes, boolean thumbnail)
+        {
             if (fileId <= 0 || maxBytes <= 0)
             {
                 return CompletableFuture.failedFuture(new IllegalArgumentException("Telegram 附件下载参数无效"));
@@ -1013,19 +1072,7 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                     {
                         throw new IllegalStateException("Telegram 附件未能完整下载");
                     }
-                    Path root = sessionDirectory.resolve("files").toRealPath(LinkOption.NOFOLLOW_LINKS);
-                    Path path = Path.of(file.local.path).toRealPath(LinkOption.NOFOLLOW_LINKS);
-                    if (!path.startsWith(root) || Files.isSymbolicLink(path)
-                            || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
-                    {
-                        throw new IllegalStateException("Telegram 返回的附件路径不在受控目录内");
-                    }
-                    long size = Files.size(path);
-                    if (size < 1 || size > byteLimit)
-                    {
-                        throw new IllegalStateException("Telegram 附件超过本机单文件大小限制");
-                    }
-                    return new TelegramDownloadedFile(path, size);
+                    return TelegramDownloadedFile.checked(sessionDirectory, file.local.path, byteLimit, thumbnail);
                 } catch (java.io.IOException exception)
                 {
                     throw new IllegalStateException("无法安全读取 Telegram 附件", exception);

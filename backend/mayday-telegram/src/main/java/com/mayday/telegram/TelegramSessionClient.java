@@ -48,6 +48,12 @@ public interface TelegramSessionClient
     CompletableFuture<String> messageLink(String chatId, String messageId);
 
     /**
+     * Reads only a bounded thumbnail after rechecking the source message's save
+     * permission.
+     */
+    CompletableFuture<byte[]> channelThumbnail(String chatId, String messageId);
+
+    /**
      * Searches channel history using Telegram's server-side keyword and media
      * indexes.
      */

@@ -18,9 +18,6 @@ import {
 } from "antd";
 import {
   ArrowLeftOutlined,
-  FileOutlined,
-  PictureOutlined,
-  PlayCircleOutlined,
   ReloadOutlined,
   SearchOutlined,
   SoundOutlined,
@@ -34,6 +31,10 @@ import {
 import dayjs, { type Dayjs } from "dayjs";
 import { api, jsonBody } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import {
+  TelegramChannelMediaCard,
+  type ChannelMediaPreview,
+} from "./TelegramChannelMediaCard";
 
 interface Channel {
   chatId: string;
@@ -51,6 +52,7 @@ interface ChannelMessage {
   canBeSaved: boolean;
   sentAt: number | null;
   hasMedia: boolean;
+  media: ChannelMediaPreview | null;
 }
 interface MessagePage {
   items: ChannelMessage[];
@@ -610,42 +612,29 @@ export function TelegramChannelBrowser({
                           : ""}
                       </time>
                     </div>
-                    {post.text ? (
-                      <p>{post.text}</p>
-                    ) : !post.canBeSaved ? (
-                      <Tag>此消息限制保存，请在 Telegram 查看</Tag>
-                    ) : !post.hasMedia ? (
-                      <p>（无文本消息）</p>
-                    ) : null}
-                    {post.hasMedia &&
+                    {post.media &&
                     post.canBeSaved &&
                     can("telegram:download") ? (
-                      <Button
-                        className="telegram-channel-media"
-                        icon={
-                          post.contentType === "MessageVideo" ? (
-                            <PlayCircleOutlined />
-                          ) : post.contentType === "MessagePhoto" ? (
-                            <PictureOutlined />
-                          ) : (
-                            <FileOutlined />
-                          )
-                        }
+                      <TelegramChannelMediaCard
+                        chatId={selected.chatId}
+                        messageId={post.id}
+                        media={post.media}
                         disabled={postAction.isPending}
-                        onClick={() =>
+                        onOpen={() =>
                           postAction.mutate({
                             chatId: selected.chatId,
                             post,
                             preview: true,
                           })
                         }
-                      >
-                        {post.contentType === "MessageVideo"
-                          ? "播放视频"
-                          : post.contentType === "MessagePhoto"
-                            ? "查看图片"
-                            : "预览附件"}
-                      </Button>
+                      />
+                    ) : null}
+                    {post.text ? (
+                      <p>{post.text}</p>
+                    ) : !post.canBeSaved ? (
+                      <Tag>此消息限制保存，请在 Telegram 查看</Tag>
+                    ) : !post.hasMedia ? (
+                      <p>（无文本消息）</p>
                     ) : null}
                     {post.canBeSaved ? (
                       <div className="telegram-channel-post-actions">

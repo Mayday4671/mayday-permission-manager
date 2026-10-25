@@ -1860,6 +1860,9 @@
           "id": {
             "type": "string"
           },
+          "media": {
+            "$ref": "#/components/schemas/TelegramChannelMediaPreview"
+          },
           "sentAt": {
             "format": "int64",
             "type": "integer"
@@ -5158,6 +5161,36 @@
           },
           "telegramUserId": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TelegramChannelMediaPreview": {
+        "properties": {
+          "durationSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "hasThumbnail": {
+            "type": "boolean"
+          },
+          "height": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "width": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -14992,6 +15025,63 @@
         "tags": [
           "telegram-channel-controller"
         ]
+      }
+    },
+    "/api/telegram/channels/{chatId}/messages/{messageId}/thumbnail": {
+      "get": {
+        "operationId": "TelegramChannelController_thumbnail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chatId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-channel-controller"
+        ],
+        "x-authorization": "@access.has('telegram:collect') and @access.has('telegram:view') and @access.has('telegram:download')"
       }
     },
     "/api/telegram/channels/{chatId}/search": {

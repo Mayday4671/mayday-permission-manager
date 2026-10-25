@@ -32,7 +32,7 @@ public class TelegramChannelBrowserService
      * contents.
      */
     public record ChannelMessage(String id, @Nullable String text, String contentType, boolean canBeSaved,
-            @Nullable Long sentAt, boolean hasMedia) {
+            @Nullable Long sentAt, boolean hasMedia, @Nullable TelegramChannelMediaPreview media) {
     }
 
     /**
@@ -85,8 +85,7 @@ public class TelegramChannelBrowserService
                     Long time = item.sentAtEpochSeconds();
                     if ((from == null || time != null && time >= from) && (to == null || time != null && time <= to))
                     {
-                        matches.add(new ChannelMessage(item.messageId(), item.text(), item.contentType(), true, time,
-                                item.attachmentMetadataJson() != null && !"[]".equals(item.attachmentMetadataJson())));
+                        matches.add(project(item));
                     }
                 }
                 String previous = next;
@@ -146,12 +145,35 @@ public class TelegramChannelBrowserService
                             Long.parseLong(left.messageId())))
                     .limit(20).toList();
             String next = snapshots.isEmpty() ? null : snapshots.getLast().messageId();
-            return new MessagePage(snapshots.stream()
-                    .map(item -> new ChannelMessage(item.messageId(), item.canBeSaved() ? item.text() : null,
-                            item.contentType(), item.canBeSaved(), item.sentAtEpochSeconds(),
-                            item.canBeSaved() && item.attachmentMetadataJson() != null
-                                    && !"[]".equals(item.attachmentMetadataJson())))
-                    .toList(), next);
+            return new MessagePage(snapshots.stream().map(TelegramChannelBrowserService::project).toList(), next);
+        });
+    }
+
+    private static ChannelMessage project(TelegramMessageSnapshot item)
+    {
+        var media = TelegramChannelMediaPreview.from(item);
+        return new ChannelMessage(item.messageId(), item.canBeSaved() ? item.text() : null, item.contentType(),
+                item.canBeSaved(), item.sentAtEpochSeconds(), media != null, media);
+    }
+
+    /**
+     * Rechecks account ownership, channel membership and download permission before
+     * reading pixels.
+     */
+    public byte[] thumbnail(String chatId, String messageId)
+    {
+        TelegramSessionClient client = client();
+        access.require("telegram:download");
+        requireId(chatId, true);
+        requireId(messageId, false);
+        return read(() -> {
+            client.resolveChannel(chatId).join();
+            byte[] bytes = client.channelThumbnail(chatId, messageId).join();
+            if (bytes == null || bytes.length == 0 || bytes.length > TelegramChannelThumbnail.MAX_BYTES)
+            {
+                throw new BusinessException("缩略图无效，请重试");
+            }
+            return bytes;
         });
     }
 

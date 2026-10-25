@@ -196,6 +196,27 @@ class TelegramChannelBrowserServiceTest
                 .isInstanceOf(BusinessException.class);
     }
 
+    @Test
+    void thumbnailRequiresDownloadPermissionAndCurrentMembership()
+    {
+        doThrow(new AccessDeniedException("revoked")).when(access).require("telegram:download");
+        assertThatThrownBy(() -> service.thumbnail("-1001", "10")).isInstanceOf(AccessDeniedException.class);
+        verify(client, never()).channelThumbnail("-1001", "10");
+    }
+
+    @Test
+    void thumbnailReturnsBoundedPixelsAndPropagatesProtectedSourceFailure()
+    {
+        byte[] pixels =
+        {(byte) 255, (byte) 216, (byte) 255};
+        when(client.channelThumbnail("-1001", "10")).thenReturn(CompletableFuture.completedFuture(pixels));
+        assertThat(service.thumbnail("-1001", "10")).isEqualTo(pixels);
+        verify(client).resolveChannel("-1001");
+        when(client.channelThumbnail("-1001", "10"))
+                .thenReturn(CompletableFuture.failedFuture(new IllegalArgumentException("protected")));
+        assertThatThrownBy(() -> service.thumbnail("-1001", "10")).isInstanceOf(BusinessException.class);
+    }
+
     private TelegramMessageSnapshot snapshot(String chatId, String messageId, boolean canSave)
     {
         return new TelegramMessageSnapshot(chatId, messageId, null, false, "history", "VIDEO", "Nature video", "[]",
