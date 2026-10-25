@@ -754,7 +754,13 @@ public class TelegramCollectionService
     /** 将消息进度和独立附件队列进度组合为页面需要的安全摘要。 */
     private TaskView taskView(TelegramCollectionTask task)
     {
-        return TaskView.from(task, media.pendingCountForTask(task.getId()));
+        String title = task.getSourceTitle();
+        if ((title == null || title.isBlank()) && task.getMessageLink() != null && task.getStartMessageId() != null)
+        {
+            title = TelegramCollectionTitle.from(messages.findTitleCandidates(task.getId(), task.getStartMessageId(),
+                    Boolean.TRUE.equals(task.getIncludeAlbum())));
+        }
+        return TaskView.from(task, media.pendingCountForTask(task.getId()), title);
     }
 
     private void clearLease(TelegramCollectionTask task)

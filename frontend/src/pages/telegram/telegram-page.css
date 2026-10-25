@@ -676,3 +676,13 @@
     font-size: 20px;
   }
 }
+
+.telegram-collection-source {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.telegram-collection-source .ant-typography {
+  max-width: 100%;
+}

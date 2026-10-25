@@ -2578,14 +2578,7 @@ export function TelegramPage() {
         ))}
 
       {workspaceTab === "collection" && view && can("telegram:view") && (
-        <Card title="消息采集" className="telegram-collection-panel">
-          <Alert
-            type="info"
-            showIcon
-            message="按授权范围采集 Telegram 消息"
-            description="可从消息链接开始，或从当前账号已加入的频道开始；日期范围包含首尾两天。每项任务最多保存 500 条，最多检查 5000 条历史消息；系统不会自动加入频道。受保护消息不会保存正文或附件。"
-            style={{ marginBottom: 20 }}
-          />
+        <Card className="telegram-collection-panel">
           {can("telegram:collect") ? (
             <Space
               direction="vertical"
@@ -2722,27 +2715,31 @@ export function TelegramPage() {
                   (collectionTaskPage - 1) * 10 + index + 1,
               },
               {
-                title: "采集来源",
+                title: "采集内容",
                 dataIndex: "sourceTitle",
                 ellipsis: true,
                 render: (_title: string | null, task) => (
-                  <Space direction="vertical" size={0}>
+                  <div className="telegram-collection-source">
+                    <Typography.Text
+                      strong
+                      ellipsis
+                      title={task.sourceTitle || undefined}
+                    >
+                      {task.sourceTitle ||
+                        (task.messageLink ? "未获取到标题" : "已加入频道")}
+                    </Typography.Text>
                     {task.messageLink ? (
-                      <Typography.Text copyable>
+                      <Typography.Text type="secondary" copyable ellipsis>
                         {task.messageLink}
                       </Typography.Text>
-                    ) : (
-                      <Typography.Text>
-                        {task.sourceTitle ?? "已加入频道"}
-                      </Typography.Text>
-                    )}
+                    ) : null}
                     {task.fromDate || task.toDate ? (
                       <Typography.Text type="secondary">
                         {task.fromDate ?? "最早消息"} 至{" "}
                         {task.toDate ?? "最新消息"}
                       </Typography.Text>
                     ) : null}
-                  </Space>
+                  </div>
                 ),
               },
               {

@@ -30,9 +30,17 @@ public final class TelegramCollectionContracts
         /** 附件队列与消息采集分别结束，单独返回待下载数量供页面提供停止入口。 */
         public static TaskView from(TelegramCollectionTask task, long pendingMediaCount)
         {
-            return new TaskView(task.getId(), task.getMessageLink(), task.getSourceTitle(), task.getFromDate(),
-                    task.getToDate(), task.getStatus(), task.getStatusMessage(), task.getMaxMessages(),
-                    task.getCollectedMessages(), task.getScannedMessages(), Boolean.TRUE.equals(task.getIncludeAlbum()),
+            return from(task, pendingMediaCount, task.getSourceTitle());
+        }
+
+        /**
+         * Includes a title derived from saved source content for existing link tasks.
+         */
+        public static TaskView from(TelegramCollectionTask task, long pendingMediaCount, @Nullable String sourceTitle)
+        {
+            return new TaskView(task.getId(), task.getMessageLink(), sourceTitle, task.getFromDate(), task.getToDate(),
+                    task.getStatus(), task.getStatusMessage(), task.getMaxMessages(), task.getCollectedMessages(),
+                    task.getScannedMessages(), Boolean.TRUE.equals(task.getIncludeAlbum()),
                     Boolean.TRUE.equals(task.getTrackingEnabled()), task.getLiveCheckedAt(),
                     task.getLiveStatusMessage(), task.getCreatedAt(), task.getUpdatedAt(), pendingMediaCount);
         }
