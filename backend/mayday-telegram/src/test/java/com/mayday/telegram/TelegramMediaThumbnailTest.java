@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 class TelegramMediaThumbnailTest
 {
     private final AccessPolicy access = mock(AccessPolicy.class);
+    private final UserMapper users = mock(UserMapper.class);
     private final TelegramSessionCoordinator sessions = mock(TelegramSessionCoordinator.class);
     private final TelegramSessionClient client = mock(TelegramSessionClient.class);
     private final TelegramMediaMapper media = mock(TelegramMediaMapper.class);
@@ -75,7 +76,7 @@ class TelegramMediaThumbnailTest
                 .thenReturn(CompletableFuture.completedFuture(456));
         when(client.channelThumbnail("-10001", "100")).thenReturn(CompletableFuture.completedFuture(new byte[]
         {(byte) 0xff, (byte) 0xd8, (byte) 0xff, 0}));
-        service = new TelegramMediaDownloadService(new TelegramModuleGuard(switches), access, mock(UserMapper.class),
+        service = new TelegramMediaDownloadService(new TelegramModuleGuard(switches), access, users,
                 new TelegramSettings(), mock(StorageSettings.class), mock(StoredFileContent.class), sessions, media,
                 tasks, messages, mock(TelegramMediaStateService.class));
     }
@@ -141,4 +142,51 @@ class TelegramMediaThumbnailTest
             assertThatThrownBy(() -> service.thumbnail(1L)).isInstanceOf(BusinessException.class);
         }
     }
+
+    @Test
+    void qualitiesExposeOnlyActualRenditionsAndNoNativeHandles()
+    {
+        when(client.videoQualities(task.getMessageLink(), "-10001", "100")).thenReturn(CompletableFuture
+                .completedFuture(java.util.List.of(new TelegramVideoQuality("original", 1920, 1080, "", 999, 123),
+                        new TelegramVideoQuality("alt:17", 1280, 720, "h264", 500, 42))));
+        var result = service.videoQualities(1L);
+        assertThat(result).extracting(TelegramVideoQuality.VideoQualityView::id).containsExactly("original", "alt:17");
+        assertThat(new tools.jackson.databind.ObjectMapper().writeValueAsString(result)).doesNotContain("fileId",
+                "telegramFileId");
+        verify(client, never()).downloadFile(any(Integer.class), any(Long.class));
+    }
+
+    @Test
+    void renditionStreamRechecksScopeAndNeverRewritesTheOriginalFile()
+    {
+        when(media.lock(1L)).thenReturn(Optional.of(attachment));
+        var owner = new com.mayday.system.model.SysUser();
+        owner.setId(2L);
+        when(users.findById(2L)).thenReturn(Optional.of(owner));
+        when(access.hasFor(owner, "telegram:download")).thenReturn(true);
+        when(access.hasFor(owner, "telegram:view")).thenReturn(true);
+        when(access.containsFor(owner, "telegram", 2L, 3L)).thenReturn(true);
+        when(client.videoQualities(task.getMessageLink(), "-10001", "100")).thenReturn(CompletableFuture
+                .completedFuture(java.util.List.of(new TelegramVideoQuality("alt:17", 1280, 720, "h264", 32, 42))));
+        when(client.fileSize(42)).thenReturn(CompletableFuture.completedFuture(32L));
+        byte[] header = new byte[16];
+        header[4] = 'f';
+        header[5] = 't';
+        header[6] = 'y';
+        header[7] = 'p';
+        when(client.readFileRange(42, 0, 16)).thenReturn(CompletableFuture.completedFuture(header));
+        String ticket = service.createStreamTicket(1L).url().split("ticket=")[1];
+        var response = service.stream(1L, ticket, "bytes=0-15", "alt:17");
+        assertThat(response.getStatusCode().value()).isEqualTo(206);
+        assertThat(response.getHeaders().getFirst("Content-Range")).isEqualTo("bytes 0-15/32");
+        assertThat(attachment.getTelegramFileId()).isEqualTo(123);
+        assertThatThrownBy(() -> service.stream(1L, ticket, "bytes=0-15", "alt:999"))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.stream(1L, ticket, "bytes=0-15", "file:42"))
+                .isInstanceOf(BusinessException.class);
+        when(access.hasFor(owner, "telegram:download")).thenReturn(false);
+        assertThatThrownBy(() -> service.stream(1L, ticket, "bytes=0-15", "alt:17"))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
 }

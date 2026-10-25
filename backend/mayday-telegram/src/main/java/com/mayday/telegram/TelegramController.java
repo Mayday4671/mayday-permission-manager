@@ -60,6 +60,15 @@ public class TelegramController
                 .header("X-Content-Type-Options", "nosniff").body(bytes);
     }
 
+    /** Reads available video qualities without exposing native file handles. */
+    @GetMapping("/media/{id}/video-qualities")
+    @PreAuthorize("@access.has('telegram:view') and @access.has('telegram:download')")
+    public ApiResponse<java.util.List<TelegramVideoQuality.VideoQualityView>> videoQualities(
+            @org.springframework.web.bind.annotation.PathVariable Long id)
+    {
+        return ApiResponse.ok(mediaDownloads.videoQualities(id));
+    }
+
     /** Reads independently editable attachment download policy. */
     @GetMapping("/media-policy")
     @PreAuthorize("@access.has('telegram:configure')")
@@ -250,9 +259,10 @@ public class TelegramController
     @PreAuthorize("permitAll()")
     public ResponseEntity<Resource> streamMedia(@org.springframework.web.bind.annotation.PathVariable Long id,
             @org.springframework.web.bind.annotation.RequestParam String ticket,
-            @org.springframework.web.bind.annotation.RequestHeader(value = "Range", required = false) String range)
+            @org.springframework.web.bind.annotation.RequestHeader(value = "Range", required = false) String range,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "original") String quality)
     {
-        return mediaDownloads.stream(id, ticket, range);
+        return mediaDownloads.stream(id, ticket, range, quality);
     }
 
     /** Retries one failed attachment under the task's persisted selection rules. */

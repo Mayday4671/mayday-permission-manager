@@ -1062,6 +1062,39 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         public CompletableFuture<Integer> resolveMediaFile(String messageLink, String chatId, String messageId,
                 int attachmentIndex)
         {
+            return resolveStoredMessage(messageLink, chatId, messageId).thenApply(source -> {
+                List<Map<String, Object>> attachments = attachmentMetadata(source.content);
+                if (attachmentIndex < 0 || attachmentIndex >= attachments.size())
+                {
+                    throw new IllegalStateException("视频附件已发生变化，请重新读取原消息");
+                }
+                Object value = attachments.get(attachmentIndex).get("tdFileId");
+                if (!(value instanceof Number number) || number.intValue() <= 0)
+                {
+                    throw new IllegalStateException("视频附件已失效");
+                }
+                return number.intValue();
+            });
+        }
+
+        /**
+         * Reads alternate qualities from the same verified source as original playback.
+         */
+        @Override
+        public CompletableFuture<List<TelegramVideoQuality>> videoQualities(String messageLink, String chatId,
+                String messageId)
+        {
+            return resolveStoredMessage(messageLink, chatId, messageId)
+                    .thenApply(source -> TelegramVideoQuality.from(source.content));
+        }
+
+        /**
+         * Reconnecting may require resolving the permalink before the stored message is
+         * readable.
+         */
+        private CompletableFuture<TdApi.Message> resolveStoredMessage(String messageLink, String chatId,
+                String messageId)
+        {
             long chat = Long.parseLong(chatId);
             long message = Long.parseLong(messageId);
             return client.sendAsync(new TdApi.GetMessage(chat, message)).exceptionallyCompose(
@@ -1078,17 +1111,7 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                         {
                             throw new IllegalStateException("视频来源禁止保存或访问");
                         }
-                        List<Map<String, Object>> attachments = attachmentMetadata(source.content);
-                        if (attachmentIndex < 0 || attachmentIndex >= attachments.size())
-                        {
-                            throw new IllegalStateException("视频附件已发生变化，请重新读取原消息");
-                        }
-                        Object value = attachments.get(attachmentIndex).get("tdFileId");
-                        if (!(value instanceof Number number) || number.intValue() <= 0)
-                        {
-                            throw new IllegalStateException("视频附件已失效");
-                        }
-                        return number.intValue();
+                        return source;
                     });
         }
 

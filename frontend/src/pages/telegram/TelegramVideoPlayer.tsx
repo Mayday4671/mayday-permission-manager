@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject, VideoHTMLAttributes } from "react";
 import {
-  Check,
   Expand,
   LoaderCircle,
   Maximize,
@@ -15,8 +14,16 @@ import {
   VolumeX,
 } from "lucide-react";
 
+import { TelegramVideoOptionsMenu } from "./TelegramVideoOptionsMenu";
+import type { TelegramVideoQuality } from "./telegram-media-types";
+
 type Props = Omit<VideoHTMLAttributes<HTMLVideoElement>, "ref"> & {
   videoRef?: RefObject<HTMLVideoElement | null>;
+  qualities?: TelegramVideoQuality[];
+  quality?: string;
+  qualityError?: boolean;
+  onQualityChange?: (quality: string) => void;
+  onQualityRetry?: () => void;
 };
 
 /** Keep elapsed and total time readable for both clips and multi-hour videos. */
@@ -30,6 +37,11 @@ function formatTime(seconds: number) {
 /** One overlay control surface shared by native and HLS playback. */
 export function TelegramVideoPlayer({
   videoRef,
+  qualities,
+  quality = "original",
+  qualityError,
+  onQualityChange,
+  onQualityRetry,
   onLoadedMetadata,
   onDurationChange,
   onRateChange,
@@ -50,7 +62,13 @@ export function TelegramVideoPlayer({
   const ownVideo = useRef<HTMLVideoElement>(null);
   const video = videoRef ?? ownVideo;
   const container = useRef<HTMLDivElement>(null);
-  const speedMenu = useRef<HTMLDivElement>(null);
+  const qualityRestore = useRef<{
+    position: number;
+    playing: boolean;
+    rate: number;
+    volume: number;
+    muted: boolean;
+  } | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
@@ -65,23 +83,53 @@ export function TelegramVideoPlayer({
   const [muted, setMuted] = useState(false);
   const [rate, setRate] = useState(1);
   const [rateMenu, setRateMenu] = useState(false);
+  const [qualityMenu, setQualityMenu] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [interacting, setInteracting] = useState(false);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
   const [webFullscreen, setWebFullscreen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [notice, setNotice] = useState<string>();
+  const qualityOptions = (qualities ?? []).map((item) => {
+    const pixels = Math.min(item.width, item.height);
+    const size = pixels > 0 ? `${pixels}p` : "";
+    const duplicate = (qualities ?? []).some(
+      (other) =>
+        other.id !== item.id &&
+        other.id !== "original" &&
+        Math.min(other.width, other.height) === pixels,
+    );
+    return {
+      value: item.id,
+      label:
+        item.id === "original"
+          ? `原画${size ? ` · ${size}` : ""}`
+          : `${size}${duplicate && item.codec ? ` · ${item.codec.toUpperCase()}` : ""}`,
+    };
+  });
+  const currentQuality = qualities?.find((item) => item.id === quality);
+  const qualityLabel =
+    quality === "original"
+      ? "原画"
+      : currentQuality
+        ? `${Math.min(currentQuality.width, currentQuality.height)}p`
+        : "画质";
   const canSeek = Number.isFinite(duration) && duration > 0;
   const elapsed = seekPreview ?? position;
   const showControls =
-    !playing || controlsVisible || rateMenu || interacting || keyboardFocus;
+    !playing ||
+    controlsVisible ||
+    rateMenu ||
+    qualityMenu ||
+    interacting ||
+    keyboardFocus;
 
   const revealControls = useCallback(() => {
     clearTimeout(idleTimer.current);
     setControlsVisible(true);
-    if (playing && !rateMenu && !interacting && !keyboardFocus)
+    if (playing && !rateMenu && !qualityMenu && !interacting && !keyboardFocus)
       idleTimer.current = setTimeout(() => setControlsVisible(false), 2500);
-  }, [playing, rateMenu, interacting, keyboardFocus]);
+  }, [playing, rateMenu, qualityMenu, interacting, keyboardFocus]);
   useEffect(() => {
     revealControls();
     return () => clearTimeout(idleTimer.current);
@@ -93,15 +141,6 @@ export function TelegramVideoPlayer({
     return () => document.removeEventListener("fullscreenchange", changed);
   }, []);
   useEffect(() => {
-    if (!rateMenu) return;
-    const outside = (event: PointerEvent) => {
-      if (!speedMenu.current?.contains(event.target as Node))
-        setRateMenu(false);
-    };
-    document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
-  }, [rateMenu]);
-  useEffect(() => {
     if (!webFullscreen && !fullscreen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -109,8 +148,9 @@ export function TelegramVideoPlayer({
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (rateMenu) {
+      if (rateMenu || qualityMenu) {
         setRateMenu(false);
+        setQualityMenu(false);
         return;
       }
       if (document.fullscreenElement === container.current)
@@ -123,7 +163,7 @@ export function TelegramVideoPlayer({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", escape, true);
     };
-  }, [webFullscreen, fullscreen, rateMenu]);
+  }, [webFullscreen, fullscreen, rateMenu, qualityMenu]);
 
   function updateBuffer(element: HTMLVideoElement) {
     let end = 0;
@@ -246,6 +286,20 @@ export function TelegramVideoPlayer({
         onLoadedMetadata={(event) => {
           onLoadedMetadata?.(event);
           const element = event.currentTarget;
+          const saved = qualityRestore.current;
+          if (saved) {
+            element.currentTime = Number.isFinite(element.duration)
+              ? Math.min(saved.position, element.duration)
+              : saved.position;
+            element.playbackRate = saved.rate;
+            element.volume = saved.volume;
+            element.muted = saved.muted;
+            qualityRestore.current = null;
+            if (saved.playing)
+              void element
+                .play()
+                .catch(() => setNotice("已切换清晰度，点击播放继续"));
+          }
           setDuration(element.duration);
           setPosition(element.currentTime);
           setVolume(element.volume);
@@ -453,90 +507,59 @@ export function TelegramVideoPlayer({
             </span>
           </div>
           <div className="telegram-video-tools">
-            <div
-              ref={speedMenu}
-              className="telegram-video-speed"
-              onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget))
-                  setRateMenu(false);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape" && rateMenu) {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setRateMenu(false);
-                  speedMenu.current
-                    ?.querySelector<HTMLButtonElement>(
-                      ".telegram-video-control",
-                    )
-                    ?.focus();
-                }
-                if (
-                  (event.key === "ArrowDown" || event.key === "ArrowUp") &&
-                  rateMenu
-                ) {
-                  event.preventDefault();
-                  const items = Array.from(
-                    speedMenu.current?.querySelectorAll<HTMLButtonElement>(
-                      '[role="menuitemradio"]',
-                    ) ?? [],
-                  );
-                  const current = items.indexOf(
-                    document.activeElement as HTMLButtonElement,
-                  );
-                  const next =
-                    current < 0
-                      ? event.key === "ArrowDown"
-                        ? 0
-                        : items.length - 1
-                      : (current +
-                          (event.key === "ArrowDown" ? 1 : -1) +
-                          items.length) %
-                        items.length;
-                  items[next]?.focus();
-                }
-              }}
-            >
+            {qualityError ? (
               <button
                 type="button"
                 className="telegram-video-control telegram-video-rate"
-                aria-label="播放速度"
-                title="播放速度"
-                aria-haspopup="menu"
-                aria-expanded={rateMenu}
-                onClick={() => setRateMenu((value) => !value)}
+                aria-label="重新读取清晰度"
+                title="读取清晰度失败，点击重试"
+                onClick={onQualityRetry}
               >
-                {rate}×
+                画质
               </button>
-              {rateMenu ? (
-                <div
-                  className="telegram-video-speed-menu"
-                  role="menu"
-                  aria-label="播放速度"
-                >
-                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => (
-                    <button
-                      type="button"
-                      key={value}
-                      role="menuitemradio"
-                      aria-checked={rate === value}
-                      onClick={() => {
-                        if (video.current) video.current.playbackRate = value;
-                        setRate(value);
-                        setRateMenu(false);
-                        speedMenu.current
-                          ?.querySelector<HTMLButtonElement>(
-                            ".telegram-video-control",
-                          )
-                          ?.focus();
-                      }}
-                    >
-                      {value}×{rate === value ? <Check size={14} /> : null}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            ) : qualityOptions.length ? (
+              <TelegramVideoOptionsMenu
+                label="视频清晰度"
+                text={qualityLabel}
+                options={qualityOptions}
+                value={quality}
+                open={qualityMenu}
+                onOpenChange={(open) => {
+                  setQualityMenu(open);
+                  if (open) setRateMenu(false);
+                }}
+                onChange={(value) => {
+                  const element = video.current;
+                  if (value === quality || !element) return;
+                  qualityRestore.current = {
+                    position: element.currentTime,
+                    playing: !element.paused,
+                    rate: element.playbackRate,
+                    volume: element.volume,
+                    muted: element.muted,
+                  };
+                  onQualityChange?.(value);
+                }}
+              />
+            ) : null}
+            <TelegramVideoOptionsMenu
+              label="播放速度"
+              text={`${rate}×`}
+              options={[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => ({
+                value: String(value),
+                label: `${value}×`,
+              }))}
+              value={String(rate)}
+              open={rateMenu}
+              onOpenChange={(open) => {
+                setRateMenu(open);
+                if (open) setQualityMenu(false);
+              }}
+              onChange={(value) => {
+                if (video.current) video.current.playbackRate = Number(value);
+                setRate(Number(value));
+              }}
+            />
             <button
               type="button"
               className="telegram-video-control"

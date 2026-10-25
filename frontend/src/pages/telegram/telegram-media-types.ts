@@ -58,3 +58,12 @@ export interface TelegramVideoPreviewStatus {
   manifestUrl: string | null;
   updatedAt: string;
 }
+
+/** Actual source renditions; IDs are scoped to the selected message, never native file handles. */
+export interface TelegramVideoQuality {
+  id: string;
+  width: number;
+  height: number;
+  codec: string;
+  size: number;
+}

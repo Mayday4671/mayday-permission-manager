@@ -467,7 +467,16 @@ public class TelegramMediaDownloadService
      */
     public ResponseEntity<Resource> stream(Long mediaId, String ticket, String rangeHeader)
     {
-        return capabilityContent(mediaId, ticket, rangeHeader, false);
+        return stream(mediaId, ticket, rangeHeader, "original");
+    }
+
+    /**
+     * The playback capability covers only renditions of this exact authorized media
+     * source.
+     */
+    public ResponseEntity<Resource> stream(Long mediaId, String ticket, String rangeHeader, String quality)
+    {
+        return capabilityContent(mediaId, ticket, rangeHeader, false, quality);
     }
 
     /**
@@ -476,11 +485,11 @@ public class TelegramMediaDownloadService
      */
     public ResponseEntity<Resource> downloadContent(Long mediaId, String ticket, String rangeHeader)
     {
-        return capabilityContent(mediaId, ticket, rangeHeader, true);
+        return capabilityContent(mediaId, ticket, rangeHeader, true, "original");
     }
 
     private ResponseEntity<Resource> capabilityContent(Long mediaId, String ticket, String rangeHeader,
-            boolean download)
+            boolean download, String quality)
     {
         moduleGuard.requireEnabled();
         TelegramMedia row = media.findById(mediaId).orElseThrow(() -> new ResourceNotFoundException("Telegram 媒体不存在"));
@@ -492,7 +501,58 @@ public class TelegramMediaDownloadService
             throw new AccessDeniedException("播放票据所有者已失去媒体访问权限");
         }
         verifySource(row);
+        if (!"original".equals(quality))
+        {
+            if (quality == null || !quality.matches("alt:-?[0-9]{1,20}"))
+            {
+                throw new BusinessException("视频清晰度标识无效");
+            }
+            TelegramVideoQuality rendition = sourceQualities(row).stream().filter(item -> item.id().equals(quality))
+                    .findFirst().orElseThrow(() -> new BusinessException("原消息未提供该清晰度，请重新选择"));
+            // Keep the stored original untouched; every request resolves the current native
+            // handle.
+            TelegramMedia selected = new TelegramMedia();
+            selected.setId(row.getId());
+            selected.setTelegramFileId(rendition.fileId());
+            return TelegramRemoteVideoStream.response(sessions.requireMediaClient(row.getOwnerId()), selected,
+                    rangeHeader, false);
+        }
         return streamContent(row, rangeHeader, download);
+    }
+
+    /**
+     * Lists source-provided qualities under the same ownership checks as playback.
+     */
+    public List<TelegramVideoQuality.VideoQualityView> videoQualities(Long mediaId)
+    {
+        moduleGuard.requireEnabled();
+        access.require("telegram:view");
+        access.require("telegram:download");
+        TelegramMedia row = visibleMedia(mediaId);
+        return sourceQualities(row).stream().map(TelegramVideoQuality::view).toList();
+    }
+
+    private List<TelegramVideoQuality> sourceQualities(TelegramMedia row)
+    {
+        if (!"VIDEO".equals(row.getKind()))
+        {
+            throw new BusinessException("此附件未提供多清晰度视频");
+        }
+        TelegramCollectedMessage source = messages.findById(row.getMessageId()).orElseThrow();
+        TelegramCollectionTask task = tasks.findById(row.getTaskId()).orElseThrow();
+        TelegramSessionClient client = sessions.requireMediaClient(row.getOwnerId());
+        try
+        {
+            return client.videoQualities(task.getMessageLink(), source.getChatId(), source.getTelegramMessageId())
+                    .get(25, TimeUnit.SECONDS);
+        } catch (Exception exception)
+        {
+            if (exception instanceof InterruptedException)
+            {
+                Thread.currentThread().interrupt();
+            }
+            throw new BusinessException("无法读取视频清晰度，请检查 Telegram 连接后重试");
+        }
     }
 
     private TelegramMedia visibleMedia(Long mediaId)

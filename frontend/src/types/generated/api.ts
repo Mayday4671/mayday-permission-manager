@@ -3312,6 +3312,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/telegram/media/{id}/video-qualities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramController_videoQualities"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/telegram/messages/unmatched": {
     parameters: {
       query?: never;
@@ -3764,6 +3780,11 @@ export interface components {
     };
     ApiResponseListTemplate: {
       data: components["schemas"]["Template"][];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseListVideoQualityView: {
+      data: components["schemas"]["VideoQualityView"][];
       message: string;
       success: boolean;
     };
@@ -5337,6 +5358,16 @@ export interface components {
       username: string;
       /** Format: int32 */
       x: number;
+    };
+    VideoQualityView: {
+      codec?: string;
+      /** Format: int32 */
+      height?: number;
+      id?: string;
+      /** Format: int64 */
+      size?: number;
+      /** Format: int32 */
+      width?: number;
     };
     WorkflowDraft: {
       businessType: string;
@@ -11278,6 +11309,7 @@ export interface operations {
   TelegramController_streamMedia: {
     parameters: {
       query: {
+        quality?: string;
         ticket: string;
       };
       header?: {
@@ -11409,6 +11441,28 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponsePreviewView"];
+        };
+      };
+    };
+  };
+  TelegramController_videoQualities: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseListVideoQualityView"];
         };
       };
     };

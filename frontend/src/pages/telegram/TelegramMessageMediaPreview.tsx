@@ -23,6 +23,7 @@ import type {
   TelegramCollectedMessage,
   TelegramCollectedMedia,
   TelegramVideoPreviewStatus,
+  TelegramVideoQuality,
 } from "./telegram-media-types";
 
 const ACTIVE_TASKS = ["QUEUED", "RUNNING"];
@@ -436,6 +437,7 @@ export function TelegramInlineMediaItem({
   poster?: string;
 }) {
   const [playbackError, setPlaybackError] = useState(false);
+  const [quality, setQuality] = useState("original");
   const [convert, setConvert] = useState(false);
   const playbackPosition = useRef(0);
   const restorePosition = useRef<number | null>(null);
@@ -452,6 +454,20 @@ export function TelegramInlineMediaItem({
     enabled: nativeVideo && !convert,
     retry: false,
     staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+  const qualities = useQuery({
+    queryKey: ["telegram", "video-qualities", attachment.id],
+    queryFn: async ({ signal }) => {
+      const options = await api<TelegramVideoQuality[]>(
+        `/telegram/media/${attachment.id}/video-qualities`,
+        { signal },
+      );
+      if (!Array.isArray(options)) throw new Error("视频清晰度数据无效");
+      return options;
+    },
+    enabled: nativeVideo && attachment.kind === "VIDEO" && !convert,
+    retry: false,
     refetchOnWindowFocus: false,
   });
   const preview = useQuery({
@@ -532,7 +548,15 @@ export function TelegramInlineMediaItem({
       ) : ticket.data?.url ? (
         <TelegramVideoPlayer
           key={ticket.data.url}
-          src={ticket.data.url}
+          src={`${ticket.data.url}${quality === "original" ? "" : `&quality=${encodeURIComponent(quality)}`}`}
+          qualities={qualities.data}
+          quality={quality}
+          qualityError={!!qualities.error}
+          onQualityChange={(value) => {
+            setQuality(value);
+            setPlaybackError(false);
+          }}
+          onQualityRetry={() => void qualities.refetch()}
           poster={poster}
           controls
           playsInline

@@ -1323,14 +1323,16 @@
   font-weight: 550;
   font-variant-numeric: tabular-nums;
 }
-.telegram-video-speed {
+.telegram-video-options {
   position: relative;
 }
-.telegram-video-speed-menu {
+.telegram-video-options-menu {
   position: absolute;
   bottom: calc(100% + 12px);
   right: 0;
-  min-width: 112px;
+  min-width: 144px;
+  max-height: min(320px, 50dvh);
+  overflow-y: auto;
   padding: 5px;
   border: 1px solid #ffffff24;
   border-radius: 10px;
@@ -1338,7 +1340,7 @@
   backdrop-filter: blur(12px);
   box-shadow: 0 8px 24px #0006;
 }
-.telegram-video-speed-menu button {
+.telegram-video-options-menu button {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1349,12 +1351,13 @@
   border-radius: 5px;
   color: #fff;
   font-size: 12px;
+  white-space: nowrap;
   background: transparent;
   cursor: pointer;
 }
-.telegram-video-speed-menu button:hover,
-.telegram-video-speed-menu button:focus-visible,
-.telegram-video-speed-menu button[aria-checked="true"] {
+.telegram-video-options-menu button:hover,
+.telegram-video-options-menu button:focus-visible,
+.telegram-video-options-menu button[aria-checked="true"] {
   outline: none;
   background: #ffffff22;
 }

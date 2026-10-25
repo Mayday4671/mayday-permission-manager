@@ -701,6 +701,28 @@
         ],
         "type": "object"
       },
+      "ApiResponseListVideoQualityView": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/VideoQualityView"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponseLoginPolicy": {
         "properties": {
           "data": {
@@ -5691,6 +5713,29 @@
           "username",
           "x"
         ],
+        "type": "object"
+      },
+      "VideoQualityView": {
+        "properties": {
+          "codec": {
+            "type": "string"
+          },
+          "height": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "width": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
         "type": "object"
       },
       "WorkOrderRequest": {
@@ -16223,6 +16268,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "quality",
+            "required": false,
+            "schema": {
+              "default": "original",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16443,6 +16497,43 @@
           "telegram-controller"
         ],
         "x-authorization": "@access.has('telegram:download')"
+      }
+    },
+    "/api/telegram/media/{id}/video-qualities": {
+      "get": {
+        "operationId": "TelegramController_videoQualities",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListVideoQualityView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:view') and @access.has('telegram:download')"
       }
     },
     "/api/telegram/messages/unmatched": {

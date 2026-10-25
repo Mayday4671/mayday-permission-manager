@@ -121,6 +121,13 @@ public interface TelegramSessionClient
             int attachmentIndex);
 
     /**
+     * Reads current source renditions without downloading, transcoding or joining
+     * chats.
+     */
+    CompletableFuture<java.util.List<TelegramVideoQuality>> videoQualities(String messageLink, String chatId,
+            String messageId);
+
+    /**
      * Reads at most one MiB at the requested offset, without waiting for the
      * complete file.
      */

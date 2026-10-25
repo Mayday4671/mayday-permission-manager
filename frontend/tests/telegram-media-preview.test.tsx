@@ -812,3 +812,91 @@ test("播放时控制层自动隐藏，指针唤醒；暂停、键盘操作与�
   assert.equal(video.playbackRate, 2);
   assert.equal(screen.queryByRole("menu"), null);
 });
+
+test("切换真实清晰度选项保留进度、倍速、音量和全屏，不重新创建播放票据", async () => {
+  let tickets = 0;
+  globalThis.fetch = async (input) => {
+    if (String(input).endsWith("/video-qualities"))
+      return reply([
+        { id: "original", width: 1920, height: 1080, codec: "", size: 9000 },
+        {
+          id: "alt:9223372036854775807",
+          width: 1280,
+          height: 720,
+          codec: "h264",
+          size: 4000,
+        },
+      ]);
+    tickets++;
+    return reply({ url: "/api/telegram/media/9/stream?ticket=test" });
+  };
+  mount(<TelegramInlineMediaItem attachment={media("REMOTE", "video/mp4")} />);
+  fireEvent.click(await screen.findByRole("button", { name: "视频清晰度" }));
+  const video = document.querySelector("video")!;
+  Object.defineProperty(video, "duration", { configurable: true, value: 120 });
+  Object.defineProperty(video, "paused", { configurable: true, value: false });
+  video.currentTime = 42;
+  video.playbackRate = 1.5;
+  video.volume = 0.35;
+  video.muted = true;
+  let resumed = 0;
+  video.play = async () => {
+    resumed++;
+  };
+  fireEvent.loadedMetadata(video);
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "720p" }));
+  assert(
+    document
+      .querySelector("video")!
+      .src.includes("quality=alt%3A9223372036854775807"),
+  );
+  assert.equal(document.querySelector("video"), video);
+  video.currentTime = 0;
+  video.playbackRate = 1;
+  video.volume = 1;
+  video.muted = false;
+  fireEvent.loadedMetadata(video);
+  assert.equal(video.currentTime, 42);
+  assert.equal(video.playbackRate, 1.5);
+  assert.equal(video.volume, 0.35);
+  assert.equal(video.muted, true);
+  assert.equal(resumed, 1);
+  fireEvent.click(screen.getByRole("button", { name: "网页全屏" }));
+  fireEvent.click(screen.getByRole("button", { name: "视频清晰度" }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "原画 · 1080p" }));
+  assert(!video.src.includes("quality="));
+  assert(document.querySelector(".is-web-fullscreen"));
+  assert.equal(tickets, 1);
+});
+
+test("仅原画时不虚列清晰度，读取失败可独立重试且原视频继续可播放", async () => {
+  let calls = 0;
+  globalThis.fetch = async (input) => {
+    if (String(input).endsWith("/video-qualities")) {
+      calls++;
+      return calls === 1
+        ? new Response("unavailable", { status: 503 })
+        : reply([
+            {
+              id: "original",
+              width: 1080,
+              height: 1920,
+              codec: "",
+              size: 9000,
+            },
+          ]);
+    }
+    return reply({ url: "/api/telegram/media/9/stream?ticket=test" });
+  };
+  mount(<TelegramInlineMediaItem attachment={media("REMOTE", "video/mp4")} />);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "重新读取清晰度" }),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "视频清晰度" }));
+  assert.equal(screen.getAllByRole("menuitemradio").length, 1);
+  assert(screen.getByRole("menuitemradio", { name: "原画 · 1080p" }));
+  assert.equal(
+    document.querySelector("video")?.getAttribute("src"),
+    "/api/telegram/media/9/stream?ticket=test",
+  );
+});
