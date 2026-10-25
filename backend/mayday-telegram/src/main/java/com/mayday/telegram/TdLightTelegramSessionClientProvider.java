@@ -140,7 +140,8 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                 }, new ThreadPoolExecutor.AbortPolicy());
         private volatile TelegramAuthorizationState currentState = TelegramAuthorizationState.INITIALIZING;
         private volatile String botChatId;
-        private boolean closing;
+        private volatile boolean closing;
+        private final AtomicBoolean factoryReleaseStarted = new AtomicBoolean();
         private boolean loggedOut;
 
         TdLightSessionClient(ClientFactory factory, TelegramClient client, TelegramSettings settings,
@@ -1407,14 +1408,21 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             emit(TelegramAuthorizationState.ERROR, null);
         }
 
-        /** Releases the native factory once TDLib reports its closed state. */
-        private synchronized void releaseFactory()
+        /**
+         * Native cleanup waits for the update thread to exit. Run it separately so
+         * neither an update callback nor a caller holding the coordinator lock waits
+         * for its own completion.
+         */
+        private void releaseFactory()
         {
-            if (!closing)
+            closing = true;
+            messageEvents.shutdown();
+            if (factoryReleaseStarted.compareAndSet(false, true))
             {
-                closing = true;
-                Arrays.fill(databaseKey, (byte) 0);
-                factory.close();
+                Thread.ofVirtual().name("mayday-telegram-native-close").start(() -> {
+                    Arrays.fill(databaseKey, (byte) 0);
+                    factory.close();
+                });
             }
         }
 
@@ -1498,22 +1506,16 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
          * process restart.
          */
         @Override
-        public void close()
+        public synchronized void close()
         {
             if (!closing)
             {
                 closing = true;
                 messageEvents.shutdown();
                 client.sendAsync(new TdApi.Close()).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                        .whenComplete((ignored, error) -> releaseFactoryAfterClose());
+                        .whenComplete((ignored, error) -> releaseFactory());
             }
         }
 
-        /** Ensures factory cleanup when TDLib cannot deliver a final closed update. */
-        private synchronized void releaseFactoryAfterClose()
-        {
-            Arrays.fill(databaseKey, (byte) 0);
-            factory.close();
-        }
     }
 }

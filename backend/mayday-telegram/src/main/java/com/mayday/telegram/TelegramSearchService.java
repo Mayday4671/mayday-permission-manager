@@ -344,6 +344,14 @@ public class TelegramSearchService
         TelegramSessionClient client = sessions.requireReadyClient("telegram:search");
         try
         {
+            // A restored user session does not restore the client's verified bot cache.
+            // Resolve read-only before using persisted buttons, without resending keywords.
+            TelegramBotChat bot = client.resolveBot(TelegramBotUsername.normalize(settings.getSearchBotUsername()))
+                    .join();
+            if (!Objects.equals(bot.chatId(), message.getBotChatId()))
+            {
+                throw new BusinessException("当前配置的机器人与这条回复不一致，请重新搜索后使用新回复中的按钮。");
+            }
             TelegramCallbackAnswer answer = client
                     .activateCallback(message.getBotChatId(), message.getTelegramMessageId(), callbackData).join();
             return new CallbackAnswerView(answer.text(), answer.showAlert(), answer.url());

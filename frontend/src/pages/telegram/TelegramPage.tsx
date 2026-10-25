@@ -30,6 +30,7 @@ import {
   ClockCircleOutlined,
   CustomerServiceOutlined,
   DisconnectOutlined,
+  DoubleLeftOutlined,
   DownloadOutlined,
   FilterOutlined,
   FolderOutlined,
@@ -425,13 +426,15 @@ function resourceTypeFromButton(text: string): SearchResourceType | null {
   return resourceType?.value ?? null;
 }
 
-/** Returns the canonical category label while leaving non-category action labels untouched. */
+/** Normalizes known bot labels while preserving the original callback coordinates. */
 function callbackButtonLabel(text: string): string {
   const type = resourceTypeFromButton(text);
   if (!type) {
     if (/最新|\bnewest?\b/i.test(text)) return "最新";
     if (/过滤|\bfilter\b/i.test(text)) return "过滤";
     if (/时长/.test(text)) return "时长";
+    if (/下一页|\bnext\b|^➡\uFE0F?$/i.test(text.trim())) return "下一页";
+    if (/^⏮\uFE0F?$/.test(text.trim())) return "首页";
     if (/^🔄\uFE0F?$/.test(text.trim())) return "切换";
   }
   return type
@@ -451,7 +454,8 @@ function callbackButtonIcon(text: string): ReactNode {
   if (/时长/.test(text)) return <ClockCircleOutlined />;
   if (/^🔄\uFE0F?$/.test(text.trim())) return <ReloadOutlined />;
   if (/过滤|\bfilter\b/i.test(text)) return <FilterOutlined />;
-  if (/下一页|\bnext\b/i.test(text)) return <RightOutlined />;
+  if (callbackButtonLabel(text) === "下一页") return <RightOutlined />;
+  if (callbackButtonLabel(text) === "首页") return <DoubleLeftOutlined />;
   if (/上一页|\bprevious\b/i.test(text)) return <LeftOutlined />;
 
   return undefined;
