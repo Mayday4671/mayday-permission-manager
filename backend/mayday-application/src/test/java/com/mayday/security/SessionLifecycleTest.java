@@ -6,6 +6,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
+import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.mapper.SessionMapper;
 import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.LoginSession;
@@ -13,6 +14,7 @@ import com.mayday.system.model.SysUser;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.access.AccessDeniedException;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -28,7 +30,7 @@ import static org.mockito.Mockito.when;
 class SessionLifecycleTest
 {
     private static final Instant NOW = Instant.parse("2026-10-04T06:00:00Z");
-    private final SessionPolicy policy = new SessionPolicy();
+    private final SessionPolicy policy = new SessionPolicy(mock(EntryMapper.class), JsonMapper.builder().build());
     private final SessionMapper sessions = mock(SessionMapper.class);
     private final UserMapper users = mock(UserMapper.class);
     private final TokenService tokens = new TokenService(sessions, users, policy, Clock.fixed(NOW, ZoneOffset.UTC));
@@ -93,8 +95,38 @@ class SessionLifecycleTest
         when(sessions.findById(TokenService.hash("active"))).thenReturn(Optional.of(active));
         when(users.findById(1L)).thenReturn(Optional.of(user("hash")));
         assertTrue(tokens.authenticate("active").isPresent());
-        assertEquals(NOW, active.getLastActiveAt());
+        verify(sessions).touchActivity(active.getTokenHash(), NOW, NOW.minusSeconds(60), NOW.minusSeconds(720 * 60L),
+                NOW.minusSeconds(30 * 60L));
+        verify(sessions, never()).save(any());
         assertEquals(expiry, active.getExpiresAt());
+    }
+
+    @Test
+    void recentOrDisabledSessionsDoNotWriteActivity()
+    {
+        var active = session(10, 0);
+        when(sessions.findById(TokenService.hash("active"))).thenReturn(Optional.of(active));
+        when(users.findById(1L)).thenReturn(Optional.of(user("hash")));
+        assertTrue(tokens.authenticate("active").isPresent());
+        active.setLastActiveAt(NOW.minusSeconds(120));
+        var disabled = user("hash");
+        disabled.setEnabled(false);
+        when(users.findById(1L)).thenReturn(Optional.of(disabled));
+        assertTrue(tokens.authenticate("active").isEmpty());
+        verify(sessions, never()).touchActivity(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void shortestIdleWindowCanStillRenewBeforeItExpires()
+    {
+        policy.setIdleMinutes(1);
+        var active = session(10, 0);
+        active.setLastActiveAt(NOW.minusSeconds(30));
+        when(sessions.findById(TokenService.hash("active"))).thenReturn(Optional.of(active));
+        when(users.findById(1L)).thenReturn(Optional.of(user("hash")));
+        assertTrue(tokens.authenticate("active").isPresent());
+        verify(sessions).touchActivity(active.getTokenHash(), NOW, NOW.minusSeconds(30), NOW.minusSeconds(720 * 60L),
+                NOW.minusSeconds(60));
     }
 
     @Test

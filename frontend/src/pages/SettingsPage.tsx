@@ -189,7 +189,10 @@ export function SettingsPage() {
             </Form.Item>
             <Form.Item label="状态" name="enabled" valuePropName="checked">
               <Switch
-                disabled={record?.code === "security.loginCaptchaEnabled"}
+                disabled={
+                  record?.code === "security.loginCaptchaEnabled" ||
+                  record?.code === "security.sessionPolicy"
+                }
                 checkedChildren="启用"
                 unCheckedChildren="停用"
               />

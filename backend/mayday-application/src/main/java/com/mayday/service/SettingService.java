@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import com.mayday.common.exception.BusinessException;
+import com.mayday.security.SessionPolicy;
 import com.mayday.system.mapper.EntryMapper;
 import com.mayday.system.model.SystemEntry;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +59,14 @@ public class SettingService
     /** 保存前按参数类型验证值；内置键不可换类型，前台主题拒绝任意CSS及未知字段，错误不会写入缓存或数据库。 */
     public void validate(String code, String value, String type)
     {
+        if (SessionPolicy.SETTING_KEY.equals(code))
+        {
+            if (!"JSON".equals(type))
+            {
+                throw new BusinessException("登录会话策略必须使用 JSON 类型");
+            }
+            SessionPolicy.parse(json, value);
+        }
         if ("content.requireApproval".equals(code) && !"BOOLEAN".equals(type))
         {
             throw new BusinessException("内容审核参数必须使用 BOOLEAN 类型");

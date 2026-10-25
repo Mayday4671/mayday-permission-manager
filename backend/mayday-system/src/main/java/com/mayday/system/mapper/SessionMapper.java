@@ -10,6 +10,8 @@ import com.mybatisflex.core.BaseMapper;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * 修改密码、停用账号时清除此账号所有令牌。
@@ -20,6 +22,18 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface SessionMapper extends BaseMapper<LoginSession>
 {
+    /** 原子推进有效会话的活动时间；限频且只更新，不插入、不回退时间、不复活已撤销或过期会话。 */
+    @Update("""
+            UPDATE sys_session SET last_active_at = #{now}
+            WHERE token_hash = #{tokenHash} AND expires_at > #{now}
+              AND created_at > #{absoluteCutoff}
+              AND COALESCE(last_active_at, created_at) > #{idleCutoff}
+              AND (last_active_at IS NULL OR last_active_at <= #{touchCutoff})
+            """)
+    int touchActivity(@Param("tokenHash") String tokenHash, @Param("now") Instant now,
+            @Param("touchCutoff") Instant touchCutoff, @Param("absoluteCutoff") Instant absoluteCutoff,
+            @Param("idleCutoff") Instant idleCutoff);
+
     /** 按摘要主键载入会话；不存在返回空，由认证流程决定是否拒绝。 */
     default Optional<LoginSession> findById(Serializable id)
     {

@@ -67,6 +67,7 @@ mayday:
     production: ${MAYDAY_PRODUCTION:false}
     public-origin: ${MAYDAY_PUBLIC_ORIGIN:}
   security:
+    # 系统参数 security.sessionPolicy 优先；此处仅作为缺失或损坏时的启动回退值。
     sessions:
       absolute-minutes: ${MAYDAY_SESSION_ABSOLUTE_MINUTES:720}
       idle-minutes: ${MAYDAY_SESSION_IDLE_MINUTES:30}

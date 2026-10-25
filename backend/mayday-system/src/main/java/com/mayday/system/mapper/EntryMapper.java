@@ -1,6 +1,7 @@
 package com.mayday.system.mapper;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.mayday.common.persistence.EntityMapper;
 import com.mayday.system.model.SystemEntry;
@@ -12,6 +13,13 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface EntryMapper extends EntityMapper<SystemEntry>
 {
+    /** 按唯一的类型和编码读取配置，认证路径不扫描整张参数表。 */
+    default Optional<SystemEntry> findByKindAndCode(String kind, String code)
+    {
+        return Optional.ofNullable(selectOneByQuery(
+                QueryWrapper.create().where(new QueryColumn("kind").eq(kind)).and(new QueryColumn("code").eq(code))));
+    }
+
     /** 按已校验资料类型稳定排序；菜单可见性、停用状态和资源授权由服务层继续筛选。 */
     default List<SystemEntry> findByKindOrderBySortOrderAscIdAsc(String kind)
     {

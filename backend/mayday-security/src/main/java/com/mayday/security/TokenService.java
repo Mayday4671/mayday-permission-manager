@@ -58,15 +58,16 @@ public class TokenService
         }
         // 锁等待可能持续到其他登录提交之后，取锁成功后的时间，保证配额淘汰顺序反映实际签发顺序。
         Instant now = sessionClock.instant();
+        var limits = policy.current();
         var previous = sessions.findByUserIdOrderByCreatedAtAscTokenHashAsc(current.getId());
-        var active = previous.stream().filter(s -> policy.active(s, now)).toList();
-        var expiredIds = previous.stream().filter(s -> !policy.active(s, now)).map(LoginSession::getTokenHash).toList();
+        var active = previous.stream().filter(s -> limits.active(s, now)).toList();
+        var expiredIds = previous.stream().filter(s -> !limits.active(s, now)).map(LoginSession::getTokenHash).toList();
         // Skip empty batches because MyBatis-Flex rejects them.
         if (!expiredIds.isEmpty())
         {
             sessions.deleteBatchByIds(expiredIds);
         }
-        int revoke = Math.max(0, active.size() - policy.getMaxPerUser() + 1);
+        int revoke = Math.max(0, active.size() - limits.maxPerUser() + 1);
         if (revoke > 0)
         {
             var revokedIds = active.subList(0, revoke).stream().map(LoginSession::getTokenHash).toList();
@@ -83,7 +84,7 @@ public class TokenService
         session.setDevice(device == null ? "" : device.substring(0, Math.min(device.length(), 255)));
         session.setTokenHash(hash(token));
         session.setUserId(current.getId());
-        session.setExpiresAt(now.plusSeconds(policy.getAbsoluteMinutes() * 60L));
+        session.setExpiresAt(now.plusSeconds(limits.absoluteMinutes() * 60L));
         sessions.save(session);
         return token;
     }
@@ -97,13 +98,20 @@ public class TokenService
             return Optional.empty();
         }
         Instant now = sessionClock.instant();
-        return sessions.findById(hash(token)).filter(session -> policy.active(session, now)).flatMap(session -> {
-            if (session.getLastActiveAt() == null || !session.getLastActiveAt().isAfter(now.minusSeconds(60)))
-            {
-                session.setLastActiveAt(now);
-            }
-            return users.findById(session.getUserId());
-        }).filter(SysUser::isEnabled);
+        var limits = policy.current();
+        // 最短空闲窗口为一分钟；触碰间隔必须短于窗口，否则持续使用也无法续活动时间。
+        Instant touchCutoff = now.minusSeconds(Math.min(60, limits.idleMinutes() * 30L));
+        return sessions.findById(hash(token)).filter(session -> limits.active(session, now))
+                .flatMap(session -> users.findById(session.getUserId()).filter(SysUser::isEnabled).map(user -> {
+                    if (session.getLastActiveAt() == null || !session.getLastActiveAt().isAfter(touchCutoff))
+                    {
+                        // MyBatis 不会自动保存实体修改；只更新活动列，避免整行保存重建已撤销的会话。
+                        sessions.touchActivity(session.getTokenHash(), now, touchCutoff,
+                                now.minusSeconds(limits.absoluteMinutes() * 60L),
+                                now.minusSeconds(limits.idleMinutes() * 60L));
+                    }
+                    return user;
+                }));
     }
 
     /** 按令牌摘要删除当前会话；已不存在时仍视作完成，调用方只能传入已认证请求持有的令牌。 */

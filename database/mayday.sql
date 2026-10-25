@@ -1,5 +1,5 @@
 -- ============================================================================
--- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V53）
+-- Mayday 数据库完整初始化脚本（MySQL 8.4，结构版本 V54）
 -- 唯一对外交付 SQL：80 张业务表、816 个业务字段、索引/外键及必要基础资料。
 -- 表和字段的中文 COMMENT 是字段字典；无需额外说明文件。
 -- ============================================================================
@@ -13,7 +13,7 @@
 -- 3. 配置应用 DB_URL/DB_USERNAME/DB_PASSWORD 和独立 ADMIN_PASSWORD，再启动后端。
 --    默认 SEED_DEMO_DATA=false：应用创建 admin 及管理员角色、补全菜单/字典/分类。
 --    管理员密码由应用 BCrypt 加密；本 SQL 不包含固定密码、个人数据或演示文章。
--- 4. 本文件已包含 V53 的 Flyway BASELINE 标记，不会在空库启动时重复执行 V35–V53 迁移。
+-- 4. 本文件已包含 V54 的 Flyway BASELINE 标记，不会在空库启动时重复执行 V35–V54 迁移。
 --    不需要关闭 Flyway、打开 baseline-on-migrate 或修改历史迁移文件。
 -- 【适用范围】仅首次空库安装。已有业务库使用程序内部增量迁移，不重复导入本文件。
 -- 本脚本没有 DROP/TRUNCATE 业务表，也不会覆盖已有账号。MySQL DDL 隐式提交，
@@ -651,8 +651,8 @@ CREATE TABLE `sys_user_role` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='账号与角色多对多关联；联合主键防止重复授权，用户与角色均有物理外键';
 
 
--- Flyway 版本管理表：记录本文件对应的 V53 基线，后续仍按正常增量迁移升级。
--- BASELINE 声明当前结构已处于版本 53；不伪造历史迁移的执行校验和。
+-- Flyway 版本管理表：记录本文件对应的 V54 基线，后续仍按正常增量迁移升级。
+-- BASELINE 声明当前结构已处于版本 54；不伪造历史迁移的执行校验和。
 -- 参考：https://documentation.red-gate.com/flyway/flyway-concepts/baselines
 CREATE TABLE flyway_schema_history (
   installed_rank INT NOT NULL COMMENT '安装记录顺序；由 Flyway 后续维护',
@@ -726,6 +726,7 @@ CREATE TABLE `cms_portal_home` (
   `night_primary_color` varchar(7) NOT NULL COMMENT '门户暗夜强调色，格式 #RRGGBB；默认薄荷色，后台管理主题与此独立',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='门户首页编排和访客明暗策略；仅存受支持配置，不存草稿正文或登录凭据';
+
 
 
 SET SESSION foreign_key_checks = @mayday_original_foreign_key_checks;
@@ -1606,9 +1607,14 @@ INSERT INTO sys_entry(kind, name, code, value, description, group_name, value_ty
 SELECT 'settings', '登录验证码', 'security.loginCaptchaEnabled', 'true', '开启后账号密码登录必须完成滑块验证；关闭后直接验证账号密码。保存立即生效，不影响 MFA 与登录失败限流。', '登录安全', 'BOOLEAN', 1, 0, 1, NOW(6), NOW(6), 0
 WHERE NOT EXISTS (SELECT 1 FROM sys_entry WHERE kind = 'settings' AND code = 'security.loginCaptchaEnabled');
 
+-- 三个会话限制作为一个参数原子更新，沿用系统参数权限、版本冲突检测和变更审计。
+INSERT INTO sys_entry(kind, name, code, value, description, group_name, value_type, built_in, sort_order, enabled, created_at, updated_at, version)
+SELECT 'settings', '登录会话策略', 'security.sessionPolicy', '{"absoluteMinutes":720,"idleMinutes":30,"maxPerUser":5}', '登录有效期、无认证请求超时（分钟）及同时登录上限。缩短时限约束已有登录；调长不延长已签发会话的固定到期时间；并发上限在下次登录时执行。', '登录安全', 'JSON', 1, 1, 1, NOW(6), NOW(6), 0
+WHERE NOT EXISTS (SELECT 1 FROM sys_entry WHERE kind = 'settings' AND code = 'security.sessionPolicy');
+
 INSERT INTO flyway_schema_history
   (installed_rank, version, description, type, script, checksum, installed_by, execution_time, success)
-VALUES (1, '53', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
+VALUES (1, '54', '<< Flyway Baseline >>', 'BASELINE', '<< Flyway Baseline >>', NULL, LEFT(CURRENT_USER(),100), 0, 1);
 
 -- 安装完成自检：应得到 80 张业务表、816 个业务字段，缺少注释数均为 0。
 -- 以下只有元数据查询，不输出用户资料、密码摘要或会话信息。

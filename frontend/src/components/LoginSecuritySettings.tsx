@@ -1,8 +1,18 @@
-import { Alert, App, Button, Card, Space, Switch, Typography } from "antd";
+import {
+  Alert,
+  App,
+  Button,
+  Card,
+  Divider,
+  Space,
+  Switch,
+  Typography,
+} from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { Entry } from "../types";
+import { LoginSessionSettings } from "./LoginSessionSettings";
 
 const CAPTCHA_KEY = "security.loginCaptchaEnabled";
 
@@ -104,6 +114,8 @@ export function LoginSecuritySettings() {
           />
         </Space>
       )}
+      <Divider style={{ marginBlock: 20 }} />
+      <LoginSessionSettings />
     </Card>
   );
 }

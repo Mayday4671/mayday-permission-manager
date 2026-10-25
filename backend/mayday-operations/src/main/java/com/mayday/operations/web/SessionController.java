@@ -62,6 +62,7 @@ public class SessionController
         access.require("sessions:view");
         String current = TokenService.hash(auth.substring(7));
         var now = sessionClock.instant();
+        var limits = policy.current();
         // 会话本身没有部门列；可见账号集合由用户表的行级并集子查询决定，本人会话始终可见。
         QueryCondition visibleUser = new QueryColumn("id").eq(access.current().getId());
         if (access.has("users:view"))
@@ -80,7 +81,7 @@ public class SessionController
                 .or(SearchPredicates.contains("nickname", keyword));
         visibleUsers.where(keywordMatch);
         QueryWrapper filter = QueryWrapper.create().where(new QueryColumn("user_id").in(visibleUsers))
-                .and(sessions.activeWindow(now, policy.getAbsoluteMinutes() * 60L, policy.getIdleMinutes() * 60L));
+                .and(sessions.activeWindow(now, limits.absoluteMinutes() * 60L, limits.idleMinutes() * 60L));
         // UUID作为次级排序键，保证同一时刻多会话分页不重复或遗漏。
         var pageData = sessions.paginate(PageResult.request(page, size),
                 filter.orderBy("created_at desc, session_id desc"));
@@ -106,7 +107,7 @@ public class SessionController
             m.put("nickname", u.getNickname());
             m.put("createdAt", s.getCreatedAt());
             m.put("lastActiveAt", s.getLastActiveAt());
-            m.put("expiresAt", policy.effectiveExpiry(s));
+            m.put("expiresAt", limits.effectiveExpiry(s));
             m.put("ip", s.getIp());
             m.put("device", s.getDevice());
             m.put("current", current.equals(s.getTokenHash()));

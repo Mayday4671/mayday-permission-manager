@@ -10,6 +10,7 @@ import com.mayday.common.exception.BusinessException;
 import com.mayday.common.persistence.PageResult;
 import com.mayday.common.web.ApiResponse;
 import com.mayday.security.AccessPolicy;
+import com.mayday.security.SessionPolicy;
 import com.mayday.service.NavigationCatalog;
 import com.mayday.service.SettingService;
 import com.mayday.service.UserService;
@@ -130,6 +131,10 @@ public class EntryController
             {
                 throw new BusinessException("请通过登录验证码参数值开关控制验证，不要停用这条配置");
             }
+            if (SessionPolicy.SETTING_KEY.equals(request.code()) && !request.enabled())
+            {
+                throw new BusinessException("登录会话策略不能停用，请修改有效期和同时登录上限");
+            }
             var definition = SettingService.SITE_KEYS.get(request.code());
             String type = request.valueType() != null
                     ? request.valueType()
@@ -139,7 +144,7 @@ public class EntryController
             entity.setGroupName(
                     request.groupName() == null || request.groupName().isBlank() ? "通用" : request.groupName());
             entity.setBuiltIn(definition != null || SettingService.LOGIN_CAPTCHA_KEY.equals(request.code())
-                    || entity.isBuiltIn());
+                    || SessionPolicy.SETTING_KEY.equals(request.code()) || entity.isBuiltIn());
             settings.invalidateAfterCommit();
         }
         if ("dictionaries".equals(kind) && id != null && "user.status".equals(entity.getCode())
@@ -225,7 +230,8 @@ public class EntryController
         }
         if ("settings".equals(kind))
         {
-            if (entry.isBuiltIn() || SettingService.SITE_KEYS.containsKey(entry.getCode()))
+            if (entry.isBuiltIn() || SettingService.SITE_KEYS.containsKey(entry.getCode())
+                    || SessionPolicy.SETTING_KEY.equals(entry.getCode()))
             {
                 throw new BusinessException("内置参数不能删除");
             }
