@@ -1028,3 +1028,207 @@
 .telegram-channel-file-info small {
   color: var(--app-text-secondary);
 }
+
+/* One active attachment occupies the stage; the rail never starts additional players. */
+.telegram-media-viewer .ant-modal-body {
+  max-height: calc(100dvh - 110px);
+  overflow-y: auto;
+}
+.telegram-media-gallery-heading,
+.telegram-media-gallery-navigation,
+.telegram-media-gallery-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.telegram-media-gallery-heading {
+  margin-bottom: 12px;
+  color: var(--app-text-secondary);
+  font-size: 13px;
+}
+.telegram-media-gallery-heading > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.telegram-media-gallery-navigation {
+  flex-shrink: 0;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.telegram-media-gallery-stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: min(56dvh, 640px);
+  min-height: 220px;
+  border-radius: 12px;
+  overflow: hidden;
+  color: #eee;
+  background: #090909;
+}
+.telegram-media-gallery-stage > .ant-typography {
+  color: inherit;
+}
+.telegram-media-gallery-stage > .ant-space,
+.telegram-media-gallery-stage .telegram-hls-player,
+.telegram-media-gallery-stage .ant-image {
+  height: 100%;
+  width: 100%;
+}
+.telegram-media-gallery-stage .ant-space > .ant-space-item:first-child {
+  flex: 1;
+  min-height: 0;
+}
+.telegram-media-gallery-stage .ant-image-img {
+  height: 100%;
+  max-height: 100% !important;
+  object-fit: contain;
+}
+.telegram-media-gallery-rail {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 136px;
+  overflow-y: auto;
+}
+.telegram-media-gallery-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 80px;
+  height: 56px;
+  padding: 2px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: var(--app-text-secondary);
+  background: color-mix(in srgb, var(--app-text) 6%, var(--app-surface));
+  cursor: pointer;
+  overflow: hidden;
+  font-size: 24px;
+}
+.telegram-media-gallery-tile.is-selected,
+.telegram-media-gallery-tile:focus-visible {
+  border-color: var(--app-primary);
+  outline: none;
+  color: var(--app-primary-text);
+}
+.telegram-media-gallery-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.telegram-media-gallery-tile > span:last-child {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  padding: 0 3px;
+  border-radius: 3px;
+  color: #fff;
+  background: #0009;
+  font-size: 10px;
+}
+.telegram-media-gallery-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.telegram-media-gallery-footer {
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.telegram-video-player {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #090909;
+  color: #eee;
+}
+.telegram-video-player > video {
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  object-fit: contain;
+  max-height: 65dvh;
+  aspect-ratio: 16 / 9;
+  background: #090909;
+}
+.telegram-video-toolbar,
+.telegram-video-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.telegram-video-toolbar {
+  flex-shrink: 0;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-top: 1px solid #ffffff1a;
+  background: #181818;
+}
+.telegram-video-toolbar .ant-btn {
+  color: #eee;
+}
+.telegram-video-toolbar .ant-btn:disabled {
+  color: #ffffff55;
+}
+.telegram-video-toolbar select {
+  border: 1px solid #ffffff30;
+  border-radius: 6px;
+  padding: 3px 4px;
+  color: #eee;
+  background: #242424;
+  font: inherit;
+  cursor: pointer;
+}
+.telegram-video-notice {
+  padding: 4px 12px;
+  color: #ddd;
+  font-size: 12px;
+}
+.telegram-video-player.is-web-fullscreen,
+.telegram-video-player:fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: 2000;
+  border-radius: 0;
+}
+.telegram-video-player.is-web-fullscreen > video,
+.telegram-video-player:fullscreen > video {
+  max-height: none;
+}
+.telegram-media-viewer:has(.is-web-fullscreen),
+.telegram-media-viewer .ant-modal-content:has(.is-web-fullscreen) {
+  transform: none !important;
+}
+@media (max-width: 600px) {
+  .telegram-media-viewer .ant-modal-container {
+    padding: 16px;
+  }
+  .telegram-media-gallery-stage {
+    height: 42dvh;
+  }
+  .telegram-video-toolbar {
+    padding: 8px;
+    gap: 8px;
+  }
+  .telegram-video-tools {
+    gap: 4px;
+  }
+  .telegram-media-gallery-tile {
+    width: 64px;
+    height: 48px;
+  }
+}

@@ -3,6 +3,15 @@ import { Alert, Button, Image, Modal, Space, Spin, Typography } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, tokenStore } from "../../lib/api";
 import { AuthenticatedHlsVideo } from "./AuthenticatedHlsVideo";
+import { TelegramVideoPlayer } from "./TelegramVideoPlayer";
+import {
+  LeftOutlined,
+  RightOutlined,
+  PictureOutlined,
+  PlayCircleOutlined,
+  FileOutlined,
+  SoundOutlined,
+} from "@ant-design/icons";
 import { telegramVideoPreviewMode } from "./telegram-video-policy";
 import {
   TelegramAttachmentDownload,
@@ -56,6 +65,12 @@ export function TelegramMessageMediaPreview({
   onRetry: () => void;
   retrying: boolean;
 }) {
+  const [selectedId, setSelectedId] = useState<number>();
+  const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
+  useEffect(() => {
+    setSelectedId(undefined);
+    setThumbnails({});
+  }, [taskId]);
   const result = useQuery({
     queryKey: ["telegram", "inline-media-preview", taskId],
     queryFn: async ({ signal }) => {
@@ -119,14 +134,55 @@ export function TelegramMessageMediaPreview({
   const protectedMessage = rows.some((row) => !row.canBeSaved);
   const genuinelyEmpty =
     task?.status === "COMPLETED" && !attachments.length && !protectedMessage;
+  const active = ready.find((item) => item.id === selectedId) ?? ready[0];
+  const activeIndex = active
+    ? ready.findIndex((item) => item.id === active.id)
+    : 0;
+
+  /** Reuse a loaded frame for the rail; never load every video just to create thumbnails. */
+  function rememberThumbnail(target: EventTarget) {
+    if (!active || thumbnails[active.id]) return;
+    if (
+      !(target instanceof HTMLImageElement) &&
+      !(target instanceof HTMLVideoElement)
+    )
+      return;
+    if (target instanceof HTMLVideoElement && target.currentTime < 0.5) return;
+    const width =
+      target instanceof HTMLVideoElement
+        ? target.videoWidth
+        : target.naturalWidth;
+    const height =
+      target instanceof HTMLVideoElement
+        ? target.videoHeight
+        : target.naturalHeight;
+    if (!width || !height) return;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 160;
+      canvas.height = Math.max(
+        1,
+        Math.min(240, Math.round((160 * height) / width)),
+      );
+      canvas
+        .getContext("2d")
+        ?.drawImage(target, 0, 0, canvas.width, canvas.height);
+      const thumbnail = canvas.toDataURL("image/jpeg", 0.65);
+      setThumbnails((current) => ({ ...current, [active.id]: thumbnail }));
+    } catch {
+      /* A cross-origin frame may not be readable; retain the file-type tile. */
+    }
+  }
 
   return (
     <Modal
       title="附件预览"
       open
       onCancel={onClose}
-      width={960}
-      footer={<Button onClick={onClose}>关闭</Button>}
+      width="min(1200px, calc(100vw - 32px))"
+      centered
+      className="telegram-media-viewer"
+      footer={null}
       destroyOnHidden
     >
       <Space orientation="vertical" size={16} style={{ width: "100%" }}>
@@ -231,42 +287,89 @@ export function TelegramMessageMediaPreview({
             }
           />
         ) : null}
-        {ready.length ? (
-          <Image.PreviewGroup>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  ready.length === 1
-                    ? "minmax(0, 1fr)"
-                    : "repeat(auto-fit, minmax(240px, 1fr))",
-                gap: 16,
-                maxHeight: "65vh",
-                overflowY: "auto",
-                minWidth: 0,
-              }}
-            >
-              {ready.map((attachment) => (
-                <Space
-                  key={attachment.id}
-                  orientation="vertical"
-                  size={12}
-                  style={{ width: "100%", minWidth: 0 }}
-                >
-                  <TelegramInlineMediaItem attachment={attachment} />
-                  <TelegramAttachmentDownload attachment={attachment} />
-                </Space>
-              ))}
+        {active ? (
+          <div className="telegram-media-gallery">
+            <div className="telegram-media-gallery-heading">
+              <span title={telegramDownloadName(active)}>
+                {telegramDownloadName(active)}
+              </span>
+              <div className="telegram-media-gallery-navigation">
+                <Button
+                  type="text"
+                  size="small"
+                  aria-label="上一个附件"
+                  icon={<LeftOutlined />}
+                  disabled={activeIndex === 0}
+                  onClick={() => setSelectedId(ready[activeIndex - 1].id)}
+                />
+                <span>
+                  {activeIndex + 1} / {ready.length}
+                </span>
+                <Button
+                  type="text"
+                  size="small"
+                  aria-label="下一个附件"
+                  icon={<RightOutlined />}
+                  disabled={activeIndex === ready.length - 1}
+                  onClick={() => setSelectedId(ready[activeIndex + 1].id)}
+                />
+              </div>
             </div>
-          </Image.PreviewGroup>
+            <div
+              className="telegram-media-gallery-stage"
+              onLoadCapture={(event) => rememberThumbnail(event.target)}
+              onLoadedDataCapture={(event) => rememberThumbnail(event.target)}
+              onTimeUpdateCapture={(event) => rememberThumbnail(event.target)}
+            >
+              <TelegramInlineMediaItem key={active.id} attachment={active} />
+            </div>
+            {ready.length > 1 ? (
+              <div
+                className="telegram-media-gallery-rail"
+                aria-label="附件列表"
+              >
+                {ready.map((item, index) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`telegram-media-gallery-tile${active.id === item.id ? " is-selected" : ""}`}
+                    aria-label={`查看附件 ${index + 1}：${telegramDownloadName(item)}`}
+                    aria-pressed={active.id === item.id}
+                    onClick={() => setSelectedId(item.id)}
+                  >
+                    {thumbnails[item.id] ? (
+                      <img src={thumbnails[item.id]} alt="" />
+                    ) : item.kind === "PHOTO" ? (
+                      <PictureOutlined />
+                    ) : ["VIDEO", "ANIMATION"].includes(item.kind) ? (
+                      <PlayCircleOutlined />
+                    ) : ["AUDIO", "VOICE"].includes(item.kind) ? (
+                      <SoundOutlined />
+                    ) : (
+                      <FileOutlined />
+                    )}
+                    <span>{index + 1}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         ) : null}
-        <Typography.Link
-          href={messageLink}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          在 Telegram 查看原消息
-        </Typography.Link>
+        <div className="telegram-media-gallery-footer">
+          <Typography.Link
+            href={messageLink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            在 Telegram 查看原消息
+          </Typography.Link>
+          <div className="telegram-media-gallery-footer-actions">
+            {active ? (
+              <TelegramAttachmentDownload key={active.id} attachment={active} />
+            ) : null}
+            <Button onClick={onClose}>关闭</Button>
+          </div>
+        </div>
       </Space>
     </Modal>
   );
@@ -446,7 +549,7 @@ export function TelegramInlineMediaItem({
           description={telegramDownloadName(attachment)}
         />
       ) : ticket.data?.url ? (
-        <video
+        <TelegramVideoPlayer
           key={ticket.data.url}
           src={ticket.data.url}
           controls
@@ -468,12 +571,6 @@ export function TelegramInlineMediaItem({
               ? Math.min(savedPosition, player.duration)
               : savedPosition;
             restorePosition.current = null;
-          }}
-          style={{
-            display: "block",
-            width: "100%",
-            maxHeight: "60vh",
-            background: "#111",
           }}
         />
       ) : ticket.isPending ? (

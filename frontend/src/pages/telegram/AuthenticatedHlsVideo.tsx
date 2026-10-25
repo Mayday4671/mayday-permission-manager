@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Space, Typography } from "antd";
 import Hls from "hls.js";
 import { api, tokenStore } from "../../lib/api";
+import { TelegramVideoPlayer } from "./TelegramVideoPlayer";
 
 /** HLS 资源需要带后台 Bearer 会话；只允许从当前站点加载清单和分片。 */
 export function AuthenticatedHlsVideo({
@@ -65,8 +66,13 @@ export function AuthenticatedHlsVideo({
   };
 
   return (
-    <Space direction="vertical" size={4}>
-      <video ref={video} controls preload="metadata" width={width} />
+    <Space
+      direction="vertical"
+      size={4}
+      style={{ width }}
+      className="telegram-hls-player"
+    >
+      <TelegramVideoPlayer videoRef={video} aria-label="Telegram 视频" />
       {error ? <Typography.Text type="danger">{error}</Typography.Text> : null}
       {originalUrl ? (
         <a href={originalUrl} target="_blank" rel="noopener noreferrer">

@@ -11,6 +11,8 @@ for (const key of [
   "document",
   "navigator",
   "HTMLElement",
+  "HTMLImageElement",
+  "HTMLVideoElement",
   "HTMLBodyElement",
   "HTMLHtmlElement",
   "Element",
@@ -532,4 +534,109 @@ test("失败附件原地重试，不重建任务或重复下载成功附件", as
   fireEvent.click(await screen.findByRole("button", { name: "重试下载" }));
   await waitFor(() => assert(retried));
   assert.equal(recreated, false);
+});
+
+test("主预览只挂载当前附件，切换时停止旧播放器且下载指向当前文件", async () => {
+  const video = {
+    ...media("REMOTE", "video/mp4"),
+    id: 10,
+    fileName: "演示.mp4",
+  };
+  const image = {
+    ...media(),
+    id: 11,
+    fileName: "配图.jpg",
+    contentUrl: "/api/telegram/media/11/content",
+  };
+  const calls: string[] = [];
+  URL.createObjectURL = () => "blob:gallery-image";
+  URL.revokeObjectURL = () => {};
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url).endsWith("/content"))
+      return new Response(new Blob(["image"], { type: "image/jpeg" }));
+    return reply(
+      String(url).endsWith("/stream-ticket")
+        ? { url: "/api/telegram/media/10/stream?ticket=test" }
+        : String(url).includes("/messages?")
+          ? { items: [row([video, image])] }
+          : { status: "COMPLETED" },
+    );
+  };
+  mount(modal());
+  await waitFor(() =>
+    assert.equal(document.querySelectorAll("video").length, 1),
+  );
+  assert.equal(calls.filter((url) => url.endsWith("/content")).length, 0);
+  fireEvent.click(screen.getByRole("button", { name: "下一个附件" }));
+  await screen.findByAltText("配图.jpg");
+  assert.equal(document.querySelector("video"), null);
+  assert.equal(screen.getAllByRole("button", { name: "下载文件" }).length, 1);
+  fireEvent.click(screen.getByRole("button", { name: "上一个附件" }));
+  await waitFor(() =>
+    assert.equal(document.querySelectorAll("video").length, 1),
+  );
+  assert.equal(screen.queryByAltText("配图.jpg"), null);
+});
+
+test("播放器支持快进快退、边界限位和倍速", async () => {
+  globalThis.fetch = async () =>
+    reply({ url: "/api/telegram/media/9/stream?ticket=test" });
+  mount(<TelegramInlineMediaItem attachment={media("REMOTE", "video/mp4")} />);
+  await waitFor(() => assert(document.querySelector("video")));
+  const video = document.querySelector("video")!;
+  Object.defineProperty(video, "duration", { configurable: true, value: 60 });
+  video.currentTime = 30;
+  fireEvent.loadedMetadata(video);
+  fireEvent.click(screen.getByRole("button", { name: "快进 10 秒" }));
+  assert.equal(video.currentTime, 40);
+  fireEvent.click(screen.getByRole("button", { name: "快退 10 秒" }));
+  assert.equal(video.currentTime, 30);
+  video.currentTime = 2;
+  fireEvent.click(screen.getByRole("button", { name: "快退 10 秒" }));
+  assert.equal(video.currentTime, 0);
+  video.currentTime = 58;
+  fireEvent.keyDown(screen.getByRole("region", { name: "视频播放器" }), {
+    key: "ArrowRight",
+  });
+  assert.equal(video.currentTime, 60);
+  fireEvent.change(screen.getByRole("combobox", { name: "播放速度" }), {
+    target: { value: "1.5" },
+  });
+  assert.equal(video.playbackRate, 1.5);
+});
+
+test("网页全屏保留播放器和进度，Escape 只退出全屏", async () => {
+  globalThis.fetch = async () =>
+    reply({ url: "/api/telegram/media/9/stream?ticket=test" });
+  mount(<TelegramInlineMediaItem attachment={media("REMOTE", "video/mp4")} />);
+  await waitFor(() => assert(document.querySelector("video")));
+  const video = document.querySelector("video")!;
+  video.currentTime = 18;
+  fireEvent.click(screen.getByRole("button", { name: "网页全屏" }));
+  assert(document.querySelector(".is-web-fullscreen"));
+  assert.equal(document.querySelector("video"), video);
+  assert.equal(video.currentTime, 18);
+  fireEvent.keyDown(window, { key: "Escape" });
+  assert.equal(document.querySelector(".is-web-fullscreen"), null);
+  assert.equal(document.querySelector("video"), video);
+});
+
+test("浏览器拒绝原生全屏时回退网页全屏", async () => {
+  const previous = HTMLElement.prototype.requestFullscreen;
+  HTMLElement.prototype.requestFullscreen = async () => {
+    throw new Error("permission denied");
+  };
+  try {
+    globalThis.fetch = async () =>
+      reply({ url: "/api/telegram/media/9/stream?ticket=test" });
+    mount(
+      <TelegramInlineMediaItem attachment={media("REMOTE", "video/mp4")} />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "全屏播放" }));
+    await screen.findByText("当前浏览器未允许全屏，已切换网页全屏");
+    assert(document.querySelector(".is-web-fullscreen"));
+  } finally {
+    HTMLElement.prototype.requestFullscreen = previous;
+  }
 });
