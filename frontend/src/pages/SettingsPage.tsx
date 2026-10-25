@@ -1,6 +1,11 @@
 import { App, Button, Form, Input, Select, Switch, Tag } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
-import { LoginSecuritySettings } from "../components/LoginSecuritySettings";
+import {
+  SESSION_POLICY_KEY,
+  SessionPolicyInput,
+  readSessionLimits,
+  validateSessionLimits,
+} from "../components/SessionPolicyInput";
 import { ResourcePage } from "../components/ResourcePage";
 import { StatusTag } from "../components/shared";
 import { useAuth } from "../lib/auth";
@@ -13,20 +18,23 @@ function ParameterInput({
   value,
   onChange,
   id,
+  valueType,
 }: {
   value?: string;
   onChange?: (value: string) => void;
   id?: string;
+  valueType?: string;
 }) {
-  const type = Form.useWatch("valueType");
+  const watchedType = Form.useWatch("valueType");
+  const type = valueType ?? watchedType;
   if (type === "BOOLEAN")
     return (
       <Switch
         id={id}
         checked={value === "true"}
         onChange={(enabled) => onChange?.(String(enabled))}
-        checkedChildren="true"
-        unCheckedChildren="false"
+        checkedChildren="开启"
+        unCheckedChildren="关闭"
       />
     );
   return (
@@ -54,7 +62,6 @@ export function SettingsPage() {
   const [group, setGroup] = usePageState("settings.group", "");
   return (
     <>
-      <LoginSecuritySettings />
       <ResourcePage<Entry>
         resource="settings"
         endpoint="/system/entries/settings"
@@ -73,10 +80,25 @@ export function SettingsPage() {
         onResetFilters={() => setGroup("")}
         defaults={{ groupName: "通用", valueType: "TEXT" }}
         // 排序未显示为表单字段，提交时需保留原值；新增参数使用默认排序。
-        beforeSave={(values, record) => ({
-          ...values,
-          sortOrder: record?.sortOrder ?? 0,
-        })}
+        beforeSave={(values, record) => {
+          if (
+            record &&
+            [SESSION_POLICY_KEY, "security.loginCaptchaEnabled"].includes(
+              record.code,
+            )
+          )
+            return {
+              name: record.name,
+              code: record.code,
+              description: record.description,
+              groupName: record.groupName,
+              valueType: record.valueType,
+              enabled: true,
+              sortOrder: record.sortOrder ?? 0,
+              value: values.value,
+            };
+          return { ...values, sortOrder: record?.sortOrder ?? 0 };
+        }}
         canDelete={(record) => !record.builtIn}
         extraFilters={
           <Input
@@ -109,8 +131,40 @@ export function SettingsPage() {
           { title: "参数名称", dataIndex: "name", width: 180 },
           { title: "编码", dataIndex: "code", width: 190 },
           { title: "分组", dataIndex: "groupName", width: 110 },
-          { title: "类型", dataIndex: "valueType", width: 90 },
-          { title: "参数值", dataIndex: "value", width: 240, ellipsis: true },
+          {
+            title: "类型",
+            dataIndex: "valueType",
+            width: 90,
+            render: (value, record) =>
+              record.code === SESSION_POLICY_KEY
+                ? "会话策略"
+                : ((
+                    {
+                      TEXT: "文本",
+                      NUMBER: "数字",
+                      BOOLEAN: "开关",
+                      JSON: "JSON",
+                      EMAIL: "邮箱",
+                    } as Record<string, string>
+                  )[value] ?? value),
+          },
+          {
+            title: "参数值",
+            dataIndex: "value",
+            width: 280,
+            ellipsis: true,
+            render: (value, record) => {
+              if (record.code === SESSION_POLICY_KEY) {
+                const limits = readSessionLimits(value);
+                return `${limits.absoluteMinutes ?? "—"} 分钟 / 空闲 ${limits.idleMinutes ?? "—"} 分钟 / ${limits.maxPerUser ?? "—"} 个登录`;
+              }
+              return record.valueType === "BOOLEAN"
+                ? value === "true"
+                  ? "开启"
+                  : "关闭"
+                : value;
+            },
+          },
           {
             title: "内置",
             dataIndex: "builtIn",
@@ -124,81 +178,92 @@ export function SettingsPage() {
             render: (value) => <StatusTag enabled={value} />,
           },
         ]}
-        fields={(record, form) => (
-          <>
-            <div className="form-two-columns">
-              <Form.Item
-                label="参数名称"
-                name="name"
-                rules={[{ required: true }]}
-              >
-                <Input maxLength={100} />
-              </Form.Item>
-              <Form.Item
-                label="参数编码"
-                name="code"
-                rules={[
-                  { required: true },
-                  {
-                    pattern: /^[A-Za-z0-9_.:-]{1,100}$/,
-                    message: "仅支持字母、数字、点、冒号、下划线和短横线",
-                  },
-                ]}
-              >
-                <Input maxLength={100} disabled={record?.builtIn} />
-              </Form.Item>
-            </div>
-            <div className="form-two-columns">
-              <Form.Item
-                label="分组"
-                name="groupName"
-                rules={[{ required: true }]}
-              >
-                <Input maxLength={64} />
-              </Form.Item>
-              <Form.Item
-                label="值类型"
-                name="valueType"
-                rules={[{ required: true }]}
-              >
-                <Select
-                  disabled={record?.builtIn}
-                  onChange={(type) => {
-                    if (type === "BOOLEAN")
-                      form.setFieldValue("value", "false");
-                  }}
-                  options={[
-                    { value: "TEXT", label: "文本" },
-                    { value: "NUMBER", label: "数字" },
-                    { value: "BOOLEAN", label: "布尔值" },
-                    { value: "JSON", label: "JSON" },
-                    { value: "EMAIL", label: "邮箱" },
+        fields={(record, form) =>
+          record?.code === SESSION_POLICY_KEY ? (
+            <Form.Item
+              name="value"
+              rules={[
+                { validator: (_, value) => validateSessionLimits(value) },
+              ]}
+            >
+              <SessionPolicyInput />
+            </Form.Item>
+          ) : record?.code === "security.loginCaptchaEnabled" ? (
+            <Form.Item name="value" label="登录验证码">
+              <ParameterInput valueType="BOOLEAN" />
+            </Form.Item>
+          ) : (
+            <>
+              <div className="form-two-columns">
+                <Form.Item
+                  label="参数名称"
+                  name="name"
+                  rules={[{ required: true }]}
+                >
+                  <Input maxLength={100} />
+                </Form.Item>
+                <Form.Item
+                  label="参数编码"
+                  name="code"
+                  rules={[
+                    { required: true },
+                    {
+                      pattern: /^[A-Za-z0-9_.:-]{1,100}$/,
+                      message: "仅支持字母、数字、点、冒号、下划线和短横线",
+                    },
                   ]}
+                >
+                  <Input maxLength={100} disabled={record?.builtIn} />
+                </Form.Item>
+              </div>
+              <div className="form-two-columns">
+                <Form.Item
+                  label="分组"
+                  name="groupName"
+                  rules={[{ required: true }]}
+                >
+                  <Input maxLength={64} />
+                </Form.Item>
+                <Form.Item
+                  label="值类型"
+                  name="valueType"
+                  rules={[{ required: true }]}
+                >
+                  <Select
+                    disabled={record?.builtIn}
+                    onChange={(type) => {
+                      if (type === "BOOLEAN")
+                        form.setFieldValue("value", "false");
+                    }}
+                    options={[
+                      { value: "TEXT", label: "文本" },
+                      { value: "NUMBER", label: "数字" },
+                      { value: "BOOLEAN", label: "布尔值" },
+                      { value: "JSON", label: "JSON" },
+                      { value: "EMAIL", label: "邮箱" },
+                    ]}
+                  />
+                </Form.Item>
+              </div>
+              <Form.Item label="参数值" name="value">
+                <ParameterInput />
+              </Form.Item>
+              <Form.Item label="说明" name="description">
+                <Input.TextArea rows={2} maxLength={500} />
+              </Form.Item>
+              <Form.Item label="状态" name="enabled" valuePropName="checked">
+                <Switch
+                  disabled={
+                    record?.code === "security.loginCaptchaEnabled" ||
+                    record?.code === "security.sessionPolicy"
+                  }
+                  checkedChildren="启用"
+                  unCheckedChildren="停用"
                 />
               </Form.Item>
-            </div>
-            <Form.Item
-              label="参数值"
-              name="value"
-              extra="公共网站只读取登记的公开字段。请勿在系统参数中保存密码或密钥。"
-            >
-              <ParameterInput />
-            </Form.Item>
-            <Form.Item label="说明" name="description">
-              <Input.TextArea rows={2} maxLength={500} />
-            </Form.Item>
-            <Form.Item label="状态" name="enabled" valuePropName="checked">
-              <Switch
-                disabled={
-                  record?.code === "security.loginCaptchaEnabled" ||
-                  record?.code === "security.sessionPolicy"
-                }
-                checkedChildren="启用"
-                unCheckedChildren="停用"
-              />
-            </Form.Item>
-          </>
-        )}
+            </>
+          )
+        }
       />
     </>
   );
