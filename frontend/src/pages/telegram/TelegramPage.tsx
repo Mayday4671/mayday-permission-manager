@@ -2333,32 +2333,36 @@ export function TelegramPage() {
                                       {keyboard.resourceTypeButtons.map(
                                         renderButton,
                                       )}
-                                      {keyboard.actionButtonRows.flatMap(
-                                        (buttonRow) =>
-                                          buttonRow.map(renderButton),
-                                      )}
-                                      {row.messageText ? (
-                                        <Button
-                                          className="telegram-chat-copy-button"
-                                          type="text"
-                                          size="small"
-                                          icon={<CopyOutlined />}
-                                          aria-label="复制回复"
-                                          title="复制回复"
-                                          onClick={() => {
-                                            void navigator.clipboard
-                                              .writeText(row.messageText!)
-                                              .then(
-                                                () =>
-                                                  message.success("已复制回复"),
-                                                () =>
-                                                  message.error(
-                                                    "复制失败，请选中文字复制",
-                                                  ),
-                                              );
-                                          }}
-                                        />
-                                      ) : null}
+                                      <div className="telegram-chat-action-row">
+                                        {keyboard.actionButtonRows.flatMap(
+                                          (buttonRow) =>
+                                            buttonRow.map(renderButton),
+                                        )}
+                                        {row.messageText ? (
+                                          <Button
+                                            className="telegram-chat-copy-button"
+                                            type="text"
+                                            size="small"
+                                            icon={<CopyOutlined />}
+                                            aria-label="复制回复"
+                                            title="复制回复"
+                                            onClick={() => {
+                                              void navigator.clipboard
+                                                .writeText(row.messageText!)
+                                                .then(
+                                                  () =>
+                                                    message.success(
+                                                      "已复制回复",
+                                                    ),
+                                                  () =>
+                                                    message.error(
+                                                      "复制失败，请选中文字复制",
+                                                    ),
+                                                );
+                                            }}
+                                          />
+                                        ) : null}
+                                      </div>
                                     </div>
                                   ) : null}
                                 </div>

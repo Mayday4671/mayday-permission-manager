@@ -333,7 +333,7 @@
   outline-offset: 2px;
   border-radius: 2px;
 }
-/* Keep reply controls together; wrap only when the available width is exhausted. */
+/* Resource filters precede a separate, full-width row of reply actions. */
 .telegram-chat-inline-keyboard {
   display: flex;
   flex-wrap: wrap;
@@ -342,6 +342,13 @@
   margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--chat-line);
+}
+.telegram-chat-action-row {
+  display: flex;
+  flex: 0 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 .telegram-chat-inline-keyboard .ant-btn {
   min-height: 30px;
