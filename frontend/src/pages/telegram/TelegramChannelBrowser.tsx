@@ -12,6 +12,7 @@ import {
   InputNumber,
   Modal,
   Space,
+  Select,
   Spin,
   Tag,
 } from "antd";
@@ -80,6 +81,23 @@ export function TelegramChannelBrowser({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Channel | null>(null);
   const [collecting, setCollecting] = useState(false);
+  const [collectionMode, setCollectionMode] = useState<"channel" | "selection">(
+    "channel",
+  );
+  const [keyword, setKeyword] = useState("");
+  const [mediaType, setMediaType] = useState("ALL");
+  const [dates, setDates] = useState<[Dayjs, Dayjs] | null>(null);
+  const [filters, setFilters] = useState({
+    query: "",
+    type: "ALL",
+    from: "",
+    to: "",
+  });
+  const [checked, setChecked] = useState<string[]>([]);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const [batchError, setBatchError] = useState("");
+  const filtering =
+    !!filters.query || filters.type !== "ALL" || !!filters.from || !!filters.to;
   const [form] = Form.useForm<CollectionValues>();
   const transcript = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -117,13 +135,15 @@ export function TelegramChannelBrowser({
       );
   const listError = query ? results.error : channels.error;
   const listLoading = query ? results.isFetching : channels.isFetching;
-  const historyKey = ["telegram", "channel-history", selected?.chatId];
+  const historyKey = ["telegram", "channel-history", selected?.chatId, filters];
   const history = useInfiniteQuery({
     queryKey: historyKey,
     initialPageParam: "0",
     queryFn: ({ pageParam }) =>
       api<MessagePage>(
-        `/telegram/channels/${selected!.chatId}/messages?before=${pageParam}`,
+        filtering
+          ? `/telegram/channels/${selected!.chatId}/search?${new URLSearchParams(Object.entries({ ...filters, cursor: pageParam }).filter(([, value]) => value !== ""))}`
+          : `/telegram/channels/${selected!.chatId}/messages?before=${pageParam}`,
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     enabled: connected && !!selected,
@@ -213,6 +233,78 @@ export function TelegramChannelBrowser({
     },
     onError: (error: Error) => message.error(error.message),
   });
+  const batchCollect = useMutation({
+    mutationFn: async (values: CollectionValues) => {
+      const failed: string[] = [];
+      let failure = "";
+      setBatchProgress(0);
+      setBatchError("");
+      const chatId = selected!.chatId;
+      const ids = [...checked];
+      for (const [index, id] of ids.entries()) {
+        try {
+          const link = await api<string>(
+            `/telegram/channels/${chatId}/messages/${id}/link`,
+          );
+          await api("/telegram/collections", {
+            method: "POST",
+            body: jsonBody({
+              messageLink: link,
+              // Batch selection is exact; selecting two album members must not collect the whole album twice.
+              includeAlbum: false,
+              maxMessages: 1,
+              downloadImages:
+                can("telegram:download") &&
+                !!values.attachments?.includes("images"),
+              downloadVideos:
+                can("telegram:download") &&
+                !!values.attachments?.includes("videos"),
+              downloadDocuments:
+                can("telegram:download") &&
+                !!values.attachments?.includes("documents"),
+            }),
+          });
+        } catch (error) {
+          failed.push(id);
+          failure = error instanceof Error ? error.message : "采集失败";
+        }
+        setBatchProgress(index + 1);
+      }
+      return { failed, failure, total: ids.length };
+    },
+    onSuccess: ({ failed, failure, total }) => {
+      setChecked(failed);
+      setCollecting(false);
+      setBatchError(
+        failed.length
+          ? `${failed.length} 条创建失败，已保留勾选，可重试。${failure}`
+          : "",
+      );
+      void client.invalidateQueries({ queryKey: ["telegram", "collections"] });
+      message.info(
+        `已创建 ${total - failed.length} 条采集任务${failed.length ? `，${failed.length} 条失败` : ""}`,
+      );
+    },
+  });
+  const applyFilters = () => {
+    setChecked([]);
+    setBatchError("");
+    setFilters({
+      query: keyword.trim(),
+      type: mediaType,
+      from: dates ? String(dates[0].startOf("day").unix()) : "",
+      to: dates ? String(dates[1].endOf("day").unix()) : "",
+    });
+  };
+  const openCollection = (mode: "channel" | "selection") => {
+    setCollectionMode(mode);
+    form.setFieldsValue({
+      maxMessages: 100,
+      dates: dates ?? undefined,
+      attachments: [],
+    });
+    setCollecting(true);
+  };
   const refreshDirectory = () =>
     query
       ? void results.refetch()
@@ -276,7 +368,12 @@ export function TelegramChannelBrowser({
                 key={channel.chatId}
                 className={`telegram-channel-item${selected?.chatId === channel.chatId ? " is-selected" : ""}`}
                 aria-pressed={selected?.chatId === channel.chatId}
-                onClick={() => setSelected(channel)}
+                disabled={batchCollect.isPending}
+                onClick={() => {
+                  setSelected(channel);
+                  setChecked([]);
+                  setBatchError("");
+                }}
               >
                 <Avatar size={42}>
                   {Array.from(channel.title)[0] || <SoundOutlined />}
@@ -334,11 +431,116 @@ export function TelegramChannelBrowser({
                     }
                     loading={history.isFetching}
                   />
-                  <Button type="primary" onClick={() => setCollecting(true)}>
-                    采集频道
+                  <Button
+                    type="primary"
+                    disabled={batchCollect.isPending}
+                    onClick={() => openCollection("channel")}
+                  >
+                    按日期采集
                   </Button>
                 </Space>
               </header>
+              <div className="telegram-channel-tools">
+                <div className="telegram-channel-filter-row">
+                  <Input
+                    aria-label="频道消息关键词"
+                    placeholder="查找频道消息"
+                    value={keyword}
+                    maxLength={200}
+                    disabled={batchCollect.isPending}
+                    onChange={(e) => setKeyword(e.target.value)}
+                    onPressEnter={applyFilters}
+                    allowClear
+                  />
+                  <Select
+                    aria-label="频道消息类型"
+                    value={mediaType}
+                    disabled={batchCollect.isPending}
+                    onChange={setMediaType}
+                    options={[
+                      { value: "ALL", label: "全部类型" },
+                      { value: "PHOTO", label: "图片" },
+                      { value: "VIDEO", label: "视频" },
+                      { value: "DOCUMENT", label: "文件" },
+                      { value: "AUDIO", label: "音频" },
+                      { value: "LINK", label: "链接" },
+                    ]}
+                  />
+                  <DatePicker.RangePicker
+                    aria-label="频道消息日期"
+                    value={dates}
+                    disabled={batchCollect.isPending}
+                    onChange={(value) =>
+                      setDates(
+                        value?.[0] && value?.[1] ? [value[0], value[1]] : null,
+                      )
+                    }
+                  />
+                  <Button
+                    type="primary"
+                    icon={<SearchOutlined />}
+                    disabled={batchCollect.isPending}
+                    onClick={applyFilters}
+                  >
+                    查找
+                  </Button>
+                  <Button
+                    disabled={batchCollect.isPending}
+                    onClick={() => {
+                      setKeyword("");
+                      setMediaType("ALL");
+                      setDates(null);
+                      setChecked([]);
+                      setFilters({ query: "", type: "ALL", from: "", to: "" });
+                    }}
+                  >
+                    重置
+                  </Button>
+                </div>
+                <div className="telegram-channel-selection-row">
+                  <Checkbox
+                    disabled={
+                      batchCollect.isPending || !posts.some((p) => p.canBeSaved)
+                    }
+                    checked={
+                      checked.length > 0 &&
+                      posts
+                        .filter((p) => p.canBeSaved)
+                        .every((p) => checked.includes(p.id))
+                    }
+                    indeterminate={
+                      checked.length > 0 &&
+                      posts.some((p) => p.canBeSaved && !checked.includes(p.id))
+                    }
+                    onChange={(e) =>
+                      setChecked(
+                        e.target.checked
+                          ? posts.filter((p) => p.canBeSaved).map((p) => p.id)
+                          : [],
+                      )
+                    }
+                  >
+                    全选已加载
+                  </Checkbox>
+                  <span>
+                    已加载 {posts.length} 条 · 已选 {checked.length} 条
+                  </span>
+                  <Button
+                    disabled={!checked.length || batchCollect.isPending}
+                    onClick={() => openCollection("selection")}
+                  >
+                    采集选中
+                  </Button>
+                </div>
+                {batchError ? (
+                  <Alert
+                    type="error"
+                    title={batchError}
+                    closable
+                    onClose={() => setBatchError("")}
+                  />
+                ) : null}
+              </div>
               <div className="telegram-channel-transcript" ref={transcript}>
                 {history.error ? (
                   <Alert
@@ -368,18 +570,38 @@ export function TelegramChannelBrowser({
                       });
                     }}
                   >
-                    加载更早消息
+                    {filtering ? "继续查找" : "加载更早消息"}
                   </Button>
                 ) : null}
                 {!posts.length && !history.isPending && !history.error ? (
                   <Empty
-                    description="暂无可读取消息"
+                    description={
+                      filtering
+                        ? history.hasNextPage
+                          ? "本批无匹配消息，可继续查找"
+                          : "没有匹配的消息"
+                        : "暂无可读取消息"
+                    }
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                   />
                 ) : null}
                 {posts.map((post) => (
                   <article key={post.id} className="telegram-channel-post">
                     <div className="telegram-channel-post-meta">
+                      {post.canBeSaved ? (
+                        <Checkbox
+                          aria-label={`选择消息 ${post.id}`}
+                          checked={checked.includes(post.id)}
+                          disabled={batchCollect.isPending}
+                          onChange={(e) =>
+                            setChecked((ids) =>
+                              e.target.checked
+                                ? [...ids, post.id]
+                                : ids.filter((id) => id !== post.id),
+                            )
+                          }
+                        />
+                      ) : null}
                       <SoundOutlined />
                       <strong>{selected.title}</strong>
                       <time>
@@ -460,36 +682,60 @@ export function TelegramChannelBrowser({
         </div>
       </section>
       <Modal
-        title={selected ? `采集 · ${selected.title}` : "采集频道"}
+        title={
+          collectionMode === "selection"
+            ? `采集选中的 ${checked.length} 条消息`
+            : `按日期采集 · ${selected?.title ?? "频道"}`
+        }
         open={collecting}
-        onCancel={() => setCollecting(false)}
+        onCancel={() => {
+          if (!batchCollect.isPending && !collect.isPending)
+            setCollecting(false);
+        }}
         onOk={() => form.submit()}
         okText="开始采集"
-        confirmLoading={collect.isPending}
+        confirmLoading={collect.isPending || batchCollect.isPending}
+        closable={!batchCollect.isPending && !collect.isPending}
+        cancelButtonProps={{
+          disabled: batchCollect.isPending || collect.isPending,
+        }}
         destroyOnHidden
       >
         <Form
           form={form}
           layout="vertical"
           initialValues={{ maxMessages: 100, attachments: [] }}
-          onFinish={(values) => collect.mutate(values)}
+          onFinish={(values) =>
+            collectionMode === "selection"
+              ? batchCollect.mutate(values)
+              : collect.mutate(values)
+          }
         >
-          <Form.Item name="dates" label="消息日期">
-            <DatePicker.RangePicker
-              style={{ width: "100%" }}
-              disabledDate={(date) =>
-                date.isAfter(dayjs(), "day") ||
-                date.isBefore(dayjs().subtract(10, "year"), "day")
-              }
-            />
-          </Form.Item>
-          <Form.Item
-            name="maxMessages"
-            label="采集条数上限"
-            rules={[{ required: true, type: "number", min: 1, max: 500 }]}
-          >
-            <InputNumber min={1} max={500} style={{ width: "100%" }} />
-          </Form.Item>
+          {collectionMode === "channel" ? (
+            <>
+              <Form.Item name="dates" label="消息日期">
+                <DatePicker.RangePicker
+                  style={{ width: "100%" }}
+                  disabledDate={(date) =>
+                    date.isAfter(dayjs(), "day") ||
+                    date.isBefore(dayjs().subtract(10, "year"), "day")
+                  }
+                />
+              </Form.Item>
+              <Form.Item
+                name="maxMessages"
+                label="采集条数上限"
+                rules={[{ required: true, type: "number", min: 1, max: 500 }]}
+              >
+                <InputNumber min={1} max={500} style={{ width: "100%" }} />
+              </Form.Item>
+            </>
+          ) : null}
+          {batchCollect.isPending ? (
+            <p>
+              正在创建任务 {batchProgress} / {checked.length}
+            </p>
+          ) : null}
           {can("telegram:download") ? (
             <Form.Item name="attachments" label="保存附件">
               <Checkbox.Group

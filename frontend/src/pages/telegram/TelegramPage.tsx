@@ -48,7 +48,7 @@ import {
   TeamOutlined,
   VideoCameraOutlined,
 } from "@ant-design/icons";
-import { Radio, Select } from "antd";
+import { Select } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -250,7 +250,7 @@ interface PageResult<T> {
   size: number;
 }
 
-type TelegramWorkspaceTab = "search" | "collection" | "account";
+type TelegramWorkspaceTab = "search" | "channels" | "collection" | "account";
 
 interface TelegramStatus {
   enabled: boolean;
@@ -654,9 +654,6 @@ export function TelegramPage() {
   };
   const [workspaceTab, setWorkspaceTab] =
     useState<TelegramWorkspaceTab>("search");
-  const [collectionSource, setCollectionSource] = useState<"link" | "channel">(
-    "link",
-  );
   const [messageLink, setMessageLink] = useState("");
   const [collectionDateRange, setCollectionDateRange] = useState<
     [Dayjs | null, Dayjs | null] | null
@@ -1416,7 +1413,10 @@ export function TelegramPage() {
         onChange={(key) => setWorkspaceTab(key as TelegramWorkspaceTab)}
         items={[
           { key: "search", label: "极搜" },
-          { key: "collection", label: "消息采集" },
+          ...(can("telegram:collect")
+            ? [{ key: "channels", label: "频道" }]
+            : []),
+          { key: "collection", label: "采集记录" },
           { key: "account", label: "账号与连接" },
         ]}
       />
@@ -2519,6 +2519,15 @@ export function TelegramPage() {
           </div>
         ))}
 
+      {workspaceTab === "channels" && view && can("telegram:collect") && (
+        <TelegramChannelBrowser
+          connected={view.state === "READY"}
+          onPreview={previewTelegramPost}
+          onConnection={() => setWorkspaceTab("account")}
+          onRecords={() => setWorkspaceTab("collection")}
+        />
+      )}
+
       {workspaceTab === "collection" && view && can("telegram:view") && (
         <Card className="telegram-collection-panel">
           {can("telegram:collect") ? (
@@ -2527,341 +2536,309 @@ export function TelegramPage() {
               size={12}
               style={{ width: "100%", marginBottom: 20 }}
             >
-              <Radio.Group
-                aria-label="采集来源类型"
-                optionType="button"
-                buttonStyle="solid"
-                value={collectionSource}
-                onChange={(event) => {
-                  setCollectionSource(event.target.value);
-                }}
-                options={[
-                  { label: "消息链接", value: "link" },
-                  { label: "已加入频道", value: "channel" },
-                ]}
-              />
-              {collectionSource === "link" && (
-                <>
-                  <Space wrap align="center">
-                    <Input
-                      aria-label="Telegram 消息链接"
-                      placeholder="粘贴 t.me 消息链接"
-                      value={messageLink}
-                      onChange={(event) => setMessageLink(event.target.value)}
-                      style={{ width: 340 }}
-                      maxLength={2048}
-                    />
-                    <DatePicker.RangePicker
-                      aria-label="采集日期范围"
-                      value={collectionDateRange}
-                      onChange={(dates) =>
-                        setCollectionDateRange(
-                          dates ? [dates[0], dates[1]] : null,
-                        )
-                      }
-                      disabledDate={(date) =>
-                        date.isAfter(dayjs(), "day") ||
-                        date.isBefore(dayjs().subtract(10, "year"), "day")
-                      }
-                      placeholder={["开始日期", "结束日期"]}
-                    />
-                    <InputNumber
-                      aria-label="采集条数上限"
-                      min={1}
-                      max={500}
-                      value={maxMessages}
-                      onChange={(value) => setMaxMessages(value ?? 100)}
-                      addonAfter="条"
-                      style={{ width: 130 }}
-                    />
-                    <Button
-                      type="primary"
-                      disabled={!messageLink.trim()}
-                      loading={createCollection.isPending}
-                      onClick={() => createCollection.mutate()}
-                    >
-                      新建采集
-                    </Button>
-                  </Space>
-                  {can("telegram:download") ? (
-                    <Space wrap>
-                      <Typography.Text type="secondary">
-                        保存附件：
-                      </Typography.Text>
-                      <Checkbox
-                        checked={downloadImages}
-                        onChange={(event) =>
-                          setDownloadImages(event.target.checked)
-                        }
-                      >
-                        图片
-                      </Checkbox>
-                      <Checkbox
-                        checked={downloadVideos}
-                        onChange={(event) =>
-                          setDownloadVideos(event.target.checked)
-                        }
-                      >
-                        视频
-                      </Checkbox>
-                      <Checkbox
-                        checked={downloadDocuments}
-                        onChange={(event) =>
-                          setDownloadDocuments(event.target.checked)
-                        }
-                      >
-                        文件
-                      </Checkbox>
-                    </Space>
-                  ) : null}
-                </>
-              )}
+              <Space wrap align="center">
+                <Input
+                  aria-label="Telegram 消息链接"
+                  placeholder="粘贴 t.me 消息链接"
+                  value={messageLink}
+                  onChange={(event) => setMessageLink(event.target.value)}
+                  style={{ width: 340 }}
+                  maxLength={2048}
+                />
+                <DatePicker.RangePicker
+                  aria-label="采集日期范围"
+                  value={collectionDateRange}
+                  onChange={(dates) =>
+                    setCollectionDateRange(dates ? [dates[0], dates[1]] : null)
+                  }
+                  disabledDate={(date) =>
+                    date.isAfter(dayjs(), "day") ||
+                    date.isBefore(dayjs().subtract(10, "year"), "day")
+                  }
+                  placeholder={["开始日期", "结束日期"]}
+                />
+                <InputNumber
+                  aria-label="采集条数上限"
+                  min={1}
+                  max={500}
+                  value={maxMessages}
+                  onChange={(value) => setMaxMessages(value ?? 100)}
+                  addonAfter="条"
+                  style={{ width: 130 }}
+                />
+                <Button
+                  type="primary"
+                  disabled={!messageLink.trim()}
+                  loading={createCollection.isPending}
+                  onClick={() => createCollection.mutate()}
+                >
+                  新建采集
+                </Button>
+              </Space>
+              {can("telegram:download") ? (
+                <Space wrap>
+                  <Typography.Text type="secondary">保存附件：</Typography.Text>
+                  <Checkbox
+                    checked={downloadImages}
+                    onChange={(event) =>
+                      setDownloadImages(event.target.checked)
+                    }
+                  >
+                    图片
+                  </Checkbox>
+                  <Checkbox
+                    checked={downloadVideos}
+                    onChange={(event) =>
+                      setDownloadVideos(event.target.checked)
+                    }
+                  >
+                    视频
+                  </Checkbox>
+                  <Checkbox
+                    checked={downloadDocuments}
+                    onChange={(event) =>
+                      setDownloadDocuments(event.target.checked)
+                    }
+                  >
+                    文件
+                  </Checkbox>
+                </Space>
+              ) : null}
             </Space>
           ) : null}
-          {collectionSource === "channel" && can("telegram:collect") ? (
-            <TelegramChannelBrowser
-              connected={view.state === "READY"}
-              onPreview={previewTelegramPost}
-              onConnection={() => setWorkspaceTab("account")}
-              onRecords={() => setCollectionSource("link")}
-            />
-          ) : (
-            <Table<TelegramCollectionTask>
-              className="telegram-collection-table"
-              rowKey="id"
-              columns={[
-                {
-                  title: "序号",
-                  width: 64,
-                  align: "center",
-                  render: (_, _task, index) =>
-                    (collectionTaskPage - 1) * 10 + index + 1,
-                },
-                {
-                  title: "采集内容",
-                  dataIndex: "sourceTitle",
-                  ellipsis: true,
-                  render: (_title: string | null, task) => (
-                    <div className="telegram-collection-source">
-                      <Typography.Text
-                        strong
-                        ellipsis
-                        title={task.sourceTitle || undefined}
-                      >
-                        {task.sourceTitle ||
-                          (task.messageLink ? "未获取到标题" : "已加入频道")}
-                      </Typography.Text>
-                      {task.messageLink ? (
-                        <Typography.Text type="secondary" copyable ellipsis>
-                          {task.messageLink}
-                        </Typography.Text>
-                      ) : null}
-                      {task.fromDate || task.toDate ? (
-                        <Typography.Text type="secondary">
-                          {task.fromDate ?? "最早消息"} 至{" "}
-                          {task.toDate ?? "最新消息"}
-                        </Typography.Text>
-                      ) : null}
-                    </div>
-                  ),
-                },
-                {
-                  title: "进度",
-                  width: 150,
-                  render: (_, task) => (
-                    <Space direction="vertical" size={0}>
-                      <Typography.Text>
-                        已保存 {task.collectedMessages} / {task.maxMessages} 条
-                      </Typography.Text>
-                      <Typography.Text type="secondary">
-                        已检查 {task.scannedMessages} / 5000 条
-                      </Typography.Text>
-                    </Space>
-                  ),
-                },
-                {
-                  title: "状态",
-                  dataIndex: "status",
-                  width: 100,
-                  render: (status: string) => (
-                    <Tag
-                      color={
-                        status === "COMPLETED"
-                          ? "success"
-                          : status === "FAILED"
-                            ? "error"
-                            : ["PAUSED", "CANCELLED"].includes(status)
-                              ? "default"
-                              : "processing"
-                      }
+          <Table<TelegramCollectionTask>
+            className="telegram-collection-table"
+            rowKey="id"
+            columns={[
+              {
+                title: "序号",
+                width: 64,
+                align: "center",
+                render: (_, _task, index) =>
+                  (collectionTaskPage - 1) * 10 + index + 1,
+              },
+              {
+                title: "采集内容",
+                dataIndex: "sourceTitle",
+                ellipsis: true,
+                render: (_title: string | null, task) => (
+                  <div className="telegram-collection-source">
+                    <Typography.Text
+                      strong
+                      ellipsis
+                      title={task.sourceTitle || undefined}
                     >
-                      {collectionStatusLabel(status)}
-                    </Tag>
-                  ),
-                },
-                {
-                  title: "创建时间",
-                  dataIndex: "createdAt",
-                  width: 165,
-                  render: (value: string) =>
-                    dayjs(value).format("YYYY-MM-DD HH:mm"),
-                },
-                {
-                  title: "进度说明",
-                  dataIndex: "statusMessage",
-                  ellipsis: true,
-                  render: (statusMessage: string, task) => (
-                    <Space direction="vertical" size={0}>
-                      <Typography.Text ellipsis>
-                        {statusMessage}
+                      {task.sourceTitle ||
+                        (task.messageLink ? "未获取到标题" : "已加入频道")}
+                    </Typography.Text>
+                    {task.messageLink ? (
+                      <Typography.Text type="secondary" copyable ellipsis>
+                        {task.messageLink}
                       </Typography.Text>
-                      {task.trackingEnabled || task.liveStatusMessage ? (
-                        <Typography.Text type="secondary" ellipsis>
-                          {task.liveStatusMessage ?? "定期追赶尚未启用"}
-                          {task.liveCheckedAt
-                            ? ` · 最近检查 ${dayjs(task.liveCheckedAt).format("MM-DD HH:mm")}`
-                            : ""}
-                        </Typography.Text>
-                      ) : null}
-                    </Space>
-                  ),
-                },
-                {
-                  title: "操作",
-                  width: 240,
-                  render: (_, task) => (
-                    <Space size={4}>
+                    ) : null}
+                    {task.fromDate || task.toDate ? (
+                      <Typography.Text type="secondary">
+                        {task.fromDate ?? "最早消息"} 至{" "}
+                        {task.toDate ?? "最新消息"}
+                      </Typography.Text>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
+                title: "进度",
+                width: 150,
+                render: (_, task) => (
+                  <Space direction="vertical" size={0}>
+                    <Typography.Text>
+                      已保存 {task.collectedMessages} / {task.maxMessages} 条
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      已检查 {task.scannedMessages} / 5000 条
+                    </Typography.Text>
+                  </Space>
+                ),
+              },
+              {
+                title: "状态",
+                dataIndex: "status",
+                width: 100,
+                render: (status: string) => (
+                  <Tag
+                    color={
+                      status === "COMPLETED"
+                        ? "success"
+                        : status === "FAILED"
+                          ? "error"
+                          : ["PAUSED", "CANCELLED"].includes(status)
+                            ? "default"
+                            : "processing"
+                    }
+                  >
+                    {collectionStatusLabel(status)}
+                  </Tag>
+                ),
+              },
+              {
+                title: "创建时间",
+                dataIndex: "createdAt",
+                width: 165,
+                render: (value: string) =>
+                  dayjs(value).format("YYYY-MM-DD HH:mm"),
+              },
+              {
+                title: "进度说明",
+                dataIndex: "statusMessage",
+                ellipsis: true,
+                render: (statusMessage: string, task) => (
+                  <Space direction="vertical" size={0}>
+                    <Typography.Text ellipsis>{statusMessage}</Typography.Text>
+                    {task.trackingEnabled || task.liveStatusMessage ? (
+                      <Typography.Text type="secondary" ellipsis>
+                        {task.liveStatusMessage ?? "定期追赶尚未启用"}
+                        {task.liveCheckedAt
+                          ? ` · 最近检查 ${dayjs(task.liveCheckedAt).format("MM-DD HH:mm")}`
+                          : ""}
+                      </Typography.Text>
+                    ) : null}
+                  </Space>
+                ),
+              },
+              {
+                title: "操作",
+                width: 240,
+                render: (_, task) => (
+                  <Space size={4}>
+                    <Button
+                      type="link"
+                      onClick={() => {
+                        if (
+                          task.messageLink &&
+                          (task.maxMessages === 1 || task.includeAlbum) &&
+                          can("telegram:download")
+                        ) {
+                          mediaPreviewGeneration.current += 1;
+                          setInlineMediaPreview({
+                            taskId: task.id,
+                            messageLink: task.messageLink,
+                          });
+                          return;
+                        }
+                        setCollectionPage(1);
+                        setSelectedCollection(task);
+                      }}
+                    >
+                      {task.messageLink &&
+                      (task.maxMessages === 1 || task.includeAlbum) &&
+                      can("telegram:download")
+                        ? "预览媒体"
+                        : "查看消息"}
+                    </Button>
+                    {can("telegram:collect") &&
+                    !task.messageLink &&
+                    task.status === "COMPLETED" &&
+                    task.toDate === null ? (
                       <Button
                         type="link"
-                        onClick={() => {
-                          if (
-                            task.messageLink &&
-                            (task.maxMessages === 1 || task.includeAlbum) &&
-                            can("telegram:download")
-                          ) {
-                            mediaPreviewGeneration.current += 1;
-                            setInlineMediaPreview({
-                              taskId: task.id,
-                              messageLink: task.messageLink,
-                            });
-                            return;
-                          }
-                          setCollectionPage(1);
-                          setSelectedCollection(task);
-                        }}
+                        loading={collectionTracking.isPending}
+                        onClick={() =>
+                          collectionTracking.mutate({
+                            id: task.id,
+                            enabled: !task.trackingEnabled,
+                          })
+                        }
                       >
-                        {task.messageLink &&
-                        (task.maxMessages === 1 || task.includeAlbum) &&
-                        can("telegram:download")
-                          ? "预览媒体"
-                          : "查看消息"}
+                        {task.trackingEnabled ? "停止追赶" : "开启追赶"}
                       </Button>
-                      {can("telegram:collect") &&
-                      !task.messageLink &&
-                      task.status === "COMPLETED" &&
-                      task.toDate === null ? (
-                        <Button
-                          type="link"
-                          loading={collectionTracking.isPending}
-                          onClick={() =>
-                            collectionTracking.mutate({
-                              id: task.id,
-                              enabled: !task.trackingEnabled,
-                            })
-                          }
-                        >
-                          {task.trackingEnabled ? "停止追赶" : "开启追赶"}
-                        </Button>
-                      ) : null}
-                      {can("telegram:collect") && task.status === "PAUSED" ? (
-                        <Button
-                          type="link"
-                          onClick={() =>
-                            collectionAction.mutate({
-                              id: task.id,
-                              action: "resume",
-                            })
-                          }
-                        >
-                          继续
-                        </Button>
-                      ) : null}
-                      {can("telegram:collect") &&
-                      ["QUEUED", "RUNNING", "WAITING_ACCOUNT"].includes(
-                        task.status,
-                      ) ? (
-                        <Button
-                          type="link"
-                          onClick={() =>
-                            collectionAction.mutate({
-                              id: task.id,
-                              action: "pause",
-                            })
-                          }
-                        >
-                          暂停
-                        </Button>
-                      ) : null}
-                      {can("telegram:collect") &&
-                      (!["COMPLETED", "FAILED", "CANCELLED"].includes(
-                        task.status,
-                      ) ||
-                        (task.status !== "CANCELLED" &&
-                          task.pendingMediaCount > 0)) ? (
-                        <Button
-                          type="link"
-                          danger
-                          onClick={() =>
-                            collectionAction.mutate({
-                              id: task.id,
-                              action: "cancel",
-                            })
-                          }
-                        >
-                          {["COMPLETED", "FAILED"].includes(task.status)
-                            ? "停止附件下载"
-                            : "取消"}
-                        </Button>
-                      ) : null}
-                      {can("telegram:delete") &&
-                      ["COMPLETED", "FAILED", "CANCELLED"].includes(
-                        task.status,
-                      ) ? (
-                        <Button
-                          type="link"
-                          danger
-                          loading={deleteCollection.isPending}
-                          onClick={() =>
-                            modal.confirm({
-                              title: "删除采集记录？",
-                              content:
-                                "这会永久删除本地任务记录和已采集消息，不会影响 Telegram 上的原始消息。",
-                              okText: "删除",
-                              okButtonProps: { danger: true },
-                              cancelText: "保留",
-                              onOk: () => deleteCollection.mutateAsync(task.id),
-                            })
-                          }
-                        >
-                          删除
-                        </Button>
-                      ) : null}
-                    </Space>
-                  ),
-                },
-              ]}
-              dataSource={collectionTasks.data?.items ?? []}
-              loading={collectionTasks.isPending}
-              pagination={{
-                current: collectionTaskPage,
-                pageSize: 10,
-                total: collectionTasks.data?.total ?? 0,
-                onChange: setCollectionTaskPage,
-                hideOnSinglePage: true,
-              }}
-              locale={{ emptyText: "暂无采集任务" }}
-            />
-          )}
+                    ) : null}
+                    {can("telegram:collect") && task.status === "PAUSED" ? (
+                      <Button
+                        type="link"
+                        onClick={() =>
+                          collectionAction.mutate({
+                            id: task.id,
+                            action: "resume",
+                          })
+                        }
+                      >
+                        继续
+                      </Button>
+                    ) : null}
+                    {can("telegram:collect") &&
+                    ["QUEUED", "RUNNING", "WAITING_ACCOUNT"].includes(
+                      task.status,
+                    ) ? (
+                      <Button
+                        type="link"
+                        onClick={() =>
+                          collectionAction.mutate({
+                            id: task.id,
+                            action: "pause",
+                          })
+                        }
+                      >
+                        暂停
+                      </Button>
+                    ) : null}
+                    {can("telegram:collect") &&
+                    (!["COMPLETED", "FAILED", "CANCELLED"].includes(
+                      task.status,
+                    ) ||
+                      (task.status !== "CANCELLED" &&
+                        task.pendingMediaCount > 0)) ? (
+                      <Button
+                        type="link"
+                        danger
+                        onClick={() =>
+                          collectionAction.mutate({
+                            id: task.id,
+                            action: "cancel",
+                          })
+                        }
+                      >
+                        {["COMPLETED", "FAILED"].includes(task.status)
+                          ? "停止附件下载"
+                          : "取消"}
+                      </Button>
+                    ) : null}
+                    {can("telegram:delete") &&
+                    ["COMPLETED", "FAILED", "CANCELLED"].includes(
+                      task.status,
+                    ) ? (
+                      <Button
+                        type="link"
+                        danger
+                        loading={deleteCollection.isPending}
+                        onClick={() =>
+                          modal.confirm({
+                            title: "删除采集记录？",
+                            content:
+                              "这会永久删除本地任务记录和已采集消息，不会影响 Telegram 上的原始消息。",
+                            okText: "删除",
+                            okButtonProps: { danger: true },
+                            cancelText: "保留",
+                            onOk: () => deleteCollection.mutateAsync(task.id),
+                          })
+                        }
+                      >
+                        删除
+                      </Button>
+                    ) : null}
+                  </Space>
+                ),
+              },
+            ]}
+            dataSource={collectionTasks.data?.items ?? []}
+            loading={collectionTasks.isPending}
+            pagination={{
+              current: collectionTaskPage,
+              pageSize: 10,
+              total: collectionTasks.data?.total ?? 0,
+              onChange: setCollectionTaskPage,
+              hideOnSinglePage: true,
+            }}
+            locale={{ emptyText: "暂无采集任务" }}
+          />
         </Card>
       )}
 

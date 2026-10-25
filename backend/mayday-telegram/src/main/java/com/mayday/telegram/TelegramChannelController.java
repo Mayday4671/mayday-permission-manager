@@ -38,6 +38,18 @@ public class TelegramChannelController
     }
 
     /**
+     * Searches indexed history with optional media and inclusive date filters.
+     */
+    @GetMapping("/{chatId}/search")
+    public ApiResponse<TelegramChannelBrowserService.MessagePage> search(@PathVariable String chatId,
+            @RequestParam(defaultValue = "") String query, @RequestParam(defaultValue = "ALL") String type,
+            @RequestParam(defaultValue = "0") String cursor, @RequestParam(required = false) Long from,
+            @RequestParam(required = false) Long to)
+    {
+        return ApiResponse.ok(browser.search(chatId, query, type, cursor, from, to));
+    }
+
+    /**
      * Retrieves the canonical Telegram URL only when the user selects a message.
      */
     @GetMapping("/{chatId}/messages/{messageId}/link")

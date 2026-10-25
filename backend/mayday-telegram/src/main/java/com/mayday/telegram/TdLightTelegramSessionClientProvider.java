@@ -777,7 +777,7 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             TdApi.GetMessageLink request = new TdApi.GetMessageLink();
             request.chatId = Long.parseLong(chatId);
             request.messageId = Long.parseLong(messageId);
-            request.forAlbum = true;
+            request.forAlbum = false;
             return client.sendAsync(request).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                     .thenApply(link -> link.link);
         }
@@ -914,6 +914,51 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                 }
                 return List.copyOf(result);
             });
+        }
+
+        /**
+         * Resolves the newest message not after a date; only a native 404 means no
+         * match.
+         */
+        @Override
+        public CompletableFuture<String> channelMessageAtDate(String chatId, int timestamp)
+        {
+            return client.sendAsync(new TdApi.GetChatMessageByDate(Long.parseLong(chatId), timestamp))
+                    .orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS).handle((message, failure) -> {
+                        if (failure == null)
+                            return Long.toString(message.id);
+                        Throwable cause = failure;
+                        while (cause.getCause() != null)
+                            cause = cause.getCause();
+                        if (cause instanceof it.tdlight.client.TelegramError error && error.getErrorCode() == 404)
+                            return null;
+                        throw new java.util.concurrent.CompletionException(failure);
+                    });
+        }
+
+        /** Preserves Telegram's continuation cursor, including short search pages. */
+        @Override
+        public CompletableFuture<TelegramChannelBrowserService.SearchBatch> searchChannelMessages(String chatId,
+                String query, String mediaType, String cursor)
+        {
+            TdApi.SearchChatMessages request = new TdApi.SearchChatMessages();
+            request.chatId = Long.parseLong(chatId);
+            request.query = query;
+            request.fromMessageId = Long.parseLong(cursor);
+            request.limit = 20;
+            request.filter = switch (mediaType)
+            {
+                case "PHOTO" -> new TdApi.SearchMessagesFilterPhoto();
+                case "VIDEO" -> new TdApi.SearchMessagesFilterVideo();
+                case "DOCUMENT" -> new TdApi.SearchMessagesFilterDocument();
+                case "AUDIO" -> new TdApi.SearchMessagesFilterAudio();
+                case "LINK" -> new TdApi.SearchMessagesFilterUrl();
+                default -> new TdApi.SearchMessagesFilterEmpty();
+            };
+            return client.sendAsync(request).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .thenApply(found -> new TelegramChannelBrowserService.SearchBatch(
+                            Arrays.stream(found.messages).map(item -> toSnapshot(item, "SearchChatMessages")).toList(),
+                            found.nextFromMessageId == 0 ? null : Long.toString(found.nextFromMessageId)));
         }
 
         /**

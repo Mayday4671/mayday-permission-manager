@@ -2880,6 +2880,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/telegram/channels/{chatId}/search": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramChannelController_search"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/telegram/collections": {
     parameters: {
       query?: never;
@@ -10580,6 +10596,34 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponseString"];
+        };
+      };
+    };
+  };
+  TelegramChannelController_search: {
+    parameters: {
+      query?: {
+        cursor?: string;
+        from?: number;
+        query?: string;
+        to?: number;
+        type?: string;
+      };
+      header?: never;
+      path: {
+        chatId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseMessagePage"];
         };
       };
     };

@@ -48,6 +48,19 @@ public interface TelegramSessionClient
     CompletableFuture<String> messageLink(String chatId, String messageId);
 
     /**
+     * Searches channel history using Telegram's server-side keyword and media
+     * indexes.
+     */
+    CompletableFuture<TelegramChannelBrowserService.SearchBatch> searchChannelMessages(String chatId, String query,
+            String mediaType, String cursor);
+
+    /**
+     * Finds a date anchor without scanning every newer message; null means no
+     * earlier message.
+     */
+    CompletableFuture<String> channelMessageAtDate(String chatId, int timestamp);
+
+    /**
      * Resolves an ID again and confirms that it is an accessible channel before a
      * task is created.
      */

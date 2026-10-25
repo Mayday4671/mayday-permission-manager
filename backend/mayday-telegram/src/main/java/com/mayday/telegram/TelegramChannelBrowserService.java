@@ -1,5 +1,6 @@
 package com.mayday.telegram;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
@@ -39,6 +40,69 @@ public class TelegramChannelBrowserService
      * history.
      */
     public record MessagePage(List<ChannelMessage> items, @Nullable String nextCursor) {
+    }
+
+    /**
+     * Internal search page; native file identifiers never reach the API response.
+     */
+    public record SearchBatch(List<TelegramMessageSnapshot> items, @Nullable String nextCursor) {
+    }
+
+    /**
+     * Searches beyond loaded messages and applies inclusive timestamp bounds in
+     * bounded batches.
+     */
+    public MessagePage search(String chatId, String query, String mediaType, String cursor, @Nullable Long from,
+            @Nullable Long to)
+    {
+        TelegramSessionClient client = client();
+        requireId(chatId, true);
+        requireId(cursor, false);
+        if (query == null || query.length() > 200
+                || !List.of("ALL", "PHOTO", "VIDEO", "DOCUMENT", "AUDIO", "LINK").contains(mediaType)
+                || from != null && (from < 0 || from > Integer.MAX_VALUE)
+                || to != null && (to < 0 || to > Integer.MAX_VALUE) || from != null && to != null && from > to)
+        {
+            throw new BusinessException("请检查搜索关键词、媒体类型及日期范围");
+        }
+        return read(() -> {
+            client.resolveChannel(chatId).join();
+            String next = "0".equals(cursor) && to != null
+                    ? client.channelMessageAtDate(chatId, to.intValue()).join()
+                    : cursor;
+            if (next == null)
+                return new MessagePage(List.of(), null);
+            List<ChannelMessage> matches = new ArrayList<>();
+            // At most 100 indexed results per request; an empty filtered batch can still
+            // have a cursor.
+            for (int batch = 0; batch < 5; batch++)
+            {
+                SearchBatch page = client.searchChannelMessages(chatId, query.trim(), mediaType, next).join();
+                for (TelegramMessageSnapshot item : page.items())
+                {
+                    if (!chatId.equals(item.chatId()) || !item.canBeSaved())
+                        continue;
+                    Long time = item.sentAtEpochSeconds();
+                    if ((from == null || time != null && time >= from) && (to == null || time != null && time <= to))
+                    {
+                        matches.add(new ChannelMessage(item.messageId(), item.text(), item.contentType(), true, time,
+                                item.attachmentMetadataJson() != null && !"[]".equals(item.attachmentMetadataJson())));
+                    }
+                }
+                String previous = next;
+                next = page.nextCursor();
+                // Message dates follow reverse history order, so the lower date bound ends this
+                // search.
+                if (from != null && page.items().stream().anyMatch(item -> chatId.equals(item.chatId())
+                        && item.sentAtEpochSeconds() != null && item.sentAtEpochSeconds() < from))
+                    next = null;
+                if (next != null && next.equals(previous))
+                    throw new BusinessException("Telegram 搜索游标未推进，请刷新后重试");
+                if (!matches.isEmpty() || next == null)
+                    break;
+            }
+            return new MessagePage(matches, next);
+        });
     }
 
     /**
