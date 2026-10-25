@@ -152,6 +152,25 @@
         ],
         "type": "object"
       },
+      "ApiResponseChannelPage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ChannelPage"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponseChannelView": {
         "properties": {
           "data": {
@@ -780,6 +799,25 @@
         ],
         "type": "object"
       },
+      "ApiResponseMessagePage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MessagePage"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponseMonitorPolicyView": {
         "properties": {
           "data": {
@@ -1310,6 +1348,25 @@
         ],
         "type": "object"
       },
+      "ApiResponseString": {
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data",
+          "message",
+          "success"
+        ],
+        "type": "object"
+      },
       "ApiResponseTaskView": {
         "properties": {
           "data": {
@@ -1787,6 +1844,44 @@
           "name",
           "template"
         ],
+        "type": "object"
+      },
+      "ChannelMessage": {
+        "properties": {
+          "canBeSaved": {
+            "type": "boolean"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "hasMedia": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sentAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChannelPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TelegramChannelOption"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "ChannelView": {
@@ -3292,6 +3387,20 @@
             "type": "string"
           },
           "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MessagePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelMessage"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
             "type": "string"
           }
         },
@@ -14760,6 +14869,129 @@
           "user-controller"
         ],
         "x-authorization": "@access.has('users:reset')"
+      }
+    },
+    "/api/telegram/channels": {
+      "get": {
+        "operationId": "TelegramChannelController_channels",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "default": "0:0",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseChannelPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-channel-controller"
+        ]
+      }
+    },
+    "/api/telegram/channels/{chatId}/messages": {
+      "get": {
+        "operationId": "TelegramChannelController_messages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chatId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "default": "0",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMessagePage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-channel-controller"
+        ]
+      }
+    },
+    "/api/telegram/channels/{chatId}/messages/{messageId}/link": {
+      "get": {
+        "operationId": "TelegramChannelController_link",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chatId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-channel-controller"
+        ]
       }
     },
     "/api/telegram/collections": {

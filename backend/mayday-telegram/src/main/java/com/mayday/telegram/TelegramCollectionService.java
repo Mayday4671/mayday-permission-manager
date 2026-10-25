@@ -155,9 +155,9 @@ public class TelegramCollectionService
         access.require("telegram:collect");
         access.require("telegram:view");
         int limit = Math.max(1, Math.min(size, 50));
-        if (query == null || query.trim().length() < 2 || query.trim().length() > 100)
+        if (query == null || query.trim().isEmpty() || query.trim().length() > 100)
         {
-            throw new BusinessException("频道搜索词需为 2 至 100 个字符");
+            throw new BusinessException("频道搜索词需为 1 至 100 个字符");
         }
         try
         {

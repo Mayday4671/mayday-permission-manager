@@ -675,7 +675,7 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         public CompletableFuture<List<TelegramChannelOption>> searchChannels(String query, int limit)
         {
             String normalized = query == null ? "" : query.trim();
-            if (normalized.length() < 2 || normalized.length() > 100 || limit < 1 || limit > 50)
+            if (normalized.isEmpty() || normalized.length() > 100 || limit < 1 || limit > 50)
             {
                 return CompletableFuture.failedFuture(new IllegalArgumentException("频道搜索词或结果数量无效"));
             }
@@ -689,6 +689,97 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                                 .thenApply(ignored -> lookups.stream().map(CompletableFuture::join)
                                         .filter(Objects::nonNull).limit(limit).toList());
                     });
+        }
+
+        /**
+         * Loads bounded chat batches; archive traversal starts after the main list
+         * ends.
+         */
+        @Override
+        public CompletableFuture<TelegramChannelBrowserService.ChannelPage> browseChannels(String cursor)
+        {
+            if (cursor == null || !cursor.matches("[01]:[0-9]{1,5}"))
+            {
+                return CompletableFuture.failedFuture(new IllegalArgumentException("频道分页游标无效"));
+            }
+            String[] parts = cursor.split(":");
+            int list = Integer.parseInt(parts[0]);
+            int offset = Integer.parseInt(parts[1]);
+            TdApi.ChatList chatList = list == 0 ? new TdApi.ChatListMain() : new TdApi.ChatListArchive();
+            return loadChannelBatch(chatList, list, offset, 0);
+        }
+
+        private CompletableFuture<TelegramChannelBrowserService.ChannelPage> loadChannelBatch(TdApi.ChatList chatList,
+                int list, int offset, int attempt)
+        {
+            return client.sendAsync(new TdApi.LoadChats(chatList, 100)).handle((ok, failure) -> {
+                if (failure == null)
+                {
+                    return false;
+                }
+                Throwable cause = failure;
+                while (cause.getCause() != null)
+                {
+                    cause = cause.getCause();
+                }
+                if (cause instanceof it.tdlight.client.TelegramError error && error.getErrorCode() == 404)
+                {
+                    return true;
+                }
+                throw new java.util.concurrent.CompletionException(failure);
+            }).thenCompose(
+                    exhausted -> client.sendAsync(new TdApi.GetChats(chatList, offset + 101)).thenCompose(chats -> {
+                        if (!exhausted && chats.chatIds.length <= offset)
+                        {
+                            if (attempt >= 2)
+                            {
+                                return CompletableFuture.failedFuture(new IllegalStateException("频道目录尚未同步，请重试"));
+                            }
+                            return loadChannelBatch(chatList, list, offset, attempt + 1);
+                        }
+                        int end = Math.min(chats.chatIds.length, offset + 100);
+                        List<CompletableFuture<TelegramChannelOption>> lookups = Arrays.stream(chats.chatIds)
+                                .skip(offset).limit(100)
+                                .mapToObj(id -> client.sendAsync(new TdApi.GetChat(id)).thenCompose(chat -> {
+                                    if (!(chat.type instanceof TdApi.ChatTypeSupergroup group))
+                                    {
+                                        return CompletableFuture.<TelegramChannelOption>completedFuture(null);
+                                    }
+                                    return client.sendAsync(new TdApi.GetSupergroup(group.supergroupId))
+                                            .thenApply(channel -> {
+                                                if (!channel.isChannel
+                                                        || !TelegramChannelMembership.isJoined(channel.status))
+                                                {
+                                                    return null;
+                                                }
+                                                String username = channel.usernames == null
+                                                        || channel.usernames.activeUsernames.length == 0
+                                                                ? null
+                                                                : channel.usernames.activeUsernames[0];
+                                                return new TelegramChannelOption(Long.toString(chat.id), chat.title,
+                                                        username);
+                                            });
+                                })).toList();
+                        String next = exhausted && chats.chatIds.length <= end
+                                ? (list == 0 ? "1:0" : null)
+                                : list + ":" + end;
+                        return CompletableFuture.allOf(lookups.toArray(CompletableFuture[]::new))
+                                .thenApply(ignored -> new TelegramChannelBrowserService.ChannelPage(
+                                        lookups.stream().map(CompletableFuture::join).filter(Objects::nonNull).toList(),
+                                        next));
+                    })).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        }
+
+        /** Asks Telegram for the public or private permalink for one channel post. */
+        @Override
+        public CompletableFuture<String> messageLink(String chatId, String messageId)
+        {
+            TdApi.GetMessageLink request = new TdApi.GetMessageLink();
+            request.chatId = Long.parseLong(chatId);
+            request.messageId = Long.parseLong(messageId);
+            request.forAlbum = true;
+            return client.sendAsync(request).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .thenApply(link -> link.link);
         }
 
         /**
@@ -712,9 +803,9 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                     return CompletableFuture.failedFuture(new IllegalArgumentException("所选会话不是可访问的频道"));
                 }
                 return client.sendAsync(new TdApi.GetSupergroup(channelChat.supergroupId)).thenApply(channel -> {
-                    if (!channel.isChannel)
+                    if (!channel.isChannel || !TelegramChannelMembership.isJoined(channel.status))
                     {
-                        throw new IllegalArgumentException("所选会话是群组，不是频道");
+                        throw new IllegalArgumentException("所选会话不是当前账号已加入的频道");
                     }
                     String username = channel.usernames == null || channel.usernames.activeUsernames.length == 0
                             ? null

@@ -36,6 +36,18 @@ public interface TelegramSessionClient
     CompletableFuture<java.util.List<TelegramChannelOption>> searchChannels(String query, int limit);
 
     /**
+     * Lists a bounded batch of joined channels from the main and archived chat
+     * lists.
+     */
+    CompletableFuture<TelegramChannelBrowserService.ChannelPage> browseChannels(String cursor);
+
+    /**
+     * Resolves Telegram's canonical message link without guessing internal
+     * identifier encodings.
+     */
+    CompletableFuture<String> messageLink(String chatId, String messageId);
+
+    /**
      * Resolves an ID again and confirms that it is an accessible channel before a
      * task is created.
      */

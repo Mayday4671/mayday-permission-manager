@@ -2832,6 +2832,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/telegram/channels": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramChannelController_channels"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/channels/{chatId}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramChannelController_messages"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/telegram/channels/{chatId}/messages/{messageId}/link": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TelegramChannelController_link"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/telegram/collections": {
     parameters: {
       query?: never;
@@ -3536,6 +3584,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseChannelPage: {
+      data: components["schemas"]["ChannelPage"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseChannelView: {
       data: components["schemas"]["ChannelView"];
       message: string;
@@ -3693,6 +3746,11 @@ export interface components {
       message: string;
       success: boolean;
     };
+    ApiResponseMessagePage: {
+      data: components["schemas"]["MessagePage"];
+      message: string;
+      success: boolean;
+    };
     ApiResponseMonitorPolicyView: {
       data: components["schemas"]["MonitorPolicyView"];
       message: string;
@@ -3830,6 +3888,11 @@ export interface components {
     };
     ApiResponseStoredFile: {
       data: components["schemas"]["StoredFile"];
+      message: string;
+      success: boolean;
+    };
+    ApiResponseString: {
+      data: string;
       message: string;
       success: boolean;
     };
@@ -3974,6 +4037,19 @@ export interface components {
       template: string;
       /** Format: int64 */
       version?: number;
+    };
+    ChannelMessage: {
+      canBeSaved?: boolean;
+      contentType?: string;
+      hasMedia?: boolean;
+      id?: string;
+      /** Format: int64 */
+      sentAt?: number;
+      text?: string;
+    };
+    ChannelPage: {
+      items?: components["schemas"]["TelegramChannelOption"][];
+      nextCursor?: string;
     };
     ChannelView: {
       categories?: components["schemas"]["CategoryView"][];
@@ -4456,6 +4532,10 @@ export interface components {
       kind?: string;
       mediaType?: string;
       status?: string;
+    };
+    MessagePage: {
+      items?: components["schemas"]["ChannelMessage"][];
+      nextCursor?: string;
     };
     MessageView: {
       content?: string;
@@ -10431,6 +10511,75 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApiResponseObject"];
+        };
+      };
+    };
+  };
+  TelegramChannelController_channels: {
+    parameters: {
+      query?: {
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseChannelPage"];
+        };
+      };
+    };
+  };
+  TelegramChannelController_messages: {
+    parameters: {
+      query?: {
+        before?: string;
+      };
+      header?: never;
+      path: {
+        chatId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseMessagePage"];
+        };
+      };
+    };
+  };
+  TelegramChannelController_link: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        chatId: string;
+        messageId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponseString"];
         };
       };
     };
