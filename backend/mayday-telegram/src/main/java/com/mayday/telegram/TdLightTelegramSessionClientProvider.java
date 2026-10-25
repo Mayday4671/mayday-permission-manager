@@ -9,10 +9,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -119,7 +117,7 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
      * Owns one TDLib client and translates its authorization events to safe
      * application states.
      */
-    private static final class TdLightSessionClient implements TelegramSessionClient
+    static final class TdLightSessionClient implements TelegramSessionClient
     {
         private final java.util.concurrent.Semaphore rangeReaders = new java.util.concurrent.Semaphore(8);
         private final java.util.concurrent.Semaphore[] rangeLocks = java.util.stream.IntStream.range(0, 64)
@@ -134,8 +132,6 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         private final Consumer<TelegramMessageSnapshot> messageListener;
         private final ObjectMapper objectMapper;
         private final AtomicBoolean parametersInitializing = new AtomicBoolean();
-        private final Map<String, CompletableFuture<Void>> startedBots = new ConcurrentHashMap<>();
-        private final Set<String> botStartMessageIds = ConcurrentHashMap.newKeySet();
         private final ThreadPoolExecutor messageEvents = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(256), runnable -> {
                     Thread thread = new Thread(runnable, "mayday-telegram-message-events");
@@ -147,7 +143,7 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         private boolean closing;
         private boolean loggedOut;
 
-        private TdLightSessionClient(ClientFactory factory, TelegramClient client, TelegramSettings settings,
+        TdLightSessionClient(ClientFactory factory, TelegramClient client, TelegramSettings settings,
                 Path sessionDirectory, byte[] databaseKey, Consumer<TelegramSessionUpdate> stateListener,
                 Consumer<TelegramMessageSnapshot> messageListener, ObjectMapper objectMapper)
         {
@@ -224,10 +220,6 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             client.sendAsync(new TdApi.GetMessage(chatId, messageId)).whenComplete((message, error) -> {
                 if (error == null && message != null)
                 {
-                    if (botStartMessageIds.contains(Long.toString(message.id)))
-                    {
-                        return;
-                    }
                     enqueueSnapshot(message, updateType);
                 }
             });
@@ -268,8 +260,7 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         private void enqueueSnapshot(TdApi.Message message, String updateType, String previousMessageId,
                 Integer sendErrorCode, String sendErrorName)
         {
-            if (message == null || !isVerifiedBotChat(message.chatId)
-                    || isInternalBotStartMessage(message, previousMessageId))
+            if (message == null || !isVerifiedBotChat(message.chatId))
             {
                 return;
             }
@@ -299,15 +290,6 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
         {
             String verifiedChatId = botChatId;
             return verifiedChatId != null && verifiedChatId.equals(Long.toString(chatId));
-        }
-
-        /**
-         * Keeps the internal TDLib bot-start message out of a user's search transcript.
-         */
-        private boolean isInternalBotStartMessage(TdApi.Message message, String previousMessageId)
-        {
-            return message.isOutgoing && (botStartMessageIds.contains(Long.toString(message.id))
-                    || previousMessageId != null && botStartMessageIds.contains(previousMessageId));
         }
 
         /**
@@ -541,8 +523,8 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
 
         /**
          * Resolves the configured username and verifies Telegram identifies it as a bot
-         * before storing its chat ID. Search actions never accept a chat ID supplied by
-         * the browser.
+         * before storing its chat ID. Resolution is read-only: a local conversation
+         * must not restart the remote bot or inject a welcome reply before the keyword.
          */
         @Override
         public CompletableFuture<TelegramBotChat> resolveBot(String username)
@@ -553,19 +535,15 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                 {
                     return CompletableFuture.failedFuture(new IllegalStateException("配置的搜索账号不是私聊机器人"));
                 }
-                return client.sendAsync(new TdApi.GetUser(privateChat.userId)).thenCompose(user -> {
+                return client.sendAsync(new TdApi.GetUser(privateChat.userId)).thenApply(user -> {
                     if (!(user.type instanceof TdApi.UserTypeBot))
                     {
-                        return CompletableFuture.failedFuture(new IllegalStateException("配置的搜索账号不是 Telegram 机器人"));
+                        throw new IllegalStateException("配置的搜索账号不是 Telegram 机器人");
                     }
                     String verifiedChatId = Long.toString(chat.id);
                     String botUserId = Long.toString(privateChat.userId);
-                    return ensureBotStarted(verifiedChatId, botUserId).thenApply(ignored -> {
-                        // Publish the bot chat only after TDLib finishes its dedicated
-                        // /start request; its own update must never match a user search.
-                        botChatId = verifiedChatId;
-                        return new TelegramBotChat(verifiedChatId, normalized, botUserId);
-                    });
+                    botChatId = verifiedChatId;
+                    return new TelegramBotChat(verifiedChatId, normalized, botUserId);
                 });
             }).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         }
@@ -650,26 +628,6 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                 }
                 return findMainBlockListStatus(botUserId, nextOffset);
             });
-        }
-
-        /**
-         * Starts the verified bot once per local TDLib session before exposing its chat
-         * to the search-message listener. The cached future prevents duplicate start
-         * commands from concurrent searches.
-         */
-        private CompletableFuture<Void> ensureBotStarted(String chatId, String botUserId)
-        {
-            return startedBots.computeIfAbsent(chatId, ignored -> client
-                    .sendAsync(new TdApi.SendBotStartMessage(Long.parseLong(botUserId), Long.parseLong(chatId), ""))
-                    .orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS).thenApply(message -> {
-                        botStartMessageIds.add(Long.toString(message.id));
-                        return (Void) null;
-                    }).whenComplete((ignoredResult, error) -> {
-                        if (error != null)
-                        {
-                            startedBots.remove(chatId);
-                        }
-                    }));
         }
 
         /**
@@ -1523,8 +1481,6 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
             {
                 closing = true;
                 messageEvents.shutdown();
-                startedBots.clear();
-                botStartMessageIds.clear();
                 client.sendAsync(new TdApi.Close()).orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                         .whenComplete((ignored, error) -> releaseFactoryAfterClose());
             }
