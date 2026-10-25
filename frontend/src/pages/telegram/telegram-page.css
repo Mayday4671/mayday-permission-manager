@@ -1143,57 +1143,275 @@
   flex-wrap: wrap;
 }
 .telegram-video-player {
-  display: flex;
-  flex-direction: column;
+  position: relative;
+  isolation: isolate;
   width: 100%;
   height: 100%;
   min-height: 0;
   overflow: hidden;
   background: #090909;
-  color: #eee;
+  color: #fff;
+}
+.telegram-video-player:focus-visible {
+  outline: 2px solid var(--app-primary);
+  outline-offset: -2px;
 }
 .telegram-video-player > video {
   display: block;
-  flex: 1;
   width: 100%;
+  height: 100%;
   min-height: 0;
   object-fit: contain;
   max-height: 65dvh;
   aspect-ratio: 16 / 9;
   background: #090909;
 }
+.telegram-video-player.is-idle > video {
+  cursor: none;
+}
+.telegram-video-controls {
+  position: absolute;
+  z-index: 2;
+  inset: auto 0 0;
+  padding: 36px 18px 10px;
+  background: linear-gradient(transparent, #0009 55%, #000c);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+.telegram-video-player.has-controls .telegram-video-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+.telegram-video-progress {
+  display: block;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 18px;
+  margin: 0 0 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  --played: 0%;
+  --buffered: 0%;
+}
+.telegram-video-progress::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 3px;
+  background:
+    linear-gradient(
+      to right,
+      var(--app-primary, #8b5cf6) var(--played),
+      transparent var(--played)
+    ),
+    linear-gradient(
+      to right,
+      #ffffff80 var(--buffered),
+      #ffffff35 var(--buffered)
+    );
+}
+.telegram-video-progress::-moz-range-track {
+  height: 3px;
+  border-radius: 3px;
+  background:
+    linear-gradient(
+      to right,
+      var(--app-primary, #8b5cf6) var(--played),
+      transparent var(--played)
+    ),
+    linear-gradient(
+      to right,
+      #ffffff80 var(--buffered),
+      #ffffff35 var(--buffered)
+    );
+}
+.telegram-video-progress::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 3px #0006;
+}
+.telegram-video-progress::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+}
+.telegram-video-progress:focus-visible {
+  outline: 1px solid #ffffff90;
+  outline-offset: 2px;
+}
 .telegram-video-toolbar,
 .telegram-video-tools {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 .telegram-video-toolbar {
-  flex-shrink: 0;
   justify-content: space-between;
-  flex-wrap: wrap;
-  padding: 8px 12px;
-  border-top: 1px solid #ffffff1a;
-  background: #181818;
 }
-.telegram-video-toolbar .ant-btn {
-  color: #eee;
-}
-.telegram-video-toolbar .ant-btn:disabled {
-  color: #ffffff55;
-}
-.telegram-video-toolbar select {
-  border: 1px solid #ffffff30;
+.telegram-video-control {
+  display: inline-flex;
+  position: relative;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
   border-radius: 6px;
-  padding: 3px 4px;
-  color: #eee;
-  background: #242424;
+  background: transparent;
+  color: #f9fafb;
   font: inherit;
   cursor: pointer;
+  transition: background 120ms ease;
+}
+.telegram-video-control:hover,
+.telegram-video-control[aria-expanded="true"] {
+  background: #ffffff20;
+}
+.telegram-video-control:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+.telegram-video-control:disabled {
+  color: #ffffff55;
+  cursor: default;
+}
+.telegram-video-skip > span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -30%);
+  font-size: 8px;
+  font-weight: 650;
+  line-height: 1;
+}
+.telegram-video-time {
+  white-space: nowrap;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.telegram-video-time > span {
+  color: #ffffffa8;
+}
+.telegram-video-volume {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.telegram-video-volume input {
+  width: 64px;
+  height: 14px;
+  margin: 0 4px 0 0;
+  accent-color: #fff;
+  cursor: pointer;
+}
+.telegram-video-rate {
+  width: 42px;
+  font-size: 13px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+.telegram-video-speed {
+  position: relative;
+}
+.telegram-video-speed-menu {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  min-width: 112px;
+  padding: 5px;
+  border: 1px solid #ffffff24;
+  border-radius: 10px;
+  background: #222e;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px #0006;
+}
+.telegram-video-speed-menu button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+.telegram-video-speed-menu button:hover,
+.telegram-video-speed-menu button:focus-visible,
+.telegram-video-speed-menu button[aria-checked="true"] {
+  outline: none;
+  background: #ffffff22;
+}
+.telegram-video-center-play,
+.telegram-video-center-loading {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border: 1px solid #ffffff40;
+  border-radius: 50%;
+  background: #0006;
+  color: #fff;
+  backdrop-filter: blur(6px);
+}
+.telegram-video-center-play {
+  cursor: pointer;
+}
+.telegram-video-center-play svg {
+  margin-left: 3px;
+}
+.telegram-video-center-play:hover {
+  background: #0009;
+}
+.telegram-video-center-play:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+.telegram-video-center-loading {
+  pointer-events: none;
+  border: 0;
+  background: transparent;
+}
+.telegram-video-center-loading svg {
+  animation: telegram-video-spin 1s linear infinite;
+}
+@keyframes telegram-video-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .telegram-video-notice {
-  padding: 4px 12px;
-  color: #ddd;
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #000b;
+  color: #eee;
   font-size: 12px;
 }
 .telegram-video-player.is-web-fullscreen,
@@ -1220,15 +1438,45 @@
   .telegram-media-gallery-stage {
     height: 42dvh;
   }
+  .telegram-video-controls {
+    padding: 30px 8px 6px;
+  }
   .telegram-video-toolbar {
-    padding: 8px;
-    gap: 8px;
+    gap: 2px;
   }
   .telegram-video-tools {
-    gap: 4px;
+    gap: 1px;
+  }
+  .telegram-video-control {
+    width: 28px;
+    height: 36px;
+  }
+  .telegram-video-rate {
+    width: 35px;
+    font-size: 12px;
+  }
+  .telegram-video-time {
+    font-size: 10px;
+  }
+  .telegram-video-volume {
+    gap: 0;
+  }
+  .telegram-video-volume input {
+    display: none;
+  }
+  .telegram-video-center-play {
+    width: 50px;
+    height: 50px;
   }
   .telegram-media-gallery-tile {
     width: 64px;
     height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .telegram-video-controls,
+  .telegram-video-control {
+    transition: none;
   }
 }

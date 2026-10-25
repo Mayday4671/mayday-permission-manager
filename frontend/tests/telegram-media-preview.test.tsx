@@ -314,7 +314,9 @@ test("原视频使用受权播放票据，浏览器解码失败时可发起兼�
       "/api/telegram/media/9/stream?ticket=test",
     ),
   );
-  assert(document.querySelector("video")?.controls);
+  assert.equal(document.querySelector("video")?.controls, false);
+  assert(screen.getByRole("slider", { name: "播放进度" }));
+  assert(screen.getByRole("button", { name: "播放", exact: true }));
   fireEvent.error(document.querySelector("video")!);
   fireEvent.click(await screen.findByRole("button", { name: "转换兼容格式" }));
   await screen.findByText("正在转换兼容视频");
@@ -600,9 +602,8 @@ test("播放器支持快进快退、边界限位和倍速", async () => {
     key: "ArrowRight",
   });
   assert.equal(video.currentTime, 60);
-  fireEvent.change(screen.getByRole("combobox", { name: "播放速度" }), {
-    target: { value: "1.5" },
-  });
+  fireEvent.click(screen.getByRole("button", { name: "播放速度" }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "1.5×" }));
   assert.equal(video.playbackRate, 1.5);
 });
 
@@ -739,4 +740,75 @@ test("封面失败可单独重试，关闭画廊中止等待且不遗留私有�
   view.unmount();
   assert.equal(aborted, true);
   assert.deepEqual(released, ["blob:retry-cover"]);
+});
+
+test("进度拖动只在松开时定位，支持方向键及音量静音", async () => {
+  globalThis.fetch = async () =>
+    reply({ url: "/api/telegram/media/9/stream?ticket=test" });
+  mount(<TelegramInlineMediaItem attachment={media("REMOTE", "video/mp4")} />);
+  await waitFor(() => assert(document.querySelector("video")));
+  const video = document.querySelector("video")!;
+  Object.defineProperty(video, "duration", { configurable: true, value: 120 });
+  video.currentTime = 10;
+  fireEvent.loadedMetadata(video);
+  const progress = screen.getByRole("slider", { name: "播放进度" });
+  fireEvent.pointerDown(progress);
+  fireEvent.change(progress, { target: { value: "80" } });
+  assert.equal(video.currentTime, 10);
+  assert.equal(progress.getAttribute("aria-valuetext"), "1:20 / 2:00");
+  fireEvent.pointerUp(progress);
+  assert.equal(video.currentTime, 80);
+  fireEvent.keyDown(progress, { key: "ArrowLeft" });
+  assert.equal(video.currentTime, 75);
+  fireEvent.keyDown(progress, { key: "End" });
+  assert.equal(video.currentTime, 120);
+  fireEvent.change(screen.getByRole("slider", { name: "音量" }), {
+    target: { value: "0.35" },
+  });
+  assert.equal(video.volume, 0.35);
+  fireEvent.click(screen.getByRole("button", { name: "静音", exact: true }));
+  assert.equal(video.muted, true);
+  fireEvent.click(screen.getByRole("button", { name: "取消静音" }));
+  assert.equal(video.muted, false);
+  assert.equal(video.volume, 0.35);
+});
+
+test("播放时控制层自动隐藏，指针唤醒；暂停、键盘操作与倍速菜单保持可用", async () => {
+  globalThis.fetch = async () =>
+    reply({ url: "/api/telegram/media/9/stream?ticket=test" });
+  mount(<TelegramInlineMediaItem attachment={media("REMOTE", "video/mp4")} />);
+  await waitFor(() => assert(document.querySelector("video")));
+  const video = document.querySelector("video")!;
+  let paused = true;
+  Object.defineProperty(video, "paused", {
+    configurable: true,
+    get: () => paused,
+  });
+  video.play = async () => {
+    paused = false;
+    fireEvent.play(video);
+  };
+  video.pause = () => {
+    paused = true;
+    fireEvent.pause(video);
+  };
+  fireEvent.click(screen.getByRole("button", { name: "播放", exact: true }));
+  assert.equal(paused, false);
+  await waitFor(
+    () => assert(document.querySelector(".telegram-video-player.is-idle")),
+    { timeout: 3500 },
+  );
+  const region = screen.getByRole("region", { name: "视频播放器" });
+  fireEvent.pointerMove(region);
+  assert(region.classList.contains("has-controls"));
+  fireEvent.keyDown(region, { key: " " });
+  assert.equal(paused, true);
+  fireEvent.click(screen.getByRole("button", { name: "播放速度" }));
+  fireEvent.keyDown(screen.getByRole("button", { name: "播放速度" }), {
+    key: "ArrowUp",
+  });
+  assert.equal(document.activeElement?.textContent, "2×");
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "2×" }));
+  assert.equal(video.playbackRate, 2);
+  assert.equal(screen.queryByRole("menu"), null);
 });
