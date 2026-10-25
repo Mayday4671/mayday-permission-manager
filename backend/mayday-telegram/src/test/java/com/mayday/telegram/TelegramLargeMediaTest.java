@@ -104,6 +104,49 @@ class TelegramLargeMediaTest
     }
 
     @Test
+    void remoteStreamResolvesFreshFileHandleInsteadOfTrustingPersistedId() throws Exception
+    {
+        row.setStatus("REMOTE");
+        row.setAttachmentIndex(0);
+        task.setPreviewOnly(true);
+        task.setMessageLink("https://t.me/example/10");
+        TelegramCollectedMessage source = messages.findById(4L).orElseThrow();
+        source.setChatId("-100123");
+        source.setTelegramMessageId("10485760");
+        when(client.resolveMediaFile("https://t.me/example/10", "-100123", "10485760", 0))
+                .thenReturn(CompletableFuture.completedFuture(99));
+        when(client.fileSize(99)).thenReturn(CompletableFuture.completedFuture(2048L));
+        byte[] header = new byte[16];
+        header[4] = 'f';
+        header[5] = 't';
+        header[6] = 'y';
+        header[7] = 'p';
+        when(client.readFileRange(99, 0, 16)).thenReturn(CompletableFuture.completedFuture(header));
+        var response = service.content(1L, "bytes=0-15");
+        assertThat(response.getStatusCode().value()).isEqualTo(206);
+        try (var input = response.getBody().getInputStream())
+        {
+            assertThat(input.readAllBytes()).isEqualTo(header);
+        }
+        verify(client, org.mockito.Mockito.never()).fileSize(5);
+    }
+
+    @Test
+    void remoteTicketRequiresExplicitPreviewTaskAndCurrentSourcePermission()
+    {
+        row.setStatus("REMOTE");
+        task.setPreviewOnly(true);
+        assertThat(service.createStreamTicket(1L).url()).contains("/stream?ticket=");
+        task.setStatus("CANCELLED");
+        assertThatThrownBy(() -> service.createStreamTicket(1L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        task.setStatus("COMPLETED");
+        task.setPreviewOnly(false);
+        assertThatThrownBy(() -> service.createStreamTicket(1L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
     void reservesFourGiBWithoutReservingTheEntireStorageBudget()
     {
         when(media.reservedStorageBytes(anyLong())).thenReturn(1024L * 1024 * 1024);

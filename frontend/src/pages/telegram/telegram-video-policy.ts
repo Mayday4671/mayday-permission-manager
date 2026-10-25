@@ -14,6 +14,8 @@ export function telegramVideoPreviewMode(
   attachment: TelegramCollectedMedia,
 ): "native" | "conversion" | null {
   if (!VIDEO_KINDS.has(attachment.kind)) return null;
+  // Remote preview is opt-in server state; the stream validates binary headers before serving it.
+  if (attachment.status === "REMOTE") return "native";
   const type = (attachment.mediaType ?? "").trim().toLowerCase();
   const supported =
     VIDEO_TYPES.has(type) ||

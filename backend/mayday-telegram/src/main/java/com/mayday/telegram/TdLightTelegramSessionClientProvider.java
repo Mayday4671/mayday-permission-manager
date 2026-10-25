@@ -120,6 +120,10 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
      */
     private static final class TdLightSessionClient implements TelegramSessionClient
     {
+        private final java.util.concurrent.Semaphore rangeReaders = new java.util.concurrent.Semaphore(8);
+        private final java.util.concurrent.Semaphore[] rangeLocks = java.util.stream.IntStream.range(0, 64)
+                .mapToObj(ignored -> new java.util.concurrent.Semaphore(1))
+                .toArray(java.util.concurrent.Semaphore[]::new);
         private final ClientFactory factory;
         private final TelegramClient client;
         private final TelegramSettings settings;
@@ -891,6 +895,158 @@ public class TdLightTelegramSessionClientProvider implements TelegramSessionClie
                     throw new IllegalStateException("无法安全读取 Telegram 附件", exception);
                 }
             });
+        }
+
+        /**
+         * Queries TDLib rather than trusting a message's estimated size for HTTP
+         * ranges.
+         */
+        @Override
+        public CompletableFuture<Long> fileSize(int fileId)
+        {
+            return client.sendAsync(new TdApi.GetFile(fileId)).orTimeout(15, TimeUnit.SECONDS).thenApply(file -> {
+                if (file.size <= 0)
+                {
+                    throw new IllegalStateException("Telegram 尚未提供视频大小，请稍后重试");
+                }
+                return file.size;
+            });
+        }
+
+        /**
+         * Refreshes the exact source message before trusting a session-local file
+         * handle.
+         */
+        @Override
+        public CompletableFuture<Integer> resolveMediaFile(String messageLink, String chatId, String messageId,
+                int attachmentIndex)
+        {
+            long chat = Long.parseLong(chatId);
+            long message = Long.parseLong(messageId);
+            return client.sendAsync(new TdApi.GetMessage(chat, message)).exceptionallyCompose(
+                    failure -> client.sendAsync(new TdApi.GetMessageLinkInfo(messageLink)).thenCompose(info -> {
+                        if (info.message == null || info.message.chatId != chat)
+                        {
+                            return CompletableFuture.failedFuture(new IllegalStateException("视频来源已失效"));
+                        }
+                        return info.message.id == message
+                                ? CompletableFuture.completedFuture(info.message)
+                                : client.sendAsync(new TdApi.GetMessage(chat, message));
+                    })).orTimeout(20, TimeUnit.SECONDS).thenApply(source -> {
+                        if (!source.canBeSaved || source.chatId != chat || source.id != message)
+                        {
+                            throw new IllegalStateException("视频来源禁止保存或访问");
+                        }
+                        List<Map<String, Object>> attachments = attachmentMetadata(source.content);
+                        if (attachmentIndex < 0 || attachmentIndex >= attachments.size())
+                        {
+                            throw new IllegalStateException("视频附件已发生变化，请重新读取原消息");
+                        }
+                        Object value = attachments.get(attachmentIndex).get("tdFileId");
+                        if (!(value instanceof Number number) || number.intValue() <= 0)
+                        {
+                            throw new IllegalStateException("视频附件已失效");
+                        }
+                        return number.intValue();
+                    });
+        }
+
+        /**
+         * Downloads only the requested window and copies at most one MiB from TDLib's
+         * verified cache. Per-file locks prevent simultaneous seeks from replacing each
+         * other's native download window; existing complete downloads are not
+         * cancelled.
+         */
+        @Override
+        public CompletableFuture<byte[]> readFileRange(int fileId, long offset, int count)
+        {
+            if (fileId <= 0 || offset < 0 || count < 1 || count > 1024 * 1024)
+            {
+                return CompletableFuture.failedFuture(new IllegalArgumentException("视频分段参数无效"));
+            }
+            if (!rangeReaders.tryAcquire())
+            {
+                return CompletableFuture.failedFuture(new IllegalStateException("视频读取繁忙，请稍后重试"));
+            }
+            CompletableFuture<byte[]> result = new CompletableFuture<>();
+            Thread.startVirtualThread(() -> {
+                java.util.concurrent.Semaphore lock = rangeLocks[fileId % rangeLocks.length];
+                boolean acquired = false;
+                try
+                {
+                    acquired = lock.tryAcquire(30, TimeUnit.SECONDS);
+                    if (!acquired || closing)
+                    {
+                        throw new IllegalStateException("视频读取繁忙或账号已断开");
+                    }
+                    TdApi.File file = client.sendAsync(new TdApi.GetFile(fileId)).get(15, TimeUnit.SECONDS);
+                    if (file.size <= offset || count > file.size - offset)
+                    {
+                        throw new IllegalArgumentException("视频分段超出文件大小");
+                    }
+                    long available = client.sendAsync(new TdApi.GetFileDownloadedPrefixSize(fileId, offset)).get(15,
+                            TimeUnit.SECONDS).size;
+                    if (available < count && !file.local.isDownloadingActive)
+                    {
+                        if (Files.getFileStore(sessionDirectory).getUsableSpace() < count
+                                + Math.max(64L * 1024 * 1024, settings.getMinimumFreeDiskBytes()))
+                        {
+                            throw new IllegalStateException("视频缓存空间不足");
+                        }
+                        client.sendAsync(new TdApi.DownloadFile(fileId, 32, offset, count, false)).get(15,
+                                TimeUnit.SECONDS);
+                    }
+                    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+                    while (available < count)
+                    {
+                        if (closing || result.isCancelled() || System.nanoTime() >= deadline)
+                        {
+                            throw new IllegalStateException("视频分段加载超时，请重试");
+                        }
+                        Thread.sleep(100);
+                        available = client.sendAsync(new TdApi.GetFileDownloadedPrefixSize(fileId, offset)).get(5,
+                                TimeUnit.SECONDS).size;
+                        // A small metadata window may still be finishing when a seek
+                        // arrives. Extend it once idle without cancelling a full download.
+                        if (available < count)
+                        {
+                            file = client.sendAsync(new TdApi.GetFile(fileId)).get(5, TimeUnit.SECONDS);
+                            if (!file.local.isDownloadingActive)
+                            {
+                                if (Files.getFileStore(sessionDirectory).getUsableSpace() < count
+                                        + Math.max(64L * 1024 * 1024, settings.getMinimumFreeDiskBytes()))
+                                {
+                                    throw new IllegalStateException("视频缓存空间不足");
+                                }
+                                client.sendAsync(new TdApi.DownloadFile(fileId, 32, offset, count, false)).get(5,
+                                        TimeUnit.SECONDS);
+                            }
+                        }
+                    }
+                    byte[] bytes = client.sendAsync(new TdApi.ReadFilePart(fileId, offset, count)).get(15,
+                            TimeUnit.SECONDS).data;
+                    if (bytes.length != count)
+                    {
+                        throw new IllegalStateException("视频分段不完整");
+                    }
+                    result.complete(bytes);
+                } catch (Exception exception)
+                {
+                    if (exception instanceof InterruptedException)
+                    {
+                        Thread.currentThread().interrupt();
+                    }
+                    result.completeExceptionally(new IllegalStateException("视频分段读取失败，请检查账号连接后重试"));
+                } finally
+                {
+                    if (acquired)
+                    {
+                        lock.release();
+                    }
+                    rangeReaders.release();
+                }
+            });
+            return result;
         }
 
         /** Requests native cancellation when the owning bounded worker times out. */

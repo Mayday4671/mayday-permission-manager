@@ -37,6 +37,12 @@ public class TelegramCollectionTask extends BaseEntity
     private Boolean includeAlbum;
 
     /**
+     * Preview requests keep native videos remote until the browser requests byte
+     * ranges.
+     */
+    private Boolean previewOnly;
+
+    /**
      * Server-verified channel title for channel-based tasks; null for link-based
      * tasks.
      */

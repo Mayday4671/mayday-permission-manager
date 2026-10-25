@@ -43,6 +43,7 @@ public interface TelegramCollectionTaskMapper extends EntityMapper<TelegramColle
     {@Result(column = "owner_id", property = "ownerId"), @Result(column = "department_id", property = "departmentId"),
             @Result(column = "message_link", property = "messageLink"),
             @Result(column = "include_album", property = "includeAlbum"),
+            @Result(column = "preview_only", property = "previewOnly"),
             @Result(column = "source_title", property = "sourceTitle"),
             @Result(column = "from_date", property = "fromDate"), @Result(column = "to_date", property = "toDate"),
             @Result(column = "chat_id", property = "chatId"),

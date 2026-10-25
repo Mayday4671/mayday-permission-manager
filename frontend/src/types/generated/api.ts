@@ -5072,6 +5072,7 @@ export interface components {
       /** Format: int32 */
       maxMessages?: number;
       messageLink?: string;
+      previewOnly?: boolean;
       /** Format: date */
       toDate?: string;
     };

@@ -56,7 +56,7 @@ public final class TelegramCollectionContracts
                     media.stream()
                             .map(item -> new MediaView(item.getId(), item.getKind(), item.getFileName(),
                                     item.getExpectedSize(), item.getActualSize(), item.getMediaType(), item.getStatus(),
-                                    canDownload && "AVAILABLE".equals(item.getStatus())
+                                    canDownload && List.of("AVAILABLE", "REMOTE").contains(item.getStatus())
                                             ? "/api/telegram/media/" + item.getId() + "/content"
                                             : null,
                                     item.getFailureMessage()))

@@ -59,6 +59,10 @@ public class TelegramCollectionService
         access.require("telegram:view");
         boolean hasLink = request.messageLink() != null && !request.messageLink().isBlank();
         boolean hasChannel = request.channelId() != null && !request.channelId().isBlank();
+        if (request.previewOnly() && !request.includeAlbum())
+        {
+            throw new BusinessException("在线播放预览只支持所选消息及其相册");
+        }
         if (hasLink == hasChannel)
         {
             throw new BusinessException("请选择一个 Telegram 消息链接或已加入的频道作为采集来源");
@@ -118,6 +122,7 @@ public class TelegramCollectionService
         task.setDepartmentId(owner.getDepartmentId());
         task.setMessageLink(link);
         task.setIncludeAlbum(request.includeAlbum());
+        task.setPreviewOnly(request.previewOnly());
         task.setSourceTitle(channel == null ? null : channel.title());
         task.setFromDate(request.fromDate());
         task.setToDate(request.toDate());

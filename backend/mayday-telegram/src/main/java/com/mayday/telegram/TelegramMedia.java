@@ -66,7 +66,7 @@ public class TelegramMedia extends BaseEntity
     /** Digest for checking that storage contains the bytes that TDLib returned. */
     private String sha256;
 
-    /** QUEUED, DOWNLOADING, AVAILABLE, FAILED, DELETING, or EXPIRED. */
+    /** REMOTE, QUEUED, DOWNLOADING, AVAILABLE, FAILED, DELETING, or EXPIRED. */
     private String status;
 
     /** Short sanitized failure state, never the original native exception text. */

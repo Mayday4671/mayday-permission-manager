@@ -1133,6 +1133,7 @@ export function TelegramPage() {
           messageLink: link,
           maxMessages: 10,
           includeAlbum: true,
+          previewOnly: true,
           downloadImages: true,
           downloadVideos: true,
           downloadDocuments: true,

@@ -44,8 +44,9 @@ export function TelegramAttachmentDownload({
       // Large originals go straight to the browser download manager instead of
       // allocating a multi-gigabyte Blob or timing out after two minutes.
       if (
+        attachment.status === "REMOTE" ||
         (attachment.actualSize ?? attachment.expectedSize ?? 0) >
-        100 * 1024 * 1024
+          100 * 1024 * 1024
       ) {
         const ticket = await api<{ url: string }>(
           `/telegram/media/${attachment.id}/download-ticket`,
@@ -110,7 +111,11 @@ export function TelegramAttachmentDownload({
     }
   };
 
-  if (attachment.status !== "AVAILABLE" || !attachment.contentUrl) return null;
+  if (
+    !["AVAILABLE", "REMOTE"].includes(attachment.status) ||
+    !attachment.contentUrl
+  )
+    return null;
   return (
     <Space orientation="vertical" size={6}>
       <Space wrap>

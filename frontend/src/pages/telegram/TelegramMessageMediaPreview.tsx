@@ -105,12 +105,14 @@ export function TelegramMessageMediaPreview({
   // A failed recheck must remove cached players, especially after permission revocation.
   const rows = result.error ? [] : (result.data?.rows ?? []);
   const attachments = previewAttachments(rows);
-  const ready = attachments.filter((item) => item.status === "AVAILABLE");
+  const ready = attachments.filter((item) =>
+    ["AVAILABLE", "REMOTE"].includes(item.status),
+  );
   const pending = attachments.filter((item) =>
     ACTIVE_MEDIA.includes(item.status),
   );
   const failed = attachments.filter(
-    (item) => !["AVAILABLE", ...ACTIVE_MEDIA].includes(item.status),
+    (item) => !["AVAILABLE", "REMOTE", ...ACTIVE_MEDIA].includes(item.status),
   );
   const reading = result.isPending || ACTIVE_TASKS.includes(task?.status ?? "");
   const stopped = task && !["COMPLETED", ...ACTIVE_TASKS].includes(task.status);
@@ -393,6 +395,11 @@ export function TelegramInlineMediaItem({
       setConvert(true);
     },
   });
+  const prepareConversion = useMutation({
+    mutationFn: () =>
+      api(`/telegram/media/${attachment.id}/retry`, { method: "POST" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["telegram"] }),
+  });
   if (attachment.mediaType?.startsWith("image/"))
     return <TelegramInlineImage attachment={attachment} />;
   if (!playbackMode)
@@ -494,11 +501,20 @@ export function TelegramInlineMediaItem({
       ) : null}
       {!nativeVideo || playbackError ? (
         <Button
-          onClick={() => convertVideo.mutate()}
-          loading={convertVideo.isPending}
+          onClick={() =>
+            attachment.status === "REMOTE"
+              ? prepareConversion.mutate()
+              : convertVideo.mutate()
+          }
+          loading={convertVideo.isPending || prepareConversion.isPending}
         >
-          转换兼容格式
+          {attachment.status === "REMOTE"
+            ? "缓存完整视频以转换格式"
+            : "转换兼容格式"}
         </Button>
+      ) : null}
+      {prepareConversion.error ? (
+        <Alert type="error" title={prepareConversion.error.message} />
       ) : null}
       {convertVideo.error ? (
         <Alert type="error" title={convertVideo.error.message} />

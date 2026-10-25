@@ -5101,6 +5101,9 @@
             "minLength": 0,
             "type": "string"
           },
+          "previewOnly": {
+            "type": "boolean"
+          },
           "toDate": {
             "format": "date",
             "type": "string"

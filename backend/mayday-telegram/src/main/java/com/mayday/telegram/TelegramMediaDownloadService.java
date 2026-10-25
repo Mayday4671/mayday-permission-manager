@@ -398,7 +398,8 @@ public class TelegramMediaDownloadService
         TelegramMedia row = media.lock(mediaId).orElseThrow(() -> new ResourceNotFoundException("Telegram 媒体不存在"));
         access.checkData("telegram", row.getOwnerId(), row.getDepartmentId());
         verifySource(row);
-        if (!download && !List.of("video/mp4", "video/webm").contains(row.getMediaType()))
+        if (!download && !"REMOTE".equals(row.getStatus())
+                && !List.of("video/mp4", "video/webm").contains(row.getMediaType()))
         {
             throw new BusinessException("受权原视频打开仅支持 MP4 与 WebM 视频");
         }
@@ -466,7 +467,9 @@ public class TelegramMediaDownloadService
 
     private void verifySource(TelegramMedia row)
     {
-        if (!"AVAILABLE".equals(row.getStatus()) || row.getStorageKey() == null || row.getStorageProvider() == null)
+        boolean remote = "REMOTE".equals(row.getStatus());
+        if (!remote && (!"AVAILABLE".equals(row.getStatus()) || row.getStorageKey() == null
+                || row.getStorageProvider() == null))
         {
             throw new BusinessException("媒体文件尚未下载完成");
         }
@@ -476,6 +479,16 @@ public class TelegramMediaDownloadService
                 || !java.util.Objects.equals(source.getTaskId(), row.getTaskId()))
         {
             throw new AccessDeniedException("来源消息禁止保存或访问");
+        }
+        if (remote)
+        {
+            TelegramCollectionTask task = tasks.findById(row.getTaskId()).orElse(null);
+            if (task == null || !Boolean.TRUE.equals(task.getPreviewOnly()) || "CANCELLED".equals(task.getStatus())
+                    || row.getTelegramFileId() == null || row.getTelegramFileId() <= 0
+                    || !List.of("VIDEO", "ANIMATION", "DOCUMENT").contains(row.getKind()))
+            {
+                throw new AccessDeniedException("视频预览来源已失效，请重新读取原消息");
+            }
         }
     }
 
@@ -503,6 +516,27 @@ public class TelegramMediaDownloadService
 
     private ResponseEntity<Resource> streamContent(TelegramMedia row, String rangeHeader, boolean download)
     {
+        if ("REMOTE".equals(row.getStatus()))
+        {
+            TelegramSessionClient client = sessions.requireMediaClient(row.getOwnerId());
+            TelegramCollectedMessage source = messages.findById(row.getMessageId()).orElseThrow();
+            TelegramCollectionTask task = tasks.findById(row.getTaskId()).orElseThrow();
+            try
+            {
+                // Never trust a persisted native handle after a session restart; an
+                // old integer can be missing or identify a different file in TDLib.
+                row.setTelegramFileId(client.resolveMediaFile(task.getMessageLink(), source.getChatId(),
+                        source.getTelegramMessageId(), row.getAttachmentIndex()).get(25, TimeUnit.SECONDS));
+            } catch (Exception exception)
+            {
+                if (exception instanceof InterruptedException)
+                {
+                    Thread.currentThread().interrupt();
+                }
+                throw new BusinessException("无法定位原视频，请检查账号连接或重新读取原消息");
+            }
+            return TelegramRemoteVideoStream.response(client, row, rangeHeader, download);
+        }
         try
         {
             long totalSize = row.getActualSize();
@@ -559,7 +593,8 @@ public class TelegramMediaDownloadService
         TelegramMedia row = media.lock(mediaId).orElseThrow(() -> new ResourceNotFoundException("Telegram 媒体不存在"));
         access.checkData("telegram", row.getOwnerId(), row.getDepartmentId());
         boolean expired = "EXPIRED".equals(row.getStatus());
-        if (!expired && !"FAILED".equals(row.getStatus()))
+        boolean remote = "REMOTE".equals(row.getStatus());
+        if (!expired && !remote && !"FAILED".equals(row.getStatus()))
         {
             throw new BusinessException("只有下载失败或已过期的附件可以重新下载");
         }

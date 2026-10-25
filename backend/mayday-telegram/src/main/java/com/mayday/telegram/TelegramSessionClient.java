@@ -79,6 +79,22 @@ public interface TelegramSessionClient
     /** Downloads one TDLib file into the session's private files directory. */
     CompletableFuture<TelegramDownloadedFile> downloadFile(int fileId, long maxBytes);
 
+    /** Reads the authoritative remote file size without downloading its body. */
+    CompletableFuture<Long> fileSize(int fileId);
+
+    /**
+     * Re-resolves a stored message's attachment because TDLib file IDs are
+     * session-local.
+     */
+    CompletableFuture<Integer> resolveMediaFile(String messageLink, String chatId, String messageId,
+            int attachmentIndex);
+
+    /**
+     * Reads at most one MiB at the requested offset, without waiting for the
+     * complete file.
+     */
+    CompletableFuture<byte[]> readFileRange(int fileId, long offset, int count);
+
     /** Cancels an in-progress TDLib file transfer after its configured deadline. */
     void cancelDownloadFile(int fileId);
 
