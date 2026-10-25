@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   App,
@@ -35,6 +35,7 @@ import {
   TelegramChannelMediaCard,
   type ChannelMediaPreview,
 } from "./TelegramChannelMediaCard";
+import { useChannelHistoryScroll } from "./useChannelHistoryScroll";
 
 interface Channel {
   chatId: string;
@@ -101,7 +102,6 @@ export function TelegramChannelBrowser({
   const filtering =
     !!filters.query || filters.type !== "ALL" || !!filters.from || !!filters.to;
   const [form] = Form.useForm<CollectionValues>();
-  const transcript = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(search.trim()), 300);
     return () => window.clearTimeout(timer);
@@ -161,10 +161,15 @@ export function TelegramChannelBrowser({
   ).sort((a, b) =>
     BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0,
   );
-  useEffect(() => {
-    if (history.data?.pages.length === 1 && transcript.current)
-      transcript.current.scrollTop = transcript.current.scrollHeight;
-  }, [selected?.chatId, history.data]);
+  const { transcript, trigger, loadEarlier, trackReadingPosition } =
+    useChannelHistoryScroll({
+      scope: JSON.stringify([selected?.chatId, filters]),
+      pageCount: history.data?.pages.length ?? 0,
+      hasMore: connected && !!history.hasNextPage,
+      fetching: history.isFetching,
+      failed: history.isError,
+      loadMore: () => history.fetchNextPage({ cancelRefetch: false }),
+    });
   const postAction = useMutation({
     mutationFn: async ({
       chatId,
@@ -543,44 +548,47 @@ export function TelegramChannelBrowser({
                   />
                 ) : null}
               </div>
-              <div className="telegram-channel-transcript" ref={transcript}>
+              <div
+                className="telegram-channel-transcript"
+                ref={transcript}
+                onScroll={trackReadingPosition}
+              >
                 {history.error ? (
                   <Alert
                     type="error"
                     title={history.error.message}
                     action={
-                      <Button onClick={() => void history.refetch()}>
+                      <Button
+                        onClick={() =>
+                          void (history.isFetchNextPageError
+                            ? loadEarlier()
+                            : history.refetch())
+                        }
+                      >
                         重试
                       </Button>
                     }
                   />
                 ) : null}
                 {history.isPending ? <Spin /> : null}
-                {history.hasNextPage ? (
-                  <Button
-                    className="telegram-channel-older"
-                    type="text"
-                    loading={history.isFetchingNextPage}
-                    onClick={async () => {
-                      const height = transcript.current?.scrollHeight ?? 0;
-                      const top = transcript.current?.scrollTop ?? 0;
-                      await history.fetchNextPage();
-                      requestAnimationFrame(() => {
-                        if (transcript.current)
-                          transcript.current.scrollTop =
-                            top + transcript.current.scrollHeight - height;
-                      });
-                    }}
-                  >
-                    {filtering ? "继续查找" : "加载更早消息"}
-                  </Button>
-                ) : null}
+                <div
+                  ref={trigger}
+                  className="telegram-channel-older"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {history.isFetchingNextPage ? (
+                    <Spin size="small" aria-label="正在加载更早消息" />
+                  ) : !history.hasNextPage && posts.length ? (
+                    "已到最早消息"
+                  ) : null}
+                </div>
                 {!posts.length && !history.isPending && !history.error ? (
                   <Empty
                     description={
                       filtering
                         ? history.hasNextPage
-                          ? "本批无匹配消息，可继续查找"
+                          ? "正在查找匹配消息"
                           : "没有匹配的消息"
                         : "暂无可读取消息"
                     }
@@ -588,7 +596,11 @@ export function TelegramChannelBrowser({
                   />
                 ) : null}
                 {posts.map((post) => (
-                  <article key={post.id} className="telegram-channel-post">
+                  <article
+                    key={post.id}
+                    data-channel-message={post.id}
+                    className="telegram-channel-post"
+                  >
                     <div className="telegram-channel-post-meta">
                       {post.canBeSaved ? (
                         <Checkbox

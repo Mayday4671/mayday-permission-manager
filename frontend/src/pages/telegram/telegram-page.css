@@ -839,6 +839,8 @@
   min-height: 0;
   padding: 16px 24px;
   overflow-y: auto;
+  /* 历史消息插入时由阅读锚点恢复位置，避免浏览器再次补偿导致跳动。 */
+  overflow-anchor: none;
   background: color-mix(in srgb, var(--app-primary) 3%, var(--app-surface));
 }
 .telegram-channel-tools {
@@ -909,8 +911,13 @@
   margin-top: 8px;
 }
 .telegram-channel-older {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
   margin: 0 auto 12px;
+  color: var(--app-text-tertiary);
+  font-size: 12px;
 }
 .telegram-channel-placeholder {
   display: flex;
