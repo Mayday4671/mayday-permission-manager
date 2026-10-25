@@ -14,6 +14,7 @@ import {
   SoundOutlined,
 } from "@ant-design/icons";
 import { telegramVideoPreviewMode } from "./telegram-video-policy";
+import { telegramMediaFileSize } from "./telegram-file-size";
 import {
   TelegramAttachmentDownload,
   telegramDownloadName,
@@ -258,9 +259,21 @@ export function TelegramMessageMediaPreview({
         {active ? (
           <div className="telegram-media-gallery">
             <div className="telegram-media-gallery-heading">
-              <span title={telegramDownloadName(active)}>
-                {telegramDownloadName(active)}
-              </span>
+              <div className="telegram-media-gallery-file">
+                <span
+                  className="telegram-media-gallery-filename"
+                  title={telegramDownloadName(active)}
+                >
+                  {telegramDownloadName(active)}
+                </span>
+                <span
+                  className="telegram-media-gallery-size"
+                  aria-label="文件大小"
+                  title="源文件大小"
+                >
+                  {telegramMediaFileSize(active)}
+                </span>
+              </div>
               <div className="telegram-media-gallery-navigation">
                 <Button
                   type="text"
@@ -303,7 +316,8 @@ export function TelegramMessageMediaPreview({
                     aria-label={`查看附件 ${index + 1}：${telegramDownloadName(item)}`}
                     aria-pressed={active.id === item.id}
                     title={
-                      thumbnails[item.id]?.error ?? telegramDownloadName(item)
+                      thumbnails[item.id]?.error ??
+                      `${telegramDownloadName(item)} · ${telegramMediaFileSize(item)}`
                     }
                     onClick={() => setSelectedId(item.id)}
                   >

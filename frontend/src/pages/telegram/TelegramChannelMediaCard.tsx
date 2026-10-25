@@ -8,6 +8,7 @@ import {
   SoundOutlined,
 } from "@ant-design/icons";
 import { tokenStore } from "../../lib/api";
+import { formatTelegramFileSize } from "./telegram-file-size";
 
 export interface ChannelMediaPreview {
   kind: string;
@@ -53,14 +54,7 @@ export function TelegramChannelMediaCard({
         VOICE: "语音",
       } as Record<string, string>
     )[media.kind] ?? "附件";
-  const size =
-    media.size >= 1024 ** 3
-      ? `${(media.size / 1024 ** 3).toFixed(1)} GB`
-      : media.size >= 1024 ** 2
-        ? `${(media.size / 1024 ** 2).toFixed(1)} MB`
-        : media.size > 0
-          ? `${Math.max(1, Math.round(media.size / 1024))} KB`
-          : "";
+  const size = formatTelegramFileSize(media.size);
   const seconds = media.durationSeconds;
   const duration =
     seconds > 0

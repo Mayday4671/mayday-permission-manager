@@ -1054,11 +1054,22 @@
   color: var(--app-text-secondary);
   font-size: 13px;
 }
-.telegram-media-gallery-heading > span {
+.telegram-media-gallery-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.telegram-media-gallery-filename {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.telegram-media-gallery-size {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .telegram-media-gallery-navigation {
   flex-shrink: 0;

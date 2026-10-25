@@ -60,6 +60,7 @@ import {
 } from "./TelegramMessageMediaPreview";
 import { TelegramMediaPolicySettings } from "./TelegramMediaPolicySettings";
 import { TelegramAttachmentDownload } from "./TelegramAttachmentDownload";
+import { telegramMediaFileSize } from "./telegram-file-size";
 import type {
   TelegramCollectionTask,
   TelegramCollectedMessage,
@@ -2913,6 +2914,9 @@ export function TelegramPage() {
                                 size={2}
                               >
                                 <TelegramMediaPreview attachment={attachment} />
+                                <Typography.Text type="secondary">
+                                  {telegramMediaFileSize(attachment)}
+                                </Typography.Text>
                                 <TelegramAttachmentDownload
                                   attachment={attachment}
                                 />
