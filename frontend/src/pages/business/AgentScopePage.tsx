@@ -219,12 +219,6 @@ export function AgentScopePage() {
   return (
     <section className="agent-scope-page">
       <header className="agent-scope-heading">
-        <div>
-          <Typography.Title level={3}>智能体</Typography.Title>
-          <Typography.Text type="secondary">
-            在独立会话中提问；每个账号只能访问自己的对话记录。
-          </Typography.Text>
-        </div>
         <div className="agent-scope-heading-actions">
           {can("agentscope:configure") && (
             <Button
@@ -469,9 +463,6 @@ export function AgentScopePage() {
                   }
                 />
                 <div className="agent-scope-composer-footer">
-                  <Typography.Text type="secondary">
-                    消息会发送至已配置的模型服务，请勿输入密码、密钥等敏感信息。
-                  </Typography.Text>
                   <Button
                     type="primary"
                     htmlType="submit"

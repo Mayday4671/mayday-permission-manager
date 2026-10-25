@@ -8,7 +8,6 @@ import {
   InputNumber,
   Space,
   Switch,
-  Typography,
 } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
@@ -119,12 +118,12 @@ export function TelegramMediaPolicySettings() {
               <InputNumber min={1} max={1440} style={{ width: 190 }} />
             </Form.Item>
           </Space>
-          <Typography.Paragraph type="secondary">
-            大文件需要先下载到服务端再预览。此前失败的附件可在预览窗口点击“重试下载”，无需重新搜索。
-          </Typography.Paragraph>
-          <Button type="primary" htmlType="submit" loading={save.isPending}>
-            保存媒体设置
-          </Button>
+
+          <div>
+            <Button type="primary" htmlType="submit" loading={save.isPending}>
+              保存媒体设置
+            </Button>
+          </div>
         </Form>
       )}
     </Card>

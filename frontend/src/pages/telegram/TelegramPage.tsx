@@ -33,7 +33,6 @@ import {
   FilterOutlined,
   FolderOutlined,
   LeftOutlined,
-  LockOutlined,
   LoginOutlined,
   LogoutOutlined,
   MessageOutlined,
@@ -1462,9 +1461,8 @@ export function TelegramPage() {
       />
 
       {workspaceTab === "account" && (
-        <Card
-          title="Telegram 账号"
-          extra={
+        <Card>
+          <div className="telegram-account-toolbar">
             <Space>
               {canConfigure ? (
                 <Button
@@ -1480,8 +1478,7 @@ export function TelegramPage() {
                 onClick={() => void status.refetch()}
               />
             </Space>
-          }
-        >
+          </div>
           {status.isPending ? (
             <Typography.Text type="secondary">
               正在读取 Telegram 状态…
@@ -1495,18 +1492,13 @@ export function TelegramPage() {
             />
           ) : view ? (
             <>
-              <Alert
-                type={
-                  view.state === "READY"
-                    ? "success"
-                    : view.state === "ERROR"
-                      ? "error"
-                      : "info"
-                }
-                showIcon
-                message={view.message}
-                description="验证码、两步验证密码和邮箱验证内容仅用于当前请求，不会保存到数据库或浏览器本地存储。"
-              />
+              {view.state !== "READY" && (
+                <Alert
+                  type={view.state === "ERROR" ? "error" : "info"}
+                  showIcon
+                  message={view.message}
+                />
+              )}
               <Descriptions
                 column={{ xs: 1, sm: 2, lg: 3 }}
                 style={{ marginTop: 20 }}
@@ -1598,10 +1590,6 @@ export function TelegramPage() {
                     >
                       检查机器人会话
                     </Button>
-                    <Typography.Text type="secondary">
-                      只读取当前账号、机器人身份和 Telegram 在线屏蔽列表；
-                      不会发送消息、显示其他屏蔽对象或更改设置。
-                    </Typography.Text>
                   </Space>
                   {botDiagnostic.data ? (
                     <Alert
@@ -1713,17 +1701,15 @@ export function TelegramPage() {
           <Alert type="error" showIcon message={configuration.error.message} />
         ) : configuration.data ? (
           <>
-            <Alert
-              type={configuration.data.encryptionAvailable ? "info" : "warning"}
-              showIcon
-              style={{ marginBottom: 20 }}
-              message="密钥只提交和加密保存，不会回显"
-              description={
-                configuration.data.encryptionAvailable
-                  ? "API Hash、代理密码和 MTProto Secret 会使用平台加密密钥加密存入数据库；留空表示保持现有值。会话数据库密钥在首次保存时由服务端生成。"
-                  : "服务端尚未配置 MAYDAY_IDENTITY_ENCRYPTION_KEY；请先完成部署加密密钥配置，才能安全保存凭据。"
-              }
-            />
+            {!configuration.data.encryptionAvailable && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 20 }}
+                message="无法保存凭据：尚未配置平台加密密钥"
+                description="请联系管理员配置 MAYDAY_IDENTITY_ENCRYPTION_KEY。"
+              />
+            )}
             <Form<TelegramConfigurationForm>
               form={configurationForm}
               layout="vertical"
@@ -1892,7 +1878,7 @@ export function TelegramPage() {
         canConnect &&
         view.credentialsConfigured &&
         view.encryptionKeyConfigured && (
-          <Card title="授权步骤">
+          <Card>
             {challenge ? (
               <Form
                 layout="vertical"
@@ -2036,11 +2022,6 @@ export function TelegramPage() {
                   >
                     退出 Telegram 账号
                   </Button>
-                )}
-                {view.connected && (
-                  <Tag icon={<CheckCircleOutlined />} color="success">
-                    会话已授权
-                  </Tag>
                 )}
                 {view.state === "WAITING_FOR_DEVICE_CONFIRMATION" && (
                   <Typography.Text type="secondary">
@@ -2564,13 +2545,6 @@ export function TelegramPage() {
                       />
                     </div>
                   </div>
-                </div>
-                <div className="telegram-chat-disclosure">
-                  {!view?.connected
-                    ? "连接 Telegram 后即可搜索"
-                    : !can("telegram:search")
-                      ? "当前账号只有对话查看权限"
-                      : "结果来自 Telegram · 图片、视频和文件可点击预览"}
                 </div>
               </div>
             </section>
@@ -3096,10 +3070,6 @@ export function TelegramPage() {
         view?.connected &&
         can("telegram:view") && (
           <Card title="未匹配的机器人消息">
-            <Typography.Paragraph type="secondary">
-              这些消息来自已验证的搜索机器人私聊，但没有 Telegram
-              明确的回复关联。它们不会被拼接到某次搜索或伪装为搜索结果。
-            </Typography.Paragraph>
             <Table<TelegramMessage>
               rowKey="id"
               columns={[
@@ -3130,25 +3100,6 @@ export function TelegramPage() {
             />
           </Card>
         )}
-
-      {workspaceTab === "account" && (
-        <Card title="连接说明">
-          <Space direction="vertical" size={8}>
-            <Typography.Text>
-              连接会创建加密的本地 TDLib
-              会话；模块关闭时不加载原生库，也不发起连接。
-            </Typography.Text>
-            <Typography.Text>
-              “关闭连接”保留已授权会话；“退出 Telegram
-              账号”会删除复用授权，两者操作分开。
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              <LockOutlined /> 当前页面以分页方式呈现 Telegram
-              消息快照；未识别的消息仅作为原始消息展示，不生成虚构的搜索条目。
-            </Typography.Text>
-          </Space>
-        </Card>
-      )}
 
       {inlineMediaPreview ? (
         <TelegramMessageMediaPreview

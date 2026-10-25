@@ -19,12 +19,6 @@
   max-width: 640px;
 }
 
-.agent-settings-footer {
-  margin-top: 20px;
-  padding-top: 14px;
-  border-top: 1px solid var(--app-border);
-}
-
 .agent-scope-heading,
 .agent-scope-chat-heading,
 .agent-scope-list-heading,
@@ -43,8 +37,9 @@
   gap: 8px;
 }
 
-.agent-scope-heading h3 {
-  margin: 0 0 4px;
+.agent-scope-heading,
+.agent-scope-composer-footer {
+  justify-content: flex-end;
 }
 
 .agent-scope-readiness {

@@ -631,16 +631,13 @@ export function WorkflowDesignerPage() {
                     <Form.Item
                       name="applicantId"
                       label="模拟发起人"
+                      tooltip="模拟按当前填写值展开条件、全部并行支路及固定子流程。正式审批中修改的字段可能改变后续路线，模拟不会预先替审批人作决定。"
                       extra="留空使用当前账号。模拟不会创建申请或发送通知。"
                     >
                       <UserSelect />
                     </Form.Item>
                   )}
                   <WorkflowFields fields={spec.fields} />
-                  <Alert
-                    type="info"
-                    title="模拟按当前填写值展开条件、全部并行支路及固定子流程。正式审批中修改的字段可能改变后续路线，模拟不会预先替审批人作决定。"
-                  />
                   {result?.generation ===
                     simulationContext.current.generation && (
                     <div className="simulation-result">

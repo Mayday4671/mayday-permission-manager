@@ -11,14 +11,11 @@ import {
   InputNumber,
   Space,
   Tag,
-  Typography,
 } from "antd";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QueryState, RefreshButton } from "../../components/shared";
 import { api, jsonBody } from "../../lib/api";
 import "./agentscope.css";
-
-const { Paragraph, Text } = Typography;
 
 /**
  * 常用模型名称来自百炼当前公开的文本模型目录；保存前仍由服务端校验统一模型 ID 格式。
@@ -117,7 +114,6 @@ export function AgentScopeSettingsPage({
             />
           )}
           <Card
-            title="模型服务"
             extra={
               <Space>
                 <Tag color={query.data.modelReady ? "success" : "warning"}>
@@ -130,11 +126,6 @@ export function AgentScopeSettingsPage({
               </Space>
             }
           >
-            <Paragraph type="secondary">
-              配置只影响本系统智能体。API
-              密钥由服务端加密保存，读取时不会回传；当前通过百炼模型服务调用，模型
-              ID 可从常用项中选择，也可按百炼控制台中已开通的模型手动输入。
-            </Paragraph>
             <Form<SettingsFormValues>
               form={form}
               layout="vertical"
@@ -233,16 +224,6 @@ export function AgentScopeSettingsPage({
                   <Checkbox>清除后台保存的密钥，改用部署默认密钥</Checkbox>
                 </Form.Item>
               )}
-              {query.data.apiSecretConfigured &&
-                !query.data.apiSecretOverrideStored && (
-                  <Alert
-                    type="info"
-                    showIcon
-                    message="当前密钥来自部署默认配置"
-                    description="你可以在上方输入新密钥，由后台加密保存并覆盖部署默认值。"
-                    style={{ marginBottom: 20 }}
-                  />
-                )}
               <div className="form-two-columns">
                 <Form.Item
                   name="requestTimeoutSeconds"
@@ -276,7 +257,7 @@ export function AgentScopeSettingsPage({
                   name="maxContextMessages"
                   label="历史上下文消息数"
                   rules={[{ required: true, type: "number", min: 2, max: 100 }]}
-                  extra="服务端会按完整问答轮次取偶数。"
+                  tooltip="按完整问答保留，消息数取偶数。"
                 >
                   <InputNumber
                     min={2}
@@ -290,7 +271,6 @@ export function AgentScopeSettingsPage({
                 name="systemPrompt"
                 label="系统提示词"
                 rules={[{ required: true, whitespace: true, max: 4000 }]}
-                extra="此提示词由服务端控制；用户消息不能覆盖它，也不会自动注入平台业务数据。"
               >
                 <Input.TextArea rows={5} maxLength={4000} showCount />
               </Form.Item>
@@ -308,12 +288,6 @@ export function AgentScopeSettingsPage({
                 </Button>
               </Space>
             </Form>
-            <div className="agent-settings-footer">
-              <Text type="secondary">
-                当前使用 AgentScope {query.data.sdkVersion} · 配置来源：
-                {query.data.configurationSource}
-              </Text>
-            </div>
           </Card>
         </div>
       )}

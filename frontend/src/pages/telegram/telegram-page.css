@@ -498,13 +498,7 @@
   height: 34px;
   min-width: 34px;
 }
-.telegram-chat-disclosure {
-  padding-top: 9px;
-  color: var(--app-text-tertiary);
-  font-size: 11px;
-  text-align: center;
-  line-height: 1.6;
-}
+
 .telegram-chat-scroll-latest {
   position: absolute;
   top: -34px;
@@ -639,7 +633,6 @@
     padding-block: 5px;
   }
   .telegram-chat-connection,
-  .telegram-chat-disclosure,
   .telegram-chat-turn-heading {
     display: none;
   }
@@ -685,4 +678,10 @@
 }
 .telegram-collection-source .ant-typography {
   max-width: 100%;
+}
+
+.telegram-account-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
 }

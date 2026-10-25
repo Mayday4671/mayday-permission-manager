@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Alert, Button, Select, Space, Spin } from "antd";
+import { InfoCircleOutlined } from "@ant-design/icons";
+import { Alert, Button, Select, Space, Spin, Tooltip } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import type { PageResult } from "../../types";
@@ -127,10 +128,11 @@ export function WorkflowSubprocessEditor({
           action={<Button onClick={() => void query.refetch()}>重试</Button>}
         />
       )}
-      <Alert
-        type="info"
-        title="执行始终使用当前绑定版本。输入按子表单字段匹配父表单；通过后才回填输出。退回、撤回和终止会传播到运行中的子流程。"
-      />
+      <Tooltip title="执行使用所选发布版本；输入映射父表单字段，通过后回填输出。退回、撤回和终止会同步到运行中的子流程。">
+        <Button type="text" size="small" icon={<InfoCircleOutlined />}>
+          版本与字段映射说明
+        </Button>
+      </Tooltip>
       {selected.isLoading && <Spin />}
       {value?.versionId && (
         <QueryState
