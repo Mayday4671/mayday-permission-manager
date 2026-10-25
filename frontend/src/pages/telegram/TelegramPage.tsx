@@ -434,6 +434,7 @@ function callbackButtonLabel(text: string): string {
     if (/过滤|\bfilter\b/i.test(text)) return "过滤";
     if (/时长/.test(text)) return "时长";
     if (/下一页|\bnext\b|^➡\uFE0F?$/i.test(text.trim())) return "下一页";
+    if (/上一页|\bprevious\b|^⬅\uFE0F?$/i.test(text.trim())) return "上一页";
     if (/^⏮\uFE0F?$/.test(text.trim())) return "首页";
     if (/^🔄\uFE0F?$/.test(text.trim())) return "切换";
   }
@@ -456,7 +457,7 @@ function callbackButtonIcon(text: string): ReactNode {
   if (/过滤|\bfilter\b/i.test(text)) return <FilterOutlined />;
   if (callbackButtonLabel(text) === "下一页") return <RightOutlined />;
   if (callbackButtonLabel(text) === "首页") return <DoubleLeftOutlined />;
-  if (/上一页|\bprevious\b/i.test(text)) return <LeftOutlined />;
+  if (callbackButtonLabel(text) === "上一页") return <LeftOutlined />;
 
   return undefined;
 }
