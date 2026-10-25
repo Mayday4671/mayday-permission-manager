@@ -1,14 +1,5 @@
 import { useEffect } from "react";
-import {
-  Alert,
-  App,
-  Button,
-  Card,
-  Form,
-  InputNumber,
-  Space,
-  Switch,
-} from "antd";
+import { Alert, App, Button, Card, Form, InputNumber, Switch } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 
@@ -65,7 +56,11 @@ export function TelegramMediaPolicySettings() {
     onError: (error: Error) => void message.error(error.message),
   });
   return (
-    <Card title="媒体下载设置" loading={policy.isPending}>
+    <Card
+      title="媒体下载设置"
+      className="telegram-media-policy-card"
+      loading={policy.isPending}
+    >
       {policy.error ? (
         <Alert
           type="error"
@@ -76,6 +71,7 @@ export function TelegramMediaPolicySettings() {
       ) : (
         <Form
           form={form}
+          className="telegram-media-policy-form"
           layout="vertical"
           onFinish={(values) => save.mutate(values)}
           disabled={save.isPending || !policy.data}
@@ -84,42 +80,40 @@ export function TelegramMediaPolicySettings() {
             name="unlimited"
             label="不限制单个文件大小"
             valuePropName="checked"
-            extra="保留原始图片和视频画质，包括 4K；仍需有足够的磁盘空间和总存储容量。"
+            tooltip="保留原始画质，包括 4K；仍受总存储容量和可用磁盘空间约束。"
           >
             <Switch />
           </Form.Item>
-          <Space size={24} wrap align="start">
-            {!unlimited && (
-              <Form.Item
-                name="fileMiB"
-                label="单文件上限（MiB）"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={1} max={2097152} style={{ width: 190 }} />
-              </Form.Item>
-            )}
+          {!unlimited && (
             <Form.Item
-              name="storageGiB"
-              label="总存储容量（GiB）"
+              name="fileMiB"
+              label="单文件上限（MiB）"
               rules={[{ required: true }]}
             >
-              <InputNumber
-                min={0.1}
-                max={2048}
-                step={10}
-                style={{ width: 190 }}
-              />
+              <InputNumber min={1} max={2097152} style={{ width: "100%" }} />
             </Form.Item>
-            <Form.Item
-              name="timeoutMinutes"
-              label="单次下载最长等待（分钟）"
-              rules={[{ required: true }]}
-            >
-              <InputNumber min={1} max={1440} style={{ width: 190 }} />
-            </Form.Item>
-          </Space>
+          )}
+          <Form.Item
+            name="storageGiB"
+            label="总存储容量（GiB）"
+            rules={[{ required: true }]}
+          >
+            <InputNumber
+              min={0.1}
+              max={2048}
+              step={10}
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
+          <Form.Item
+            name="timeoutMinutes"
+            label="单次下载最长等待（分钟）"
+            rules={[{ required: true }]}
+          >
+            <InputNumber min={1} max={1440} style={{ width: "100%" }} />
+          </Form.Item>
 
-          <div>
+          <div className="telegram-media-policy-actions">
             <Button type="primary" htmlType="submit" loading={save.isPending}>
               保存媒体设置
             </Button>

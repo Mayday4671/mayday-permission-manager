@@ -685,3 +685,44 @@
   justify-content: flex-end;
   margin-bottom: 16px;
 }
+
+/* Account controls share one card; media fields use the available horizontal space. */
+.telegram-account-card .ant-card-body,
+.telegram-media-policy-card .ant-card-body {
+  padding: 20px;
+}
+.telegram-account-toolbar > .ant-space {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.telegram-account-authorization {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+}
+.telegram-account-authorization .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+.telegram-media-policy-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+  gap: 16px;
+}
+.telegram-media-policy-form .ant-form-item {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.telegram-media-policy-form .ant-form-item-control-input {
+  min-height: 32px;
+}
+.telegram-media-policy-actions {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+@media (max-width: 575px) {
+  .telegram-media-policy-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

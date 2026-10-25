@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Collapse,
   DatePicker,
   Descriptions,
   Drawer,
@@ -1461,9 +1462,22 @@ export function TelegramPage() {
       />
 
       {workspaceTab === "account" && (
-        <Card>
+        <Card className="telegram-account-card">
           <div className="telegram-account-toolbar">
             <Space>
+              {view?.connected &&
+                view.state === "READY" &&
+                can("telegram:view") && (
+                  <Space wrap>
+                    <Button
+                      icon={<ScanOutlined />}
+                      loading={botDiagnostic.isPending}
+                      onClick={() => botDiagnostic.mutate()}
+                    >
+                      检查机器人会话
+                    </Button>
+                  </Space>
+                )}
               {canConfigure ? (
                 <Button
                   icon={<SettingOutlined />}
@@ -1500,8 +1514,9 @@ export function TelegramPage() {
                 />
               )}
               <Descriptions
+                size="small"
                 column={{ xs: 1, sm: 2, lg: 3 }}
-                style={{ marginTop: 20 }}
+                style={{ marginTop: 12 }}
                 items={[
                   {
                     key: "module",
@@ -1576,21 +1591,13 @@ export function TelegramPage() {
               />
               {view.connected &&
               view.state === "READY" &&
-              can("telegram:view") ? (
+              can("telegram:view") &&
+              botDiagnostic.data ? (
                 <Space
                   direction="vertical"
                   size={12}
                   style={{ display: "flex", marginTop: 20 }}
                 >
-                  <Space wrap>
-                    <Button
-                      icon={<ScanOutlined />}
-                      loading={botDiagnostic.isPending}
-                      onClick={() => botDiagnostic.mutate()}
-                    >
-                      检查机器人会话
-                    </Button>
-                  </Space>
                   {botDiagnostic.data ? (
                     <Alert
                       type={
@@ -1674,6 +1681,187 @@ export function TelegramPage() {
               ) : null}
             </>
           ) : null}
+          {workspaceTab === "account" &&
+            view &&
+            (!view.credentialsConfigured || !view.encryptionKeyConfigured) && (
+              <Alert
+                type="warning"
+                showIcon
+                message="还不能发起账号授权"
+                description={
+                  canConfigure
+                    ? "点击本页顶部“配置”填写 Telegram API 凭据；会话加密密钥由服务端自动生成并安全保存。"
+                    : "请联系拥有 Telegram 配置权限的管理员完成 API 凭据设置。"
+                }
+              />
+            )}
+
+          {workspaceTab === "account" &&
+            view &&
+            canConnect &&
+            view.credentialsConfigured &&
+            view.encryptionKeyConfigured && (
+              <div className="telegram-account-authorization">
+                {challenge ? (
+                  <Form
+                    layout="vertical"
+                    onFinish={submitChallenge}
+                    style={{ maxWidth: 560 }}
+                    autoComplete="off"
+                  >
+                    <Form.Item
+                      label={challenge.label}
+                      required
+                      extra={
+                        view.state === "WAITING_FOR_PHONE"
+                          ? "用于登录 Telegram 用户账号，不是 Mayday 的手机号验证；验证码由 Telegram 决定发送方式。"
+                          : undefined
+                      }
+                    >
+                      {challenge.password ? (
+                        <Input.Password
+                          value={value}
+                          onChange={(event) => setValue(event.target.value)}
+                          placeholder={challenge.placeholder}
+                          autoComplete="new-password"
+                        />
+                      ) : (
+                        <Input
+                          value={value}
+                          onChange={(event) => setValue(event.target.value)}
+                          placeholder={challenge.placeholder}
+                          autoComplete="off"
+                        />
+                      )}
+                    </Form.Item>
+                    {/* 授权挑战期间保留安全断开入口，便于调整代理等运行配置；关闭连接不会退出账号。 */}
+                    <Space wrap>
+                      <Button
+                        type="primary"
+                        htmlType="submit"
+                        loading={isBusy}
+                        disabled={!value.trim()}
+                      >
+                        提交并继续
+                      </Button>
+                      {view.connected && canClose && (
+                        <Button
+                          htmlType="button"
+                          icon={<DisconnectOutlined />}
+                          loading={isBusy}
+                          onClick={() =>
+                            action.mutate({ endpoint: "/session/close" })
+                          }
+                        >
+                          关闭连接并保留会话
+                        </Button>
+                      )}
+                    </Space>
+                    {view.state === "WAITING_FOR_CODE" && (
+                      <Typography.Paragraph
+                        type="secondary"
+                        style={{ marginTop: 12, marginBottom: 0 }}
+                      >
+                        Telegram 可能把验证码发到已登录的 Telegram
+                        客户端，不一定通过短信发送。
+                      </Typography.Paragraph>
+                    )}
+                  </Form>
+                ) : view.state === "WAITING_FOR_REGISTRATION" ? (
+                  <Form
+                    layout="vertical"
+                    onFinish={submitRegistration}
+                    style={{ maxWidth: 560 }}
+                  >
+                    <Form.Item label="名字" required>
+                      <Input
+                        value={firstName}
+                        onChange={(event) => setFirstName(event.target.value)}
+                        maxLength={64}
+                      />
+                    </Form.Item>
+                    <Form.Item label="姓氏">
+                      <Input
+                        value={lastName}
+                        onChange={(event) => setLastName(event.target.value)}
+                        maxLength={64}
+                      />
+                    </Form.Item>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={isBusy}
+                      disabled={!firstName.trim()}
+                    >
+                      完成注册
+                    </Button>
+                  </Form>
+                ) : (
+                  <Space wrap>
+                    {!view.connected &&
+                      view.state !== "INITIALIZING" &&
+                      view.state !== "CLOSING" && (
+                        <Button
+                          type="primary"
+                          icon={<LoginOutlined />}
+                          loading={isBusy}
+                          onClick={() =>
+                            action.mutate({ endpoint: "/session/start" })
+                          }
+                        >
+                          {view.accountConfigured
+                            ? "重新连接"
+                            : "连接 Telegram 账号"}
+                        </Button>
+                      )}
+                    {view.connected && canClose && (
+                      <Button
+                        icon={<DisconnectOutlined />}
+                        loading={isBusy}
+                        onClick={() =>
+                          action.mutate({ endpoint: "/session/close" })
+                        }
+                      >
+                        关闭连接并保留会话
+                      </Button>
+                    )}
+                    {view.connected && canLogOut && (
+                      <Button
+                        danger
+                        icon={<LogoutOutlined />}
+                        loading={isBusy}
+                        onClick={() =>
+                          Modal.confirm({
+                            title: "退出 Telegram 账号？",
+                            content:
+                              "退出会清除本地可复用会话，下次连接需要重新完成授权。",
+                            okText: "确认退出",
+                            cancelText: "取消",
+                            okButtonProps: { danger: true },
+                            onOk: () =>
+                              action.mutateAsync({
+                                endpoint: "/session/logout",
+                              }),
+                          })
+                        }
+                      >
+                        退出 Telegram 账号
+                      </Button>
+                    )}
+                    {view.state === "WAITING_FOR_DEVICE_CONFIRMATION" && (
+                      <Typography.Text type="secondary">
+                        请查看 Telegram 客户端并确认新的登录设备。
+                      </Typography.Text>
+                    )}
+                  </Space>
+                )}
+                {!canConnect && (
+                  <Typography.Text type="secondary">
+                    当前账号没有连接或授权 Telegram 的权限。
+                  </Typography.Text>
+                )}
+              </div>
+            )}
         </Card>
       )}
 
@@ -1857,186 +2045,6 @@ export function TelegramPage() {
           </>
         ) : null}
       </Modal>
-
-      {workspaceTab === "account" &&
-        view &&
-        (!view.credentialsConfigured || !view.encryptionKeyConfigured) && (
-          <Alert
-            type="warning"
-            showIcon
-            message="还不能发起账号授权"
-            description={
-              canConfigure
-                ? "点击本页顶部“配置”填写 Telegram API 凭据；会话加密密钥由服务端自动生成并安全保存。"
-                : "请联系拥有 Telegram 配置权限的管理员完成 API 凭据设置。"
-            }
-          />
-        )}
-
-      {workspaceTab === "account" &&
-        view &&
-        canConnect &&
-        view.credentialsConfigured &&
-        view.encryptionKeyConfigured && (
-          <Card>
-            {challenge ? (
-              <Form
-                layout="vertical"
-                onFinish={submitChallenge}
-                style={{ maxWidth: 560 }}
-                autoComplete="off"
-              >
-                <Form.Item
-                  label={challenge.label}
-                  required
-                  extra={
-                    view.state === "WAITING_FOR_PHONE"
-                      ? "用于登录 Telegram 用户账号，不是 Mayday 的手机号验证；验证码由 Telegram 决定发送方式。"
-                      : undefined
-                  }
-                >
-                  {challenge.password ? (
-                    <Input.Password
-                      value={value}
-                      onChange={(event) => setValue(event.target.value)}
-                      placeholder={challenge.placeholder}
-                      autoComplete="new-password"
-                    />
-                  ) : (
-                    <Input
-                      value={value}
-                      onChange={(event) => setValue(event.target.value)}
-                      placeholder={challenge.placeholder}
-                      autoComplete="off"
-                    />
-                  )}
-                </Form.Item>
-                {/* 授权挑战期间保留安全断开入口，便于调整代理等运行配置；关闭连接不会退出账号。 */}
-                <Space wrap>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    loading={isBusy}
-                    disabled={!value.trim()}
-                  >
-                    提交并继续
-                  </Button>
-                  {view.connected && canClose && (
-                    <Button
-                      htmlType="button"
-                      icon={<DisconnectOutlined />}
-                      loading={isBusy}
-                      onClick={() =>
-                        action.mutate({ endpoint: "/session/close" })
-                      }
-                    >
-                      关闭连接并保留会话
-                    </Button>
-                  )}
-                </Space>
-                {view.state === "WAITING_FOR_CODE" && (
-                  <Typography.Paragraph
-                    type="secondary"
-                    style={{ marginTop: 12, marginBottom: 0 }}
-                  >
-                    Telegram 可能把验证码发到已登录的 Telegram
-                    客户端，不一定通过短信发送。
-                  </Typography.Paragraph>
-                )}
-              </Form>
-            ) : view.state === "WAITING_FOR_REGISTRATION" ? (
-              <Form
-                layout="vertical"
-                onFinish={submitRegistration}
-                style={{ maxWidth: 560 }}
-              >
-                <Form.Item label="名字" required>
-                  <Input
-                    value={firstName}
-                    onChange={(event) => setFirstName(event.target.value)}
-                    maxLength={64}
-                  />
-                </Form.Item>
-                <Form.Item label="姓氏">
-                  <Input
-                    value={lastName}
-                    onChange={(event) => setLastName(event.target.value)}
-                    maxLength={64}
-                  />
-                </Form.Item>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={isBusy}
-                  disabled={!firstName.trim()}
-                >
-                  完成注册
-                </Button>
-              </Form>
-            ) : (
-              <Space wrap>
-                {!view.connected &&
-                  view.state !== "INITIALIZING" &&
-                  view.state !== "CLOSING" && (
-                    <Button
-                      type="primary"
-                      icon={<LoginOutlined />}
-                      loading={isBusy}
-                      onClick={() =>
-                        action.mutate({ endpoint: "/session/start" })
-                      }
-                    >
-                      {view.accountConfigured
-                        ? "重新连接"
-                        : "连接 Telegram 账号"}
-                    </Button>
-                  )}
-                {view.connected && canClose && (
-                  <Button
-                    icon={<DisconnectOutlined />}
-                    loading={isBusy}
-                    onClick={() =>
-                      action.mutate({ endpoint: "/session/close" })
-                    }
-                  >
-                    关闭连接并保留会话
-                  </Button>
-                )}
-                {view.connected && canLogOut && (
-                  <Button
-                    danger
-                    icon={<LogoutOutlined />}
-                    loading={isBusy}
-                    onClick={() =>
-                      Modal.confirm({
-                        title: "退出 Telegram 账号？",
-                        content:
-                          "退出会清除本地可复用会话，下次连接需要重新完成授权。",
-                        okText: "确认退出",
-                        cancelText: "取消",
-                        okButtonProps: { danger: true },
-                        onOk: () =>
-                          action.mutateAsync({ endpoint: "/session/logout" }),
-                      })
-                    }
-                  >
-                    退出 Telegram 账号
-                  </Button>
-                )}
-                {view.state === "WAITING_FOR_DEVICE_CONFIRMATION" && (
-                  <Typography.Text type="secondary">
-                    请查看 Telegram 客户端并确认新的登录设备。
-                  </Typography.Text>
-                )}
-              </Space>
-            )}
-            {!canConnect && (
-              <Typography.Text type="secondary">
-                当前账号没有连接或授权 Telegram 的权限。
-              </Typography.Text>
-            )}
-          </Card>
-        )}
 
       {workspaceTab === "search" &&
         (!can("telegram:view") ? (
@@ -3069,36 +3077,45 @@ export function TelegramPage() {
       {workspaceTab === "account" &&
         view?.connected &&
         can("telegram:view") && (
-          <Card title="未匹配的机器人消息">
-            <Table<TelegramMessage>
-              rowKey="id"
-              columns={[
-                { title: "类型", dataIndex: "contentType", width: 200 },
-                {
-                  title: "内容",
-                  dataIndex: "messageText",
-                  render: (text: string | null) => (
-                    <Typography.Paragraph
-                      ellipsis={{ rows: 2 }}
-                      style={{ marginBottom: 0 }}
-                    >
-                      {text || "（无文本内容）"}
-                    </Typography.Paragraph>
-                  ),
-                },
-                {
-                  title: "到达时间",
-                  dataIndex: "telegramSentAt",
-                  width: 200,
-                  render: (value: string | null) => value ?? "—",
-                },
-              ]}
-              dataSource={unmatchedMessages.data?.items ?? []}
-              loading={unmatchedMessages.isPending}
-              pagination={false}
-              locale={{ emptyText: "目前没有未匹配的机器人消息" }}
-            />
-          </Card>
+          <Collapse
+            className="telegram-account-diagnostics"
+            items={[
+              {
+                key: "unmatched",
+                label: "未匹配的机器人消息",
+                children: (
+                  <Table<TelegramMessage>
+                    rowKey="id"
+                    columns={[
+                      { title: "类型", dataIndex: "contentType", width: 200 },
+                      {
+                        title: "内容",
+                        dataIndex: "messageText",
+                        render: (text: string | null) => (
+                          <Typography.Paragraph
+                            ellipsis={{ rows: 2 }}
+                            style={{ marginBottom: 0 }}
+                          >
+                            {text || "（无文本内容）"}
+                          </Typography.Paragraph>
+                        ),
+                      },
+                      {
+                        title: "到达时间",
+                        dataIndex: "telegramSentAt",
+                        width: 200,
+                        render: (value: string | null) => value ?? "—",
+                      },
+                    ]}
+                    dataSource={unmatchedMessages.data?.items ?? []}
+                    loading={unmatchedMessages.isPending}
+                    pagination={false}
+                    locale={{ emptyText: "目前没有未匹配的机器人消息" }}
+                  />
+                ),
+              },
+            ]}
+          />
         )}
 
       {inlineMediaPreview ? (
