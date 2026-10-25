@@ -640,3 +640,103 @@ test("浏览器拒绝原生全屏时回退网页全屏", async () => {
     HTMLElement.prototype.requestFullscreen = previous;
   }
 });
+
+test("打开画廊即加载所有封面并设置主视频海报，无需先播放其他视频", async () => {
+  tokenStore.set("cover-session");
+  const covers: number[] = [];
+  const tickets: number[] = [];
+  const released: string[] = [];
+  let serial = 0;
+  URL.createObjectURL = () => `blob:cover-${++serial}`;
+  URL.revokeObjectURL = (url) => released.push(url);
+  globalThis.fetch = async (input, options) => {
+    const url = String(input);
+    if (url.endsWith("/thumbnail")) {
+      assert.equal(
+        (options?.headers as any).Authorization,
+        "Bearer cover-session",
+      );
+      assert.equal(options?.cache, "no-store");
+      covers.push(Number(url.split("/").at(-2)));
+      return new Response("small-cover", {
+        headers: { "Content-Type": "image/jpeg" },
+      });
+    }
+    if (url.endsWith("/stream-ticket")) {
+      const id = Number(url.split("/").at(-2));
+      tickets.push(id);
+      return reply({ url: `/api/telegram/media/${id}/stream?ticket=sample` });
+    }
+    if (url.includes("/messages?"))
+      return reply({
+        items: [
+          row([
+            media("REMOTE", "video/mp4"),
+            { ...media("REMOTE", "video/mp4"), id: 10 },
+          ]),
+        ],
+      });
+    return reply({ id: 4, status: "COMPLETED" });
+  };
+  const view = mount(modal());
+  await waitFor(() =>
+    assert.equal(
+      document.querySelectorAll(".telegram-media-gallery-tile img").length,
+      2,
+    ),
+  );
+  const video = document.querySelector("video")!;
+  await waitFor(() => assert(video.poster.startsWith("blob:cover-")));
+  assert.equal(video.currentTime, 0);
+  assert.equal(video.paused, true);
+  assert.deepEqual(
+    covers.sort((a, b) => a - b),
+    [9, 10],
+  );
+  assert.deepEqual(tickets, [9]);
+  const firstPoster = video.poster;
+  fireEvent.click(screen.getByRole("button", { name: "下一个附件" }));
+  await waitFor(() => assert.equal(tickets.length, 2));
+  await waitFor(() =>
+    assert(document.querySelector("video")?.poster.startsWith("blob:cover-")),
+  );
+  assert.notEqual(document.querySelector("video")!.poster, firstPoster);
+  assert.equal(covers.length, 2);
+  view.unmount();
+  assert.equal(released.length, 2);
+});
+
+test("封面失败可单独重试，关闭画廊中止等待且不遗留私有图片地址", async () => {
+  let attempts = 0;
+  let aborted = false;
+  const released: string[] = [];
+  URL.createObjectURL = () => "blob:retry-cover";
+  URL.revokeObjectURL = (url) => released.push(url);
+  globalThis.fetch = async (input, options) => {
+    const url = String(input);
+    if (url.endsWith("/thumbnail")) {
+      attempts++;
+      options?.signal?.addEventListener("abort", () => {
+        aborted = true;
+      });
+      return attempts === 1
+        ? new Response("unavailable", { status: 503 })
+        : new Response("cover", { headers: { "Content-Type": "image/jpeg" } });
+    }
+    if (url.endsWith("/stream-ticket"))
+      return reply({ url: "/api/telegram/media/9/stream?ticket=sample" });
+    if (url.includes("/messages?"))
+      return reply({ items: [row([media("REMOTE", "video/mp4")])] });
+    return reply({ id: 4, status: "COMPLETED" });
+  };
+  const view = mount(modal());
+  fireEvent.click(await screen.findByRole("button", { name: "重试封面" }));
+  await waitFor(() =>
+    assert.equal(document.querySelector("video")?.poster, "blob:retry-cover"),
+  );
+  assert.equal(attempts, 2);
+  assert.equal(screen.queryByRole("button", { name: "重试封面" }), null);
+  view.unmount();
+  assert.equal(aborted, true);
+  assert.deepEqual(released, ["blob:retry-cover"]);
+});

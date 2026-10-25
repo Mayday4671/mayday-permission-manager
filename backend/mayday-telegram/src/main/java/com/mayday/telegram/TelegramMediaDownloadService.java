@@ -372,6 +372,44 @@ public class TelegramMediaDownloadService
     }
 
     /**
+     * Reads only Telegram's small source cover. Resolving the stored message first
+     * supports public search results after reconnecting, without joining a channel
+     * or trusting an obsolete native file handle.
+     */
+    public byte[] thumbnail(Long mediaId)
+    {
+        moduleGuard.requireEnabled();
+        access.require("telegram:view");
+        access.require("telegram:download");
+        TelegramMedia row = visibleMedia(mediaId);
+        TelegramCollectedMessage source = messages.findById(row.getMessageId()).orElseThrow();
+        TelegramCollectionTask task = tasks.findById(row.getTaskId())
+                .orElseThrow(() -> new ResourceNotFoundException("来源采集记录不存在"));
+        TelegramSessionClient client = sessions.requireMediaClient(row.getOwnerId());
+        try
+        {
+            byte[] bytes = client
+                    .resolveMediaFile(task.getMessageLink(), source.getChatId(), source.getTelegramMessageId(),
+                            row.getAttachmentIndex())
+                    .thenCompose(ignored -> client.channelThumbnail(source.getChatId(), source.getTelegramMessageId()))
+                    .get(30, TimeUnit.SECONDS);
+            if (bytes == null || bytes.length == 0 || bytes.length > TelegramChannelThumbnail.MAX_BYTES)
+            {
+                throw new BusinessException("原消息没有可用的封面");
+            }
+            TelegramChannelThumbnail.contentType(bytes);
+            return bytes;
+        } catch (Exception exception)
+        {
+            if (exception instanceof InterruptedException)
+            {
+                Thread.currentThread().interrupt();
+            }
+            throw new BusinessException("封面暂不可用，请检查账号连接后重试");
+        }
+    }
+
+    /**
      * Creates a short-lived opaque playback capability; only its digest and
      * expiration are persisted.
      */

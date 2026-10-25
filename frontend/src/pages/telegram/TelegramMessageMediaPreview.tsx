@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, tokenStore } from "../../lib/api";
 import { AuthenticatedHlsVideo } from "./AuthenticatedHlsVideo";
 import { TelegramVideoPlayer } from "./TelegramVideoPlayer";
+import { useTelegramMediaThumbnails } from "./useTelegramMediaThumbnails";
 import {
   LeftOutlined,
   RightOutlined,
@@ -66,10 +67,8 @@ export function TelegramMessageMediaPreview({
   retrying: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<number>();
-  const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
   useEffect(() => {
     setSelectedId(undefined);
-    setThumbnails({});
   }, [taskId]);
   const result = useQuery({
     queryKey: ["telegram", "inline-media-preview", taskId],
@@ -139,40 +138,8 @@ export function TelegramMessageMediaPreview({
     ? ready.findIndex((item) => item.id === active.id)
     : 0;
 
-  /** Reuse a loaded frame for the rail; never load every video just to create thumbnails. */
-  function rememberThumbnail(target: EventTarget) {
-    if (!active || thumbnails[active.id]) return;
-    if (
-      !(target instanceof HTMLImageElement) &&
-      !(target instanceof HTMLVideoElement)
-    )
-      return;
-    if (target instanceof HTMLVideoElement && target.currentTime < 0.5) return;
-    const width =
-      target instanceof HTMLVideoElement
-        ? target.videoWidth
-        : target.naturalWidth;
-    const height =
-      target instanceof HTMLVideoElement
-        ? target.videoHeight
-        : target.naturalHeight;
-    if (!width || !height) return;
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = 160;
-      canvas.height = Math.max(
-        1,
-        Math.min(240, Math.round((160 * height) / width)),
-      );
-      canvas
-        .getContext("2d")
-        ?.drawImage(target, 0, 0, canvas.width, canvas.height);
-      const thumbnail = canvas.toDataURL("image/jpeg", 0.65);
-      setThumbnails((current) => ({ ...current, [active.id]: thumbnail }));
-    } catch {
-      /* A cross-origin frame may not be readable; retain the file-type tile. */
-    }
-  }
+  const { thumbnails, retry: retryThumbnails } =
+    useTelegramMediaThumbnails(ready);
 
   return (
     <Modal
@@ -315,13 +282,12 @@ export function TelegramMessageMediaPreview({
                 />
               </div>
             </div>
-            <div
-              className="telegram-media-gallery-stage"
-              onLoadCapture={(event) => rememberThumbnail(event.target)}
-              onLoadedDataCapture={(event) => rememberThumbnail(event.target)}
-              onTimeUpdateCapture={(event) => rememberThumbnail(event.target)}
-            >
-              <TelegramInlineMediaItem key={active.id} attachment={active} />
+            <div className="telegram-media-gallery-stage">
+              <TelegramInlineMediaItem
+                key={active.id}
+                attachment={active}
+                poster={thumbnails[active.id]?.source}
+              />
             </div>
             {ready.length > 1 ? (
               <div
@@ -335,10 +301,17 @@ export function TelegramMessageMediaPreview({
                     className={`telegram-media-gallery-tile${active.id === item.id ? " is-selected" : ""}`}
                     aria-label={`查看附件 ${index + 1}：${telegramDownloadName(item)}`}
                     aria-pressed={active.id === item.id}
+                    title={
+                      thumbnails[item.id]?.error ?? telegramDownloadName(item)
+                    }
                     onClick={() => setSelectedId(item.id)}
                   >
-                    {thumbnails[item.id] ? (
-                      <img src={thumbnails[item.id]} alt="" />
+                    {thumbnails[item.id]?.source ? (
+                      <img src={thumbnails[item.id].source} alt="" />
+                    ) : ["PHOTO", "VIDEO", "ANIMATION", "DOCUMENT"].includes(
+                        item.kind,
+                      ) && !thumbnails[item.id]?.error ? (
+                      <Spin size="small" />
                     ) : item.kind === "PHOTO" ? (
                       <PictureOutlined />
                     ) : ["VIDEO", "ANIMATION"].includes(item.kind) ? (
@@ -364,6 +337,11 @@ export function TelegramMessageMediaPreview({
             在 Telegram 查看原消息
           </Typography.Link>
           <div className="telegram-media-gallery-footer-actions">
+            {active && thumbnails[active.id]?.error ? (
+              <Button type="text" onClick={retryThumbnails}>
+                重试封面
+              </Button>
+            ) : null}
             {active ? (
               <TelegramAttachmentDownload key={active.id} attachment={active} />
             ) : null}
@@ -452,8 +430,10 @@ function TelegramInlineImage({
 /** Plays native video or offers authenticated conversion for other supported containers. */
 export function TelegramInlineMediaItem({
   attachment,
+  poster,
 }: {
   attachment: TelegramCollectedMedia;
+  poster?: string;
 }) {
   const [playbackError, setPlaybackError] = useState(false);
   const [convert, setConvert] = useState(false);
@@ -516,6 +496,7 @@ export function TelegramInlineMediaItem({
     if (!preview.error && state?.status === "READY" && state.manifestUrl)
       return (
         <AuthenticatedHlsVideo
+          poster={poster}
           manifestUrl={state.manifestUrl}
           mediaId={attachment.id}
           width="100%"
@@ -552,6 +533,7 @@ export function TelegramInlineMediaItem({
         <TelegramVideoPlayer
           key={ticket.data.url}
           src={ticket.data.url}
+          poster={poster}
           controls
           playsInline
           preload="metadata"

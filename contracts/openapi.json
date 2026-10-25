@@ -16286,6 +16286,56 @@
         "x-authorization": "@access.has('telegram:download')"
       }
     },
+    "/api/telegram/media/{id}/thumbnail": {
+      "get": {
+        "operationId": "TelegramController_mediaThumbnail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "telegram-controller"
+        ],
+        "x-authorization": "@access.has('telegram:view') and @access.has('telegram:download')"
+      }
+    },
     "/api/telegram/media/{id}/video-preview": {
       "get": {
         "operationId": "TelegramController_videoPreviewStatus",

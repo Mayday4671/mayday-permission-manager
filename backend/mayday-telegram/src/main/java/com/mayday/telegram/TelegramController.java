@@ -45,6 +45,21 @@ public class TelegramController
     private final TelegramConfigurationService configuration;
     private final TelegramMediaPolicyService mediaPolicy;
 
+    /**
+     * Returns an authorized source cover without transferring the original video.
+     */
+    @GetMapping(value = "/media/{id}/thumbnail", produces =
+    {"image/jpeg", "image/png", "image/webp"})
+    @PreAuthorize("@access.has('telegram:view') and @access.has('telegram:download')")
+    public ResponseEntity<byte[]> mediaThumbnail(@org.springframework.web.bind.annotation.PathVariable Long id)
+    {
+        byte[] bytes = mediaDownloads.thumbnail(id);
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .contentType(
+                        org.springframework.http.MediaType.parseMediaType(TelegramChannelThumbnail.contentType(bytes)))
+                .header("X-Content-Type-Options", "nosniff").body(bytes);
+    }
+
     /** Reads independently editable attachment download policy. */
     @GetMapping("/media-policy")
     @PreAuthorize("@access.has('telegram:configure')")

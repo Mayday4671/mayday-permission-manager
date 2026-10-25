@@ -8,10 +8,12 @@ import { TelegramVideoPlayer } from "./TelegramVideoPlayer";
 export function AuthenticatedHlsVideo({
   manifestUrl,
   mediaId,
+  poster,
   width = 240,
 }: {
   manifestUrl: string;
   mediaId: number;
+  poster?: string;
   width?: number | string;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -72,7 +74,11 @@ export function AuthenticatedHlsVideo({
       style={{ width }}
       className="telegram-hls-player"
     >
-      <TelegramVideoPlayer videoRef={video} aria-label="Telegram 视频" />
+      <TelegramVideoPlayer
+        videoRef={video}
+        poster={poster}
+        aria-label="Telegram 视频"
+      />
       {error ? <Typography.Text type="danger">{error}</Typography.Text> : null}
       {originalUrl ? (
         <a href={originalUrl} target="_blank" rel="noopener noreferrer">
