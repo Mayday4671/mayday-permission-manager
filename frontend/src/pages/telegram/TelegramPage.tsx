@@ -2370,56 +2370,44 @@ export function TelegramPage() {
                                     ) || `（${row.contentType}，无文本内容）`}
                                   </Typography.Paragraph>
 
-                                  {hasKeyboard ? (
-                                    <div className="telegram-chat-inline-keyboard">
-                                      {keyboard.resourceTypeButtons.length ? (
-                                        <div
-                                          aria-label="资源类型筛选"
-                                          className="telegram-chat-inline-keyboard-row telegram-chat-resource-buttons"
-                                          role="group"
-                                        >
-                                          {keyboard.resourceTypeButtons.map(
-                                            renderButton,
-                                          )}
-                                        </div>
-                                      ) : null}
-                                      {keyboard.actionButtonRows.map(
-                                        (buttonRow, index) => (
-                                          <div
-                                            aria-label="回复操作"
-                                            className="telegram-chat-inline-keyboard-row"
-                                            key={`${row.id}-actions-${index}`}
-                                            role="group"
-                                          >
-                                            {buttonRow.map(renderButton)}
-                                          </div>
-                                        ),
+                                  {hasKeyboard || row.messageText ? (
+                                    <div
+                                      className="telegram-chat-inline-keyboard"
+                                      aria-label="回复操作"
+                                      role="group"
+                                    >
+                                      {keyboard.resourceTypeButtons.map(
+                                        renderButton,
                                       )}
+                                      {keyboard.actionButtonRows.flatMap(
+                                        (buttonRow) =>
+                                          buttonRow.map(renderButton),
+                                      )}
+                                      {row.messageText ? (
+                                        <Button
+                                          className="telegram-chat-copy-button"
+                                          type="text"
+                                          size="small"
+                                          icon={<CopyOutlined />}
+                                          aria-label="复制回复"
+                                          title="复制回复"
+                                          onClick={() => {
+                                            void navigator.clipboard
+                                              .writeText(row.messageText!)
+                                              .then(
+                                                () =>
+                                                  message.success("已复制回复"),
+                                                () =>
+                                                  message.error(
+                                                    "复制失败，请选中文字复制",
+                                                  ),
+                                              );
+                                          }}
+                                        />
+                                      ) : null}
                                     </div>
                                   ) : null}
                                 </div>
-                                {row.messageText ? (
-                                  <div className="telegram-chat-message-actions">
-                                    <Button
-                                      type="text"
-                                      size="small"
-                                      icon={<CopyOutlined />}
-                                      aria-label="复制回复"
-                                      title="复制回复"
-                                      onClick={() => {
-                                        void navigator.clipboard
-                                          .writeText(row.messageText!)
-                                          .then(
-                                            () => message.success("已复制回复"),
-                                            () =>
-                                              message.error(
-                                                "复制失败，请选中文字复制",
-                                              ),
-                                          );
-                                      }}
-                                    />
-                                  </div>
-                                ) : null}
                               </div>
                             );
                           })}

@@ -333,28 +333,15 @@
   outline-offset: 2px;
   border-radius: 2px;
 }
-.telegram-chat-message-actions {
-  padding-left: 30px;
-  margin-top: -8px;
-}
-.telegram-chat-message-actions .ant-btn {
-  color: var(--app-text-tertiary);
-}
+/* Keep reply controls together; wrap only when the available width is exhausted. */
 .telegram-chat-inline-keyboard {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--chat-line);
-}
-.telegram-chat-inline-keyboard-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
 }
 .telegram-chat-inline-keyboard .ant-btn {
   min-height: 30px;
@@ -366,15 +353,20 @@
   color: var(--app-text-secondary);
   font-size: 12px;
 }
-.telegram-chat-resource-buttons .ant-btn {
+.telegram-chat-inline-keyboard .telegram-chat-resource-button {
   border-color: transparent;
   background: var(--chat-soft);
 }
-.telegram-chat-resource-buttons .ant-btn:hover,
-.telegram-chat-resource-buttons .ant-btn[aria-pressed="true"] {
+.telegram-chat-inline-keyboard .telegram-chat-resource-button:hover,
+.telegram-chat-inline-keyboard
+  .telegram-chat-resource-button[aria-pressed="true"] {
   color: var(--app-primary-text);
   border-color: color-mix(in srgb, var(--app-primary) 30%, transparent);
   background: color-mix(in srgb, var(--app-primary) 8%, var(--app-surface));
+}
+.telegram-chat-inline-keyboard .telegram-chat-copy-button {
+  border-color: transparent;
+  color: var(--app-text-tertiary);
 }
 .telegram-chat-waiting {
   display: flex;
@@ -590,9 +582,6 @@
     max-width: 90%;
   }
   .telegram-chat-message.is-incoming .telegram-chat-bubble {
-    padding-left: 0;
-  }
-  .telegram-chat-message-actions {
     padding-left: 0;
   }
   .telegram-chat-message-content {
