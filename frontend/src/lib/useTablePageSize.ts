@@ -15,6 +15,7 @@ export function useTablePageSize(
     const element = panel.current;
     if (!element) return;
     let frame = 0;
+    let measuredRowHeight = 0;
     const measure = () => {
       const rectangle = element.getBoundingClientRect();
       if (rectangle.width <= 0) return;
@@ -29,8 +30,10 @@ export function useTablePageSize(
           .height ?? 0;
       const card = element.querySelector(".table-mobile-card");
       const row = card ?? element.querySelector(".ant-table-row");
+      // 翻页请求期间列表暂时清空，保留真实行高，避免手机卡片与默认行高反复切换触发请求。
+      if (row) measuredRowHeight = row.getBoundingClientRect().height;
       const rowHeight =
-        row?.getBoundingClientRect().height ||
+        measuredRowHeight ||
         (card ? 180 : density === "small" ? 48 : density === "large" ? 76 : 64);
       const footer =
         document.querySelector(".admin-footer")?.getBoundingClientRect()

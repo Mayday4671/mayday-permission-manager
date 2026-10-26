@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Button, Checkbox, Empty, Input } from "antd";
-import { Search } from "lucide-react";
+import { useEffect, useRef, useState, type Key } from "react";
+import { Button, Empty, Input, Tree, Tooltip, type TreeDataNode } from "antd";
+import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import type { PermissionGroup } from "../types";
 import { useAuth } from "../lib/auth";
 import {
@@ -8,7 +8,7 @@ import {
   permissionDependencies,
 } from "../lib/permission-selection";
 
-/** 模块选择和权限编辑各占一栏，限制滚动区域；切换模块不卸载或重置表单的完整权限值。 */
+/** 按模块与操作展示勾选树；父节点批量授权仍经过权限依赖和当前操作者的授权范围校验。 */
 export function PermissionPicker({
   value = [],
   onChange,
@@ -20,29 +20,79 @@ export function PermissionPicker({
 }) {
   const { can } = useAuth();
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState("");
-  const matches = groups.filter((group) =>
-    `${group.name} ${group.key} ${Object.values(group.actions).join(" ")}`
-      .toLowerCase()
-      .includes(search.trim().toLowerCase()),
-  );
-  const active = matches.find((group) => group.key === selected) ?? matches[0];
-  const editable = active
-    ? Object.keys(active.actions)
-        .map((action) => `${active.key}:${action}`)
-        .filter((key) => permissionDependencies(key).every(can))
-    : [];
-  const selectedCount = (group: PermissionGroup) =>
-    Object.keys(group.actions).filter((action) =>
-      value.includes(`${group.key}:${action}`),
-    ).length;
-  const batch = (checked: boolean) =>
+  const [expanded, setExpanded] = useState<Key[]>([]);
+  const scrollArea = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollArea.current) scrollArea.current.scrollTop = 0;
+  }, [search]);
+  const groupKey = (group: PermissionGroup) => `module:${group.key}`;
+  const keys = (group: PermissionGroup) =>
+    Object.keys(group.actions).map((action) => `${group.key}:${action}`);
+  const editable = (key: string) => permissionDependencies(key).every(can);
+  const matchingGroups = (query: string) =>
+    groups.filter((group) =>
+      `${group.name} ${group.key} ${Object.values(group.actions).join(" ")}`
+        .toLowerCase()
+        .includes(query.trim().toLowerCase()),
+    );
+  const matches = matchingGroups(search);
+  const checked = [...value];
+  const halfChecked: string[] = [];
+  const data: TreeDataNode[] = matches.map((group) => {
+    const actions = keys(group);
+    const selected = actions.filter((key) => value.includes(key)).length;
+    if (actions.length && selected === actions.length)
+      checked.push(groupKey(group));
+    else if (selected) halfChecked.push(groupKey(group));
+    return {
+      key: groupKey(group),
+      disableCheckbox: !actions.some(editable),
+      title: (
+        <span className="permission-tree-module">
+          <span>{group.name}</span>
+          <small>
+            {selected} / {actions.length}
+          </small>
+        </span>
+      ),
+      children: Object.entries(group.actions)
+        .sort(([a], [b]) => (a === "view" ? -1 : b === "view" ? 1 : 0))
+        .map(([action, label]) => {
+          const key = `${group.key}:${action}`;
+          return {
+            key,
+            disableCheckbox: !editable(key),
+            title: (
+              <span title={key}>
+                {label}
+                {[
+                  "grant",
+                  "sensitive",
+                  "assign",
+                  "reset",
+                  "publish",
+                  "export",
+                ].includes(action) && (
+                  <Tooltip title="敏感操作">
+                    <i className="permission-dot" />
+                  </Tooltip>
+                )}
+              </span>
+            ),
+          };
+        }),
+    };
+  });
+  const change = (key: Key, selected: boolean) => {
+    const group = groups.find((item) => groupKey(item) === key);
+    const actions = group ? keys(group).filter(editable) : [String(key)];
     onChange?.(
-      editable.reduce(
-        (next, key) => changePermission(next, key, checked, can),
+      actions.reduce(
+        (next, action) => changePermission(next, action, selected, can),
         value,
       ),
     );
+  };
   return (
     <div className="permission-picker">
       <div className="permission-picker-toolbar">
@@ -52,103 +102,62 @@ export function PermissionPicker({
           prefix={<Search size={15} />}
           allowClear
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            const query = event.target.value;
+            setSearch(query);
+            setExpanded(
+              query.trim() ? matchingGroups(query).map(groupKey) : [],
+            );
+          }}
         />
-        <span className="muted">已选 {value.length} 项权限</span>
+        <div className="permission-tree-tools">
+          <span className="muted">已选 {value.length} 项</span>
+          <Button
+            type="text"
+            size="small"
+            onClick={() => setExpanded(matches.map(groupKey))}
+          >
+            展开全部
+          </Button>
+          <Button type="text" size="small" onClick={() => setExpanded([])}>
+            收起全部
+          </Button>
+        </div>
       </div>
-      <div className="permission-picker-body">
-        <nav className="permission-module-list" aria-label="权限模块">
-          {matches.map((group) => (
-            <button
-              type="button"
-              key={group.key}
-              aria-current={active?.key === group.key ? "true" : undefined}
-              onClick={() => setSelected(group.key)}
-            >
-              <span>{group.name}</span>
-              <small>
-                {selectedCount(group)} / {Object.keys(group.actions).length}
-              </small>
-            </button>
-          ))}
-          {!matches.length && (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="没有匹配的模块"
-            />
-          )}
-        </nav>
-        <section
-          className="permission-module-detail"
-          aria-label={active ? `${active.name}权限` : "权限选项"}
-        >
-          {active && (
-            <>
-              <div className="permission-module-heading">
-                <strong>{active.name}</strong>
-                <div>
-                  <Button
-                    type="link"
-                    size="small"
-                    disabled={!editable.length}
-                    onClick={() => batch(true)}
-                  >
-                    全选本模块
-                  </Button>
-                  <Button
-                    type="link"
-                    size="small"
-                    disabled={!editable.some((key) => value.includes(key))}
-                    onClick={() => batch(false)}
-                  >
-                    清空
-                  </Button>
-                </div>
-              </div>
-              <div className="permission-choice-grid">
-                {Object.entries(active.actions)
-                  .sort(([a], [b]) =>
-                    a === "view" ? -1 : b === "view" ? 1 : 0,
-                  )
-                  .map(([action, label]) => {
-                    const key = `${active.key}:${action}`;
-                    return (
-                      <Checkbox
-                        key={key}
-                        aria-label={`${active.name} - ${label}`}
-                        checked={value.includes(key)}
-                        disabled={!permissionDependencies(key).every(can)}
-                        onChange={(event) =>
-                          onChange?.(
-                            changePermission(
-                              value,
-                              key,
-                              event.target.checked,
-                              can,
-                            ),
-                          )
-                        }
-                      >
-                        {label}
-                        {[
-                          "grant",
-                          "sensitive",
-                          "assign",
-                          "reset",
-                          "publish",
-                          "export",
-                        ].includes(action) && <i className="permission-dot" />}
-                      </Checkbox>
-                    );
-                  })}
-              </div>
-              <p className="permission-picker-help">
-                <i className="permission-dot" />{" "}
-                敏感操作；选择操作时自动关联必要的查看权限。
-              </p>
-            </>
-          )}
-        </section>
+      <div className="permission-tree-body" ref={scrollArea}>
+        {data.length ? (
+          <Tree
+            aria-label="操作权限树"
+            checkable
+            checkStrictly
+            blockNode
+            selectedKeys={[]}
+            checkedKeys={{ checked, halfChecked }}
+            expandedKeys={expanded}
+            onExpand={(next) => setExpanded(next)}
+            switcherIcon={({ expanded: open }) =>
+              open ? <ChevronDown size={15} /> : <ChevronRight size={15} />
+            }
+            treeData={data}
+            onCheck={(_, info) => change(info.node.key, info.checked)}
+            onSelect={(_, info) => {
+              const key = info.node.key;
+              if (info.node.children?.length)
+                setExpanded((previous) =>
+                  previous.includes(key)
+                    ? previous.filter((item) => item !== key)
+                    : [...previous, key],
+                );
+              else if (!info.node.disableCheckbox)
+                change(key, !value.includes(String(key)));
+            }}
+          />
+        ) : (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="没有匹配的权限"
+          />
+        )}
       </div>
     </div>
   );

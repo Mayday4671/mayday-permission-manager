@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Alert, Button, Form, Input, Select, Switch, Tabs, Tag } from "antd";
+import {
+  Alert,
+  Button,
+  Form,
+  Input,
+  Select,
+  Switch,
+  Tabs,
+  Tag,
+  Tooltip,
+} from "antd";
 import { PermissionPicker } from "../components/PermissionPicker";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
@@ -130,19 +140,27 @@ export function RolesPage() {
         {
           title: "数据范围",
           width: 180,
-          render: (_, r) => (
-            <div className="scope-cell">
-              {scopedGroups.map((group) => (
-                <span key={group.key}>
-                  {group.name} ·{" "}
-                  {r.code === "admin" ||
-                  r.permissions.includes(`${group.key}:view`)
-                    ? scopeNames[r.dataScopes[group.key] ?? "SELF"]
-                    : "未授权"}
-                </span>
-              ))}
-            </div>
-          ),
+          ellipsis: true,
+          render: (_, r) => {
+            if (r.code === "admin") return "全部数据";
+            const scopes = scopedGroups
+              .filter((group) => r.permissions.includes(`${group.key}:view`))
+              .map(
+                (group) =>
+                  `${group.name} · ${scopeNames[r.dataScopes[group.key] ?? "SELF"]}`,
+              );
+            return scopes.length ? (
+              <Tooltip
+                title={scopes.map((scope) => (
+                  <div key={scope}>{scope}</div>
+                ))}
+              >
+                <span className="scope-cell">{scopes.join("；")}</span>
+              </Tooltip>
+            ) : (
+              <span className="muted">—</span>
+            );
+          },
         },
         {
           title: "状态",

@@ -1396,9 +1396,10 @@ code {
   font-size: 12px;
 }
 .scope-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--app-text-secondary);
   font-size: 12px;
 }

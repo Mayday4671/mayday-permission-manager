@@ -7,6 +7,7 @@ import {
 } from "react";
 import { Button, Space, type TableProps } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { DataTable } from "./DataTable";
 import { groupTableRows, type GroupedRow } from "../lib/table-model";
 
@@ -143,6 +144,27 @@ export function GroupedDataTable<T extends { id: string | number }>({
           onExpandedRowsChange: (keys) => setExpanded([...keys]),
           expandIconColumnIndex: 1,
           indentSize: 22,
+          expandIcon: ({ expanded: isExpanded, record, onExpand }) =>
+            record.children?.length ? (
+              <button
+                type="button"
+                className="table-tree-toggle"
+                aria-label={`${isExpanded ? "收起" : "展开"}${record.label}`}
+                aria-expanded={isExpanded}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onExpand(record, event);
+                }}
+              >
+                {isExpanded ? (
+                  <ChevronDown size={16} />
+                ) : (
+                  <ChevronRight size={16} />
+                )}
+              </button>
+            ) : (
+              <span className="table-tree-spacer" aria-hidden="true" />
+            ),
         }}
       />
     </>
