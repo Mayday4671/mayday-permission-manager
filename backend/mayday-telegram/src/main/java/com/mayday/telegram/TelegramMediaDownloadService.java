@@ -514,7 +514,7 @@ public class TelegramMediaDownloadService
             TelegramMedia selected = new TelegramMedia();
             selected.setId(row.getId());
             selected.setTelegramFileId(rendition.fileId());
-            return TelegramRemoteVideoStream.response(sessions.requireMediaClient(row.getOwnerId()), selected,
+            return TelegramRemoteMediaStream.response(sessions.requireMediaClient(row.getOwnerId()), selected,
                     rangeHeader, false);
         }
         return streamContent(row, rangeHeader, download);
@@ -583,9 +583,9 @@ public class TelegramMediaDownloadService
             TelegramCollectionTask task = tasks.findById(row.getTaskId()).orElse(null);
             if (task == null || !Boolean.TRUE.equals(task.getPreviewOnly()) || "CANCELLED".equals(task.getStatus())
                     || row.getTelegramFileId() == null || row.getTelegramFileId() <= 0
-                    || !List.of("VIDEO", "ANIMATION", "DOCUMENT").contains(row.getKind()))
+                    || !List.of("PHOTO", "VIDEO", "ANIMATION", "DOCUMENT", "AUDIO", "VOICE").contains(row.getKind()))
             {
-                throw new AccessDeniedException("视频预览来源已失效，请重新读取原消息");
+                throw new AccessDeniedException("附件预览来源已失效，请重新读取原消息");
             }
         }
     }
@@ -631,9 +631,9 @@ public class TelegramMediaDownloadService
                 {
                     Thread.currentThread().interrupt();
                 }
-                throw new BusinessException("无法定位原视频，请检查账号连接或重新读取原消息");
+                throw new BusinessException("无法定位原附件，请检查账号连接或重新读取原消息");
             }
-            return TelegramRemoteVideoStream.response(client, row, rangeHeader, download);
+            return TelegramRemoteMediaStream.response(client, row, rangeHeader, download);
         }
         try
         {

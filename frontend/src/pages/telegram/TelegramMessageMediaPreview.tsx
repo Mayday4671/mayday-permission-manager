@@ -513,7 +513,12 @@ export function TelegramInlineMediaItem({
       api(`/telegram/media/${attachment.id}/retry`, { method: "POST" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["telegram"] }),
   });
-  if (attachment.mediaType?.startsWith("image/"))
+  if (
+    attachment.kind === "PHOTO" ||
+    attachment.mediaType?.startsWith("image/") ||
+    (attachment.kind === "DOCUMENT" &&
+      /\.(jpe?g|png|webp|gif)$/i.test(attachment.fileName ?? ""))
+  )
     return <TelegramInlineImage attachment={attachment} />;
   if (!playbackMode)
     return (

@@ -58,7 +58,9 @@ public class TelegramMediaQueueService
                 row.setFileName(text(item, "fileName"));
                 row.setExpectedSize(expectedSize);
                 row.setAttemptCount(0);
-                if (Boolean.TRUE.equals(task.getPreviewOnly()) && remoteVideo(kind, row.getFileName()))
+                // Preview records describe remote attachments; no format may implicitly
+                // enqueue a full download. Conversion or collection must be explicit.
+                if (Boolean.TRUE.equals(task.getPreviewOnly()))
                 {
                     row.setStatus("REMOTE");
                 } else if (settings.getConfiguredMaxMediaFileBytes() > 0
@@ -84,18 +86,6 @@ public class TelegramMediaQueueService
     {
         return Boolean.TRUE.equals(task.getDownloadImages()) || Boolean.TRUE.equals(task.getDownloadVideos())
                 || Boolean.TRUE.equals(task.getDownloadDocuments());
-    }
-
-    /**
-     * Filename/kind only selects a player; the stream endpoint verifies the actual
-     * header.
-     */
-    private boolean remoteVideo(String kind, String fileName)
-    {
-        return ("VIDEO".equals(kind) || "ANIMATION".equals(kind))
-                && (fileName == null || !fileName.toLowerCase(java.util.Locale.ROOT).matches(".*\\.(mkv|mov)$"))
-                || "DOCUMENT".equals(kind) && fileName != null
-                        && fileName.toLowerCase(java.util.Locale.ROOT).matches(".*\\.(mp4|m4v|webm)$");
     }
 
     private boolean isSelected(TelegramCollectionTask task, String kind)

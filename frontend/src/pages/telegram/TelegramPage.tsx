@@ -681,6 +681,10 @@ export function TelegramPage() {
   const [resultCollections, setResultCollections] = useState<
     Record<string, TelegramCollectionTask>
   >({});
+  // A preview never satisfies an explicit request to collect the same source.
+  const [resultPreviews, setResultPreviews] = useState<
+    Record<string, TelegramCollectionTask>
+  >({});
   const [collectingResult, setCollectingResult] = useState<string | null>(null);
   // The ref also blocks a second click before React has rendered the pending state.
   const resultCollectionInFlight = useRef(false);
@@ -1106,7 +1110,7 @@ export function TelegramPage() {
         }),
       }),
     onSuccess: (task, link, generation) => {
-      setResultCollections((current) => ({ ...current, [link]: task }));
+      setResultPreviews((current) => ({ ...current, [link]: task }));
       void queryClient.invalidateQueries({
         queryKey: ["telegram", "collections"],
       });
@@ -1211,7 +1215,7 @@ export function TelegramPage() {
     ) {
       return;
     }
-    const existingTask = resultCollections[link];
+    const existingTask = resultPreviews[link];
     if (existingTask) {
       setInlineMediaPreview({ taskId: existingTask.id, messageLink: link });
       return;
@@ -1270,6 +1274,11 @@ export function TelegramPage() {
     onSuccess: async (_, id) => {
       if (selectedCollection?.id === id) setSelectedCollection(null);
       setResultCollections((current) =>
+        Object.fromEntries(
+          Object.entries(current).filter(([, task]) => task.id !== id),
+        ),
+      );
+      setResultPreviews((current) =>
         Object.fromEntries(
           Object.entries(current).filter(([, task]) => task.id !== id),
         ),

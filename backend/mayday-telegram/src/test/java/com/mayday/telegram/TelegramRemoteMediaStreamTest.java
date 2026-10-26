@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
  * Verifies real response bodies, seeking, bounded memory and preview/collection
  * separation.
  */
-class TelegramRemoteVideoStreamTest
+class TelegramRemoteMediaStreamTest
 {
     private static final long SIZE = 4L * 1024 * 1024 * 1024;
     private final TelegramSessionClient client = mock(TelegramSessionClient.class);
@@ -40,7 +40,7 @@ class TelegramRemoteVideoStreamTest
         when(client.readFileRange(eq(5), anyLong(), anyInt())).thenAnswer(call -> {
             long offset = call.getArgument(1);
             int count = call.getArgument(2);
-            assertThat(count).isBetween(1, TelegramRemoteVideoStream.CHUNK_BYTES);
+            assertThat(count).isBetween(1, TelegramRemoteMediaStream.CHUNK_BYTES);
             byte[] bytes = new byte[count];
             for (int index = 0; index < count; index++)
             {
@@ -60,7 +60,7 @@ class TelegramRemoteVideoStreamTest
     @Test
     void openEndedRangeStartsPlaybackWithoutReadingFourGiB() throws IOException
     {
-        var response = TelegramRemoteVideoStream.response(client, media, "bytes=0-", false);
+        var response = TelegramRemoteMediaStream.response(client, media, "bytes=0-", false);
         assertThat(response.getStatusCode().value()).isEqualTo(206);
         assertThat(response.getHeaders().getFirst("Content-Range")).isEqualTo("bytes 0-1048575/4294967296");
         assertThat(response.getHeaders().getContentLength()).isEqualTo(1024 * 1024);
@@ -76,7 +76,7 @@ class TelegramRemoteVideoStreamTest
     @Test
     void tailRangeReadsOnlyRequestedBytesAboveTwoGiB() throws IOException
     {
-        var response = TelegramRemoteVideoStream.response(client, media, "bytes=-64", false);
+        var response = TelegramRemoteMediaStream.response(client, media, "bytes=-64", false);
         assertThat(response.getHeaders().getFirst("Content-Range")).isEqualTo("bytes 4294967232-4294967295/4294967296");
         try (var body = response.getBody().getInputStream())
         {
@@ -91,10 +91,10 @@ class TelegramRemoteVideoStreamTest
     void invalidRangeDoesNotFetchAnyBodyAndClosingStopsAdditionalReads() throws IOException
     {
         assertThat(
-                TelegramRemoteVideoStream.response(client, media, "bytes=4294967296-", false).getStatusCode().value())
+                TelegramRemoteMediaStream.response(client, media, "bytes=4294967296-", false).getStatusCode().value())
                 .isEqualTo(416);
         verify(client, never()).readFileRange(anyInt(), anyLong(), anyInt());
-        var response = TelegramRemoteVideoStream.response(client, media, null, true);
+        var response = TelegramRemoteMediaStream.response(client, media, null, true);
         assertThat(response.getHeaders().getContentLength()).isEqualTo(SIZE);
         var body = response.getBody().getInputStream();
         body.readNBytes(20);
@@ -107,8 +107,69 @@ class TelegramRemoteVideoStreamTest
     @Test
     void rejectsFakeVideoHeaders()
     {
-        assertThatThrownBy(() -> TelegramRemoteVideoStream.nativeType("<html>unsafe</html>".getBytes()))
+        assertThatThrownBy(() -> TelegramRemoteMediaStream.nativeType("<html>unsafe</html>".getBytes()))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void photoPreviewStreamsOnlyRequestedFileWithoutArchiving() throws IOException
+    {
+        when(client.fileSize(5)).thenReturn(CompletableFuture.completedFuture(32L));
+        when(client.readFileRange(eq(5), anyLong(), anyInt())).thenAnswer(call -> {
+            byte[] bytes = new byte[(int) call.getArgument(2)];
+            bytes[0] = (byte) 255;
+            bytes[1] = (byte) 216;
+            bytes[2] = (byte) 255;
+            return CompletableFuture.completedFuture(bytes);
+        });
+        var response = TelegramRemoteMediaStream.response(client, media, null, false);
+        assertThat(response.getHeaders().getContentType().toString()).isEqualTo("image/jpeg");
+        assertThat(response.getHeaders().getContentDisposition().getType()).isEqualTo("inline");
+        assertThat(response.getHeaders().getContentDisposition().getFilename()).endsWith(".jpg");
+        try (var body = response.getBody().getInputStream())
+        {
+            assertThat(body.readAllBytes()).hasSize(32);
+        }
+        verify(client, never()).downloadFile(anyInt(), anyLong());
+    }
+
+    @Test
+    void unknownFilesOnlyAllowExplicitAttachmentDownload()
+    {
+        when(client.readFileRange(5, 0, 16))
+                .thenReturn(CompletableFuture.completedFuture("<html>unsafe</h>".getBytes()));
+        assertThatThrownBy(() -> TelegramRemoteMediaStream.response(client, media, null, false))
+                .isInstanceOf(BusinessException.class);
+        // A valid-length unknown header cannot become active inline HTML.
+        when(client.readFileRange(5, 0, 16)).thenReturn(CompletableFuture.completedFuture(new byte[16]));
+        var response = TelegramRemoteMediaStream.response(client, media, null, true);
+        assertThat(response.getHeaders().getContentType().toString()).isEqualTo("application/octet-stream");
+        assertThat(response.getHeaders().getContentDisposition().getType()).isEqualTo("attachment");
+    }
+
+    @Test
+    void previewPhotosAndOtherFormatsNeverEnterAutomaticDownloadQueue()
+    {
+        TelegramMediaMapper mapper = mock(TelegramMediaMapper.class);
+        TelegramMediaQueueService queue = new TelegramMediaQueueService(mapper, JsonMapper.builder().build(),
+                new TelegramSettings());
+        TelegramCollectionTask task = new TelegramCollectionTask();
+        task.setPreviewOnly(true);
+        task.setDownloadImages(true);
+        task.setDownloadVideos(true);
+        task.setDownloadDocuments(true);
+        TelegramCollectedMessage message = new TelegramCollectedMessage();
+        message.setCanBeSaved(true);
+        message.setMetadataJson("""
+                [{"kind":"PHOTO","tdFileId":1,"expectedSize":1000},
+                 {"kind":"PHOTO","tdFileId":2,"expectedSize":2000},
+                 {"kind":"VIDEO","tdFileId":3,"fileName":"movie.mkv"},
+                 {"kind":"DOCUMENT","tdFileId":4,"fileName":"guide.pdf"},
+                 {"kind":"AUDIO","tdFileId":5,"fileName":"music.mp3"}]
+                """);
+        queue.enqueue(task, message);
+        verify(mapper, org.mockito.Mockito.times(5)).save(org.mockito.ArgumentMatchers
+                .argThat(row -> "REMOTE".equals(row.getStatus()) && row.getStorageKey() == null));
     }
 
     @Test

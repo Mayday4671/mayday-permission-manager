@@ -18,11 +18,11 @@ import org.springframework.http.ResponseEntity;
  * end of a large file can be fetched independently, without staging the entire
  * video.
  */
-final class TelegramRemoteVideoStream
+final class TelegramRemoteMediaStream
 {
     static final int CHUNK_BYTES = 1024 * 1024;
 
-    private TelegramRemoteVideoStream()
+    private TelegramRemoteMediaStream()
     {
     }
 
@@ -41,7 +41,7 @@ final class TelegramRemoteVideoStream
             {
                 Thread.currentThread().interrupt();
             }
-            throw new BusinessException("无法读取视频信息，请检查 Telegram 连接后重试");
+            throw new BusinessException("无法读取附件信息，请检查 Telegram 连接后重试");
         }
         TelegramByteRange range = rangeHeader == null ? null : TelegramByteRange.parse(rangeHeader, size);
         if (rangeHeader != null && range == null)
@@ -50,7 +50,16 @@ final class TelegramRemoteVideoStream
                     .header(HttpHeaders.ACCEPT_RANGES, "bytes").cacheControl(CacheControl.noStore()).build();
         }
         byte[] header = read(client, fileId, 0, (int) Math.min(size, 16));
-        String type = nativeType(header);
+        String type;
+        try
+        {
+            type = nativeType(header);
+        } catch (BusinessException exception)
+        {
+            if (!download)
+                throw exception;
+            type = "application/octet-stream";
+        }
         long start = range == null ? 0 : range.start();
         // A partial response may return a smaller window than requested. Browsers
         // request subsequent windows as playback advances, keeping requests bounded.
@@ -63,9 +72,7 @@ final class TelegramRemoteVideoStream
                 .header("Content-Security-Policy", "default-src 'none'; sandbox")
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         (download ? ContentDisposition.attachment() : ContentDisposition.inline())
-                                .filename("telegram-" + media.getId() + ("video/mp4".equals(type) ? ".mp4" : ".webm"),
-                                        StandardCharsets.UTF_8)
-                                .build().toString());
+                                .filename(fileName(media, type), StandardCharsets.UTF_8).build().toString());
         if (range != null)
         {
             response.header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + size);
@@ -79,6 +86,25 @@ final class TelegramRemoteVideoStream
      */
     static String nativeType(byte[] header)
     {
+        if (header.length >= 3 && (header[0] & 255) == 255 && (header[1] & 255) == 216 && (header[2] & 255) == 255)
+        {
+            return "image/jpeg";
+        }
+        if (header.length >= 8 && header[0] == (byte) 137 && header[1] == 80 && header[2] == 78 && header[3] == 71
+                && header[4] == 13 && header[5] == 10 && header[6] == 26 && header[7] == 10)
+        {
+            return "image/png";
+        }
+        if (header.length >= 12 && header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F'
+                && header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P')
+        {
+            return "image/webp";
+        }
+        if (header.length >= 6 && (new String(header, 0, 6, StandardCharsets.US_ASCII).equals("GIF87a")
+                || new String(header, 0, 6, StandardCharsets.US_ASCII).equals("GIF89a")))
+        {
+            return "image/gif";
+        }
         if (header.length >= 12 && header[4] == 'f' && header[5] == 't' && header[6] == 'y' && header[7] == 'p')
         {
             return "video/mp4";
@@ -88,7 +114,27 @@ final class TelegramRemoteVideoStream
         {
             return "video/webm";
         }
-        throw new BusinessException("此附件不是浏览器支持的视频容器，请使用兼容转换");
+        throw new BusinessException("此附件不支持直接预览；可下载文件，视频可手动转换兼容格式");
+    }
+
+    private static String fileName(TelegramMedia media, String type)
+    {
+        if (media.getFileName() != null && !media.getFileName().isBlank())
+        {
+            String name = media.getFileName().replace('\\', '/');
+            return name.substring(name.lastIndexOf('/') + 1).replaceAll("[\\p{Cntrl}]", "_");
+        }
+        String extension = switch (type)
+        {
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "image/gif" -> ".gif";
+            case "video/mp4" -> ".mp4";
+            case "video/webm" -> ".webm";
+            default -> ".bin";
+        };
+        return "telegram-" + media.getId() + extension;
     }
 
     private static byte[] read(TelegramSessionClient client, int fileId, long offset, int count)
@@ -107,7 +153,7 @@ final class TelegramRemoteVideoStream
             {
                 Thread.currentThread().interrupt();
             }
-            throw new BusinessException("视频分段加载失败，请检查 Telegram 连接后重新加载");
+            throw new BusinessException("附件分段加载失败，请检查 Telegram 连接后重新加载");
         }
     }
 
@@ -160,7 +206,7 @@ final class TelegramRemoteVideoStream
             {
                 try
                 {
-                    buffer = TelegramRemoteVideoStream.read(client, fileId, position,
+                    buffer = TelegramRemoteMediaStream.read(client, fileId, position,
                             (int) Math.min(CHUNK_BYTES, end - position));
                     cursor = 0;
                 } catch (BusinessException exception)

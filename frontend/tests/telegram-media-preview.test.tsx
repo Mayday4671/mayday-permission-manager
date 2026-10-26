@@ -110,6 +110,83 @@ afterEach(() => {
 });
 after(() => dom.window.close());
 
+test("远程相册只读取当前图片，不批量下载或创建播放票据", async () => {
+  const contentRequests: string[] = [];
+  URL.createObjectURL = () => "blob:remote-photo";
+  URL.revokeObjectURL = () => {};
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/collections/4")) return reply({ status: "COMPLETED" });
+    if (url.includes("/messages?"))
+      return reply({
+        items: [
+          row([{ ...media("REMOTE"), mediaType: null }]),
+          {
+            ...row([
+              {
+                ...media("REMOTE"),
+                id: 10,
+                mediaType: null,
+                contentUrl: "/api/telegram/media/10/content",
+              },
+            ]),
+            id: 2,
+          },
+        ],
+      });
+    if (url.endsWith("/thumbnail"))
+      return new Response("thumbnail", {
+        headers: { "Content-Type": "image/jpeg" },
+      });
+    assert(
+      url.endsWith("/content"),
+      `Unexpected download/stream request: ${url}`,
+    );
+    contentRequests.push(url);
+    return new Response("photo", { headers: { "Content-Type": "image/jpeg" } });
+  };
+  mount(modal());
+  await waitFor(() => assert.equal(contentRequests.length, 1));
+  assert.equal(contentRequests[0], "/api/telegram/media/9/content");
+  assert.equal(screen.queryByText(/正在下载/), null);
+  fireEvent.click(screen.getByRole("button", { name: "下一个附件" }));
+  await waitFor(() => assert.equal(contentRequests.length, 2));
+  assert.equal(contentRequests[1], "/api/telegram/media/10/content");
+});
+
+test("远程普通文件和不兼容视频不会在预览时自动下载", async () => {
+  let requests = 0;
+  globalThis.fetch = async () => {
+    requests++;
+    throw new Error("Unexpected automatic download");
+  };
+  const view = mount(
+    <TelegramInlineMediaItem
+      attachment={{
+        ...media("REMOTE"),
+        kind: "DOCUMENT",
+        fileName: "guide.pdf",
+        mediaType: null,
+      }}
+    />,
+  );
+  assert(screen.getByText("guide.pdf"));
+  view.rerender(
+    <QueryClientProvider client={client}>
+      <TelegramInlineMediaItem
+        attachment={{
+          ...media("REMOTE"),
+          kind: "VIDEO",
+          fileName: "movie.mkv",
+          mediaType: null,
+        }}
+      />
+    </QueryClientProvider>,
+  );
+  assert(screen.getByRole("button", { name: "缓存完整视频以转换格式" }));
+  assert.equal(requests, 0);
+});
+
 test("下载图片、视频和普通文件均携带凭证，完整读取后保留正确文件名", async () => {
   tokenStore.set("download-session");
   const saved: string[] = [];

@@ -15,7 +15,14 @@ export function telegramVideoPreviewMode(
 ): "native" | "conversion" | null {
   if (!VIDEO_KINDS.has(attachment.kind)) return null;
   // Remote preview is opt-in server state; the stream validates binary headers before serving it.
-  if (attachment.status === "REMOTE") return "native";
+  if (attachment.status === "REMOTE") {
+    const fileName = attachment.fileName ?? "";
+    if (/\.(?:mkv|mov)$/i.test(fileName)) return "conversion";
+    return attachment.kind !== "DOCUMENT" ||
+      /\.(?:mp4|m4v|webm)$/i.test(fileName)
+      ? "native"
+      : null;
+  }
   const type = (attachment.mediaType ?? "").trim().toLowerCase();
   const supported =
     VIDEO_TYPES.has(type) ||
