@@ -39,6 +39,7 @@ import {
   LogoutOutlined,
   MessageOutlined,
   NotificationOutlined,
+  OrderedListOutlined,
   PictureOutlined,
   ReloadOutlined,
   RightOutlined,
@@ -432,6 +433,7 @@ function callbackButtonLabel(text: string): string {
   const type = resourceTypeFromButton(text);
   if (!type) {
     if (/最新|\bnewest?\b/i.test(text)) return "最新";
+    if (/综合/.test(text)) return "综合";
     if (/过滤|\bfilter\b/i.test(text)) return "过滤";
     if (/时长/.test(text)) return "时长";
     if (/下一页|\bnext\b|^➡\uFE0F?$/i.test(text.trim())) return "下一页";
@@ -454,6 +456,7 @@ function callbackButtonIcon(text: string): ReactNode {
 
   if (/最新|\bnewest?\b/i.test(text)) return <ClockCircleOutlined />;
   if (/时长/.test(text)) return <ClockCircleOutlined />;
+  if (/综合/.test(text)) return <OrderedListOutlined />;
   if (/^🔄\uFE0F?$/.test(text.trim())) return <ReloadOutlined />;
   if (/过滤|\bfilter\b/i.test(text)) return <FilterOutlined />;
   if (callbackButtonLabel(text) === "下一页") return <RightOutlined />;
@@ -2237,7 +2240,9 @@ export function TelegramPage() {
                                     title={
                                       selectedType
                                         ? `筛选这条回复中的${callbackButtonLabel(button.text)}`
-                                        : undefined
+                                        : /最新|综合|时长/.test(button.text)
+                                          ? `切换为${callbackButtonLabel(button.text)}排序`
+                                          : undefined
                                     }
                                     size="small"
                                     aria-label={callbackButtonLabel(
