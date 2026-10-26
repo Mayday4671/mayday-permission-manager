@@ -19,7 +19,10 @@ import com.mayday.system.mapper.UserMapper;
 import com.mayday.system.model.SysUser;
 import com.mayday.telegram.mapper.TelegramAccountMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +38,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TelegramSessionCoordinator
 {
     private final TelegramSettings settings;
@@ -52,6 +56,48 @@ public class TelegramSessionCoordinator
     private volatile String liveMessage;
     private FileChannel lockChannel;
     private FileLock sessionLock;
+
+    /**
+     * 服务就绪后恢复已有授权，不依赖浏览器请求；未授权、已退出或所有者失权的账号不会自动连接。
+     * 恢复失败仅记录脱敏诊断，保留页面手动重试入口，不影响其他模块启动。
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void restoreOnStartup()
+    {
+        if (!modules.isEnabled("telegram") || !settings.credentialsConfigured()
+                || !settings.sessionEncryptionKeyConfigured() || !settings.proxyConfigurationReady())
+        {
+            return;
+        }
+        synchronized (mutex)
+        {
+            if (client != null)
+            {
+                return;
+            }
+            try
+            {
+                TelegramAccount account = accounts.findPrimary().orElse(null);
+                if (account == null || account.getTelegramUserId() == null
+                        || parseStoredState(account.getAuthorizationState()) == TelegramAuthorizationState.LOGGED_OUT)
+                {
+                    return;
+                }
+                SysUser owner = users.findById(account.getOwnerId()).orElse(null);
+                if (owner == null || !access.hasFor(owner, "telegram:connect")
+                        || !access.hasFor(owner, "telegram:view"))
+                {
+                    return;
+                }
+                openSession(account);
+                log.info("Telegram saved authorization is reconnecting automatically");
+            } catch (RuntimeException exception)
+            {
+                log.warn("Telegram automatic reconnect failed: {}",
+                        TelegramCallbackFeedback.diagnosticLabel(exception));
+            }
+        }
+    }
 
     /**
      * Runs a configuration update under the same lock used by connection startup,
@@ -148,21 +194,32 @@ public class TelegramSessionCoordinator
                 return status();
             }
             TelegramAccount account = claimOrLoadAccount();
-            acquireSessionLock();
+            openSession(account);
+            return status();
+        }
+    }
+
+    /** 启动入口共享同一进程锁、目录锁和状态写入；调用方必须持有 mutex 并完成对应授权检查。 */
+    private void openSession(TelegramAccount account)
+    {
+        acquireSessionLock();
+        try
+        {
+            liveMessage = null;
+            liveState = TelegramAuthorizationState.INITIALIZING;
+            updateAccount(account, liveState, account.getMaskedPhoneNumber(), account.getTelegramUserId());
+            client = clientProvider.open(sessionDirectory(), settings, this::onSessionUpdate, this::onMessageSnapshot);
+        } catch (RuntimeException exception)
+        {
+            liveState = TelegramAuthorizationState.ERROR;
             try
             {
-                liveState = TelegramAuthorizationState.INITIALIZING;
                 updateAccount(account, liveState, account.getMaskedPhoneNumber(), account.getTelegramUserId());
-                client = clientProvider.open(sessionDirectory(), settings, this::onSessionUpdate,
-                        this::onMessageSnapshot);
-                return status();
-            } catch (RuntimeException exception)
+            } finally
             {
-                liveState = TelegramAuthorizationState.ERROR;
-                updateAccount(account, liveState, account.getMaskedPhoneNumber(), account.getTelegramUserId());
                 releaseSessionLock();
-                throw new BusinessException("Telegram 客户端未能启动，请检查 TDLib 运行环境和会话目录权限");
             }
+            throw new BusinessException("Telegram 客户端未能启动，请检查 TDLib 运行环境和会话目录权限");
         }
     }
 
