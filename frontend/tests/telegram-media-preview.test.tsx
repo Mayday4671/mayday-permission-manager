@@ -844,7 +844,7 @@ test("切换真实清晰度选项保留进度、倍速、音量和全屏，不�
     resumed++;
   };
   fireEvent.loadedMetadata(video);
-  fireEvent.click(screen.getByRole("menuitemradio", { name: "720p" }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "720p · H264" }));
   assert(
     document
       .querySelector("video")!
@@ -863,13 +863,15 @@ test("切换真实清晰度选项保留进度、倍速、音量和全屏，不�
   assert.equal(resumed, 1);
   fireEvent.click(screen.getByRole("button", { name: "网页全屏" }));
   fireEvent.click(screen.getByRole("button", { name: "视频清晰度" }));
-  fireEvent.click(screen.getByRole("menuitemradio", { name: "原画 · 1080p" }));
+  fireEvent.click(
+    screen.getByRole("menuitemradio", { name: "源文件 · 1080p" }),
+  );
   assert(!video.src.includes("quality="));
   assert(document.querySelector(".is-web-fullscreen"));
   assert.equal(tickets, 1);
 });
 
-test("仅原画时不虚列清晰度，读取失败可独立重试且原视频继续可播放", async () => {
+test("仅源文件时不虚列清晰度，读取失败可独立重试且原视频继续可播放", async () => {
   let calls = 0;
   globalThis.fetch = async (input) => {
     if (String(input).endsWith("/video-qualities")) {
@@ -894,7 +896,7 @@ test("仅原画时不虚列清晰度，读取失败可独立重试且原视频�
   );
   fireEvent.click(await screen.findByRole("button", { name: "视频清晰度" }));
   assert.equal(screen.getAllByRole("menuitemradio").length, 1);
-  assert(screen.getByRole("menuitemradio", { name: "原画 · 1080p" }));
+  assert(screen.getByRole("menuitemradio", { name: "源文件 · 1080p" }));
   assert.equal(
     document.querySelector("video")?.getAttribute("src"),
     "/api/telegram/media/9/stream?ticket=test",

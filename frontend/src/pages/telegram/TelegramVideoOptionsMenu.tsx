@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 interface Option {
   value: string;
   label: string;
+  description?: string;
 }
 
 /** A player-local menu stays visible in native fullscreen and supports keyboard navigation. */
@@ -96,6 +97,8 @@ export function TelegramVideoOptionsMenu({
               type="button"
               key={option.value}
               role="menuitemradio"
+              aria-label={option.label}
+              aria-description={option.description}
               aria-checked={value === option.value}
               onClick={() => {
                 onChange(option.value);
@@ -105,7 +108,12 @@ export function TelegramVideoOptionsMenu({
                   ?.focus();
               }}
             >
-              {option.label}
+              <span className="telegram-video-option-text">
+                <span>{option.label}</span>
+                {option.description ? (
+                  <small>{option.description}</small>
+                ) : null}
+              </span>
               {value === option.value ? <Check size={14} /> : null}
             </button>
           ))}

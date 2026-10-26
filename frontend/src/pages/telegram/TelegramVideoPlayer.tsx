@@ -16,6 +16,11 @@ import {
 
 import { TelegramVideoOptionsMenu } from "./TelegramVideoOptionsMenu";
 import type { TelegramVideoQuality } from "./telegram-media-types";
+import {
+  videoQualityOptions,
+  videoResolution,
+  type VideoDimensions,
+} from "./telegram-video-quality";
 
 type Props = Omit<VideoHTMLAttributes<HTMLVideoElement>, "ref"> & {
   videoRef?: RefObject<HTMLVideoElement | null>;
@@ -90,30 +95,14 @@ export function TelegramVideoPlayer({
   const [webFullscreen, setWebFullscreen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [notice, setNotice] = useState<string>();
-  const qualityOptions = (qualities ?? []).map((item) => {
-    const pixels = Math.min(item.width, item.height);
-    const size = pixels > 0 ? `${pixels}p` : "";
-    const duplicate = (qualities ?? []).some(
-      (other) =>
-        other.id !== item.id &&
-        other.id !== "original" &&
-        Math.min(other.width, other.height) === pixels,
-    );
-    return {
-      value: item.id,
-      label:
-        item.id === "original"
-          ? `原画${size ? ` · ${size}` : ""}`
-          : `${size}${duplicate && item.codec ? ` · ${item.codec.toUpperCase()}` : ""}`,
-    };
-  });
+  const [measured, setMeasured] = useState<Record<string, VideoDimensions>>({});
+  const qualityOptions = videoQualityOptions(qualities ?? [], measured);
   const currentQuality = qualities?.find((item) => item.id === quality);
+  const currentDimensions = measured[quality] ?? currentQuality;
   const qualityLabel =
-    quality === "original"
-      ? "原画"
-      : currentQuality
-        ? `${Math.min(currentQuality.width, currentQuality.height)}p`
-        : "画质";
+    currentDimensions && videoResolution(currentDimensions) !== "分辨率未知"
+      ? videoResolution(currentDimensions)
+      : "画质";
   const canSeek = Number.isFinite(duration) && duration > 0;
   const elapsed = seekPreview ?? position;
   const showControls =
@@ -130,6 +119,20 @@ export function TelegramVideoPlayer({
     if (playing && !rateMenu && !qualityMenu && !interacting && !keyboardFocus)
       idleTimer.current = setTimeout(() => setControlsVisible(false), 2500);
   }, [playing, rateMenu, qualityMenu, interacting, keyboardFocus]);
+  useEffect(() => {
+    const element = container.current;
+    if (!element) return;
+    // 菜单保留在画面内；手机和网页全屏切换时不能被播放器边界裁掉。
+    const resize = () =>
+      element.style.setProperty(
+        "--video-menu-height",
+        `${Math.max(60, element.clientHeight - 90)}px`,
+      );
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     revealControls();
     return () => clearTimeout(idleTimer.current);
@@ -286,6 +289,15 @@ export function TelegramVideoPlayer({
         onLoadedMetadata={(event) => {
           onLoadedMetadata?.(event);
           const element = event.currentTarget;
+          // Telegram 的源尺寸由发送者填写，已加载文件以浏览器解析出的尺寸校正。
+          if (element.videoWidth > 0 && element.videoHeight > 0)
+            setMeasured((previous) => ({
+              ...previous,
+              [quality]: {
+                width: element.videoWidth,
+                height: element.videoHeight,
+              },
+            }));
           const saved = qualityRestore.current;
           if (saved) {
             element.currentTime = Number.isFinite(element.duration)
